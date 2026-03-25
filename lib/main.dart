@@ -1,6 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -36,6 +40,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -57,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _login() {
+  Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -73,15 +78,45 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (password.length < 6) {
-      _showSnackBar('La contraseña debe tener al menos 6 caracteres', isError: true);
+      _showSnackBar('La contraseña debe tener al menos 6 caracteres',
+          isError: true);
       return;
     }
 
-    // Si todas las validaciones pasan
-    _showSnackBar('Iniciando sesión...');
-    print('Email: $email');
-    print('Password: $password');
-    // Aquí iría la lógica de autenticación con Firebase
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      _showSnackBar('Inicio de sesión exitoso');
+
+      // TODO: Navegar a la pantalla de Home
+      // Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen()));
+
+    } on FirebaseAuthException catch (e) {
+      String message;
+      if (e.code == 'user-not-found') {
+        message = 'No se encontró un usuario con ese correo.';
+      } else if (e.code == 'wrong-password') {
+        message = 'La contraseña es incorrecta.';
+      } else {
+        message = 'Ocurrió un error. Inténtalo de nuevo.';
+      }
+      _showSnackBar(message, isError: true);
+    } catch (e) {
+      _showSnackBar('Ocurrió un error inesperado.', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -144,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: _login,
+                onPressed: _isLoading ? null : _login,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE31B23),
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -152,14 +187,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'INGRESAR',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : const Text(
+                        'INGRESAR',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
               const SizedBox(height: 24),
             ],

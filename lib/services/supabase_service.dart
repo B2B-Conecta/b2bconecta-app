@@ -52,10 +52,16 @@ class SupabaseService {
     await _client.from('profiles').upsert(payload);
   }
 
+  /// Número total de filas en `products` (respeta RLS del usuario).
+  static Future<int> fetchProductsCount() async {
+    final n = await _client.from('products').count(CountOption.exact);
+    return n;
+  }
+
   /// Obtiene repuestos desde [products] con paginacion.
   /// Incluye nombre del importador vía FK `owner_id` → `profiles`.
   static Future<List<PartModel>> fetchParts({
-    int limit = 5,
+    int limit = 6,
     int offset = 0,
   }) async {
     final response = await _client

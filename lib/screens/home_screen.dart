@@ -14,16 +14,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const int _kPageSize = 5;
+  /// 2 filas × 3 columnas por bloque de carga.
+  static const int _kCrossAxisCount = 3;
+  static const int _kPageSize = _kCrossAxisCount * 2;
   late Future<List<PartModel>> _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
   bool _hasMoreProducts = true;
   bool _isLoadingMore = false;
+  int? _catalogTotal;
 
   @override
   void initState() {
     super.initState();
     _partsFuture = _fetchProducts(reset: true);
+    _refreshCatalogTotal();
+  }
+
+  Future<void> _refreshCatalogTotal() async {
+    try {
+      final n = await SupabaseService.fetchProductsCount();
+      if (!mounted) return;
+      setState(() => _catalogTotal = n);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _catalogTotal = null);
+    }
   }
 
   Future<List<PartModel>> _fetchProducts({required bool reset}) async {
@@ -117,7 +132,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  'Muestra: ${_loadedParts.length}',
+                  _catalogTotal != null
+                      ? 'Mostrando ${_loadedParts.length} de $_catalogTotal'
+                      : 'Mostrando ${_loadedParts.length}',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey.shade600,
@@ -130,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(
-              'Se cargan 5 productos por bloque.',
+              'Se cargan 6 productos por bloque (2 filas × 3 columnas).',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
@@ -189,14 +206,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Column(
                   children: [
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: parts.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final part = parts[index];
-                          return _PartCard(part: part);
-                        },
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 720),
+                          child: GridView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: _kCrossAxisCount,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              // Ancho/alto de celda: valor más bajo = más altura (evita overflow del texto).
+                              childAspectRatio: 0.62,
+                            ),
+                            itemCount: parts.length,
+                            itemBuilder: (context, index) {
+                              return _ProductGridCard(part: parts[index]);
+                            },
+                          ),
+                        ),
                       ),
                     ),
                     if (_hasMoreProducts)
@@ -242,8 +273,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _PartCard extends StatelessWidget {
-  const _PartCard({required this.part});
+/// Tarjeta compacta para rejilla 3×N (centrada en el catálogo).
+class _ProductGridCard extends StatelessWidget {
+  const _ProductGridCard({required this.part});
 
   final PartModel part;
 
@@ -251,108 +283,102 @@ class _PartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      elevation: 2,
+      elevation: 1.5,
       shadowColor: Colors.black12,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 108,
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
-                      ? Image.network(
-                          part.imagenUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _placeholder(),
-                        )
-                      : _placeholder(),
-                ),
+            Expanded(
+              flex: 4,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
+                    ? Image.network(
+                        part.imagenUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (_, __, ___) => _placeholder(),
+                      )
+                    : _placeholder(),
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(height: 4),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    part.nombre,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  if (part.ownerBusinessName != null &&
-                      part.ownerBusinessName!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+              flex: 5,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.bottomLeft,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'Importador: ${part.ownerBusinessName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                  ] else if (part.ownerId != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Importador (sin nombre en catálogo)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                  if (part.descripcion != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      part.descripcion!,
+                      part.nombre,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    if (part.ownerBusinessName != null &&
+                        part.ownerBusinessName!.isNotEmpty)
+                      Text(
+                        part.ownerBusinessName!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      )
+                    else if (part.ownerId != null)
+                      Text(
+                        'Sin importador',
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '\$${part.precio.toStringAsFixed(2)}',
+                      style: const TextStyle(
                         fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: _kCorporateRed,
+                      ),
+                    ),
+                    Text(
+                      'Stock ${part.stock}',
+                      style: TextStyle(
+                        fontSize: 9,
                         color: Colors.grey.shade700,
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 6),
-                  Text(
-                    '\$${part.precio.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: _kCorporateRed,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Stock: ${part.stock}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  if (part.compatibilidad != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Compatibilidad: ${part.compatibilidad}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                    if (part.compatibilidad != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        part.compatibilidad!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],
@@ -364,8 +390,11 @@ class _PartCard extends StatelessWidget {
   Widget _placeholder() {
     return ColoredBox(
       color: Colors.grey.shade200,
-      child: Icon(Icons.precision_manufacturing_outlined,
-          size: 40, color: Colors.grey.shade500),
+      child: Icon(
+        Icons.precision_manufacturing_outlined,
+        size: 22,
+        color: Colors.grey.shade500,
+      ),
     );
   }
 }

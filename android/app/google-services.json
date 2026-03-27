@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1032441463656",
+    "project_id": "moto-link-pro-app",
+    "storage_bucket": "moto-link-pro-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1032441463656:android:63e049a05b18f847040cdd",
+        "android_client_info": {
+          "package_name": "com.carlosf12.motolink_pro_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAT12-GE4vPt0n9rzCzhrpSNdT7y5kchaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

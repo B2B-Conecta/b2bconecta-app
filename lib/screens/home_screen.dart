@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 
@@ -22,23 +23,82 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasMoreProducts = true;
   bool _isLoadingMore = false;
   int? _catalogTotal;
+  CatalogFilters _activeFilters = CatalogFilters.empty;
+  String? _selectedOwnerId;
+
+  late final TextEditingController _searchController;
+  late final TextEditingController _minPriceController;
+  late final TextEditingController _maxPriceController;
+  late final Future<List<ImporterOption>> _importersFuture;
 
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
+    _minPriceController = TextEditingController();
+    _maxPriceController = TextEditingController();
+    _importersFuture = SupabaseService.fetchImporterOptions();
     _partsFuture = _fetchProducts(reset: true);
     _refreshCatalogTotal();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
+    super.dispose();
+  }
+
   Future<void> _refreshCatalogTotal() async {
     try {
-      final n = await SupabaseService.fetchProductsCount();
+      final n =
+          await SupabaseService.fetchProductsCount(filters: _activeFilters);
       if (!mounted) return;
       setState(() => _catalogTotal = n);
     } catch (_) {
       if (!mounted) return;
       setState(() => _catalogTotal = null);
     }
+  }
+
+  CatalogFilters _parseFiltersFromControllers() {
+    final min = double.tryParse(_minPriceController.text.replaceAll(',', '.'));
+    final max = double.tryParse(_maxPriceController.text.replaceAll(',', '.'));
+    double? minP = min;
+    double? maxP = max;
+    if (minP != null && maxP != null && minP > maxP) {
+      final t = minP;
+      minP = maxP;
+      maxP = t;
+    }
+    final q = _searchController.text.trim();
+    return CatalogFilters(
+      searchQuery: q.isEmpty ? null : q,
+      ownerId: _selectedOwnerId,
+      minPrice: minP,
+      maxPrice: maxP,
+    );
+  }
+
+  void _applyFiltersFromUi() {
+    setState(() {
+      _activeFilters = _parseFiltersFromControllers();
+      _partsFuture = _fetchProducts(reset: true);
+    });
+    _refreshCatalogTotal();
+  }
+
+  void _clearFilters() {
+    _searchController.clear();
+    _minPriceController.clear();
+    _maxPriceController.clear();
+    setState(() {
+      _selectedOwnerId = null;
+      _activeFilters = CatalogFilters.empty;
+      _partsFuture = _fetchProducts(reset: true);
+    });
+    _refreshCatalogTotal();
   }
 
   Future<List<PartModel>> _fetchProducts({required bool reset}) async {
@@ -51,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final nextBatch = await SupabaseService.fetchParts(
       limit: _kPageSize,
       offset: _loadedParts.length,
+      filters: _activeFilters,
     );
 
     if (nextBatch.length < _kPageSize) {
@@ -147,11 +208,162 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(
-              'Se cargan 6 productos por bloque (2 filas × 3 columnas).',
+              'Se cargan 6 productos por bloque (2 filas × 3 columnas). Puedes filtrar por nombre, importador y precio.',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
               ),
+            ),
+          ),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: FutureBuilder<List<ImporterOption>>(
+              future: _importersFuture,
+              builder: (context, snapshot) {
+                final importers = snapshot.data ?? [];
+                if (snapshot.hasError) {
+                  return Text(
+                    'No se pudieron cargar los importadores. El filtro por importador no estará disponible.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange.shade800,
+                    ),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _applyFiltersFromUi(),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar por nombre...',
+                        prefixIcon: const Icon(Icons.search,
+                            size: 22, color: Colors.black45),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String?>(
+                      value: _selectedOwnerId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Importador',
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Todos'),
+                        ),
+                        ...importers.map(
+                          (o) => DropdownMenuItem<String?>(
+                            value: o.id,
+                            child: Text(
+                              o.businessName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        _selectedOwnerId = v;
+                        _applyFiltersFromUi();
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _minPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Precio min (USD)',
+                              filled: true,
+                              fillColor: Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: _maxPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Precio max (USD)',
+                              filled: true,
+                              fillColor: Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _clearFilters,
+                            child: const Text('Limpiar'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _kCorporateRed,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: _applyFiltersFromUi,
+                            child: const Text('Aplicar filtros'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           Expanded(
@@ -196,7 +408,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 160),
                       Center(
                         child: Text(
-                          'No hay repuestos disponibles.',
+                          _activeFilters.hasAnyFilter
+                              ? 'No hay resultados con esos filtros.'
+                              : 'No hay repuestos disponibles.',
                           style: TextStyle(color: Colors.grey.shade600),
                         ),
                       ),
@@ -236,7 +450,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: _isLoadingMore ? null : _loadMoreProducts,
+                            onPressed:
+                                _isLoadingMore ? null : _loadMoreProducts,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _kCorporateRed,
                               foregroundColor: Colors.white,
@@ -256,8 +471,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   )
                                 : const Icon(Icons.expand_more),
                             label: Text(
-                              _isLoadingMore ? 'Cargando...' : 'Ver mas productos',
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              _isLoadingMore
+                                  ? 'Cargando...'
+                                  : 'Ver mas productos',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),

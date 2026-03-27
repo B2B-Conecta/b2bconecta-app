@@ -1,9 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
-import 'login_screen.dart';
 
 const _kCorporateRed = Color(0xFFE31B23);
 
@@ -70,12 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _signOut() async {
-    await FirebaseAuth.instance.signOut();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    await Supabase.instance.client.auth.signOut();
   }
 
   @override

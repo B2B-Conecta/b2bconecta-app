@@ -1,18 +1,30 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'firebase_options.dart';
-import 'screens/login_screen.dart';
+import 'auth/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await dotenv.load(fileName: '.env');
+
+  final url = dotenv.env['NEXT_PUBLIC_SUPABASE_URL']?.trim();
+  final anonKey =
+      dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY']?.trim();
+
+  if (url == null ||
+      url.isEmpty ||
+      anonKey == null ||
+      anonKey.isEmpty) {
+    throw StateError(
+      'Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and '
+      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY in .env',
+    );
+  }
+
   await Supabase.initialize(
-    url: 'https://hnomevjbcxahzjiofzob.supabase.co',
-    anonKey: 'sb_publishable_9YQrnZLfgqxtXkQ55lWsaQ_w9s2Trqj',
+    url: url,
+    anonKey: anonKey,
   );
   runApp(const MyApp());
 }
@@ -34,7 +46,7 @@ class MyApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: const LoginScreen(),
+      home: const AuthGate(),
     );
   }
 }

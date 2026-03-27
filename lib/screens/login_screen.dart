@@ -1,7 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
-import 'home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -60,45 +58,42 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    var didNavigate = false;
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
-
-      if (!mounted) return;
-      didNavigate = true;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (context) => const HomeScreen(),
-        ),
-      );
-    } on FirebaseException catch (e) {
+    } on AuthException catch (e) {
       debugPrint(
-        '[signInWithEmailAndPassword] FirebaseException '
-        'code=${e.code} message=${e.message}',
+        '[signInWithPassword] AuthException message=${e.message}',
       );
-      String message;
-      if (e.code == 'user-not-found') {
-        message = 'No se encontró un usuario con ese correo.';
-      } else if (e.code == 'wrong-password') {
-        message = 'La contraseña es incorrecta.';
-      } else {
-        message = 'Ocurrió un error. Inténtalo de nuevo.';
-      }
+      final message = _mapAuthErrorMessage(e.message);
       _showSnackBar(message, isError: true);
     } catch (e, stackTrace) {
-      debugPrint('[signInWithEmailAndPassword] non-Firebase error: $e');
+      debugPrint('[signInWithPassword] error: $e');
       debugPrint('$stackTrace');
       _showSnackBar('Ocurrió un error inesperado.', isError: true);
     } finally {
-      if (mounted && !didNavigate) {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
     }
+  }
+
+  String _mapAuthErrorMessage(String? raw) {
+    final m = raw?.toLowerCase() ?? '';
+    if (m.contains('invalid') && m.contains('credential')) {
+      return 'Correo o contraseña incorrectos.';
+    }
+    if (m.contains('email') && m.contains('confirm')) {
+      return 'Debes confirmar tu correo antes de iniciar sesión.';
+    }
+    if (m.contains('too many')) {
+      return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
+    }
+    return raw?.isNotEmpty == true ? raw! : 'No se pudo iniciar sesión.';
   }
 
   @override

@@ -4,6 +4,8 @@ class PartModel {
   const PartModel({
     required this.id,
     required this.nombre,
+    this.descripcion,
+    this.compatibilidad,
     required this.precio,
     required this.stock,
     this.imagenUrl,
@@ -11,23 +13,35 @@ class PartModel {
 
   final String id;
   final String nombre;
+  final String? descripcion;
+  final String? compatibilidad;
   final double precio;
   final int stock;
   final String? imagenUrl;
 
   factory PartModel.fromJson(Map<String, dynamic> json) {
-    // Tabla `products`: name, price, image_url. Compatibilidad con nombres en español.
+    // Tabla `products`: name, description, compatibility, price_usd, stock, image_url.
     final nombreRaw = json['name'] ?? json['nombre'];
-    final precioRaw = json['price'] ?? json['precio'];
+    final descripcionRaw = json['description'] ?? json['descripcion'];
+    final compatibilidadRaw = json['compatibility'] ?? json['compatibilidad'];
+    final precioRaw = json['price_usd'] ?? json['price'] ?? json['precio'];
     final imagenRaw = json['image_url'] ?? json['imagen_url'];
 
     return PartModel(
       id: json['id']?.toString() ?? '',
       nombre: nombreRaw?.toString() ?? '',
+      descripcion: _nullableText(descripcionRaw),
+      compatibilidad: _nullableText(compatibilidadRaw),
       precio: _asDouble(precioRaw),
       stock: _asInt(json['stock']),
       imagenUrl: _nullableUrl(imagenRaw),
     );
+  }
+
+  static String? _nullableText(dynamic value) {
+    if (value == null) return null;
+    final s = value.toString().trim();
+    return s.isEmpty ? null : s;
   }
 
   static String? _nullableUrl(dynamic value) {

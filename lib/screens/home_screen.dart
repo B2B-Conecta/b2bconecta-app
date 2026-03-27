@@ -186,6 +186,18 @@ class _PartCard extends StatelessWidget {
                       color: Colors.black87,
                     ),
                   ),
+                  if (part.descripcion != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      part.descripcion!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     '\$${part.precio.toStringAsFixed(2)}',
@@ -203,6 +215,18 @@ class _PartCard extends StatelessWidget {
                       color: Colors.grey.shade700,
                     ),
                   ),
+                  if (part.compatibilidad != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Compatibilidad: ${part.compatibilidad}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

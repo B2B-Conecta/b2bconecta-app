@@ -53,13 +53,14 @@ class SupabaseService {
   }
 
   /// Obtiene repuestos desde [products] con paginacion.
+  /// Incluye nombre del importador vía FK `owner_id` → `profiles`.
   static Future<List<PartModel>> fetchParts({
     int limit = 5,
     int offset = 0,
   }) async {
     final response = await _client
         .from('products')
-        .select()
+        .select('*, profiles(business_name)')
         .order('id', ascending: true)
         .range(offset, offset + limit - 1);
     final list = response as List<dynamic>;

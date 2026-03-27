@@ -288,6 +288,29 @@ class _PartCard extends StatelessWidget {
                       color: Colors.black87,
                     ),
                   ),
+                  if (part.ownerBusinessName != null &&
+                      part.ownerBusinessName!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Importador: ${part.ownerBusinessName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ] else if (part.ownerId != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Importador (sin nombre en catálogo)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
                   if (part.descripcion != null) ...[
                     const SizedBox(height: 4),
                     Text(

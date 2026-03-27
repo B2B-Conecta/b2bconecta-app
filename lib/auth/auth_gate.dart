@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
+import 'profile_gate.dart';
 
 /// Enruta entre login y home según la sesión de Supabase Auth.
 class AuthGate extends StatefulWidget {
@@ -35,7 +35,7 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) {
-      return const HomeScreen();
+      return const ProfileGate();
     }
     return const LoginScreen();
   }

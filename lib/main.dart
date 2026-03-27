@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
@@ -8,6 +9,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await Supabase.initialize(
+    url: 'https://hnomevjbcxahzjiofzob.supabase.co',
+    anonKey: 'sb_publishable_9YQrnZLfgqxtXkQ55lWsaQ_w9s2Trqj',
   );
   runApp(const MyApp());
 }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
+import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
+import 'account_settings_screen.dart';
+import 'product_detail_screen.dart';
+import 'profile_setup_screen.dart';
 
 const _kCorporateRed = Color(0xFFE31B23);
 
@@ -145,7 +148,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
+    await AuthService.signOut();
+  }
+
+  Future<void> _openProfileEdit() async {
+    final profile = await SupabaseService.fetchMyProfile();
+    if (!mounted) return;
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              const Text('No se encontró tu perfil. Vuelve a iniciar sesión.'),
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (ctx) => ProfileSetupScreen(
+          initial: profile,
+          isEditing: true,
+          onProfileComplete: () => Navigator.of(ctx).pop(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAccountSettings() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const AccountSettingsScreen(),
+      ),
+    );
   }
 
   @override
@@ -162,16 +198,54 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          TextButton.icon(
-            onPressed: _signOut,
-            icon: const Icon(Icons.logout, color: _kCorporateRed),
-            label: const Text(
-              'Cerrar sesión',
-              style: TextStyle(
-                color: _kCorporateRed,
-                fontWeight: FontWeight.w600,
+          PopupMenuButton<int>(
+            icon: const Icon(Icons.more_vert, color: Colors.black87),
+            onSelected: (value) async {
+              switch (value) {
+                case 0:
+                  await _openProfileEdit();
+                  break;
+                case 1:
+                  await _openAccountSettings();
+                  break;
+                case 2:
+                  await _signOut();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<int>(
+                value: 0,
+                child: ListTile(
+                  leading: Icon(Icons.business_outlined),
+                  title: Text('Editar perfil empresa'),
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
-            ),
+              const PopupMenuItem<int>(
+                value: 1,
+                child: ListTile(
+                  leading: Icon(Icons.lock_outline),
+                  title: Text('Cuenta y seguridad'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<int>(
+                value: 2,
+                child: ListTile(
+                  leading: Icon(Icons.logout, color: _kCorporateRed),
+                  title: Text(
+                    'Cerrar sesión',
+                    style: TextStyle(
+                      color: _kCorporateRed,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -438,7 +512,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             itemCount: parts.length,
                             itemBuilder: (context, index) {
-                              return _ProductGridCard(part: parts[index]);
+                              final p = parts[index];
+                              return _ProductGridCard(
+                                part: p,
+                                onTap: () {
+                                  Navigator.of(context).push<void>(
+                                    MaterialPageRoute<void>(
+                                      builder: (ctx) =>
+                                          ProductDetailScreen(part: p),
+                                    ),
+                                  );
+                                },
+                              );
                             },
                           ),
                         ),
@@ -493,9 +578,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
 /// Tarjeta compacta para rejilla 3×N (centrada en el catálogo).
 class _ProductGridCard extends StatelessWidget {
-  const _ProductGridCard({required this.part});
+  const _ProductGridCard({required this.part, this.onTap});
 
   final PartModel part;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -504,102 +590,109 @@ class _ProductGridCard extends StatelessWidget {
       elevation: 1.5,
       shadowColor: Colors.black12,
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 4,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
-                    ? Image.network(
-                        part.imagenUrl!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (_, __, ___) => _placeholder(),
-                      )
-                    : _placeholder(),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              flex: 5,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.bottomLeft,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      part.nombre,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        height: 1.15,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    if (part.ownerBusinessName != null &&
-                        part.ownerBusinessName!.isNotEmpty)
-                      Text(
-                        part.ownerBusinessName!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      )
-                    else if (part.ownerId != null)
-                      Text(
-                        'Sin importador',
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '\$${part.precio.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: _kCorporateRed,
-                      ),
-                    ),
-                    Text(
-                      'Stock ${part.stock}',
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    if (part.compatibilidad != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        part.compatibilidad!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 4,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Hero(
+                    tag: ProductDetailScreen.heroImageTag(part),
+                    child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
+                        ? Image.network(
+                            part.imagenUrl!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (_, __, ___) => _placeholder(),
+                          )
+                        : _placeholder(),
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Expanded(
+                flex: 5,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.bottomLeft,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        part.nombre,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      if (part.ownerBusinessName != null &&
+                          part.ownerBusinessName!.isNotEmpty)
+                        Text(
+                          part.ownerBusinessName!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        )
+                      else if (part.ownerId != null)
+                        Text(
+                          'Sin importador',
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '\$${part.precio.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: _kCorporateRed,
+                        ),
+                      ),
+                      Text(
+                        'Stock ${part.stock}',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      if (part.compatibilidad != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          part.compatibilidad!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

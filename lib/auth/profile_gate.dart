@@ -65,18 +65,21 @@ class _ProfileGateState extends State<ProfileGate> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: Colors.red.shade700),
+                    Icon(Icons.error_outline,
+                        size: 48, color: Colors.red.shade700),
                     const SizedBox(height: 12),
                     Text(
                       'No se pudo cargar el perfil.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
+                      style:
+                          TextStyle(color: Colors.grey.shade800, fontSize: 16),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '${snapshot.error}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
                     FilledButton(

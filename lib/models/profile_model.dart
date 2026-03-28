@@ -12,6 +12,7 @@ class ProfileModel {
   final String id;
   final String? businessName;
   final String? rif;
+
   /// `importador` o `aliado` según el esquema de datos.
   final String? role;
   final String? phone;

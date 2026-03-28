@@ -14,8 +14,10 @@ class PartModel {
   });
 
   final String id;
+
   /// FK `profiles.id` del importador dueño del stock.
   final String? ownerId;
+
   /// Nombre comercial del dueño (join `profiles`).
   final String? ownerBusinessName;
   final String nombre;

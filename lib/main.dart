@@ -12,10 +12,7 @@ void main() async {
   final anonKey =
       dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY']?.trim();
 
-  if (url == null ||
-      url.isEmpty ||
-      anonKey == null ||
-      anonKey.isEmpty) {
+  if (url == null || url.isEmpty || anonKey == null || anonKey.isEmpty) {
     throw StateError(
       'Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and '
       'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY in .env',

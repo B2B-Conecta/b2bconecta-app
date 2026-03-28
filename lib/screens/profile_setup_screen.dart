@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/profile_model.dart';
+import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 
 const _kCorporateRed = Color(0xFFE31B23);
@@ -11,10 +11,14 @@ class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({
     super.key,
     this.initial,
+    this.isEditing = false,
     required this.onProfileComplete,
   });
 
   final ProfileModel? initial;
+
+  /// `true` cuando se abre desde el catálogo para actualizar datos B2B.
+  final bool isEditing;
   final VoidCallback onProfileComplete;
 
   @override
@@ -38,7 +42,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void initState() {
     super.initState();
     final i = widget.initial;
-    _businessNameController = TextEditingController(text: i?.businessName ?? '');
+    _businessNameController =
+        TextEditingController(text: i?.businessName ?? '');
     _rifController = TextEditingController(text: i?.rif ?? '');
     _phoneController = TextEditingController(text: i?.phone ?? '');
     final r = i?.role?.trim().toLowerCase();
@@ -83,7 +88,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
+    await AuthService.signOut();
   }
 
   @override
@@ -95,16 +100,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'Perfil de empresa',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          widget.isEditing ? 'Editar perfil de empresa' : 'Perfil de empresa',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           TextButton(
             onPressed: _saving ? null : _signOut,
             child: const Text(
               'Cerrar sesión',
-              style: TextStyle(color: _kCorporateRed, fontWeight: FontWeight.w600),
+              style:
+                  TextStyle(color: _kCorporateRed, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -117,9 +123,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Completa tu perfil B2B',
-                  style: TextStyle(
+                Text(
+                  widget.isEditing
+                      ? 'Actualiza los datos de tu empresa'
+                      : 'Completa tu perfil B2B',
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
@@ -127,7 +135,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Estos datos son necesarios para operar en MotoLink Pro.',
+                  widget.isEditing
+                      ? 'Los cambios se reflejan en el catálogo y en tu cuenta.'
+                      : 'Estos datos son necesarios para operar en MotoLink Pro.',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 28),
@@ -218,9 +228,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'GUARDAR Y CONTINUAR',
-                          style: TextStyle(
+                      : Text(
+                          widget.isEditing
+                              ? 'GUARDAR CAMBIOS'
+                              : 'GUARDAR Y CONTINUAR',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

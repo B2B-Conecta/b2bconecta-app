@@ -22,6 +22,11 @@ void main() async {
   await Supabase.initialize(
     url: url,
     anonKey: anonKey,
+    // PKCE + deep links: necesario para que el enlace del correo (recuperación) abra sesión en la app.
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+      detectSessionInUri: true,
+    ),
   );
   runApp(const MyApp());
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../services/auth_service.dart';
@@ -11,7 +12,13 @@ import 'profile_setup_screen.dart';
 const _kCorporateRed = Color(0xFFE31B23);
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.homeRole = AppHomeRole.importador,
+  });
+
+  /// Define textos del encabezado (importador vs aliado).
+  final AppHomeRole homeRole;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -258,9 +265,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Repuestos',
-                  style: TextStyle(
+                Text(
+                  widget.homeRole == AppHomeRole.aliado
+                      ? 'Catálogo de repuestos'
+                      : 'Repuestos',
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
@@ -282,7 +291,11 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(
-              'Se cargan 6 productos por bloque (2 filas × 3 columnas). Puedes filtrar por nombre, importador y precio.',
+              widget.homeRole == AppHomeRole.aliado
+                  ? 'Vista de aliado: consulta repuestos publicados por importadores. '
+                      'Se cargan 6 productos por bloque. Puedes filtrar por nombre, importador y precio.'
+                  : 'Se cargan 6 productos por bloque (2 filas × 3 columnas). '
+                      'Puedes filtrar por nombre, importador y precio.',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,

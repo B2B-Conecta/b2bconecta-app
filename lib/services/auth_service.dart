@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Operaciones de Supabase Auth (login, registro, recuperación, actualización).
@@ -26,8 +27,14 @@ class AuthService {
     );
   }
 
+  /// [redirectTo] opcional vía `.env` → `SUPABASE_AUTH_REDIRECT_URL` (URL de tu app web o deep link).
   static Future<void> resetPasswordForEmail(String email) {
-    return _auth.resetPasswordForEmail(email.trim());
+    final redirect = dotenv.env['SUPABASE_AUTH_REDIRECT_URL']?.trim();
+    return _auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo:
+          redirect != null && redirect.isNotEmpty ? redirect : null,
+    );
   }
 
   /// Cambia la contraseña del usuario con sesión activa.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
 import '../screens/home_screen.dart';
 import '../screens/profile_setup_screen.dart';
@@ -103,7 +104,10 @@ class _ProfileGateState extends State<ProfileGate> {
           );
         }
 
-        return const HomeScreen();
+        final role = profile.role?.trim().toLowerCase();
+        final homeRole =
+            role == 'aliado' ? AppHomeRole.aliado : AppHomeRole.importador;
+        return HomeScreen(homeRole: homeRole);
       },
     );
   }

@@ -5,9 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/login_screen.dart';
 import '../screens/recover_password_screen.dart';
+import '../theme/app_theme.dart';
 import 'profile_gate.dart';
-
-const _kCorporateRed = Color(0xFFE31B23);
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
 class AuthGate extends StatefulWidget {
@@ -70,8 +69,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     if (_authState == null) {
       return const Scaffold(
+        backgroundColor: AppColors.background,
         body: Center(
-          child: CircularProgressIndicator(color: _kCorporateRed),
+          child: CircularProgressIndicator(color: AppColors.brand),
         ),
       );
     }

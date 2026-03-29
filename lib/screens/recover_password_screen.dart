@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
-
-const _kCorporateRed = Color(0xFFE31B23);
+import '../theme/app_theme.dart';
 
 /// Tras abrir el enlace del correo de recuperación: obliga a definir nueva contraseña y cerrar sesión.
 class RecoverPasswordScreen extends StatefulWidget {
@@ -44,7 +43,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           ),
           actions: [
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _kCorporateRed),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('Entendido'),
             ),
@@ -81,7 +80,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
@@ -161,7 +160,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                 FilledButton(
                   onPressed: _busy ? null : _submit,
                   style: FilledButton.styleFrom(
-                    backgroundColor: _kCorporateRed,
+                    backgroundColor: AppColors.brand,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(

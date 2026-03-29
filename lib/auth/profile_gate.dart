@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
-import '../screens/home_screen.dart';
+import '../screens/main_shell.dart';
 import '../screens/profile_setup_screen.dart';
 import '../services/supabase_service.dart';
+import '../theme/app_theme.dart';
 
-const _kCorporateRed = Color(0xFFE31B23);
-
-/// Tras login: carga `profiles` y muestra onboarding o [HomeScreen].
+/// Tras login: carga `profiles` y muestra onboarding o [MainShell].
 class ProfileGate extends StatefulWidget {
   const ProfileGate({super.key});
 
@@ -38,18 +37,19 @@ class _ProfileGateState extends State<ProfileGate> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
+            backgroundColor: AppColors.background,
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: _kCorporateRed),
+                  CircularProgressIndicator(color: AppColors.brand),
                   SizedBox(height: 16),
                   Text(
                     'Cargando perfil...',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -60,6 +60,7 @@ class _ProfileGateState extends State<ProfileGate> {
 
         if (snapshot.hasError) {
           return Scaffold(
+            backgroundColor: AppColors.background,
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -107,7 +108,7 @@ class _ProfileGateState extends State<ProfileGate> {
         final role = profile.role?.trim().toLowerCase();
         final homeRole =
             role == 'aliado' ? AppHomeRole.aliado : AppHomeRole.importador;
-        return HomeScreen(homeRole: homeRole);
+        return MainShell(homeRole: homeRole, profile: profile);
       },
     );
   }

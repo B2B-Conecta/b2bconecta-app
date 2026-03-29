@@ -3,13 +3,26 @@ import 'package:flutter/material.dart';
 import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
-import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
-import 'account_settings_screen.dart';
+import '../theme/app_theme.dart';
+import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
-import 'profile_setup_screen.dart';
 
-const _kCorporateRed = Color(0xFFE31B23);
+const _kCategoryLabels = <String>[
+  'Todos',
+  'Frenos',
+  'Transmisión',
+  'Motor',
+  'Eléctrico',
+];
+
+const _kCategorySearchTokens = <String, String?>{
+  'Todos': null,
+  'Frenos': 'freno',
+  'Transmisión': 'transmis',
+  'Motor': 'motor',
+  'Eléctrico': 'eléctric',
+};
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -17,7 +30,6 @@ class HomeScreen extends StatefulWidget {
     this.homeRole = AppHomeRole.importador,
   });
 
-  /// Define textos del encabezado (importador vs aliado).
   final AppHomeRole homeRole;
 
   @override
@@ -25,9 +37,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  /// 2 filas × 3 columnas por bloque de carga.
-  static const int _kCrossAxisCount = 3;
-  static const int _kPageSize = _kCrossAxisCount * 2;
+  static const int _kCrossAxisCount = 2;
+  static const int _kPageSize = _kCrossAxisCount * 3;
+
   late Future<List<PartModel>> _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
   bool _hasMoreProducts = true;
@@ -35,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _catalogTotal;
   CatalogFilters _activeFilters = CatalogFilters.empty;
   String? _selectedOwnerId;
+  String _selectedCategoryLabel = 'Todos';
 
   late final TextEditingController _searchController;
   late final TextEditingController _minPriceController;
@@ -82,9 +95,13 @@ class _HomeScreenState extends State<HomeScreen> {
       minP = maxP;
       maxP = t;
     }
-    final q = _searchController.text.trim();
+    final userQ = _searchController.text.trim();
+    final catToken = _kCategorySearchTokens[_selectedCategoryLabel];
+    final combined = [userQ, if (catToken != null && catToken.isNotEmpty) catToken]
+        .where((e) => e.isNotEmpty)
+        .join(' ');
     return CatalogFilters(
-      searchQuery: q.isEmpty ? null : q,
+      searchQuery: combined.isEmpty ? null : combined,
       ownerId: _selectedOwnerId,
       minPrice: minP,
       maxPrice: maxP,
@@ -105,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _maxPriceController.clear();
     setState(() {
       _selectedOwnerId = null;
+      _selectedCategoryLabel = 'Todos';
       _activeFilters = CatalogFilters.empty;
       _partsFuture = _fetchProducts(reset: true);
     });
@@ -154,296 +172,272 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _signOut() async {
-    await AuthService.signOut();
+  Future<void> _openAdvancedFiltersSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewPadding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Filtros avanzados',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _minPriceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Precio mín. (USD)',
+                        filled: true,
+                        fillColor: AppColors.fieldFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _maxPriceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Precio máx. (USD)',
+                        filled: true,
+                        fillColor: AppColors.fieldFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        _clearFilters();
+                        Navigator.of(ctx).pop();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Limpiar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _applyFiltersFromUi();
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Aplicar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
-  Future<void> _openProfileEdit() async {
-    final profile = await SupabaseService.fetchMyProfile();
-    if (!mounted) return;
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              const Text('No se encontró tu perfil. Vuelve a iniciar sesión.'),
-          backgroundColor: Colors.red.shade800,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (ctx) => ProfileSetupScreen(
-          initial: profile,
-          isEditing: true,
-          onProfileComplete: () => Navigator.of(ctx).pop(),
-        ),
+  InputDecoration _searchDecoration() {
+    return InputDecoration(
+      hintText: 'Buscar repuestos...',
+      hintStyle: const TextStyle(color: AppColors.textSecondary),
+      prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
     );
   }
 
-  Future<void> _openAccountSettings() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => const AccountSettingsScreen(),
+  Widget _chipRow({
+    required List<Widget> children,
+  }) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: children.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) => children[i],
       ),
+    );
+  }
+
+  ChoiceChip _filterChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: AppColors.brand,
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : AppColors.textPrimary,
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
+      ),
+      backgroundColor: Colors.grey.shade200,
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'MotoLink Pro',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          PopupMenuButton<int>(
-            icon: const Icon(Icons.more_vert, color: Colors.black87),
-            onSelected: (value) async {
-              switch (value) {
-                case 0:
-                  await _openProfileEdit();
-                  break;
-                case 1:
-                  await _openAccountSettings();
-                  break;
-                case 2:
-                  await _signOut();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem<int>(
-                value: 0,
-                child: ListTile(
-                  leading: Icon(Icons.business_outlined),
-                  title: Text('Editar perfil empresa'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem<int>(
-                value: 1,
-                child: ListTile(
-                  leading: Icon(Icons.lock_outline),
-                  title: Text('Cuenta y seguridad'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem<int>(
-                value: 2,
-                child: ListTile(
-                  leading: Icon(Icons.logout, color: _kCorporateRed),
-                  title: Text(
-                    'Cerrar sesión',
-                    style: TextStyle(
-                      color: _kCorporateRed,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.background,
+      appBar: MotolinkAppBar(onNotificationTap: () {}),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.homeRole == AppHomeRole.aliado
-                      ? 'Catálogo de repuestos'
-                      : 'Repuestos',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _applyFiltersFromUi(),
+                    decoration: _searchDecoration(),
                   ),
                 ),
-                Text(
-                  _catalogTotal != null
-                      ? 'Mostrando ${_loadedParts.length} de $_catalogTotal'
-                      : 'Mostrando ${_loadedParts.length}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(width: 10),
+                Material(
+                  color: AppColors.brand,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: _openAdvancedFiltersSheet,
+                    borderRadius: BorderRadius.circular(12),
+                    child: const SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: Icon(
+                        Icons.tune,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text(
-              widget.homeRole == AppHomeRole.aliado
-                  ? 'Vista de aliado: consulta repuestos publicados por importadores. '
-                      'Se cargan 6 productos por bloque. Puedes filtrar por nombre, importador y precio.'
-                  : 'Se cargan 6 productos por bloque (2 filas × 3 columnas). '
-                      'Puedes filtrar por nombre, importador y precio.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _chipRow(
+              children: _kCategoryLabels
+                  .map(
+                    (label) => _filterChip(
+                      label: label,
+                      selected: _selectedCategoryLabel == label,
+                      onSelected: () {
+                        setState(() => _selectedCategoryLabel = label);
+                        _applyFiltersFromUi();
+                      },
+                    ),
+                  )
+                  .toList(),
             ),
           ),
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: FutureBuilder<List<ImporterOption>>(
               future: _importersFuture,
               builder: (context, snapshot) {
                 final importers = snapshot.data ?? [];
                 if (snapshot.hasError) {
                   return Text(
-                    'No se pudieron cargar los importadores. El filtro por importador no estará disponible.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.orange.shade800,
-                    ),
+                    'Importadores no disponibles.',
+                    style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
                   );
                 }
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: _searchController,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _applyFiltersFromUi(),
-                      decoration: InputDecoration(
-                        hintText: 'Buscar por nombre...',
-                        prefixIcon: const Icon(Icons.search,
-                            size: 22, color: Colors.black45),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        isDense: true,
+                    const Text(
+                      'IMPORTADOR',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String?>(
-                      value: _selectedOwnerId,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: 'Importador',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        isDense: true,
-                      ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Todos'),
+                    const SizedBox(height: 8),
+                    _chipRow(
+                      children: [
+                        _filterChip(
+                          label: 'Todos',
+                          selected: _selectedOwnerId == null,
+                          onSelected: () {
+                            setState(() => _selectedOwnerId = null);
+                            _applyFiltersFromUi();
+                          },
                         ),
                         ...importers.map(
-                          (o) => DropdownMenuItem<String?>(
-                            value: o.id,
-                            child: Text(
-                              o.businessName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        _selectedOwnerId = v;
-                        _applyFiltersFromUi();
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _minPriceController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: 'Precio min (USD)',
-                              filled: true,
-                              fillColor: Colors.grey.shade100,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _maxPriceController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: 'Precio max (USD)',
-                              filled: true,
-                              fillColor: Colors.grey.shade100,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _clearFilters,
-                            child: const Text('Limpiar'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _kCorporateRed,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: _applyFiltersFromUi,
-                            child: const Text('Aplicar filtros'),
+                          (o) => _filterChip(
+                            label: o.businessName,
+                            selected: _selectedOwnerId == o.id,
+                            onSelected: () {
+                              setState(() => _selectedOwnerId = o.id);
+                              _applyFiltersFromUi();
+                            },
                           ),
                         ),
                       ],
@@ -453,11 +447,23 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Text(
+              '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
           Expanded(
             child: FutureBuilder<List<PartModel>>(
               future: _partsFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    _loadedParts.isEmpty) {
                   return const _LoadingState();
                 }
                 if (snapshot.hasError) {
@@ -498,7 +504,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _activeFilters.hasAnyFilter
                               ? 'No hay resultados con esos filtros.'
                               : 'No hay repuestos disponibles.',
-                          style: TextStyle(color: Colors.grey.shade600),
+                          style: const TextStyle(color: AppColors.textSecondary),
                         ),
                       ),
                     ],
@@ -507,39 +513,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Column(
                   children: [
                     Expanded(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: GridView.builder(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: _kCrossAxisCount,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              // Ancho/alto de celda: valor más bajo = más altura (evita overflow del texto).
-                              childAspectRatio: 0.62,
-                            ),
-                            itemCount: parts.length,
-                            itemBuilder: (context, index) {
-                              final p = parts[index];
-                              return _ProductGridCard(
-                                part: p,
-                                onTap: () {
-                                  Navigator.of(context).push<void>(
-                                    MaterialPageRoute<void>(
-                                      builder: (ctx) =>
-                                          ProductDetailScreen(part: p),
-                                    ),
-                                  );
-                                },
+                      child: GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _kCrossAxisCount,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 0.7,
+                        ),
+                        itemCount: parts.length,
+                        itemBuilder: (context, index) {
+                          final p = parts[index];
+                          return _ProductGridCard(
+                            part: p,
+                            onTap: () {
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (ctx) =>
+                                      ProductDetailScreen(part: p),
+                                ),
                               );
                             },
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
                     if (_hasMoreProducts)
@@ -547,34 +544,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton.icon(
+                          child: ElevatedButton(
                             onPressed:
                                 _isLoadingMore ? null : _loadMoreProducts,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _kCorporateRed,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            icon: _isLoadingMore
+                            child: _isLoadingMore
                                 ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
+                                    width: 22,
+                                    height: 22,
                                     child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                                      strokeWidth: 2.5,
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.expand_more),
-                            label: Text(
-                              _isLoadingMore
-                                  ? 'Cargando...'
-                                  : 'Ver mas productos',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
-                            ),
+                                : const Text('Ver mas productos'),
                           ),
                         ),
                       ),
@@ -589,7 +571,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Tarjeta compacta para rejilla 3×N (centrada en el catálogo).
 class _ProductGridCard extends StatelessWidget {
   const _ProductGridCard({required this.part, this.onTap});
 
@@ -598,116 +579,106 @@ class _ProductGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 1.5,
-      shadowColor: Colors.black12,
+    final importer = (part.ownerBusinessName ?? '').trim();
+    final importerLine =
+        importer.isNotEmpty ? importer.toUpperCase() : 'SIN IMPORTADOR';
+
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: AppDecorations.cardShadow,
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(8),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 4,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Hero(
-                    tag: ProductDetailScreen.heroImageTag(part),
-                    child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
-                        ? Image.network(
-                            part.imagenUrl!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (_, __, ___) => _placeholder(),
-                          )
-                        : _placeholder(),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Hero(
+                      tag: ProductDetailScreen.heroImageTag(part),
+                      child: part.imagenUrl != null &&
+                              part.imagenUrl!.isNotEmpty
+                          ? Image.network(
+                              part.imagenUrl!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (_, __, ___) => _placeholder(),
+                            )
+                          : _placeholder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                flex: 5,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.bottomLeft,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        part.nombre,
-                        maxLines: 2,
+                const SizedBox(height: 8),
+                Text(
+                  importerLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: Text(
+                    part.nombre,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                Text(
+                  '\$${part.precio.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.brand,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.successGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${part.stock} en stock',
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          height: 1.15,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      if (part.ownerBusinessName != null &&
-                          part.ownerBusinessName!.isNotEmpty)
-                        Text(
-                          part.ownerBusinessName!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                          ),
-                        )
-                      else if (part.ownerId != null)
-                        Text(
-                          'Sin importador',
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '\$${part.precio.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: _kCorporateRed,
-                        ),
-                      ),
-                      Text(
-                        'Stock ${part.stock}',
                         style: TextStyle(
-                          fontSize: 9,
-                          color: Colors.grey.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade700,
                         ),
                       ),
-                      if (part.compatibilidad != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          part.compatibilidad!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
     );
   }
 
@@ -716,7 +687,7 @@ class _ProductGridCard extends StatelessWidget {
       color: Colors.grey.shade200,
       child: Icon(
         Icons.precision_manufacturing_outlined,
-        size: 22,
+        size: 40,
         color: Colors.grey.shade500,
       ),
     );
@@ -734,13 +705,7 @@ class _LoadingState extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          boxShadow: AppDecorations.cardShadow,
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
@@ -750,7 +715,7 @@ class _LoadingState extends StatelessWidget {
               height: 22,
               child: CircularProgressIndicator(
                 strokeWidth: 2.8,
-                color: _kCorporateRed,
+                color: AppColors.brand,
               ),
             ),
             SizedBox(width: 12),
@@ -759,7 +724,7 @@ class _LoadingState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: AppColors.textPrimary,
               ),
             ),
           ],

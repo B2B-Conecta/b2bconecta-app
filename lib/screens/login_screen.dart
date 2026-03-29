@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
-
-const _kCorporateRed = Color(0xFFE31B23);
+import '../theme/app_theme.dart';
+import '../widgets/motolink_pro_logo.dart';
 
 enum _AuthMode { login, register }
 
@@ -20,6 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _confirmPasswordController = TextEditingController();
   _AuthMode _mode = _AuthMode.login;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   @override
   void dispose() {
@@ -134,6 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text('Recuperar contraseña'),
           content: TextField(
             controller: ctrl,
@@ -149,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _kCorporateRed),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
               onPressed: () async {
                 final e = ctrl.text.trim();
                 if (e.isEmpty || !_validateEmail(e)) {
@@ -183,121 +186,125 @@ class _LoginScreenState extends State<LoginScreen> {
     ctrl.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final inputDecoration = InputDecoration(
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(prefixIcon, color: AppColors.textSecondary),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Colors.white,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
     );
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 48),
-              Image.asset(
-                'assets/logo_motoboxes.png',
-                width: 180,
-                height: 180,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.motorcycle,
-                    size: 100,
-                    color: Colors.black),
+              const SizedBox(height: 40),
+              const Center(
+                child: MotoLinkProLogo(height: 120),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 20),
               const Text(
                 'MotoLink Pro',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 _mode == _AuthMode.login
-                    ? 'Inicia sesión para continuar'
-                    : 'Crea tu cuenta B2B',
+                    ? 'Ingrese a su cuenta'
+                    : 'Cree su cuenta B2B',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              const SizedBox(height: 28),
-              SegmentedButton<_AuthMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: _AuthMode.login,
-                    label: Text('Entrar'),
-                    icon: Icon(Icons.login, size: 18),
-                  ),
-                  ButtonSegment(
-                    value: _AuthMode.register,
-                    label: Text('Registrarse'),
-                    icon: Icon(Icons.person_add_outlined, size: 18),
-                  ),
-                ],
-                selected: {_mode},
-                onSelectionChanged: _isLoading
-                    ? null
-                    : (Set<_AuthMode> next) {
-                        setState(() {
-                          _mode = next.first;
-                        });
-                      },
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 28),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
-                decoration: inputDecoration.copyWith(
-                  labelText: 'Correo',
-                  prefixIcon: const Icon(Icons.email_outlined),
+                decoration: _inputDecoration(
+                  hint: 'Correo electrónico',
+                  prefixIcon: Icons.email_outlined,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               TextField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 autofillHints: _mode == _AuthMode.login
                     ? const [AutofillHints.password]
                     : const [AutofillHints.newPassword],
-                decoration: inputDecoration.copyWith(
-                  labelText: _mode == _AuthMode.login
-                      ? 'Contraseña'
-                      : 'Contraseña (mín. 6 caracteres)',
-                  prefixIcon: const Icon(Icons.lock_outline),
+                decoration: _inputDecoration(
+                  hint: 'Contraseña',
+                  prefixIcon: Icons.lock_outlined,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                  ),
                 ),
               ),
               if (_mode == _AuthMode.register) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _confirmPasswordController,
-                  obscureText: true,
+                  obscureText: _obscureConfirm,
                   autofillHints: const [AutofillHints.newPassword],
-                  decoration: inputDecoration.copyWith(
-                    labelText: 'Confirmar contraseña',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                  decoration: _inputDecoration(
+                    hint: 'Confirmar contraseña',
+                    prefixIcon: Icons.lock_outlined,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirm
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscureConfirm = !_obscureConfirm);
+                      },
+                    ),
                   ),
                 ),
               ],
-              if (_mode == _AuthMode.login) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _isLoading ? null : _showForgotPasswordDialog,
-                    child: const Text('¿Olvidaste tu contraseña?'),
-                  ),
-                ),
-              ] else
-                const SizedBox(height: 8),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading
                     ? null
@@ -308,13 +315,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           _register();
                         }
                       },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kCorporateRed,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
                 child: _isLoading
                     ? const SizedBox(
                         width: 24,
@@ -325,15 +325,102 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       )
                     : Text(
-                        _mode == _AuthMode.login ? 'INGRESAR' : 'CREAR CUENTA',
+                        _mode == _AuthMode.login
+                            ? 'Iniciar Sesión'
+                            : 'Crear Cuenta',
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
               ),
-              const SizedBox(height: 24),
+              if (_mode == _AuthMode.login) ...[
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                    child: const Text(
+                      '¿Olvidó su contraseña?',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Center(
+                child: _mode == _AuthMode.login
+                    ? Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            '¿No tiene cuenta? ',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 15,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () => setState(
+                                    () => _mode = _AuthMode.register,
+                                  ),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Regístrese',
+                              style: TextStyle(
+                                color: AppColors.brand,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text(
+                            '¿Ya tiene cuenta? ',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 15,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () => setState(
+                                    () => _mode = _AuthMode.login,
+                                  ),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Inicie sesión',
+                              style: TextStyle(
+                                color: AppColors.brand,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 32),
             ],
           ),
         ),

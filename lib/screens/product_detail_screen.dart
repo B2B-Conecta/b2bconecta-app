@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/part_model.dart';
+import '../theme/app_theme.dart';
 
-/// Ficha completa de un repuesto del catálogo.
+/// Ficha de producto alineada a la referencia (imagen, specs en grid, CTA fijo).
 class ProductDetailScreen extends StatelessWidget {
   const ProductDetailScreen({super.key, required this.part});
 
@@ -10,127 +11,280 @@ class ProductDetailScreen extends StatelessWidget {
 
   static String heroImageTag(PartModel p) => 'product-image-${p.id}';
 
+  static List<String> _specLines(PartModel p) {
+    final lines = <String>[];
+    if (p.compatibilidad != null && p.compatibilidad!.trim().isNotEmpty) {
+      lines.add('Compatibilidad: ${p.compatibilidad!.trim()}');
+    }
+    lines.add('Stock: ${p.stock} unidades');
+    final desc = p.descripcion?.trim();
+    if (desc != null && desc.isNotEmpty) {
+      final first = desc.split(RegExp(r'[\n.]')).first.trim();
+      if (first.isNotEmpty) {
+        lines.add(first.length > 48 ? '${first.substring(0, 45)}…' : first);
+      }
+    }
+    lines.add('Ref: ${p.id}');
+    final out = lines.take(4).toList();
+    while (out.length < 4) {
+      out.add('—');
+    }
+    return out;
+  }
+
+  String get _skuDisplay {
+    final id = part.id;
+    if (id.length <= 14) return id;
+    return id.substring(0, 12);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.secondary;
+    final importer = (part.ownerBusinessName ?? '').trim().toUpperCase();
+    final specs = _specLines(part);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          part.nombre,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 1.15,
-              child: Material(
-                color: Colors.white,
-                child: Hero(
-                  tag: heroImageTag(part),
-                  child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
-                      ? Image.network(
-                          part.imagenUrl!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                        )
-                      : _imagePlaceholder(),
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: Material(
+                          color: Colors.white,
+                          child: Hero(
+                            tag: heroImageTag(part),
+                            child: part.imagenUrl != null &&
+                                    part.imagenUrl!.isNotEmpty
+                                ? Image.network(
+                                    part.imagenUrl!,
+                                    fit: BoxFit.contain,
+                                    width: double.infinity,
+                                    errorBuilder: (_, __, ___) =>
+                                        _imagePlaceholder(),
+                                  )
+                                : _imagePlaceholder(),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: MediaQuery.paddingOf(context).top + 4,
+                        right: 8,
+                        child: Material(
+                          color: Colors.white.withOpacity(0.92),
+                          shape: const CircleBorder(),
+                          child: IconButton(
+                            icon: const Icon(Icons.close),
+                            color: AppColors.textPrimary,
+                            onPressed: () => Navigator.of(context).maybePop(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    part.nombre,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      height: 1.25,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '\$${part.precio.toStringAsFixed(2)} USD',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: accent,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Stock disponible: ${part.stock}',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _ImporterBlock(part: part),
-                  if (part.descripcion != null &&
-                      part.descripcion!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    const _SectionTitle(title: 'Descripción'),
-                    const SizedBox(height: 8),
-                    Text(
-                      part.descripcion!,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.45,
-                        color: Colors.grey.shade800,
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'SKU: $_skuDisplay',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                  if (part.compatibilidad != null &&
-                      part.compatibilidad!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    const _SectionTitle(title: 'Compatibilidad'),
-                    const SizedBox(height: 8),
-                    Text(
-                      part.compatibilidad!,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.45,
-                        color: Colors.grey.shade800,
+                      const SizedBox(height: 8),
+                      if (importer.isNotEmpty)
+                        Text(
+                          importer,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      if (importer.isNotEmpty) const SizedBox(height: 6),
+                      Text(
+                        part.nombre,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  Text(
-                    'Referencia: ${part.id}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '\$${part.precio.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.brand,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: AppColors.successGreen,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${part.stock} unidades disponibles',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (part.descripcion != null &&
+                          part.descripcion!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Descripción Técnica',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          part.descripcion!.trim(),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.45,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Especificaciones',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 4,
+                        children: specs
+                            .map(
+                              (s) => Container(
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.fieldFill,
+                                  borderRadius: AppDecorations.radius12,
+                                ),
+                                child: Text(
+                                  s,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 28),
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _ServicePill(
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Envío B2B',
+                          ),
+                          _ServicePill(
+                            icon: Icons.local_shipping_outlined,
+                            label: 'Despacho 24h',
+                          ),
+                          _ServicePill(
+                            icon: Icons.verified_user_outlined,
+                            label: 'Garantía',
+                          ),
+                        ],
+                      ),
+                      SizedBox(
+                        height: MediaQuery.paddingOf(context).bottom + 100,
+                      ),
+                    ]),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              MediaQuery.paddingOf(context).bottom + 12,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Negociación próximamente disponible.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              child: const Text('Iniciar Negociación'),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _imagePlaceholder() {
     return ColoredBox(
-      color: Colors.grey.shade200,
+      color: Colors.grey.shade100,
       child: Center(
         child: Icon(
           Icons.precision_manufacturing_outlined,
@@ -142,75 +296,29 @@ class ProductDetailScreen extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title});
+class _ServicePill extends StatelessWidget {
+  const _ServicePill({required this.icon, required this.label});
 
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.4,
-        color: Colors.black54,
-      ),
-    );
-  }
-}
-
-class _ImporterBlock extends StatelessWidget {
-  const _ImporterBlock({required this.part});
-
-  final PartModel part;
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final name = part.ownerBusinessName?.trim();
-    final hasName = name != null && name.isNotEmpty;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.storefront_outlined,
-              color: Colors.grey.shade700, size: 26),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Importador',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasName ? name : 'Sin importador asignado',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: hasName ? Colors.black87 : Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 26, color: AppColors.textSecondary),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

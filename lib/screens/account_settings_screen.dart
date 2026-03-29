@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
-
-const _kCorporateRed = Color(0xFFE31B23);
+import '../theme/app_theme.dart';
 
 /// Contraseña y datos básicos de la sesión (actualización de credenciales).
 class AccountSettingsScreen extends StatefulWidget {
@@ -73,10 +72,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text(
@@ -180,7 +179,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               FilledButton(
                 onPressed: _saving ? null : _updatePassword,
                 style: FilledButton.styleFrom(
-                  backgroundColor: _kCorporateRed,
+                  backgroundColor: AppColors.brand,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -204,11 +203,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               const SizedBox(height: 40),
               OutlinedButton.icon(
                 onPressed: _signOut,
-                icon: const Icon(Icons.logout, color: _kCorporateRed),
+                icon: const Icon(Icons.logout, color: AppColors.brand),
                 label: const Text(
                   'Cerrar sesión en este dispositivo',
                   style: TextStyle(
-                    color: _kCorporateRed,
+                    color: AppColors.brand,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

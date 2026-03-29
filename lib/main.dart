@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth/auth_gate.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,15 +40,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MotoLink Pro',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.black,
-          primary: Colors.black,
-          secondary: const Color(0xFFE31B23), // Rojo corporativo
-        ),
-        scaffoldBackgroundColor: Colors.white,
-      ),
+      theme: buildAppTheme(),
       home: const AuthGate(),
     );
   }

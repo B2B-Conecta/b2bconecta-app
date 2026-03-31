@@ -47,17 +47,18 @@ class _MainShellState extends State<MainShell> {
         index: _tabIndex,
         children: [
           HomeScreen(homeRole: widget.homeRole),
-          const _OrdersTab(),
-          const _MessagesTab(),
+          _OrdersTab(homeRole: widget.homeRole),
+          _MessagesTab(homeRole: widget.homeRole),
           _ProfileTab(
             profile: _profile,
+            homeRole: widget.homeRole,
             onProfileSaved: _refreshProfile,
           ),
         ],
       ),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surfaceTinted,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -98,13 +99,20 @@ class _MainShellState extends State<MainShell> {
 }
 
 class _OrdersTab extends StatelessWidget {
-  const _OrdersTab();
+  const _OrdersTab({required this.homeRole});
+
+  final AppHomeRole homeRole;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(onNotificationTap: () {}),
+      appBar: MotolinkAppBar(
+        logoHeight: homeRole == AppHomeRole.aliado
+            ? MotolinkAppBarLogoSizes.aliado
+            : MotolinkAppBarLogoSizes.importador,
+        onNotificationTap: () {},
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -151,13 +159,20 @@ class _OrdersTab extends StatelessWidget {
 }
 
 class _MessagesTab extends StatelessWidget {
-  const _MessagesTab();
+  const _MessagesTab({required this.homeRole});
+
+  final AppHomeRole homeRole;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(onNotificationTap: () {}),
+      appBar: MotolinkAppBar(
+        logoHeight: homeRole == AppHomeRole.aliado
+            ? MotolinkAppBarLogoSizes.aliado
+            : MotolinkAppBarLogoSizes.importador,
+        onNotificationTap: () {},
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -206,10 +221,12 @@ class _MessagesTab extends StatelessWidget {
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab({
     required this.profile,
+    required this.homeRole,
     required this.onProfileSaved,
   });
 
   final ProfileModel profile;
+  final AppHomeRole homeRole;
   final Future<void> Function() onProfileSaved;
 
   @override
@@ -217,6 +234,9 @@ class _ProfileTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
+        logoHeight: homeRole == AppHomeRole.aliado
+            ? MotolinkAppBarLogoSizes.aliado
+            : MotolinkAppBarLogoSizes.importador,
         onNotificationTap: () {},
         extraActions: [
           IconButton(

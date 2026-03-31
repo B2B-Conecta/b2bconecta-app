@@ -66,7 +66,8 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
   assets:
-    - assets/logo_motolinkpro.png
+    - assets/logo-oficial-motolinkpro-nobg.png
+    - assets/logo-oficial-motolinkpro.png
     - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
@@ -101,7 +102,7 @@ flutter_launcher_icons:
   ios: true
   web:
     generate: true
-  image_path: assets/logo_motolinkpro.png
+  image_path: assets/logo-oficial-motolinkpro-nobg.png
   remove_alpha_ios: true
-  adaptive_icon_background: '#F8F9FA'
-  adaptive_icon_foreground: assets/logo_motolinkpro.png
+  adaptive_icon_background: '#F5F7FA'
+  adaptive_icon_foreground: assets/logo-oficial-motolinkpro-nobg.png

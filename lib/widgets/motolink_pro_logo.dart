@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import '../gen/motolink_pro_logo_bytes.dart';
 import '../theme/app_theme.dart';
 
-/// Logo oficial MotoLink Pro (`assets/logo_motolinkpro.png` embebido en código
+/// Alturas recomendadas del logo en auth (login / registro).
+abstract final class MotoLinkProLogoHeights {
+  static const double login = 152;
+}
+
+/// Logo oficial MotoLink Pro sin fondo (`assets/logo-oficial-motolinkpro-nobg.png` embebido
 /// para que siempre se pinte, también en web con `file://` o fallos de AssetManifest).
 class MotoLinkProLogo extends StatelessWidget {
   const MotoLinkProLogo({
@@ -26,7 +31,7 @@ class MotoLinkProLogo extends StatelessWidget {
       errorBuilder: (_, __, ___) => Icon(
         Icons.two_wheeler_outlined,
         size: height * 0.65,
-        color: AppColors.brand,
+        color: AppColors.brandOrange,
       ),
     );
   }

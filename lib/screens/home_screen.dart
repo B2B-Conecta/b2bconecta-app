@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
@@ -295,21 +296,39 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
     );
   }
 
-  Widget _chipRow({
-    required List<Widget> children,
-  }) {
+  /// Fila de chips con scroll horizontal (touch, ratón y trackpad).
+  Widget _chipRow({required List<Widget> children}) {
     return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: children.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) => children[i],
+      height: 44,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.stylus,
+            PointerDeviceKind.trackpad,
+          },
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                children[i],
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -323,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
-      selectedColor: AppColors.brand,
+      selectedColor: AppColors.brandOrange,
       labelStyle: TextStyle(
         color: selected ? Colors.white : AppColors.textPrimary,
         fontWeight: FontWeight.w600,
@@ -340,7 +359,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(onNotificationTap: () {}),
+      appBar: MotolinkAppBar(
+        logoHeight: widget.homeRole == AppHomeRole.aliado
+            ? MotolinkAppBarLogoSizes.aliado
+            : MotolinkAppBarLogoSizes.importador,
+        onNotificationTap: () {},
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -359,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(width: 10),
                 Material(
-                  color: AppColors.brand,
+                  color: AppColors.brandOrange,
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     onTap: _openAdvancedFiltersSheet,

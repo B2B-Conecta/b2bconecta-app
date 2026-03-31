@@ -152,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.brandOrange),
               onPressed: () async {
                 final e = ctrl.text.trim();
                 if (e.isEmpty || !_validateEmail(e)) {
@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
     );
@@ -225,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 40),
               const Center(
-                child: MotoLinkProLogo(height: 120),
+                child: MotoLinkProLogo(height: MotoLinkProLogoHeights.login),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.brandBlue,
                 ),
               ),
               const SizedBox(height: 8),

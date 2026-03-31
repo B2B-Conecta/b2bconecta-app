@@ -341,29 +341,15 @@ class SupabaseService {
           sender_id,
           body,
           created_at,
-          products ( name )
+          products ( name, sku ),
+          profiles ( business_name, rif, phone )
         ''').eq('product_id', productId).order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
     final out = <ProductMessageRow>[];
     for (final row in list) {
       final m = Map<String, dynamic>.from(row as Map);
-      final products = m['products'];
-      String? productName;
-      if (products is Map) {
-        productName = Map<String, dynamic>.from(products)['name']?.toString();
-      }
-      out.add(
-        ProductMessageRow(
-          id: m['id']?.toString() ?? '',
-          productId: m['product_id']?.toString() ?? '',
-          productName: productName ?? '',
-          senderId: m['sender_id']?.toString() ?? '',
-          body: m['body']?.toString() ?? '',
-          createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ??
-              DateTime.fromMillisecondsSinceEpoch(0),
-        ),
-      );
+      out.add(_productMessageRowFromJson(m));
     }
     return out;
   }
@@ -379,7 +365,8 @@ class SupabaseService {
           sender_id,
           body,
           created_at,
-          products ( name, owner_id )
+          products ( name, owner_id, sku ),
+          profiles ( business_name, rif, phone )
         ''').order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -387,25 +374,12 @@ class SupabaseService {
     for (final row in list) {
       final m = Map<String, dynamic>.from(row as Map);
       final products = m['products'];
-      String? productName;
       String? ownerId;
       if (products is Map) {
-        final pm = Map<String, dynamic>.from(products);
-        productName = pm['name']?.toString();
-        ownerId = pm['owner_id']?.toString();
+        ownerId = Map<String, dynamic>.from(products)['owner_id']?.toString();
       }
       if (ownerId != uid) continue;
-      out.add(
-        ProductMessageRow(
-          id: m['id']?.toString() ?? '',
-          productId: m['product_id']?.toString() ?? '',
-          productName: productName ?? 'Producto',
-          senderId: m['sender_id']?.toString() ?? '',
-          body: m['body']?.toString() ?? '',
-          createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ??
-              DateTime.fromMillisecondsSinceEpoch(0),
-        ),
-      );
+      out.add(_productMessageRowFromJson(m));
     }
     return out;
   }
@@ -480,13 +454,17 @@ class InventoryMetrics {
   final int paused;
 }
 
-/// Fila de mensaje con nombre de producto (join).
+/// Fila de mensaje con producto y perfil del remitente (join).
 class ProductMessageRow {
   const ProductMessageRow({
     required this.id,
     required this.productId,
     required this.productName,
+    this.productSku,
     required this.senderId,
+    this.senderBusinessName,
+    this.senderRif,
+    this.senderPhone,
     required this.body,
     required this.createdAt,
   });
@@ -494,7 +472,57 @@ class ProductMessageRow {
   final String id;
   final String productId;
   final String productName;
+  final String? productSku;
   final String senderId;
+  final String? senderBusinessName;
+  final String? senderRif;
+  final String? senderPhone;
   final String body;
   final DateTime createdAt;
+
+  String get senderDisplayName {
+    final n = senderBusinessName?.trim();
+    if (n != null && n.isNotEmpty) return n;
+    return 'Aliado';
+  }
+}
+
+ProductMessageRow _productMessageRowFromJson(Map<String, dynamic> m) {
+  final products = m['products'];
+  String? productName;
+  String? productSku;
+  if (products is Map) {
+    final pm = Map<String, dynamic>.from(products);
+    productName = pm['name']?.toString();
+    final s = pm['sku']?.toString().trim();
+    productSku = (s != null && s.isNotEmpty) ? s : null;
+  }
+
+  final prof = m['profiles'];
+  String? biz;
+  String? rif;
+  String? phone;
+  if (prof is Map) {
+    final p = Map<String, dynamic>.from(prof);
+    biz = p['business_name']?.toString().trim();
+    if (biz != null && biz.isEmpty) biz = null;
+    rif = p['rif']?.toString().trim();
+    if (rif != null && rif.isEmpty) rif = null;
+    phone = p['phone']?.toString().trim();
+    if (phone != null && phone.isEmpty) phone = null;
+  }
+
+  return ProductMessageRow(
+    id: m['id']?.toString() ?? '',
+    productId: m['product_id']?.toString() ?? '',
+    productName: productName ?? 'Producto',
+    productSku: productSku,
+    senderId: m['sender_id']?.toString() ?? '',
+    senderBusinessName: biz,
+    senderRif: rif,
+    senderPhone: phone,
+    body: m['body']?.toString() ?? '',
+    createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+  );
 }

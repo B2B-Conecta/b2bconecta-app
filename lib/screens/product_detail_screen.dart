@@ -11,27 +11,6 @@ class ProductDetailScreen extends StatelessWidget {
 
   static String heroImageTag(PartModel p) => 'product-image-${p.id}';
 
-  static List<String> _specLines(PartModel p) {
-    final lines = <String>[];
-    if (p.compatibilidad != null && p.compatibilidad!.trim().isNotEmpty) {
-      lines.add('Compatibilidad: ${p.compatibilidad!.trim()}');
-    }
-    lines.add('Stock: ${p.stock} unidades');
-    final desc = p.descripcion?.trim();
-    if (desc != null && desc.isNotEmpty) {
-      final first = desc.split(RegExp(r'[\n.]')).first.trim();
-      if (first.isNotEmpty) {
-        lines.add(first.length > 48 ? '${first.substring(0, 45)}…' : first);
-      }
-    }
-    lines.add('Ref: ${p.id}');
-    final out = lines.take(4).toList();
-    while (out.length < 4) {
-      out.add('—');
-    }
-    return out;
-  }
-
   String get _skuDisplay {
     final sku = part.sku?.trim();
     if (sku != null && sku.isNotEmpty) return sku;
@@ -43,7 +22,6 @@ class ProductDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final importer = (part.ownerBusinessName ?? '').trim().toUpperCase();
-    final specs = _specLines(part);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -188,39 +166,57 @@ class ProductDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 4,
-                        children: specs
-                            .map(
-                              (s) => Container(
-                                alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.fieldFill,
-                                  borderRadius: AppDecorations.radius12,
-                                ),
-                                child: Text(
-                                  s,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
+                      if (part.compatibilidad != null &&
+                          part.compatibilidad!.trim().isNotEmpty)
+                        _SpecBlock(
+                          label: 'Compatibilidad',
+                          child: Text(
+                            part.compatibilidad!.trim(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      if (part.compatibilidad != null &&
+                          part.compatibilidad!.trim().isNotEmpty)
+                        const SizedBox(height: 10),
+                      _SpecBlock(
+                        label: 'Stock',
+                        child: Text(
+                          '${part.stock} unidades',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.45,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _SpecBlock(
+                        label: 'Referencia interna (ID)',
+                        child: SelectableText(
+                          part.id,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Puedes copiar el ID para soporte o seguimiento interno.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                       const SizedBox(height: 28),
                       const Row(
@@ -293,6 +289,44 @@ class ProductDetailScreen extends StatelessWidget {
           size: 72,
           color: Colors.grey.shade500,
         ),
+      ),
+    );
+  }
+}
+
+class _SpecBlock extends StatelessWidget {
+  const _SpecBlock({
+    required this.label,
+    required this.child,
+  });
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: AppDecorations.radius12,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
       ),
     );
   }

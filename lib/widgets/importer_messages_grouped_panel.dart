@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'inquiry_message_card.dart';
 
 /// Pestaña Mensajes: conversaciones agrupadas por producto (importador).
 class ImporterMessagesGroupedPanel extends StatelessWidget {
@@ -64,27 +65,66 @@ class ImporterMessagesGroupedPanel extends StatelessWidget {
           itemBuilder: (context, i) {
             final e = entries[i];
             final name = e.value.first.productName;
+            final sku = e.value.first.productSku;
             final msgs = List<ProductMessageRow>.from(e.value)
               ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            final lastContact = msgs.first.senderDisplayName;
+
             return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ExpansionTile(
-                initiallyExpanded: i == 0,
-                title: Text(
-                  name,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: AppDecorations.radius12,
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
                 ),
-                subtitle: Text('${msgs.length} mensaje(s)'),
-                children: [
-                  for (final m in msgs)
-                    ListTile(
-                      title: Text(m.body),
-                      subtitle: Text(
-                        m.createdAt.toLocal().toString(),
-                        style: const TextStyle(fontSize: 11),
-                      ),
+                child: ExpansionTile(
+                  initiallyExpanded: i == 0,
+                  tilePadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
                     ),
-                ],
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 4),
+                      if (sku != null && sku.trim().isNotEmpty)
+                        Text(
+                          'SKU: $sku',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${msgs.length} mensaje(s) · último contacto: $lastContact',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  children: [
+                    for (final m in msgs)
+                      InquiryMessageCard(
+                        message: m,
+                        showProductMeta: false,
+                      ),
+                  ],
+                ),
               ),
             );
           },

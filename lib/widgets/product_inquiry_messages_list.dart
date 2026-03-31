@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'inquiry_message_card.dart';
 
 /// Lista de mensajes de negociación para un producto (importador).
 class ProductInquiryMessagesList extends StatelessWidget {
@@ -39,22 +40,13 @@ class ProductInquiryMessagesList extends StatelessWidget {
             ),
           );
         }
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
           itemCount: rows.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (context, i) {
-            final m = rows[i];
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                m.body,
-                style: const TextStyle(fontSize: 15),
-              ),
-              subtitle: Text(
-                '${m.createdAt.toLocal()} · remitente ${m.senderId.length > 8 ? m.senderId.substring(0, 8) : m.senderId}…',
-                style: const TextStyle(fontSize: 11),
-              ),
+            return InquiryMessageCard(
+              message: rows[i],
+              showProductMeta: false,
             );
           },
         );

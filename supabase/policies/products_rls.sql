@@ -3,12 +3,12 @@
 
 alter table public.products enable row level security;
 
--- Lectura: usuarios autenticados ven el catálogo (ajusta si el catálogo es público con anon).
+-- Lectura: aliados solo ven activos; el dueño ve todo su inventario (incl. pausa).
 create policy "products_select_authenticated"
 on public.products
 for select
 to authenticated
-using (true);
+using (is_active = true or owner_id = auth.uid());
 
 -- Inserción: solo filas donde el dueño es el usuario actual.
 create policy "products_insert_own"

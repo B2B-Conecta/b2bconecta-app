@@ -5,6 +5,7 @@ class CatalogFilters {
     this.ownerId,
     this.minPrice,
     this.maxPrice,
+    this.onlyActiveProducts = true,
   });
 
   /// Texto libre: coincide con `products.name` (ilike, sin distinguir mayúsculas).
@@ -19,7 +20,11 @@ class CatalogFilters {
   /// Precio máximo en USD (`price_usd`).
   final double? maxPrice;
 
-  static const CatalogFilters empty = CatalogFilters();
+  /// Catálogo público (aliados): solo filas con `is_active = true`.
+  /// Inventario del importador: `false` para incluir pausados.
+  final bool onlyActiveProducts;
+
+  static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
 
   bool get hasAnyFilter {
     final q = searchQuery?.trim();

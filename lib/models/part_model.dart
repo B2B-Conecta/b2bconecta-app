@@ -11,6 +11,9 @@ class PartModel {
     required this.precio,
     required this.stock,
     this.imagenUrl,
+    this.sku,
+    this.isActive = true,
+    this.category,
   });
 
   final String id;
@@ -27,6 +30,14 @@ class PartModel {
   final int stock;
   final String? imagenUrl;
 
+  /// Llave de negocio por importador (tabla `products.sku`).
+  final String? sku;
+
+  /// `false` = modo pausa (no visible para aliados).
+  final bool isActive;
+
+  final String? category;
+
   factory PartModel.fromJson(Map<String, dynamic> json) {
     // Tabla `products`: owner_id, name, description, compatibility, price_usd, stock, image_url.
     final nombreRaw = json['name'] ?? json['nombre'];
@@ -36,6 +47,11 @@ class PartModel {
     final imagenRaw = json['image_url'] ?? json['imagen_url'];
 
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
+
+    final isActiveRaw = json['is_active'];
+    final isActive = isActiveRaw is bool
+        ? isActiveRaw
+        : (isActiveRaw == null ? true : isActiveRaw.toString() == 'true');
 
     return PartModel(
       id: json['id']?.toString() ?? '',
@@ -47,6 +63,39 @@ class PartModel {
       precio: _asDouble(precioRaw),
       stock: _asInt(json['stock']),
       imagenUrl: _nullableUrl(imagenRaw),
+      sku: _nullableText(json['sku']),
+      isActive: isActive,
+      category: _nullableText(json['category']),
+    );
+  }
+
+  PartModel copyWith({
+    String? id,
+    String? ownerId,
+    String? ownerBusinessName,
+    String? nombre,
+    String? descripcion,
+    String? compatibilidad,
+    double? precio,
+    int? stock,
+    String? imagenUrl,
+    String? sku,
+    bool? isActive,
+    String? category,
+  }) {
+    return PartModel(
+      id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
+      ownerBusinessName: ownerBusinessName ?? this.ownerBusinessName,
+      nombre: nombre ?? this.nombre,
+      descripcion: descripcion ?? this.descripcion,
+      compatibilidad: compatibilidad ?? this.compatibilidad,
+      precio: precio ?? this.precio,
+      stock: stock ?? this.stock,
+      imagenUrl: imagenUrl ?? this.imagenUrl,
+      sku: sku ?? this.sku,
+      isActive: isActive ?? this.isActive,
+      category: category ?? this.category,
     );
   }
 

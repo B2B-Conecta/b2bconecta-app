@@ -6,6 +6,7 @@ import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
 
@@ -111,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ownerId: _selectedOwnerId,
       minPrice: minP,
       maxPrice: maxP,
+      onlyActiveProducts: true,
     );
   }
 
@@ -373,43 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: appBar,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: 56,
-                  color: AppColors.brandBlue.withOpacity(0.9),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Acceso restringido: Esta sección es exclusiva para Aliados '
-                  '(Minoristas)',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.4,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Si necesita acceso a esta área, contacte a soporte técnico.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.35,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        body: const ImporterInventoryDashboard(),
       );
     }
 

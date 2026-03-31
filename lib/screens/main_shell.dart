@@ -4,6 +4,7 @@ import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/importer_messages_grouped_panel.dart';
 import '../widgets/motolink_app_bar.dart';
 import '../widgets/profile_b2b_form.dart';
 import 'account_settings_screen.dart';
@@ -48,7 +49,9 @@ class _MainShellState extends State<MainShell> {
         children: [
           HomeScreen(homeRole: widget.homeRole),
           _OrdersTab(homeRole: widget.homeRole),
-          _MessagesTab(homeRole: widget.homeRole),
+          _MessagesTab(
+            homeRole: widget.homeRole,
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: widget.homeRole,
@@ -70,23 +73,33 @@ class _MainShellState extends State<MainShell> {
         child: BottomNavigationBar(
           currentIndex: _tabIndex,
           onTap: (i) => setState(() => _tabIndex = i),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view),
-              label: 'Catálogo',
+              icon: Icon(
+                widget.homeRole == AppHomeRole.importador
+                    ? Icons.inventory_2_outlined
+                    : Icons.grid_view_outlined,
+              ),
+              activeIcon: Icon(
+                widget.homeRole == AppHomeRole.importador
+                    ? Icons.inventory_2
+                    : Icons.grid_view,
+              ),
+              label: widget.homeRole == AppHomeRole.importador
+                  ? 'Inventario'
+                  : 'Catálogo',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart_outlined),
               activeIcon: Icon(Icons.shopping_cart),
               label: 'Pedidos',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
               activeIcon: Icon(Icons.chat_bubble),
               label: 'Mensajes',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'Perfil',
@@ -173,47 +186,49 @@ class _MessagesTab extends StatelessWidget {
             : MotolinkAppBarLogoSizes.importador,
         onNotificationTap: () {},
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  Icons.forum_outlined,
-                  size: 44,
-                  color: Colors.grey.shade500,
+      body: homeRole == AppHomeRole.importador
+          ? const ImporterMessagesGroupedPanel()
+          : Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        Icons.forum_outlined,
+                        size: 44,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Negociaciones',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Sin conversaciones activas',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Negociaciones',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sin conversaciones activas',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

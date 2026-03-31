@@ -33,6 +33,8 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   String get _skuDisplay {
+    final sku = part.sku?.trim();
+    if (sku != null && sku.isNotEmpty) return sku;
     final id = part.id;
     if (id.length <= 14) return id;
     return id.substring(0, 12);

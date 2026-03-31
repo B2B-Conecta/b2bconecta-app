@@ -5,6 +5,10 @@ import '../theme/app_theme.dart';
 import '../widgets/profile_b2b_form.dart';
 
 /// Onboarding o edición de perfil B2B (misma estética que la pestaña Perfil).
+///
+/// Si el perfil ya tiene [ProfileModel.role] definido, el selector de rol en
+/// [ProfileB2BForm] queda deshabilitado (decisión permanente; ver también
+/// [SupabaseService.upsertMyProfile]).
 class ProfileSetupScreen extends StatelessWidget {
   const ProfileSetupScreen({
     super.key,

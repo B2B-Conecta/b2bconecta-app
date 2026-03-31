@@ -38,6 +38,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   String _role = 'importador';
   bool _saving = false;
 
+  /// Rol ya persistido: el selector no puede cambiarse (RLS / negocio).
+  bool get _roleLocked {
+    final r = widget.initial?.role?.trim();
+    return r != null && r.isNotEmpty;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -210,7 +216,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   label: 'Importador',
                   icon: Icons.local_shipping_outlined,
                   selected: _role == 'importador',
-                  onTap: _saving
+                  enabled: !_roleLocked,
+                  onTap: _saving || _roleLocked
                       ? null
                       : () => setState(() => _role = 'importador'),
                 ),
@@ -221,12 +228,28 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   label: 'Aliado',
                   icon: Icons.person_outline,
                   selected: _role == 'aliado',
-                  onTap:
-                      _saving ? null : () => setState(() => _role = 'aliado'),
+                  enabled: !_roleLocked,
+                  onTap: _saving || _roleLocked
+                      ? null
+                      : () => setState(() => _role = 'aliado'),
                 ),
               ),
             ],
           ),
+          if (_roleLocked) ...[
+            const SizedBox(height: 12),
+            Text(
+              'El tipo de cuenta no puede ser modificado. Contacte a soporte '
+              'técnico para asistencia',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: Colors.orange.shade900,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _sectionLabel('NOMBRE DEL NEGOCIO'),
           TextFormField(
@@ -309,51 +332,58 @@ class _RoleChoiceTile extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
+    this.enabled = true,
     this.onTap,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
+  final bool enabled;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.brand.withOpacity(0.08) : Colors.white,
         borderRadius: AppDecorations.radius12,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.brand.withOpacity(0.08) : Colors.white,
-            borderRadius: AppDecorations.radius12,
-            border: Border.all(
-              color: selected ? AppColors.brand : Colors.grey.shade300,
-              width: selected ? 2.5 : 1,
+        border: Border.all(
+          color: selected ? AppColors.brand : Colors.grey.shade300,
+          width: selected ? 2.5 : 1,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 22,
+            color: selected ? AppColors.brand : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: selected ? AppColors.brand : AppColors.textSecondary,
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 22,
-                color: selected ? AppColors.brand : AppColors.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: selected ? AppColors.brand : AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
+        ],
+      ),
+    );
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppDecorations.radius12,
+          child: content,
         ),
       ),
     );

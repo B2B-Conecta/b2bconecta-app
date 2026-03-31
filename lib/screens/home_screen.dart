@@ -61,9 +61,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController = TextEditingController();
     _minPriceController = TextEditingController();
     _maxPriceController = TextEditingController();
-    _importersFuture = SupabaseService.fetchImporterOptions();
-    _partsFuture = _fetchProducts(reset: true);
-    _refreshCatalogTotal();
+    if (widget.homeRole == AppHomeRole.aliado) {
+      _importersFuture = SupabaseService.fetchImporterOptions();
+      _partsFuture = _fetchProducts(reset: true);
+      _refreshCatalogTotal();
+    } else {
+      _importersFuture = Future.value(const []);
+      _partsFuture = Future.value(const []);
+    }
   }
 
   @override
@@ -357,14 +362,60 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appBar = MotolinkAppBar(
+      logoHeight: widget.homeRole == AppHomeRole.aliado
+          ? MotolinkAppBarLogoSizes.aliado
+          : MotolinkAppBarLogoSizes.importador,
+      onNotificationTap: () {},
+    );
+
+    if (widget.homeRole == AppHomeRole.importador) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: appBar,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  size: 56,
+                  color: AppColors.brandBlue.withOpacity(0.9),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Acceso restringido: Esta sección es exclusiva para Aliados '
+                  '(Minoristas)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Si necesita acceso a esta área, contacte a soporte técnico.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(
-        logoHeight: widget.homeRole == AppHomeRole.aliado
-            ? MotolinkAppBarLogoSizes.aliado
-            : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: () {},
-      ),
+      appBar: appBar,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

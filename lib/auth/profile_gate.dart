@@ -96,18 +96,21 @@ class _ProfileGateState extends State<ProfileGate> {
         }
 
         final profile = snapshot.data;
-        final needsSetup = profile == null || !profile.isComplete;
+        final roleNorm = profile?.role?.trim().toLowerCase();
+        final hasValidRole =
+            roleNorm == 'importador' || roleNorm == 'aliado';
+        final needsOnboarding =
+            profile == null || !hasValidRole || !profile.isComplete;
 
-        if (needsSetup) {
+        if (needsOnboarding) {
           return ProfileSetupScreen(
             initial: profile,
             onProfileComplete: _reloadProfile,
           );
         }
 
-        final role = profile.role?.trim().toLowerCase();
         final homeRole =
-            role == 'aliado' ? AppHomeRole.aliado : AppHomeRole.importador;
+            roleNorm == 'aliado' ? AppHomeRole.aliado : AppHomeRole.importador;
         return MainShell(homeRole: homeRole, profile: profile);
       },
     );

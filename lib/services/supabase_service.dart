@@ -24,6 +24,10 @@ class SupabaseService {
   }
 
   /// Crea o actualiza el perfil B2B (upsert por `id`).
+  ///
+  /// El campo [role] solo se persiste si el perfil aún no tiene rol definido
+  /// (`importador` / `aliado`). Tras la primera asignación, los updates omiten
+  /// `role` para que no pueda cambiarse desde el cliente.
   static Future<void> upsertMyProfile({
     required String businessName,
     required String rif,
@@ -35,12 +39,20 @@ class SupabaseService {
       throw StateError('No hay sesión activa.');
     }
 
+    final existing = await fetchMyProfile();
+    final existingRole = existing?.role?.trim().toLowerCase();
+    final roleAlreadySet =
+        existingRole == 'importador' || existingRole == 'aliado';
+
     final payload = <String, dynamic>{
       'id': uid,
       'business_name': businessName.trim(),
       'rif': rif.trim(),
-      'role': role.trim(),
     };
+    if (!roleAlreadySet) {
+      payload['role'] = role.trim();
+    }
+
     final p = phone?.trim();
     if (p != null && p.isNotEmpty) {
       payload['phone'] = p;

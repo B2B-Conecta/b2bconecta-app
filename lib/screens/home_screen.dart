@@ -66,6 +66,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _importersFuture = SupabaseService.fetchImporterOptions();
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
+    } else if (widget.homeRole == AppHomeRole.administrador) {
+      _importersFuture = Future.value(const []);
+      _partsFuture = Future.value(const []);
     } else {
       _importersFuture = Future.value(const []);
       _partsFuture = Future.value(const []);
@@ -370,6 +373,49 @@ class _HomeScreenState extends State<HomeScreen> {
           : MotolinkAppBarLogoSizes.importador,
       onNotificationTap: () {},
     );
+
+    if (widget.homeRole == AppHomeRole.administrador) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: appBar,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.admin_panel_settings_outlined,
+                  size: 64,
+                  color: AppColors.brandBlue,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Panel de intermediación',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Revisa y aprueba solicitudes en la pestaña «Bandeja». '
+                  'Los importadores solo ven pedidos que MotoLink haya validado.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.4,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     if (widget.homeRole == AppHomeRole.importador) {
       return Scaffold(

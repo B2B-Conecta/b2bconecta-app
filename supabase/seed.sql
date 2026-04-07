@@ -1,14 +1,18 @@
 -- =============================================================================
 -- MotoLink Pro — datos de desarrollo (seed)
 -- =============================================================================
--- Ejecutar en Supabase → SQL Editor (rol con permisos sobre auth y public).
+-- Aplicar al remoto enlazado (desde la raíz del repo, con `supabase link` hecho):
+--   supabase db query --linked -f supabase/seed.sql
+-- O pegar este archivo en Supabase → SQL Editor (rol con permisos sobre auth y public).
 --
--- Contraseña común (10 usuarios): SeedPass123!
+-- Contraseña común (11 usuarios): SeedPass123!
 -- Importadores: importador1@motolink.seed … importador7@motolink.seed
 -- Aliados:      aliado1@motolink.seed … aliado3@motolink.seed
+-- Admin broker: admin@motolink.seed
 --
--- Contenido: 10 usuarios auth + perfiles + esquema inventario (sku, is_active,
--- category, product_messages) + 140 productos con SKU tipo IMP{n}-### + 2 mensajes seed.
+-- Requiere migración `20260407120000_broker_transaction_requests.sql` (tabla transaction_requests).
+-- Contenido: 11 usuarios auth + perfiles + esquema inventario (sku, is_active,
+-- category) + 140 productos + solicitudes broker de ejemplo.
 -- Re-ejecutar: aplica DDL idempotente, borra productos de importadores seed,
 -- inserta productos + mensajes de ejemplo; usuarios/perfiles solo si no existen.
 -- =============================================================================
@@ -33,7 +37,8 @@ seed_users (id, email) as (
     ('a1000007-0000-4000-8000-000000000007'::uuid, 'importador7@motolink.seed'),
     ('a2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motolink.seed'),
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
-    ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed')
+    ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
+    ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed')
 )
 insert into auth.users (
   instance_id,
@@ -110,7 +115,8 @@ from (
     ('a1000007-0000-4000-8000-000000000007'::uuid, 'importador7@motolink.seed'),
     ('a2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motolink.seed'),
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
-    ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed')
+    ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
+    ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed')
 ) as s(id, email)
 where exists (select 1 from auth.users u where u.id = s.id)
   and not exists (
@@ -118,32 +124,45 @@ where exists (select 1 from auth.users u where u.id = s.id)
     where i.user_id = s.id and i.provider = 'email'
   );
 
+alter table public.profiles
+  add column if not exists credit_score integer not null default 100;
+alter table public.profiles
+  add column if not exists credit_limit numeric(14, 2);
+alter table public.profiles
+  drop constraint if exists profiles_role_check;
+alter table public.profiles
+  add constraint profiles_role_check
+  check (role in ('importador', 'aliado', 'administrador'));
+
 -- Perfiles B2B
-insert into public.profiles (id, business_name, rif, role, phone, created_at)
+insert into public.profiles (id, business_name, rif, role, phone, credit_score, credit_limit, created_at)
 values
-  ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', now()),
-  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', now()),
-  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', now()),
-  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', now()),
-  ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', now()),
-  ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', now()),
-  ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', now()),
-  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', now()),
-  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', now()),
-  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', now())
+  ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', 100, 100000, now()),
+  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, now()),
+  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, now()),
+  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, now()),
+  ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, now()),
+  ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, now()),
+  ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, now()),
+  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, now()),
+  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, now()),
+  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, now()),
+  ('a3000001-0000-4000-8000-000000000001', 'MotoLink Pro (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,
   role = excluded.role,
-  phone = excluded.phone;
+  phone = excluded.phone,
+  credit_score = excluded.credit_score,
+  credit_limit = excluded.credit_limit;
 
 -- =============================================================================
 -- Esquema inventario B2B (idempotente). Debe existir antes de insertar productos.
 -- (Mismo contenido que supabase/migrations/20260327120000_importer_inventory.sql)
 -- =============================================================================
 
--- Inventario B2B: SKU, categoría, modo pausa; mensajes por producto.
--- Ejecutar en Supabase SQL Editor (o migraciones) tras revisar.
+-- Inventario B2B: SKU, categoría, modo pausa.
+-- (Solicitudes broker: migración 20260407120000_broker_transaction_requests.sql)
 
 alter table public.products
   add column if not exists sku text,
@@ -166,48 +185,6 @@ on public.products
 for select
 to authenticated
 using (is_active = true or owner_id = auth.uid());
-
--- Mensajes ligados a producto (negociación).
-create table if not exists public.product_messages (
-  id uuid primary key default gen_random_uuid(),
-  product_id uuid not null references public.products (id) on delete cascade,
-  sender_id uuid not null references public.profiles (id) on delete cascade,
-  body text not null,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists product_messages_product_id_idx
-  on public.product_messages (product_id);
-create index if not exists product_messages_created_at_idx
-  on public.product_messages (created_at desc);
-
-alter table public.product_messages enable row level security;
-
-drop policy if exists "product_messages_select" on public.product_messages;
-create policy "product_messages_select"
-on public.product_messages
-for select
-to authenticated
-using (
-  exists (
-    select 1 from public.products p
-    where p.id = product_messages.product_id
-      and (p.owner_id = auth.uid() or product_messages.sender_id = auth.uid())
-  )
-);
-
-drop policy if exists "product_messages_insert" on public.product_messages;
-create policy "product_messages_insert"
-on public.product_messages
-for insert
-to authenticated
-with check (
-  sender_id = auth.uid()
-  and exists (
-    select 1 from public.products p
-    where p.id = product_messages.product_id
-  )
-);
 
 -- Quitar productos seed previos de estos importadores (re-ejecución limpia)
 delete from public.products
@@ -376,13 +353,48 @@ values
   ('a1000007-0000-4000-8000-000000000007', 'Aceite 2T mezcla', '1L', 7.2, 60, '2T aire', null, 'IMP7-019', true, 'Accesorios'),
   ('a1000007-0000-4000-8000-000000000007', 'Filtro aire papel OEM style', 'Rectangular', 11.0, 46, 'Scooter 150', null, 'IMP7-020', false, 'Accesorios');
 
--- Mensajes de ejemplo (aliados consultando por producto)
-insert into public.product_messages (product_id, sender_id, body)
-select p.id, 'a2000001-0000-4000-8000-000000000001'::uuid,
-  'Hola, necesitamos cotización para varias unidades del Kit embrague (SKU IMP1-001).'
-from public.products p where p.sku = 'IMP1-001' limit 1;
+-- Solicitudes broker de ejemplo (re-ejecución: quita filas demo por SKU + aliado)
+delete from public.transaction_requests tr
+using public.products p
+where tr.product_id = p.id
+  and p.sku in ('IMP1-001', 'IMP2-001')
+  and tr.aliado_id in (
+    'a2000001-0000-4000-8000-000000000001'::uuid,
+    'a2000002-0000-4000-8000-000000000002'::uuid
+  );
 
-insert into public.product_messages (product_id, sender_id, body)
-select p.id, 'a2000002-0000-4000-8000-000000000002'::uuid,
-  '¿Disponibilidad del cilindro 150cc? REF IMP2-001.'
-from public.products p where p.sku = 'IMP2-001' limit 1;
+insert into public.transaction_requests (
+  aliado_id, product_id, owner_id, status, cantidad,
+  precio_unitario_proveedor, precio_unitario_aliado, precio_total, notas_admin
+)
+select
+  'a2000001-0000-4000-8000-000000000001'::uuid,
+  p.id,
+  p.owner_id,
+  'pendiente',
+  2,
+  p.price_usd::numeric,
+  round(p.price_usd * 1.1, 4),
+  round(p.price_usd * 1.1 * 2, 2),
+  null
+from public.products p
+where p.sku = 'IMP1-001'
+limit 1;
+
+insert into public.transaction_requests (
+  aliado_id, product_id, owner_id, status, cantidad,
+  precio_unitario_proveedor, precio_unitario_aliado, precio_total, notas_admin
+)
+select
+  'a2000002-0000-4000-8000-000000000002'::uuid,
+  p.id,
+  p.owner_id,
+  'aprobado_admin',
+  1,
+  p.price_usd::numeric,
+  round(p.price_usd * 1.1, 4),
+  round(p.price_usd * 1.1, 2),
+  'Validado demo seed.'
+from public.products p
+where p.sku = 'IMP2-001'
+limit 1;

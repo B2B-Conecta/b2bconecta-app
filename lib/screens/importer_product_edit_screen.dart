@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/product_inquiry_messages_list.dart';
+import '../widgets/product_validated_orders_list.dart';
 
 /// Crear o editar un producto del inventario (importador).
 class ImporterProductEditScreen extends StatefulWidget {
@@ -408,7 +408,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
                 labelColor: AppColors.brandBlue,
                 tabs: const [
                   Tab(text: 'Datos'),
-                  Tab(text: 'Mensajes'),
+                  Tab(text: 'Pedidos validados'),
                 ],
               )
             : null,
@@ -430,7 +430,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
               controller: _tabController,
               children: [
                 _buildFormBody(),
-                ProductInquiryMessagesList(
+                ProductValidatedOrdersList(
                   productId: widget.initial!.id,
                 ),
               ],

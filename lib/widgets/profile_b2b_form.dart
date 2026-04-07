@@ -57,7 +57,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
     final r = i?.role?.trim().toLowerCase();
-    if (r == 'importador' || r == 'aliado') {
+    if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
     }
   }
@@ -235,6 +235,19 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: _RoleChoiceTile(
+              label: 'Administrador (broker)',
+              icon: Icons.admin_panel_settings_outlined,
+              selected: _role == 'administrador',
+              enabled: !_roleLocked,
+              onTap: _saving || _roleLocked
+                  ? null
+                  : () => setState(() => _role = 'administrador'),
+            ),
           ),
           if (_roleLocked) ...[
             const SizedBox(height: 12),

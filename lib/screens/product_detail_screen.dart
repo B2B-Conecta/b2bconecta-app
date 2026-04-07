@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/part_model.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
-/// Ficha de producto alineada a la referencia (imagen, specs en grid, CTA fijo).
-class ProductDetailScreen extends StatelessWidget {
+/// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
+class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.part});
 
   final PartModel part;
 
   static String heroImageTag(PartModel p) => 'product-image-${p.id}';
+
+  @override
+  State<ProductDetailScreen> createState() => _ProductDetailScreenState();
+}
+
+class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  bool _submitting = false;
+
+  PartModel get part => widget.part;
 
   String get _skuDisplay {
     final sku = part.sku?.trim();
@@ -17,6 +28,141 @@ class ProductDetailScreen extends StatelessWidget {
     final id = part.id;
     if (id.length <= 14) return id;
     return id.substring(0, 12);
+  }
+
+  double get _precioAliadoUnit =>
+      SupabaseService.calculateAliadoUnitPrice(part.precio);
+
+  Future<void> _openRequestDialog() async {
+    final ownerId = part.ownerId?.trim();
+    if (ownerId == null || ownerId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo identificar al importador.')),
+      );
+      return;
+    }
+
+    final qtyController = TextEditingController(text: '1');
+    final maxQty = part.stock < 1 ? 1 : part.stock;
+
+    bool? ok;
+    var qtyText = '1';
+    try {
+      ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text('Solicitar pedido'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    part.nombre,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Precio proveedor (ref.): \$${part.precio.toStringAsFixed(2)} / u.',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  Text(
+                    'Precio estimado (+${(SupabaseService.logisticFeeRate * 100).toStringAsFixed(0)}% intermediación): '
+                    '\$${_precioAliadoUnit.toStringAsFixed(2)} / u.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brandBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: qtyController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: 'Cantidad (máx. $maxQty)',
+                      filled: true,
+                      fillColor: AppColors.fieldFill,
+                      border: OutlineInputBorder(
+                        borderRadius: AppDecorations.radius12,
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: qtyController,
+                    builder: (context, v, _) {
+                      final q = int.tryParse(v.text) ?? 0;
+                      final safe = q.clamp(1, maxQty);
+                      final total = _precioAliadoUnit * safe;
+                      return Text(
+                        'Total estimado: \$${total.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: AppColors.brandOrange,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'La solicitud quedará pendiente de aprobación por MotoLink. '
+                    'El importador solo la verá tras validación.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Enviar solicitud'),
+              ),
+            ],
+          );
+        },
+      );
+      qtyText = qtyController.text;
+    } finally {
+      qtyController.dispose();
+    }
+
+    if (ok != true || !mounted) return;
+
+    var q = int.tryParse(qtyText) ?? 1;
+    q = q.clamp(1, maxQty);
+
+    setState(() => _submitting = true);
+    try {
+      await SupabaseService.insertTransactionRequest(
+        productId: part.id,
+        ownerId: ownerId,
+        cantidad: q,
+        precioUnitarioProveedor: part.precio,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solicitud enviada. MotoLink la revisará.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -39,7 +185,7 @@ class ProductDetailScreen extends StatelessWidget {
                         child: Material(
                           color: Colors.white,
                           child: Hero(
-                            tag: heroImageTag(part),
+                            tag: ProductDetailScreen.heroImageTag(part),
                             child: part.imagenUrl != null &&
                                     part.imagenUrl!.isNotEmpty
                                 ? Image.network(
@@ -113,6 +259,18 @@ class ProductDetailScreen extends StatelessWidget {
                           color: AppColors.brand,
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Precio estimado para ti (incl. intermediación): '
+                          '\$${_precioAliadoUnit.toStringAsFixed(2)} / u.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandBlue,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -120,82 +278,50 @@ class ProductDetailScreen extends StatelessWidget {
                             width: 10,
                             height: 10,
                             decoration: const BoxDecoration(
-                              color: AppColors.successGreen,
+                              color: Color(0xFF2E7D32),
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${part.stock} unidades disponibles',
+                            'Stock: ${part.stock} uds',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: Colors.grey.shade800,
                             ),
                           ),
                         ],
                       ),
-                      if (part.descripcion != null &&
-                          part.descripcion!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Descripción Técnica',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                      const SizedBox(height: 16),
+                      if ((part.descripcion ?? '').trim().isNotEmpty)
+                        _SpecBlock(
+                          label: 'Descripción',
+                          child: Text(
+                            part.descripcion!.trim(),
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: Colors.grey.shade800,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          part.descripcion!.trim(),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.45,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Especificaciones',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (part.compatibilidad != null &&
-                          part.compatibilidad!.trim().isNotEmpty)
+                      if ((part.descripcion ?? '').trim().isNotEmpty)
+                        const SizedBox(height: 12),
+                      if ((part.compatibilidad ?? '').trim().isNotEmpty)
                         _SpecBlock(
                           label: 'Compatibilidad',
                           child: Text(
                             part.compatibilidad!.trim(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               height: 1.45,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                              color: Colors.grey.shade800,
                             ),
                           ),
                         ),
-                      if (part.compatibilidad != null &&
-                          part.compatibilidad!.trim().isNotEmpty)
-                        const SizedBox(height: 10),
-                      _SpecBlock(
-                        label: 'Stock',
-                        child: Text(
-                          '${part.stock} unidades',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 1.45,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
+                      if ((part.compatibilidad ?? '').trim().isNotEmpty)
+                        const SizedBox(height: 12),
                       _SpecBlock(
                         label: 'Referencia interna (ID)',
                         child: SelectableText(
@@ -264,15 +390,17 @@ class ProductDetailScreen extends StatelessWidget {
               ],
             ),
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Negociación próximamente disponible.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              child: const Text('Iniciar Negociación'),
+              onPressed: _submitting ? null : _openRequestDialog,
+              child: _submitting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Solicitar pedido'),
             ),
           ),
         ],

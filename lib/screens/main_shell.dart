@@ -4,7 +4,9 @@ import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/importer_messages_grouped_panel.dart';
+import '../widgets/admin_approval_inbox_panel.dart';
+import '../widgets/aliado_my_requests_panel.dart';
+import '../widgets/importer_validated_orders_panel.dart';
 import '../widgets/motolink_app_bar.dart';
 import '../widgets/profile_b2b_form.dart';
 import 'account_settings_screen.dart';
@@ -49,9 +51,7 @@ class _MainShellState extends State<MainShell> {
         children: [
           HomeScreen(homeRole: widget.homeRole),
           _OrdersTab(homeRole: widget.homeRole),
-          _MessagesTab(
-            homeRole: widget.homeRole,
-          ),
+          _MessagesTab(homeRole: widget.homeRole),
           _ProfileTab(
             profile: _profile,
             homeRole: widget.homeRole,
@@ -94,10 +94,26 @@ class _MainShellState extends State<MainShell> {
               activeIcon: Icon(Icons.shopping_cart),
               label: 'Pedidos',
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
-              label: 'Mensajes',
+            BottomNavigationBarItem(
+              icon: Icon(
+                widget.homeRole == AppHomeRole.administrador
+                    ? Icons.inbox_outlined
+                    : widget.homeRole == AppHomeRole.importador
+                        ? Icons.check_circle_outline
+                        : Icons.list_alt_outlined,
+              ),
+              activeIcon: Icon(
+                widget.homeRole == AppHomeRole.administrador
+                    ? Icons.inbox
+                    : widget.homeRole == AppHomeRole.importador
+                        ? Icons.check_circle
+                        : Icons.list_alt,
+              ),
+              label: widget.homeRole == AppHomeRole.administrador
+                  ? 'Bandeja'
+                  : widget.homeRole == AppHomeRole.importador
+                      ? 'Pedidos validados'
+                      : 'Mis solicitudes',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
@@ -140,25 +156,31 @@ class _OrdersTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
-                  Icons.inventory_2_outlined,
+                  homeRole == AppHomeRole.administrador
+                      ? Icons.admin_panel_settings_outlined
+                      : Icons.inventory_2_outlined,
                   size: 44,
                   color: Colors.grey.shade500,
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Mis Pedidos',
-                style: TextStyle(
+              Text(
+                homeRole == AppHomeRole.administrador
+                    ? 'Pedidos (broker)'
+                    : 'Mis Pedidos',
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Aún no tiene pedidos activos',
+              Text(
+                homeRole == AppHomeRole.administrador
+                    ? 'La operación de pedidos B2B se gestiona desde la bandeja de aprobación.'
+                    : 'Aún no tiene pedidos activos',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 15,
                   color: AppColors.textSecondary,
                 ),
@@ -186,49 +208,11 @@ class _MessagesTab extends StatelessWidget {
             : MotolinkAppBarLogoSizes.importador,
         onNotificationTap: () {},
       ),
-      body: homeRole == AppHomeRole.importador
-          ? const ImporterMessagesGroupedPanel()
-          : Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        Icons.forum_outlined,
-                        size: 44,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Negociaciones',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Sin conversaciones activas',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      body: switch (homeRole) {
+        AppHomeRole.administrador => const AdminApprovalInboxPanel(),
+        AppHomeRole.importador => const ImporterValidatedOrdersPanel(),
+        AppHomeRole.aliado => const AliadoMyRequestsPanel(),
+      },
     );
   }
 }

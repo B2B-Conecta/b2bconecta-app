@@ -5,11 +5,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
+import '../models/transaction_request_model.dart';
 
 class SupabaseService {
   SupabaseService._();
 
   static const _productImagesBucket = 'product-images';
+
+  /// Fee de logística / intermediación (10 %). Cambiar aquí para ajustar precio aliado.
+  static const double logisticFeeRate = 0.10;
+
+  static double calculateAliadoUnitPrice(double precioUnitarioProveedor) {
+    return precioUnitarioProveedor * (1 + logisticFeeRate);
+  }
 
   static SupabaseClient get _client => Supabase.instance.client;
 
@@ -30,8 +38,8 @@ class SupabaseService {
   /// Crea o actualiza el perfil B2B (upsert por `id`).
   ///
   /// El campo [role] solo se persiste si el perfil aún no tiene rol definido
-  /// (`importador` / `aliado`). Tras la primera asignación, los updates omiten
-  /// `role` para que no pueda cambiarse desde el cliente.
+  /// (`importador` / `aliado` / `administrador`). Tras la primera asignación,
+  /// los updates omiten `role` para que no pueda cambiarse desde el cliente.
   static Future<void> upsertMyProfile({
     required String businessName,
     required String rif,
@@ -45,8 +53,9 @@ class SupabaseService {
 
     final existing = await fetchMyProfile();
     final existingRole = existing?.role?.trim().toLowerCase();
-    final roleAlreadySet =
-        existingRole == 'importador' || existingRole == 'aliado';
+    final roleAlreadySet = existingRole == 'importador' ||
+        existingRole == 'aliado' ||
+        existingRole == 'administrador';
 
     final payload = <String, dynamic>{
       'id': uid,
@@ -329,59 +338,134 @@ class SupabaseService {
     }).eq('id', productId);
   }
 
-  /// Mensajes de un producto concreto (dueño vía RLS).
-  static Future<List<ProductMessageRow>> fetchMessagesForProduct(
-    String productId,
-  ) async {
-    if (productId.isEmpty) return [];
+  static const _trSelect = '''
+    id,
+    aliado_id,
+    product_id,
+    owner_id,
+    status,
+    cantidad,
+    precio_unitario_proveedor,
+    precio_unitario_aliado,
+    precio_total,
+    notas_admin,
+    created_at,
+    updated_at,
+    products ( name, sku, price_usd ),
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score ),
+    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif )
+  ''';
 
-    final response = await _client.from('product_messages').select('''
-          id,
-          product_id,
-          sender_id,
-          body,
-          created_at,
-          products ( name, sku ),
-          profiles ( business_name, rif, phone )
-        ''').eq('product_id', productId).order('created_at', ascending: false);
-
-    final list = response as List<dynamic>;
-    final out = <ProductMessageRow>[];
-    for (final row in list) {
-      final m = Map<String, dynamic>.from(row as Map);
-      out.add(_productMessageRowFromJson(m));
-    }
-    return out;
-  }
-
-  /// Mensajes donde el importador es dueño del producto (agrupable por producto).
-  static Future<List<ProductMessageRow>> fetchMessagesForImporterInventory() async {
+  /// Solicitudes del aliado autenticado.
+  static Future<List<TransactionRequestModel>> fetchMyTransactionRequests() async {
     final uid = _currentUserId;
     if (uid == null) return [];
 
-    final response = await _client.from('product_messages').select('''
-          id,
-          product_id,
-          sender_id,
-          body,
-          created_at,
-          products ( name, owner_id, sku ),
-          profiles ( business_name, rif, phone )
-        ''').order('created_at', ascending: false);
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('aliado_id', uid)
+        .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
-    final out = <ProductMessageRow>[];
-    for (final row in list) {
-      final m = Map<String, dynamic>.from(row as Map);
-      final products = m['products'];
-      String? ownerId;
-      if (products is Map) {
-        ownerId = Map<String, dynamic>.from(products)['owner_id']?.toString();
-      }
-      if (ownerId != uid) continue;
-      out.add(_productMessageRowFromJson(m));
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Pedidos validados (`aprobado_admin`) para el importador actual.
+  static Future<List<TransactionRequestModel>>
+      fetchValidatedTransactionRequestsForImporter() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('owner_id', uid)
+        .eq('status', 'aprobado_admin')
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Pedidos validados para un producto (importador dueño vía RLS).
+  static Future<List<TransactionRequestModel>>
+      fetchValidatedTransactionRequestsForProduct(String productId) async {
+    if (productId.isEmpty) return [];
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('product_id', productId)
+        .eq('status', 'aprobado_admin')
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Bandeja admin: todas las solicitudes.
+  static Future<List<TransactionRequestModel>>
+      fetchTransactionRequestsForAdmin() async {
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  static Future<void> insertTransactionRequest({
+    required String productId,
+    required String ownerId,
+    required int cantidad,
+    required double precioUnitarioProveedor,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final unitAliado = calculateAliadoUnitPrice(precioUnitarioProveedor);
+    final total = unitAliado * cantidad;
+
+    await _client.from('transaction_requests').insert({
+      'aliado_id': uid,
+      'product_id': productId,
+      'owner_id': ownerId,
+      'status': 'pendiente',
+      'cantidad': cantidad,
+      'precio_unitario_proveedor': precioUnitarioProveedor,
+      'precio_unitario_aliado': unitAliado,
+      'precio_total': total,
+    });
+  }
+
+  static Future<void> adminUpdateTransactionRequest({
+    required String id,
+    required String status,
+    String? notasAdmin,
+  }) async {
+    final payload = <String, dynamic>{
+      'status': status,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    final n = notasAdmin?.trim();
+    if (n != null && n.isNotEmpty) {
+      payload['notas_admin'] = n;
     }
-    return out;
+    await _client.from('transaction_requests').update(payload).eq('id', id);
   }
 
   /// Obtiene repuestos desde [products] con paginacion.
@@ -452,77 +536,4 @@ class InventoryMetrics {
   final int totalProducts;
   final int outOfStock;
   final int paused;
-}
-
-/// Fila de mensaje con producto y perfil del remitente (join).
-class ProductMessageRow {
-  const ProductMessageRow({
-    required this.id,
-    required this.productId,
-    required this.productName,
-    this.productSku,
-    required this.senderId,
-    this.senderBusinessName,
-    this.senderRif,
-    this.senderPhone,
-    required this.body,
-    required this.createdAt,
-  });
-
-  final String id;
-  final String productId;
-  final String productName;
-  final String? productSku;
-  final String senderId;
-  final String? senderBusinessName;
-  final String? senderRif;
-  final String? senderPhone;
-  final String body;
-  final DateTime createdAt;
-
-  String get senderDisplayName {
-    final n = senderBusinessName?.trim();
-    if (n != null && n.isNotEmpty) return n;
-    return 'Aliado';
-  }
-}
-
-ProductMessageRow _productMessageRowFromJson(Map<String, dynamic> m) {
-  final products = m['products'];
-  String? productName;
-  String? productSku;
-  if (products is Map) {
-    final pm = Map<String, dynamic>.from(products);
-    productName = pm['name']?.toString();
-    final s = pm['sku']?.toString().trim();
-    productSku = (s != null && s.isNotEmpty) ? s : null;
-  }
-
-  final prof = m['profiles'];
-  String? biz;
-  String? rif;
-  String? phone;
-  if (prof is Map) {
-    final p = Map<String, dynamic>.from(prof);
-    biz = p['business_name']?.toString().trim();
-    if (biz != null && biz.isEmpty) biz = null;
-    rif = p['rif']?.toString().trim();
-    if (rif != null && rif.isEmpty) rif = null;
-    phone = p['phone']?.toString().trim();
-    if (phone != null && phone.isEmpty) phone = null;
-  }
-
-  return ProductMessageRow(
-    id: m['id']?.toString() ?? '',
-    productId: m['product_id']?.toString() ?? '',
-    productName: productName ?? 'Producto',
-    productSku: productSku,
-    senderId: m['sender_id']?.toString() ?? '',
-    senderBusinessName: biz,
-    senderRif: rif,
-    senderPhone: phone,
-    body: m['body']?.toString() ?? '',
-    createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0),
-  );
 }

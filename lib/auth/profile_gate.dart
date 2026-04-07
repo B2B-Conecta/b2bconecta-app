@@ -97,8 +97,9 @@ class _ProfileGateState extends State<ProfileGate> {
 
         final profile = snapshot.data;
         final roleNorm = profile?.role?.trim().toLowerCase();
-        final hasValidRole =
-            roleNorm == 'importador' || roleNorm == 'aliado';
+        final hasValidRole = roleNorm == 'importador' ||
+            roleNorm == 'aliado' ||
+            roleNorm == 'administrador';
         final needsOnboarding =
             profile == null || !hasValidRole || !profile.isComplete;
 
@@ -109,8 +110,17 @@ class _ProfileGateState extends State<ProfileGate> {
           );
         }
 
-        final homeRole =
-            roleNorm == 'aliado' ? AppHomeRole.aliado : AppHomeRole.importador;
+        final AppHomeRole homeRole;
+        switch (roleNorm) {
+          case 'aliado':
+            homeRole = AppHomeRole.aliado;
+            break;
+          case 'administrador':
+            homeRole = AppHomeRole.administrador;
+            break;
+          default:
+            homeRole = AppHomeRole.importador;
+        }
         return MainShell(homeRole: homeRole, profile: profile);
       },
     );

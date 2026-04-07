@@ -7,21 +7,28 @@ class ProfileModel {
     this.role,
     this.phone,
     this.createdAt,
+    this.creditScore,
+    this.creditLimit,
   });
 
   final String id;
   final String? businessName;
   final String? rif;
 
-  /// `importador` o `aliado` según el esquema de datos.
+  /// `importador`, `aliado` o `administrador` (broker).
   final String? role;
   final String? phone;
   final DateTime? createdAt;
 
+  /// Riesgo / crédito (solo relevante para aliados en flujo broker).
+  final int? creditScore;
+  final double? creditLimit;
+
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
   bool get isComplete {
     final r = role?.trim().toLowerCase();
-    final hasRole = r == 'importador' || r == 'aliado';
+    final hasRole =
+        r == 'importador' || r == 'aliado' || r == 'administrador';
     return businessName != null &&
         businessName!.trim().isNotEmpty &&
         rif != null &&
@@ -30,6 +37,20 @@ class ProfileModel {
   }
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    double? cl;
+    final clRaw = json['credit_limit'];
+    if (clRaw is num) {
+      cl = clRaw.toDouble();
+    } else if (clRaw != null) {
+      cl = double.tryParse(clRaw.toString());
+    }
+    int? cs;
+    final csRaw = json['credit_score'];
+    if (csRaw is int) {
+      cs = csRaw;
+    } else if (csRaw != null) {
+      cs = int.tryParse(csRaw.toString());
+    }
     return ProfileModel(
       id: json['id']?.toString() ?? '',
       businessName: _text(json['business_name']),
@@ -39,6 +60,8 @@ class ProfileModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
+      creditScore: cs,
+      creditLimit: cl,
     );
   }
 

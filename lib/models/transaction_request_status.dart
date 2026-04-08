@@ -1,0 +1,102 @@
+/// Estados de `transaction_requests` (trazabilidad broker + importador).
+abstract final class TransactionRequestStatus {
+  static const pendiente = 'pendiente';
+  static const aprobadoAdmin = 'aprobado_admin';
+  static const rechazado = 'rechazado';
+  static const enPreparacion = 'en_preparacion';
+  static const enTransito = 'en_transito';
+  static const entregado = 'entregado';
+
+  /// Estados visibles para el importador tras validación MotoLink.
+  static const List<String> importerPipeline = [
+    aprobadoAdmin,
+    enPreparacion,
+    enTransito,
+    entregado,
+  ];
+
+  /// Pedidos en curso de fulfillment (pestaña Pedidos del importador).
+  static const List<String> importerActiveFulfillment = [
+    enPreparacion,
+    enTransito,
+  ];
+
+  /// Aprobados por MotoLink y en fulfillment (pestaña Pedidos activos — admin).
+  static const List<String> adminOperationalActive = [
+    aprobadoAdmin,
+    enPreparacion,
+    enTransito,
+  ];
+
+  /// Pendientes de decisión del broker (pestaña Por validar).
+  static const List<String> adminPendingValidation = [
+    pendiente,
+  ];
+
+  /// Entregados o rechazados (pestaña Pedidos cerrados).
+  static const List<String> adminClosedOrders = [
+    entregado,
+    rechazado,
+  ];
+
+  static String labelEs(String status) {
+    switch (status) {
+      case pendiente:
+        return 'Pendiente de revisión';
+      case aprobadoAdmin:
+        return 'Aprobado por MotoLink';
+      case rechazado:
+        return 'Rechazado';
+      case enPreparacion:
+        return 'En preparación';
+      case enTransito:
+        return 'En tránsito';
+      case entregado:
+        return 'Entregado';
+      default:
+        return status;
+    }
+  }
+
+  /// Siguiente estado que puede aplicar el importador, o null si es terminal o no aplica.
+  static String? nextForImporter(String current) {
+    switch (current) {
+      case aprobadoAdmin:
+        return enPreparacion;
+      case enPreparacion:
+        return enTransito;
+      case enTransito:
+        return entregado;
+      default:
+        return null;
+    }
+  }
+
+  static String actionLabelForNext(String nextStatus) {
+    switch (nextStatus) {
+      case enPreparacion:
+        return 'Marcar en preparación';
+      case enTransito:
+        return 'Marcar en tránsito';
+      case entregado:
+        return 'Marcar entregado';
+      default:
+        return 'Avanzar';
+    }
+  }
+
+  /// Texto corto para la vista importador: operación vs cerrado.
+  static String importerOperationalHeadline(String status) {
+    switch (status) {
+      case entregado:
+        return 'Pedido cerrado';
+      case rechazado:
+        return '—';
+      default:
+        if (importerPipeline.contains(status)) {
+          return 'Pedido activo';
+        }
+        return '—';
+    }
+  }
+}

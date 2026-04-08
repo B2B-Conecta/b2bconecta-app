@@ -6,6 +6,7 @@ import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
+import '../models/transaction_request_status.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -351,9 +352,14 @@ class SupabaseService {
     notas_admin,
     created_at,
     updated_at,
+    at_aprobado_admin,
+    at_rechazado,
+    at_en_preparacion,
+    at_en_transito,
+    at_entregado,
     products ( name, sku, price_usd ),
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score ),
-    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif )
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone ),
+    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
   ''';
 
   /// Solicitudes del aliado autenticado.
@@ -374,7 +380,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Pedidos validados (`aprobado_admin`) para el importador actual.
+  /// Pedidos en pipeline de fulfillment para el importador actual.
   static Future<List<TransactionRequestModel>>
       fetchValidatedTransactionRequestsForImporter() async {
     final uid = _currentUserId;
@@ -384,7 +390,27 @@ class SupabaseService {
         .from('transaction_requests')
         .select(_trSelect)
         .eq('owner_id', uid)
-        .eq('status', 'aprobado_admin')
+        .inFilter('status', TransactionRequestStatus.importerPipeline)
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Pedidos en preparación o en tránsito (importador).
+  static Future<List<TransactionRequestModel>>
+      fetchActiveTransactionRequestsForImporter() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('owner_id', uid)
+        .inFilter('status', TransactionRequestStatus.importerActiveFulfillment)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -403,7 +429,7 @@ class SupabaseService {
         .from('transaction_requests')
         .select(_trSelect)
         .eq('product_id', productId)
-        .eq('status', 'aprobado_admin')
+        .inFilter('status', TransactionRequestStatus.importerPipeline)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -420,6 +446,54 @@ class SupabaseService {
         .from('transaction_requests')
         .select(_trSelect)
         .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Pedidos en curso tras validación MotoLink (pestaña Pedidos activos — admin).
+  static Future<List<TransactionRequestModel>>
+      fetchActiveTransactionRequestsForAdmin() async {
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .inFilter('status', TransactionRequestStatus.adminOperationalActive)
+        .order('updated_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Solicitudes pendientes de aprobación/rechazo (pestaña Por validar — admin).
+  static Future<List<TransactionRequestModel>>
+      fetchPendingValidationForAdmin() async {
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .inFilter('status', TransactionRequestStatus.adminPendingValidation)
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Pedidos cerrados: entregados o rechazados (admin).
+  static Future<List<TransactionRequestModel>>
+      fetchClosedTransactionRequestsForAdmin() async {
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .inFilter('status', TransactionRequestStatus.adminClosedOrders)
+        .order('updated_at', ascending: false);
 
     final list = response as List<dynamic>;
     return list
@@ -466,6 +540,25 @@ class SupabaseService {
       payload['notas_admin'] = n;
     }
     await _client.from('transaction_requests').update(payload).eq('id', id);
+  }
+
+  /// Avanza el estado del pedido (importador): cadena aprobado → preparación → tránsito → entregado.
+  static Future<void> importerAdvanceTransactionRequest({
+    required String id,
+    required String newStatus,
+  }) async {
+    final rows = await _client.from('transaction_requests').update({
+      'status': newStatus,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', id).select('id');
+    final list = rows as List<dynamic>?;
+    if (list == null || list.isEmpty) {
+      throw StateError(
+        'No se actualizó ninguna fila. Revisa que la migración de trazabilidad esté '
+        'aplicada en Supabase, que el pedido sea de tu inventario y que la transición '
+        'sea válida (aprobado → en preparación → …).',
+      );
+    }
   }
 
   /// Obtiene repuestos desde [products] con paginacion.

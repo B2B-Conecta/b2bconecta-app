@@ -7,17 +7,16 @@ import '../theme/app_theme.dart';
 import 'importer_expandable_order_card.dart';
 import 'main_shell_tab.dart';
 
-/// Pedidos validados por MotoLink y trazabilidad de fulfillment (importador).
-class ImporterValidatedOrdersPanel extends StatefulWidget {
-  const ImporterValidatedOrdersPanel({super.key});
+/// Pedidos en preparación o en tránsito (pestaña Pedidos del importador).
+class ImporterActiveOrdersPanel extends StatefulWidget {
+  const ImporterActiveOrdersPanel({super.key});
 
   @override
-  State<ImporterValidatedOrdersPanel> createState() =>
-      _ImporterValidatedOrdersPanelState();
+  State<ImporterActiveOrdersPanel> createState() =>
+      _ImporterActiveOrdersPanelState();
 }
 
-class _ImporterValidatedOrdersPanelState
-    extends State<ImporterValidatedOrdersPanel> {
+class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   List<TransactionRequestModel> _rows = [];
   bool _loading = true;
   String? _error;
@@ -26,7 +25,14 @@ class _ImporterValidatedOrdersPanelState
   @override
   void initState() {
     super.initState();
+    MainShellTabController.registerImporterPedidosReload(() => _load());
     _load();
+  }
+
+  @override
+  void dispose() {
+    MainShellTabController.registerImporterPedidosReload(null);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -36,7 +42,7 @@ class _ImporterValidatedOrdersPanelState
     });
     try {
       final rows =
-          await SupabaseService.fetchValidatedTransactionRequestsForImporter();
+          await SupabaseService.fetchActiveTransactionRequestsForImporter();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -68,10 +74,6 @@ class _ImporterValidatedOrdersPanelState
         newStatus: next,
       );
       if (!context.mounted) return;
-      if (next == TransactionRequestStatus.enPreparacion) {
-        MainShellTabController.goTo(1);
-        MainShellTabController.notifyImporterPedidosReload();
-      }
       if (next == TransactionRequestStatus.entregado) {
         MainShellTabController.notifyImporterInventoryReload();
       }
@@ -122,7 +124,15 @@ class _ImporterValidatedOrdersPanelState
           physics: const AlwaysScrollableScrollPhysics(),
           children: const [
             SizedBox(height: 100),
-            Center(child: Text('No hay pedidos validados por MotoLink.')),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Aquí verás los pedidos en preparación y en tránsito. '
+                'Desde «Validados», marca «En preparación» para que aparezcan aquí.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
           ],
         ),
       );

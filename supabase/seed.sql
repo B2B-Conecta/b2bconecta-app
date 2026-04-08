@@ -383,7 +383,8 @@ limit 1;
 
 insert into public.transaction_requests (
   aliado_id, product_id, owner_id, status, cantidad,
-  precio_unitario_proveedor, precio_unitario_aliado, precio_total, notas_admin
+  precio_unitario_proveedor, precio_unitario_aliado, precio_total, notas_admin,
+  at_aprobado_admin
 )
 select
   'a2000002-0000-4000-8000-000000000002'::uuid,
@@ -394,7 +395,8 @@ select
   p.price_usd::numeric,
   round(p.price_usd * 1.1, 4),
   round(p.price_usd * 1.1, 2),
-  'Validado demo seed.'
+  'Validado demo seed.',
+  now()
 from public.products p
 where p.sku = 'IMP2-001'
 limit 1;

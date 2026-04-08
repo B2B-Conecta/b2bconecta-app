@@ -4,20 +4,17 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import 'importer_expandable_order_card.dart';
-import 'main_shell_tab.dart';
+import 'admin_expandable_order_card.dart';
 
-/// Pedidos validados por MotoLink y trazabilidad de fulfillment (importador).
-class ImporterValidatedOrdersPanel extends StatefulWidget {
-  const ImporterValidatedOrdersPanel({super.key});
+/// Pedidos entregados o rechazados (pestaña Pedidos cerrados — admin).
+class AdminClosedOrdersPanel extends StatefulWidget {
+  const AdminClosedOrdersPanel({super.key});
 
   @override
-  State<ImporterValidatedOrdersPanel> createState() =>
-      _ImporterValidatedOrdersPanelState();
+  State<AdminClosedOrdersPanel> createState() => _AdminClosedOrdersPanelState();
 }
 
-class _ImporterValidatedOrdersPanelState
-    extends State<ImporterValidatedOrdersPanel> {
+class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
   List<TransactionRequestModel> _rows = [];
   bool _loading = true;
   String? _error;
@@ -35,12 +32,12 @@ class _ImporterValidatedOrdersPanelState
       _error = null;
     });
     try {
-      final rows =
-          await SupabaseService.fetchValidatedTransactionRequestsForImporter();
+      final rows = await SupabaseService.fetchClosedTransactionRequestsForAdmin();
       if (!mounted) return;
       setState(() {
         _rows = rows;
         _loading = false;
+        _expandedRequestId = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -51,47 +48,12 @@ class _ImporterValidatedOrdersPanelState
     }
   }
 
+  String _statusLabel(String s) => TransactionRequestStatus.labelEs(s);
+
   void _toggleExpand(String id) {
     setState(() {
       _expandedRequestId = _expandedRequestId == id ? null : id;
     });
-  }
-
-  Future<void> _advance(
-    BuildContext context,
-    TransactionRequestModel r,
-    String next,
-  ) async {
-    try {
-      await SupabaseService.importerAdvanceTransactionRequest(
-        id: r.id,
-        newStatus: next,
-      );
-      if (!context.mounted) return;
-      if (next == TransactionRequestStatus.enPreparacion) {
-        MainShellTabController.goTo(1);
-        MainShellTabController.notifyImporterPedidosReload();
-      }
-      if (next == TransactionRequestStatus.entregado) {
-        MainShellTabController.notifyImporterInventoryReload();
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            next == TransactionRequestStatus.entregado
-                ? 'Pedido marcado como entregado. Inventario y crédito del aliado actualizados.'
-                : 'Estado actualizado.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      await _load();
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
   }
 
   @override
@@ -121,8 +83,13 @@ class _ImporterValidatedOrdersPanelState
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: const [
-            SizedBox(height: 100),
-            Center(child: Text('No hay pedidos validados por MotoLink.')),
+            SizedBox(height: 120),
+            Center(
+              child: Text(
+                'No hay pedidos cerrados.',
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
       );
@@ -137,22 +104,11 @@ class _ImporterValidatedOrdersPanelState
             itemCount: _rows.length,
             itemBuilder: (context, i) {
               final r = _rows[i];
-              final next = TransactionRequestStatus.nextForImporter(r.status);
-              final headline =
-                  TransactionRequestStatus.importerOperationalHeadline(r.status);
-              return ImporterExpandableOrderCard(
+              return AdminExpandableOrderCard(
                 request: r,
                 expanded: _expandedRequestId == r.id,
                 onToggle: () => _toggleExpand(r.id),
-                statusLabel: TransactionRequestStatus.labelEs(r.status),
-                operationalHeadline: headline,
-                nextStatus: next,
-                nextActionLabel: next != null
-                    ? TransactionRequestStatus.actionLabelForNext(next)
-                    : null,
-                onAdvance: next != null
-                    ? () => _advance(context, r, next)
-                    : null,
+                statusLabel: _statusLabel(r.status),
               );
             },
           ),

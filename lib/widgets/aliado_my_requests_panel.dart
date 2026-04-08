@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/transaction_request_model.dart';
+import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
@@ -27,20 +28,7 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
     });
   }
 
-  String _label(String s) {
-    switch (s) {
-      case 'pendiente':
-        return 'Pendiente de revisión';
-      case 'aprobado_admin':
-        return 'Aprobada por MotoLink';
-      case 'rechazado':
-        return 'Rechazada';
-      case 'completado':
-        return 'Completada';
-      default:
-        return s;
-    }
-  }
+  String _label(String s) => TransactionRequestStatus.labelEs(s);
 
   @override
   Widget build(BuildContext context) {

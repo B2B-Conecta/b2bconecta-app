@@ -12,12 +12,21 @@ class TransactionRequestModel {
     required this.precioTotal,
     this.notasAdmin,
     this.createdAt,
+    this.updatedAt,
+    this.atAprobadoAdmin,
+    this.atRechazado,
+    this.atEnPreparacion,
+    this.atEnTransito,
+    this.atEntregado,
     this.productName,
     this.productSku,
     this.aliadoBusinessName,
     this.aliadoRif,
+    this.aliadoPhone,
     this.aliadoCreditScore,
     this.ownerBusinessName,
+    this.ownerRif,
+    this.ownerPhone,
   });
 
   final String id;
@@ -31,12 +40,21 @@ class TransactionRequestModel {
   final double precioTotal;
   final String? notasAdmin;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? atAprobadoAdmin;
+  final DateTime? atRechazado;
+  final DateTime? atEnPreparacion;
+  final DateTime? atEnTransito;
+  final DateTime? atEntregado;
   final String? productName;
   final String? productSku;
   final String? aliadoBusinessName;
   final String? aliadoRif;
+  final String? aliadoPhone;
   final int? aliadoCreditScore;
   final String? ownerBusinessName;
+  final String? ownerRif;
+  final String? ownerPhone;
 
   factory TransactionRequestModel.fromJson(Map<String, dynamic> json) {
     final products = json['products'];
@@ -83,12 +101,23 @@ class TransactionRequestModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())
+          : null,
+      atAprobadoAdmin: _parseDate(json['at_aprobado_admin']),
+      atRechazado: _parseDate(json['at_rechazado']),
+      atEnPreparacion: _parseDate(json['at_en_preparacion']),
+      atEnTransito: _parseDate(json['at_en_transito']),
+      atEntregado: _parseDate(json['at_entregado']),
       productName: productName,
       productSku: productSku,
       aliadoBusinessName: _nullableText(aliadoMap?['business_name']),
       aliadoRif: _nullableText(aliadoMap?['rif']),
+      aliadoPhone: _nullableText(aliadoMap?['phone']),
       aliadoCreditScore: credit,
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
+      ownerRif: _nullableText(ownerMap?['rif']),
+      ownerPhone: _nullableText(ownerMap?['phone']),
     );
   }
 
@@ -106,5 +135,10 @@ class TransactionRequestModel {
     if (v == null) return null;
     final s = v.toString().trim();
     return s.isEmpty ? null : s;
+  }
+
+  static DateTime? _parseDate(dynamic v) {
+    if (v == null) return null;
+    return DateTime.tryParse(v.toString());
   }
 }

@@ -7,6 +7,7 @@ import '../screens/importer_product_edit_screen.dart';
 import '../services/excel_catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'main_shell_tab.dart';
 
 enum _SkuConflictAction { update, ignore }
 
@@ -47,10 +48,12 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   void initState() {
     super.initState();
     _reload();
+    MainShellTabController.registerImporterInventoryReload(_reload);
   }
 
   @override
   void dispose() {
+    MainShellTabController.registerImporterInventoryReload(null);
     _searchController.dispose();
     super.dispose();
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/credit_limit_exception.dart';
+import '../models/kyc_verification_exception.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -157,6 +158,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       );
     } on CreditLimitException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on KycVerificationException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

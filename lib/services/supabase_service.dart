@@ -4,7 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/catalog_filters.dart';
 import '../models/credit_limit_exception.dart';
+import '../models/kyc_status.dart';
+import '../models/kyc_verification_exception.dart';
 import '../models/part_model.dart';
+import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -13,6 +16,7 @@ class SupabaseService {
   SupabaseService._();
 
   static const _productImagesBucket = 'product-images';
+  static const _profileDocumentsBucket = 'profile-documents';
 
   /// Fee de logística / intermediación (10 %). Cambiar aquí para ajustar precio aliado.
   static const double logisticFeeRate = 0.10;
@@ -572,6 +576,155 @@ class SupabaseService {
     );
   }
 
+  /// Broker: actualiza estado KYC del aliado.
+  static Future<void> adminSetAliadoKycStatus({
+    required String aliadoId,
+    required String status,
+  }) async {
+    await _client.rpc(
+      'admin_set_aliado_kyc_status',
+      params: <String, dynamic>{
+        'p_aliado_id': aliadoId,
+        'p_status': status,
+      },
+    );
+  }
+
+  /// Aliado: marca documentación en revisión (`en_revision`).
+  static Future<void> aliadoSubmitKycForReview() async {
+    await _client.rpc('aliado_submit_kyc_for_review');
+  }
+
+  /// Documentos subidos por el aliado autenticado.
+  static Future<List<ProfileDocumentModel>> fetchMyProfileDocuments() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final response = await _client
+        .from('profile_documents')
+        .select()
+        .eq('profile_id', uid)
+        .order('doc_type', ascending: true);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            ProfileDocumentModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Admin: documentos de un aliado (paths en Storage).
+  static Future<List<ProfileDocumentModel>> fetchProfileDocumentsForAliado(
+    String aliadoId,
+  ) async {
+    if (aliadoId.isEmpty) return [];
+
+    final response = await _client
+        .from('profile_documents')
+        .select()
+        .eq('profile_id', aliadoId)
+        .order('doc_type', ascending: true);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            ProfileDocumentModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// URL firmada (1 h) para abrir un archivo del bucket privado.
+  static Future<String> createSignedUrlForProfileDocument(
+    String storagePath,
+  ) async {
+    return _client.storage
+        .from(_profileDocumentsBucket)
+        .createSignedUrl(storagePath, 3600);
+  }
+
+  /// Sube o reemplaza un documento KYC (PDF / imagen).
+  static Future<void> uploadAliadoProfileDocument({
+    required String docType,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
+    }
+
+    final path =
+        '$uid/${docType}_${DateTime.now().microsecondsSinceEpoch}.$ext';
+
+    final existing = await _client
+        .from('profile_documents')
+        .select('storage_path')
+        .eq('profile_id', uid)
+        .eq('doc_type', docType)
+        .maybeSingle();
+
+    if (existing != null) {
+      final oldPath = Map<String, dynamic>.from(existing)['storage_path']
+          ?.toString();
+      if (oldPath != null && oldPath.isNotEmpty) {
+        try {
+          await _client.storage.from(_profileDocumentsBucket).remove([oldPath]);
+        } catch (_) {}
+      }
+      await _client
+          .from('profile_documents')
+          .delete()
+          .eq('profile_id', uid)
+          .eq('doc_type', docType);
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_profileDocumentsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    await _client.from('profile_documents').insert({
+      'profile_id': uid,
+      'doc_type': docType,
+      'storage_path': path,
+      'file_name': fileName,
+    });
+  }
+
+  static String _profileDocExtension(String fileName) {
+    final i = fileName.lastIndexOf('.');
+    if (i < 0 || i == fileName.length - 1) return '';
+    return fileName.substring(i + 1).toLowerCase();
+  }
+
+  static bool _isAllowedProfileDocExtension(String ext) {
+    const ok = {'pdf', 'jpg', 'jpeg', 'png', 'webp'};
+    final e = ext == 'jpg' ? 'jpeg' : ext;
+    return ok.contains(e);
+  }
+
+  static String _mimeForProfileDocExtension(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'pdf':
+      default:
+        return 'application/pdf';
+    }
+  }
+
   /// Suma `precio_total` de pedidos abiertos del aliado autenticado (vs. `credit_limit`).
   static Future<double> fetchOpenCreditExposureForCurrentAliado() async {
     final uid = _currentUserId;
@@ -613,6 +766,22 @@ class SupabaseService {
     final role = profile?.role?.trim().toLowerCase();
     if (role != 'aliado') {
       throw StateError('Solo los aliados pueden crear solicitudes de pedido.');
+    }
+    final ks = profile?.kycStatus?.trim();
+    if (ks != KycStatus.aprobado) {
+      if (ks == KycStatus.enRevision) {
+        throw KycVerificationException(
+          'Su documentación está en revisión. MotoLink le avisará al aprobarla.',
+        );
+      }
+      if (ks == KycStatus.rechazado) {
+        throw KycVerificationException(
+          'Su documentación fue rechazada. Actualice los archivos en su perfil y vuelva a enviar a revisión.',
+        );
+      }
+      throw KycVerificationException(
+        'Debe completar la verificación documental en su perfil y obtener la aprobación de MotoLink antes de pedir.',
+      );
     }
     final limit = profile?.creditLimit;
     if (limit == null) {

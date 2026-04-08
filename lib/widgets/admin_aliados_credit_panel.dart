@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../models/aliado_doc_type.dart';
+import '../models/kyc_status.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -126,6 +129,7 @@ class _AliadoCreditCard extends StatefulWidget {
 class _AliadoCreditCardState extends State<_AliadoCreditCard> {
   late final TextEditingController _limitCtrl;
   bool _saving = false;
+  bool _busyKyc = false;
 
   @override
   void initState() {
@@ -177,6 +181,103 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     }
   }
 
+  Future<void> _setKyc(String status) async {
+    setState(() => _busyKyc = true);
+    try {
+      await SupabaseService.adminSetAliadoKycStatus(
+        aliadoId: widget.profile.id,
+        status: status,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            status == KycStatus.aprobado
+                ? 'KYC aprobado.'
+                : 'Estado KYC actualizado.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyKyc = false);
+    }
+  }
+
+  Future<void> _openDocs() async {
+    try {
+      final docs = await SupabaseService.fetchProfileDocumentsForAliado(
+        widget.profile.id,
+      );
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Documentos cargados',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              if (docs.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('Sin archivos.'),
+                )
+              else
+                SizedBox(
+                  height: 320,
+                  child: ListView.builder(
+                    itemCount: docs.length,
+                    itemBuilder: (context, i) {
+                      final d = docs[i];
+                      return ListTile(
+                        leading: const Icon(Icons.description_outlined),
+                        title: Text(AliadoDocType.labelEs(d.docType)),
+                        subtitle: Text(d.fileName ?? d.storagePath),
+                        trailing: const Icon(Icons.open_in_new),
+                        onTap: () async {
+                          final url = await SupabaseService
+                              .createSignedUrlForProfileDocument(
+                            d.storagePath,
+                          );
+                          final uri = Uri.parse(url);
+                          if (ctx.mounted && await canLaunchUrl(uri)) {
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = (widget.profile.businessName ?? '—').trim();
@@ -215,6 +316,44 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
             Text(
               'Score: ${widget.profile.creditScore ?? '—'}',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'KYC: ${KycStatus.labelEs(widget.profile.kycStatus)}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.brandBlue,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonal(
+                  onPressed: _busyKyc
+                      ? null
+                      : () => _setKyc(KycStatus.aprobado),
+                  child: const Text('Aprobar KYC'),
+                ),
+                FilledButton.tonal(
+                  onPressed: _busyKyc
+                      ? null
+                      : () => _setKyc(KycStatus.rechazado),
+                  child: const Text('Rechazar'),
+                ),
+                OutlinedButton(
+                  onPressed: _busyKyc
+                      ? null
+                      : () => _setKyc(KycStatus.pendiente),
+                  child: const Text('Pendiente'),
+                ),
+                OutlinedButton(
+                  onPressed: _busyKyc ? null : _openDocs,
+                  child: const Text('Ver archivos'),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             TextField(

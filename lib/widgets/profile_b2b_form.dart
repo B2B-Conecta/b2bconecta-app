@@ -5,6 +5,7 @@ import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'aliado_kyc_documents_section.dart';
 import 'profile_kyc_documents_info.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). La dirección fiscal es solo UI
@@ -16,6 +17,7 @@ class ProfileB2BForm extends StatefulWidget {
     required this.onSaved,
     this.showCloseBar = false,
     this.onClose,
+    this.onRelatedDataChanged,
   });
 
   final ProfileModel? initial;
@@ -24,6 +26,9 @@ class ProfileB2BForm extends StatefulWidget {
   /// Si es true, muestra una barra superior con botón cerrar (edición empujada).
   final bool showCloseBar;
   final VoidCallback? onClose;
+
+  /// Tras subir documentos KYC u otra acción que requiera refrescar el perfil.
+  final VoidCallback? onRelatedDataChanged;
 
   @override
   State<ProfileB2BForm> createState() => _ProfileB2BFormState();
@@ -52,6 +57,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'administrador';
   }
 
+  bool get _persistedAsAliado {
+    return widget.initial?.role?.trim().toLowerCase() == 'aliado';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -68,7 +77,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
     }
-    if (_role == 'aliado') {
+    if (_persistedAsAliado) {
       _loadOpenExposure();
     }
   }
@@ -313,10 +322,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   enabled: !_roleLocked,
                   onTap: _saving || _roleLocked
                       ? null
-                      : () {
-                          setState(() => _role = 'aliado');
-                          _loadOpenExposure();
-                        },
+                      : () => setState(() => _role = 'aliado'),
                 ),
               ),
             ],
@@ -381,10 +387,15 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               'Av. Principal, Local 12, Zona Industrial...',
             ),
           ),
-          if (_role == 'aliado') ...[
+          if (_persistedAsAliado) ...[
             const SizedBox(height: 20),
             _sectionLabel('CUPO AUTORIZADO (MOTOLINK)'),
             _aliadoCreditSummary(),
+            const SizedBox(height: 20),
+            AliadoKycDocumentsSection(
+              kycStatus: widget.initial?.kycStatus,
+              onChanged: widget.onRelatedDataChanged,
+            ),
           ],
           const SizedBox(height: 20),
           const ProfileKycDocumentsInfo(),

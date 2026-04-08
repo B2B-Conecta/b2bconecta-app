@@ -129,32 +129,35 @@ alter table public.profiles
 alter table public.profiles
   add column if not exists credit_limit numeric(14, 2);
 alter table public.profiles
+  add column if not exists kyc_status text;
+alter table public.profiles
   drop constraint if exists profiles_role_check;
 alter table public.profiles
   add constraint profiles_role_check
   check (role in ('importador', 'aliado', 'administrador'));
 
 -- Perfiles B2B
-insert into public.profiles (id, business_name, rif, role, phone, credit_score, credit_limit, created_at)
+insert into public.profiles (id, business_name, rif, role, phone, credit_score, credit_limit, kyc_status, created_at)
 values
-  ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', 100, 100000, now()),
-  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, now()),
-  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, now()),
-  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, now()),
-  ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, now()),
-  ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, now()),
-  ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, now()),
-  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, now()),
-  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, now()),
-  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, now()),
-  ('a3000001-0000-4000-8000-000000000001', 'MotoLink Pro (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, now())
+  ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', 100, 100000, null, now()),
+  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, null, now()),
+  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, null, now()),
+  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, null, now()),
+  ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, null, now()),
+  ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, null, now()),
+  ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, null, now()),
+  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'aprobado', now()),
+  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'aprobado', now()),
+  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'aprobado', now()),
+  ('a3000001-0000-4000-8000-000000000001', 'MotoLink Pro (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,
   role = excluded.role,
   phone = excluded.phone,
   credit_score = excluded.credit_score,
-  credit_limit = excluded.credit_limit;
+  credit_limit = excluded.credit_limit,
+  kyc_status = excluded.kyc_status;
 
 -- =============================================================================
 -- Esquema inventario B2B (idempotente). Debe existir antes de insertar productos.

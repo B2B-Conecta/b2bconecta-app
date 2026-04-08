@@ -9,6 +9,7 @@ class ProfileModel {
     this.createdAt,
     this.creditScore,
     this.creditLimit,
+    this.kycStatus,
   });
 
   final String id;
@@ -23,6 +24,9 @@ class ProfileModel {
   /// Riesgo / crédito (solo relevante para aliados en flujo broker).
   final int? creditScore;
   final double? creditLimit;
+
+  /// Verificación documental MotoLink (`pendiente` … `aprobado`); solo aliados.
+  final String? kycStatus;
 
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
   bool get isComplete {
@@ -62,6 +66,7 @@ class ProfileModel {
           : null,
       creditScore: cs,
       creditLimit: cl,
+      kycStatus: _text(json['kyc_status']),
     );
   }
 

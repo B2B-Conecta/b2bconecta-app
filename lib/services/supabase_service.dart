@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/cash_phase_exception.dart';
+import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
 import '../models/credit_limit_exception.dart';
 import '../models/kyc_status.dart';
@@ -748,6 +750,20 @@ class SupabaseService {
     return sum;
   }
 
+  /// Cantidad de pedidos abiertos (misma lista que el cupo).
+  static Future<int> fetchOpenTransactionRequestCountForCurrentAliado() async {
+    final uid = _currentUserId;
+    if (uid == null) return 0;
+
+    final response = await _client
+        .from('transaction_requests')
+        .select('id')
+        .eq('aliado_id', uid)
+        .inFilter('status', TransactionRequestStatus.aliadoCreditExposureStatuses);
+
+    return (response as List<dynamic>).length;
+  }
+
   static const double _creditTol = 0.01;
 
   static Future<void> insertTransactionRequest({
@@ -789,6 +805,17 @@ class SupabaseService {
         'MotoLink debe asignar un límite de crédito antes de solicitar pedidos. '
         'Cuando su cupo esté autorizado, podrá continuar.',
       );
+    }
+    final pce = profile?.primerosPedidosContadoEntregados ?? 0;
+    if (pce < CashPhasePolicy.entregasRequeridas) {
+      final openCnt = await fetchOpenTransactionRequestCountForCurrentAliado();
+      if (openCnt >= 1) {
+        throw CashPhaseException(
+          'En los primeros ${CashPhasePolicy.entregasRequeridas} pedidos en contado solo puede '
+          'tener un pedido activo a la vez. Cuando el actual se entregue o lo cancele con MotoLink, '
+          'podrá solicitar otro.',
+        );
+      }
     }
     final exposure = await fetchOpenCreditExposureForCurrentAliado();
     if (exposure + total > limit + _creditTol) {

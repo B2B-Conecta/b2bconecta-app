@@ -10,6 +10,7 @@ class ProfileModel {
     this.creditScore,
     this.creditLimit,
     this.kycStatus,
+    this.primerosPedidosContadoEntregados,
   });
 
   final String id;
@@ -27,6 +28,9 @@ class ProfileModel {
 
   /// Verificación documental MotoLink (`pendiente` … `aprobado`); solo aliados.
   final String? kycStatus;
+
+  /// Entregas completadas contadas hacia la fase “primeros 3 pedidos contado” (0–3).
+  final int? primerosPedidosContadoEntregados;
 
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
   bool get isComplete {
@@ -55,6 +59,13 @@ class ProfileModel {
     } else if (csRaw != null) {
       cs = int.tryParse(csRaw.toString());
     }
+    int? pce;
+    final pceRaw = json['primeros_pedidos_contado_entregados'];
+    if (pceRaw is int) {
+      pce = pceRaw;
+    } else if (pceRaw != null) {
+      pce = int.tryParse(pceRaw.toString());
+    }
     return ProfileModel(
       id: json['id']?.toString() ?? '',
       businessName: _text(json['business_name']),
@@ -67,6 +78,7 @@ class ProfileModel {
       creditScore: cs,
       creditLimit: cl,
       kycStatus: _text(json['kyc_status']),
+      primerosPedidosContadoEntregados: pce,
     );
   }
 

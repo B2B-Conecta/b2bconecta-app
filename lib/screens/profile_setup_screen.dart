@@ -52,7 +52,7 @@ class ProfileSetupScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           child: ProfileB2BForm(
             key: ValueKey<Object>(
-              '${initial?.id ?? 'new'}_${initial?.businessName}_${initial?.rif}_${initial?.kycStatus}',
+              '${initial?.id ?? 'new'}_${initial?.businessName}_${initial?.rif}_${initial?.kycStatus}_${initial?.primerosPedidosContadoEntregados}',
             ),
             initial: initial,
             showCloseBar: false,

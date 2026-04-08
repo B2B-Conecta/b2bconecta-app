@@ -338,7 +338,7 @@ class _ProfileTab extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: ProfileB2BForm(
             key: ValueKey<Object>(
-              '${profile.id}_${profile.businessName}_${profile.rif}_${profile.role}_${profile.kycStatus}',
+              '${profile.id}_${profile.businessName}_${profile.rif}_${profile.role}_${profile.kycStatus}_${profile.primerosPedidosContadoEntregados}',
             ),
             initial: profile,
             onRelatedDataChanged: onProfileSaved,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/aliado_doc_type.dart';
+import '../models/cash_phase_policy.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
@@ -325,6 +326,12 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 fontWeight: FontWeight.w700,
                 color: AppColors.brandBlue,
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Contado: ${widget.profile.primerosPedidosContadoEntregados ?? 0}/'
+              '${CashPhasePolicy.entregasRequeridas} entregas',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 10),
             Wrap(

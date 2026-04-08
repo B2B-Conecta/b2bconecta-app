@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/cash_phase_policy.dart';
 import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
@@ -134,6 +135,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   Widget _aliadoCreditSummary() {
     final lim = widget.initial?.creditLimit;
     final exp = _openExposure ?? 0.0;
+    final pce = widget.initial?.primerosPedidosContadoEntregados ?? 0;
+    final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.fieldFill,
@@ -145,6 +148,20 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (enFaseContado) ...[
+              Text(
+                'Primeros pedidos (contado): $pce de '
+                '${CashPhasePolicy.entregasRequeridas} entregas registradas. '
+                'Mientras tanto, solo un pedido activo a la vez.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Colors.grey.shade800,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Text(
               lim == null
                   ? 'Pendiente: MotoLink asignará su límite de crédito (pestaña Crédito).'

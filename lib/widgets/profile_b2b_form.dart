@@ -38,6 +38,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   late final TextEditingController _emailDisplayController;
   String _role = 'importador';
   bool _saving = false;
+  double? _openExposure;
+  bool _loadingExposure = false;
 
   /// Rol ya persistido: el selector no puede cambiarse (RLS / negocio).
   bool get _roleLocked {
@@ -65,6 +67,27 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     final r = i?.role?.trim().toLowerCase();
     if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
+    }
+    if (_role == 'aliado') {
+      _loadOpenExposure();
+    }
+  }
+
+  Future<void> _loadOpenExposure() async {
+    setState(() => _loadingExposure = true);
+    try {
+      final v = await SupabaseService.fetchOpenCreditExposureForCurrentAliado();
+      if (!mounted) return;
+      setState(() {
+        _openExposure = v;
+        _loadingExposure = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _openExposure = null;
+        _loadingExposure = false;
+      });
     }
   }
 
@@ -96,6 +119,59 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
+  Widget _aliadoCreditSummary() {
+    final lim = widget.initial?.creditLimit;
+    final exp = _openExposure ?? 0.0;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: AppDecorations.radius12,
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              lim == null
+                  ? 'Pendiente: MotoLink asignará su límite de crédito (pestaña Crédito).'
+                  : 'Límite autorizado: \$${lim.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (lim != null) ...[
+              const SizedBox(height: 10),
+              if (_loadingExposure)
+                const LinearProgressIndicator(minHeight: 3)
+              else ...[
+                Text(
+                  'Compromiso en pedidos abiertos: \$${exp.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Disponible estimado: \$${(lim - exp).clamp(0.0, double.infinity).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.brandBlue,
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -237,7 +313,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   enabled: !_roleLocked,
                   onTap: _saving || _roleLocked
                       ? null
-                      : () => setState(() => _role = 'aliado'),
+                      : () {
+                          setState(() => _role = 'aliado');
+                          _loadOpenExposure();
+                        },
                 ),
               ),
             ],
@@ -302,6 +381,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               'Av. Principal, Local 12, Zona Industrial...',
             ),
           ),
+          if (_role == 'aliado') ...[
+            const SizedBox(height: 20),
+            _sectionLabel('CUPO AUTORIZADO (MOTOLINK)'),
+            _aliadoCreditSummary(),
+          ],
           const SizedBox(height: 20),
           const ProfileKycDocumentsInfo(),
           const SizedBox(height: 24),

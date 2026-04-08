@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/catalog_filters.dart';
+import '../models/credit_limit_exception.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
@@ -542,6 +543,60 @@ class SupabaseService {
         .toList();
   }
 
+  /// Perfiles aliado para asignar `credit_limit` (vista admin).
+  static Future<List<ProfileModel>> fetchAliadoProfilesForAdmin() async {
+    final response = await _client
+        .from('profiles')
+        .select()
+        .eq('role', 'aliado')
+        .order('business_name', ascending: true);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            ProfileModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Broker: actualiza el cupo negociable del aliado (`profiles.credit_limit`).
+  static Future<void> adminSetAliadoCreditLimit({
+    required String aliadoId,
+    required double creditLimit,
+  }) async {
+    await _client.rpc(
+      'admin_set_aliado_credit_limit',
+      params: <String, dynamic>{
+        'p_aliado_id': aliadoId,
+        'p_credit_limit': creditLimit,
+      },
+    );
+  }
+
+  /// Suma `precio_total` de pedidos abiertos del aliado autenticado (vs. `credit_limit`).
+  static Future<double> fetchOpenCreditExposureForCurrentAliado() async {
+    final uid = _currentUserId;
+    if (uid == null) return 0;
+
+    final response = await _client
+        .from('transaction_requests')
+        .select('precio_total')
+        .eq('aliado_id', uid)
+        .inFilter('status', TransactionRequestStatus.aliadoCreditExposureStatuses);
+
+    final list = response as List<dynamic>;
+    var sum = 0.0;
+    for (final row in list) {
+      final m = Map<String, dynamic>.from(row as Map);
+      final pt = m['precio_total'];
+      if (pt is num) {
+        sum += pt.toDouble();
+      }
+    }
+    return sum;
+  }
+
+  static const double _creditTol = 0.01;
+
   static Future<void> insertTransactionRequest({
     required String productId,
     required String ownerId,
@@ -553,6 +608,27 @@ class SupabaseService {
 
     final unitAliado = calculateAliadoUnitPrice(precioUnitarioProveedor);
     final total = unitAliado * cantidad;
+
+    final profile = await fetchMyProfile();
+    final role = profile?.role?.trim().toLowerCase();
+    if (role != 'aliado') {
+      throw StateError('Solo los aliados pueden crear solicitudes de pedido.');
+    }
+    final limit = profile?.creditLimit;
+    if (limit == null) {
+      throw CreditLimitException(
+        'MotoLink debe asignar un límite de crédito antes de solicitar pedidos. '
+        'Cuando su cupo esté autorizado, podrá continuar.',
+      );
+    }
+    final exposure = await fetchOpenCreditExposureForCurrentAliado();
+    if (exposure + total > limit + _creditTol) {
+      throw CreditLimitException(
+        'Este pedido (\$${total.toStringAsFixed(2)}) más su compromiso en pedidos '
+        'abiertos (\$${exposure.toStringAsFixed(2)}) supera su límite autorizado '
+        '(\$${limit.toStringAsFixed(2)}).',
+      );
+    }
 
     await _client.from('transaction_requests').insert({
       'aliado_id': uid,

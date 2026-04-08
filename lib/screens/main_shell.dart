@@ -5,6 +5,7 @@ import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/admin_active_orders_panel.dart';
+import '../widgets/admin_aliados_credit_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
 import '../widgets/admin_pending_validation_panel.dart';
 import '../widgets/aliado_my_requests_panel.dart';
@@ -57,7 +58,7 @@ class _MainShellState extends State<MainShell> {
     setState(() => _profile = p);
   }
 
-  /// Pestañas admin: Activos, Cerrados, Por validar, Perfil (sin catálogo).
+  /// Pestañas admin: Activos, Cerrados, Por validar, Crédito, Perfil (sin catálogo).
   Widget _adminOrdersScaffold({required String title, required Widget child}) {
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -102,6 +103,10 @@ class _MainShellState extends State<MainShell> {
             title: 'Por validar',
             child: const AdminPendingValidationPanel(),
           ),
+          _adminOrdersScaffold(
+            title: 'Límites de crédito',
+            child: const AdminAliadosCreditPanel(),
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.administrador,
@@ -139,6 +144,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.fact_check_outlined),
               activeIcon: Icon(Icons.fact_check),
               label: 'Validar',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_outlined),
+              activeIcon: Icon(Icons.account_balance),
+              label: 'Crédito',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

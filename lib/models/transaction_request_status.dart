@@ -51,6 +51,14 @@ abstract final class TransactionRequestStatus {
     enTransito,
   ];
 
+  /// Estados que suman `precio_total` contra el límite de crédito del aliado.
+  static const List<String> aliadoCreditExposureStatuses = [
+    pendiente,
+    aprobadoAdmin,
+    enPreparacion,
+    enTransito,
+  ];
+
   /// Aliado: pestaña Pedidos = en curso + cerrados (excluye pendiente).
   static const List<String> aliadoPedidosActivosYCerrados = [
     aprobadoAdmin,

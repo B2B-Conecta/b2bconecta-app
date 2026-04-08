@@ -5,6 +5,7 @@ import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'profile_kyc_documents_info.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). La dirección fiscal es solo UI
 /// (no se persiste en Supabase con el esquema actual).
@@ -44,11 +45,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return r != null && r.isNotEmpty;
   }
 
-  /// Importador y aliado no deben ver la opción broker; solo administrador o perfil sin rol aún.
+  /// Solo cuentas ya registradas como broker en BD; el autoregistro no ofrece este rol.
   bool get _showAdministradorRoleOption {
-    final r = widget.initial?.role?.trim().toLowerCase();
-    if (r == 'importador' || r == 'aliado') return false;
-    return true;
+    return widget.initial?.role?.trim().toLowerCase() == 'administrador';
   }
 
   @override
@@ -303,7 +302,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               'Av. Principal, Local 12, Zona Industrial...',
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
+          const ProfileKycDocumentsInfo(),
+          const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _saving ? null : _submit,
             child: _saving

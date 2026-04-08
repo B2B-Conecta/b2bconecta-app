@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/motolink_pro_logo.dart';
+import '../widgets/profile_kyc_documents_info.dart';
 
 enum _AuthMode { login, register }
 
@@ -248,6 +249,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppColors.textSecondary,
                 ),
               ),
+              if (_mode == _AuthMode.register) ...[
+                const SizedBox(height: 20),
+                const ProfileKycDocumentsInfo(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tenga a mano esta documentación para completar su perfil tras registrarse.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
               const SizedBox(height: 28),
               TextField(
                 controller: _emailController,

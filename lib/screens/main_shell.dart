@@ -8,6 +8,7 @@ import '../widgets/admin_active_orders_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
 import '../widgets/admin_pending_validation_panel.dart';
 import '../widgets/aliado_my_requests_panel.dart';
+import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
 import '../widgets/importer_validated_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
@@ -218,7 +219,7 @@ class _MainShellState extends State<MainShell> {
               ),
               label: widget.homeRole == AppHomeRole.importador
                   ? 'Validados'
-                  : 'Mis solicitudes',
+                  : 'Solicitudes',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
@@ -258,47 +259,7 @@ class _OrdersTab extends StatelessWidget {
       body: switch (homeRole) {
         AppHomeRole.importador => const ImporterActiveOrdersPanel(),
         AppHomeRole.administrador => const SizedBox.shrink(),
-        AppHomeRole.aliado => Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      Icons.inventory_2_outlined,
-                      size: 44,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Mis Pedidos',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Aún no tiene pedidos activos',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        AppHomeRole.aliado => const AliadoPedidosPanel(),
       },
     );
   }

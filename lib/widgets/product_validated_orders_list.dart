@@ -4,10 +4,12 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
 import 'main_shell_tab.dart';
+import 'order_list_filter_bar.dart';
 
-/// Pedidos validados para un producto (pestaña en edición de producto).
+/// Solo solicitudes aprobadas por MotoLink para este producto (pendientes de primera acción).
 class ProductValidatedOrdersList extends StatefulWidget {
   const ProductValidatedOrdersList({super.key, required this.productId});
 
@@ -23,17 +25,26 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
+  late final TextEditingController _searchCtrl;
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl = TextEditingController();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(ProductValidatedOrdersList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.productId != widget.productId) {
+      _searchCtrl.clear();
       _load();
     }
   }
@@ -59,6 +70,18 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
         _loading = false;
       });
     }
+  }
+
+  void _clearFilters() {
+    _searchCtrl.clear();
+    setState(() {});
+  }
+
+  List<TransactionRequestModel> get _filtered {
+    return TransactionRequestFilterUtils.apply(
+      _rows,
+      searchQuery: _searchCtrl.text,
+    );
   }
 
   void _toggleExpand(String id) {
@@ -133,43 +156,90 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
           children: const [
             SizedBox(height: 80),
             Center(
-              child: Text(
-                'No hay pedidos validados para este producto.',
-                textAlign: TextAlign.center,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'No hay solicitudes aprobadas por MotoLink pendientes de tu primera acción para este producto.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ),
             ),
           ],
         ),
       );
     }
+
+    final filtered = _filtered;
     return Stack(
       children: [
-        RefreshIndicator(
-          onRefresh: _load,
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            itemCount: _rows.length,
-            itemBuilder: (context, i) {
-              final r = _rows[i];
-              final next = TransactionRequestStatus.nextForImporter(r.status);
-              final headline =
-                  TransactionRequestStatus.importerOperationalHeadline(r.status);
-              return ImporterExpandableOrderCard(
-                request: r,
-                expanded: _expandedRequestId == r.id,
-                onToggle: () => _toggleExpand(r.id),
-                statusLabel: TransactionRequestStatus.labelEs(r.status),
-                operationalHeadline: headline,
-                nextStatus: next,
-                nextActionLabel: next != null
-                    ? TransactionRequestStatus.actionLabelForNext(next)
-                    : null,
-                onAdvance: next != null
-                    ? () => _advance(context, r, next)
-                    : null,
-              );
-            },
+        Positioned.fill(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderListFilterBar(
+                searchController: _searchCtrl,
+                onSearchChanged: (_) => setState(() {}),
+                hintText: 'Buscar por aliado',
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 32),
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Ningún pedido coincide con los filtros.',
+                                  style: TextStyle(color: Colors.grey.shade700),
+                                ),
+                                TextButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Limpiar filtros'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final r = filtered[i];
+                            final next =
+                                TransactionRequestStatus.nextForImporter(
+                              r.status,
+                            );
+                            final headline = TransactionRequestStatus
+                                .importerOperationalHeadline(r.status);
+                            return ImporterExpandableOrderCard(
+                              request: r,
+                              expanded: _expandedRequestId == r.id,
+                              onToggle: () => _toggleExpand(r.id),
+                              statusLabel:
+                                  TransactionRequestStatus.labelEs(r.status),
+                              operationalHeadline: headline,
+                              nextStatus: next,
+                              nextActionLabel: next != null
+                                  ? TransactionRequestStatus.actionLabelForNext(
+                                      next,
+                                    )
+                                  : null,
+                              onAdvance: next != null
+                                  ? () => _advance(context, r, next)
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
           ),
         ),
         if (_loading)

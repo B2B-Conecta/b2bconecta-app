@@ -4,7 +4,9 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'order_list_filter_bar.dart';
 
 /// Solicitudes pendientes de aprobación o rechazo (pestaña Por validar — admin).
 class AdminPendingValidationPanel extends StatefulWidget {
@@ -15,21 +17,60 @@ class AdminPendingValidationPanel extends StatefulWidget {
       _AdminPendingValidationPanelState();
 }
 
-class _AdminPendingValidationPanelState extends State<AdminPendingValidationPanel> {
-  late Future<List<TransactionRequestModel>> _future;
+class _AdminPendingValidationPanelState
+    extends State<AdminPendingValidationPanel> {
+  List<TransactionRequestModel> _rows = [];
+  bool _loading = true;
+  String? _error;
   String? _expandedRequestId;
+  late final TextEditingController _searchCtrl;
 
   @override
   void initState() {
     super.initState();
-    _future = SupabaseService.fetchPendingValidationForAdmin();
+    _searchCtrl = TextEditingController();
+    _load();
   }
 
-  void _reload() {
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
     setState(() {
-      _future = SupabaseService.fetchPendingValidationForAdmin();
-      _expandedRequestId = null;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final rows = await SupabaseService.fetchPendingValidationForAdmin();
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _loading = false;
+        _expandedRequestId = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _clearFilters() {
+    _searchCtrl.clear();
+    setState(() {});
+  }
+
+  List<TransactionRequestModel> get _filtered {
+    return TransactionRequestFilterUtils.apply(
+      _rows,
+      searchQuery: _searchCtrl.text,
+      statusFilter: null,
+    );
   }
 
   String _statusLabel(String s) => TransactionRequestStatus.labelEs(s);
@@ -38,71 +79,6 @@ class _AdminPendingValidationPanelState extends State<AdminPendingValidationPane
     setState(() {
       _expandedRequestId = _expandedRequestId == id ? null : id;
     });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<TransactionRequestModel>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.brand),
-          );
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Error: ${snapshot.error}'),
-                  const SizedBox(height: 12),
-                  FilledButton(onPressed: _reload, child: const Text('Reintentar')),
-                ],
-              ),
-            ),
-          );
-        }
-        final rows = snapshot.data ?? [];
-        if (rows.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: () async => _reload(),
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: const [
-                SizedBox(height: 120),
-                Center(
-                  child: Text(
-                    'No hay solicitudes por validar.',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: rows.length,
-            itemBuilder: (context, i) {
-              final r = rows[i];
-              return AdminExpandableOrderCard(
-                request: r,
-                expanded: _expandedRequestId == r.id,
-                onToggle: () => _toggleExpand(r.id),
-                statusLabel: _statusLabel(r.status),
-                expandedFooter: _buildExpandedFooter(context, r),
-              );
-            },
-          ),
-        );
-      },
-    );
   }
 
   Widget? _buildExpandedFooter(
@@ -142,7 +118,7 @@ class _AdminPendingValidationPanelState extends State<AdminPendingValidationPane
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
-                _reload();
+                _load();
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -167,7 +143,7 @@ class _AdminPendingValidationPanelState extends State<AdminPendingValidationPane
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
-                _reload();
+                _load();
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -184,6 +160,121 @@ class _AdminPendingValidationPanelState extends State<AdminPendingValidationPane
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading && _rows.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.brand),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Error: $_error'),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: _load, child: const Text('Reintentar')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_rows.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(
+              child: Text(
+                'No hay solicitudes por validar.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final filtered = _filtered;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderListFilterBar(
+                searchController: _searchCtrl,
+                onSearchChanged: (_) => setState(() {}),
+                hintText: 'Buscar solicitud por producto, SKU o empresa',
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 48),
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Ninguna solicitud coincide con la búsqueda.',
+                                  style: TextStyle(color: Colors.grey.shade700),
+                                ),
+                                TextButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Limpiar búsqueda'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final r = filtered[i];
+                            return AdminExpandableOrderCard(
+                              request: r,
+                              expanded: _expandedRequestId == r.id,
+                              onToggle: () => _toggleExpand(r.id),
+                              statusLabel: _statusLabel(r.status),
+                              expandedFooter: _buildExpandedFooter(context, r),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+        if (_loading)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppColors.brand,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

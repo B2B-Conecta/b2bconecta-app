@@ -362,7 +362,7 @@ class SupabaseService {
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
   ''';
 
-  /// Solicitudes del aliado autenticado.
+  /// Solicitudes del aliado autenticado (todas).
   static Future<List<TransactionRequestModel>> fetchMyTransactionRequests() async {
     final uid = _currentUserId;
     if (uid == null) return [];
@@ -380,7 +380,47 @@ class SupabaseService {
         .toList();
   }
 
-  /// Pedidos en pipeline de fulfillment para el importador actual.
+  /// Aliado: pendientes de validación MotoLink (pestaña Solicitudes).
+  static Future<List<TransactionRequestModel>>
+      fetchMyPendingValidationForAliado() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('aliado_id', uid)
+        .eq('status', TransactionRequestStatus.pendiente)
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Aliado: pedidos en curso y cerrados (pestaña Pedidos).
+  static Future<List<TransactionRequestModel>>
+      fetchMyPedidosActivosYCerradosForAliado() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('aliado_id', uid)
+        .inFilter('status', TransactionRequestStatus.aliadoPedidosActivosYCerrados)
+        .order('updated_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Aprobados por MotoLink pendientes de la primera acción del importador (pestaña Validados).
   static Future<List<TransactionRequestModel>>
       fetchValidatedTransactionRequestsForImporter() async {
     final uid = _currentUserId;
@@ -390,7 +430,7 @@ class SupabaseService {
         .from('transaction_requests')
         .select(_trSelect)
         .eq('owner_id', uid)
-        .inFilter('status', TransactionRequestStatus.importerPipeline)
+        .inFilter('status', TransactionRequestStatus.importerSoloValidadosAdmin)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -400,7 +440,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Pedidos en preparación o en tránsito (importador).
+  /// Ciclo completo post-validación: aprobado → … → entregado (pestaña Pedidos).
   static Future<List<TransactionRequestModel>>
       fetchActiveTransactionRequestsForImporter() async {
     final uid = _currentUserId;
@@ -410,7 +450,7 @@ class SupabaseService {
         .from('transaction_requests')
         .select(_trSelect)
         .eq('owner_id', uid)
-        .inFilter('status', TransactionRequestStatus.importerActiveFulfillment)
+        .inFilter('status', TransactionRequestStatus.importerPipeline)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -420,7 +460,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Pedidos validados para un producto (importador dueño vía RLS).
+  /// Solo aprobados por MotoLink para un producto (importador dueño vía RLS).
   static Future<List<TransactionRequestModel>>
       fetchValidatedTransactionRequestsForProduct(String productId) async {
     if (productId.isEmpty) return [];
@@ -429,7 +469,7 @@ class SupabaseService {
         .from('transaction_requests')
         .select(_trSelect)
         .eq('product_id', productId)
-        .inFilter('status', TransactionRequestStatus.importerPipeline)
+        .inFilter('status', TransactionRequestStatus.importerSoloValidadosAdmin)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;

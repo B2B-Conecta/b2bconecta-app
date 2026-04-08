@@ -8,20 +8,31 @@ import '../utils/transaction_request_filter_utils.dart';
 import 'aliado_expandable_order_card.dart';
 import 'order_list_filter_bar.dart';
 
-/// Solicitudes pendientes de validación MotoLink (pestaña Solicitudes — aliado).
-class AliadoMyRequestsPanel extends StatefulWidget {
-  const AliadoMyRequestsPanel({super.key});
+/// Pedidos en curso y cerrados del aliado (pestaña Pedidos).
+class AliadoPedidosPanel extends StatefulWidget {
+  const AliadoPedidosPanel({super.key});
 
   @override
-  State<AliadoMyRequestsPanel> createState() => _AliadoMyRequestsPanelState();
+  State<AliadoPedidosPanel> createState() => _AliadoPedidosPanelState();
 }
 
-class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
+class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   List<TransactionRequestModel> _rows = [];
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
+  String? _statusFilter;
+
+  static List<OrderStatusFilterOption> get _statusOptions =>
+      TransactionRequestStatus.aliadoPedidosActivosYCerrados
+          .map(
+            (s) => OrderStatusFilterOption(
+              status: s,
+              label: TransactionRequestStatus.labelEs(s),
+            ),
+          )
+          .toList();
 
   @override
   void initState() {
@@ -42,7 +53,8 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
       _error = null;
     });
     try {
-      final rows = await SupabaseService.fetchMyPendingValidationForAliado();
+      final rows =
+          await SupabaseService.fetchMyPedidosActivosYCerradosForAliado();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -60,14 +72,14 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
 
   void _clearFilters() {
     _searchCtrl.clear();
-    setState(() {});
+    setState(() => _statusFilter = null);
   }
 
   List<TransactionRequestModel> get _filtered {
     return TransactionRequestFilterUtils.apply(
       _rows,
       searchQuery: _searchCtrl.text,
-      statusFilter: null,
+      statusFilter: _statusFilter,
     );
   }
 
@@ -78,6 +90,24 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
   }
 
   String _label(String s) => TransactionRequestStatus.labelEs(s);
+
+  bool _esEnCurso(String status) =>
+      TransactionRequestStatus.aliadoPedidosEnCurso.contains(status);
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+          color: AppColors.textSecondary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +123,7 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('$_error'),
+              child: Text(_error!),
             ),
             TextButton(onPressed: _load, child: const Text('Reintentar')),
           ],
@@ -102,7 +132,7 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
     }
     if (_rows.isEmpty) {
       return RefreshIndicator(
-        onRefresh: () async => _load(),
+        onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: const [
@@ -110,7 +140,7 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'No tienes solicitudes pendientes de validación por MotoLink.',
+                'Cuando MotoLink apruebe una solicitud, verás aquí el pedido en curso o cerrado.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
               ),
@@ -121,6 +151,9 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
     }
 
     final filtered = _filtered;
+    final enCurso = filtered.where((r) => _esEnCurso(r.status)).toList();
+    final cerrados = filtered.where((r) => !_esEnCurso(r.status)).toList();
+
     return Stack(
       children: [
         Positioned.fill(
@@ -131,6 +164,9 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),
                 hintText: 'Buscar por producto, SKU o importador',
+                statusOptions: _statusOptions,
+                selectedStatus: _statusFilter,
+                onStatusChanged: (s) => setState(() => _statusFilter = s),
               ),
               Expanded(
                 child: filtered.isEmpty
@@ -142,12 +178,12 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
                             child: Column(
                               children: [
                                 Text(
-                                  'Ninguna solicitud coincide con la búsqueda.',
+                                  'Ningún pedido coincide con los filtros.',
                                   style: TextStyle(color: Colors.grey.shade700),
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,
-                                  child: const Text('Limpiar búsqueda'),
+                                  child: const Text('Limpiar filtros'),
                                 ),
                               ],
                             ),
@@ -155,20 +191,34 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
                         ],
                       )
                     : RefreshIndicator(
-                        onRefresh: () async => _load(),
-                        child: ListView.builder(
+                        onRefresh: _load,
+                        child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final r = filtered[i];
-                            return AliadoExpandableOrderCard(
-                              request: r,
-                              expanded: _expandedRequestId == r.id,
-                              onToggle: () => _toggleExpand(r.id),
-                              statusLabel: _label(r.status),
-                            );
-                          },
+                          children: [
+                            if (enCurso.isNotEmpty) ...[
+                              _sectionTitle('En curso'),
+                              ...enCurso.map(
+                                (r) => AliadoExpandableOrderCard(
+                                  request: r,
+                                  expanded: _expandedRequestId == r.id,
+                                  onToggle: () => _toggleExpand(r.id),
+                                  statusLabel: _label(r.status),
+                                ),
+                              ),
+                            ],
+                            if (cerrados.isNotEmpty) ...[
+                              _sectionTitle('Cerrados'),
+                              ...cerrados.map(
+                                (r) => AliadoExpandableOrderCard(
+                                  request: r,
+                                  expanded: _expandedRequestId == r.id,
+                                  onToggle: () => _toggleExpand(r.id),
+                                  statusLabel: _label(r.status),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
               ),

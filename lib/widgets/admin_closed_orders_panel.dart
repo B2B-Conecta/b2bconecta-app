@@ -4,7 +4,9 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'order_list_filter_bar.dart';
 
 /// Pedidos entregados o rechazados (pestaña Pedidos cerrados — admin).
 class AdminClosedOrdersPanel extends StatefulWidget {
@@ -19,11 +21,35 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
+  late final TextEditingController _searchCtrl;
+  String? _statusFilter;
+
+  static List<OrderStatusFilterOption> get _statusOptions => [
+        OrderStatusFilterOption(
+          status: TransactionRequestStatus.entregado,
+          label: TransactionRequestStatus.labelEs(
+            TransactionRequestStatus.entregado,
+          ),
+        ),
+        OrderStatusFilterOption(
+          status: TransactionRequestStatus.rechazado,
+          label: TransactionRequestStatus.labelEs(
+            TransactionRequestStatus.rechazado,
+          ),
+        ),
+      ];
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl = TextEditingController();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -46,6 +72,19 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
         _loading = false;
       });
     }
+  }
+
+  void _clearFilters() {
+    _searchCtrl.clear();
+    setState(() => _statusFilter = null);
+  }
+
+  List<TransactionRequestModel> get _filtered {
+    return TransactionRequestFilterUtils.apply(
+      _rows,
+      searchQuery: _searchCtrl.text,
+      statusFilter: _statusFilter,
+    );
   }
 
   String _statusLabel(String s) => TransactionRequestStatus.labelEs(s);
@@ -94,23 +133,62 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
         ),
       );
     }
+
+    final filtered = _filtered;
     return Stack(
       children: [
-        RefreshIndicator(
-          onRefresh: _load,
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: _rows.length,
-            itemBuilder: (context, i) {
-              final r = _rows[i];
-              return AdminExpandableOrderCard(
-                request: r,
-                expanded: _expandedRequestId == r.id,
-                onToggle: () => _toggleExpand(r.id),
-                statusLabel: _statusLabel(r.status),
-              );
-            },
+        Positioned.fill(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderListFilterBar(
+                searchController: _searchCtrl,
+                onSearchChanged: (_) => setState(() {}),
+                statusOptions: _statusOptions,
+                selectedStatus: _statusFilter,
+                onStatusChanged: (s) => setState(() => _statusFilter = s),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 48),
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Ningún pedido coincide con los filtros.',
+                                  style: TextStyle(color: Colors.grey.shade700),
+                                ),
+                                TextButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Limpiar filtros'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final r = filtered[i];
+                            return AdminExpandableOrderCard(
+                              request: r,
+                              expanded: _expandedRequestId == r.id,
+                              onToggle: () => _toggleExpand(r.id),
+                              statusLabel: _statusLabel(r.status),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
           ),
         ),
         if (_loading)

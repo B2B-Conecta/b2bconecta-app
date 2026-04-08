@@ -83,6 +83,41 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
   }
 }
 
+/// Solo importador (vista aliado en pedidos).
+class TransactionRequestImporterContactSection extends StatelessWidget {
+  const TransactionRequestImporterContactSection({
+    super.key,
+    required this.request,
+  });
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Datos del importador',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _PartyCard(
+          icon: Icons.local_shipping_outlined,
+          title: 'Importador',
+          businessName: request.ownerBusinessName,
+          rif: request.ownerRif,
+          phone: request.ownerPhone,
+        ),
+      ],
+    );
+  }
+}
+
 class _PartyCard extends StatelessWidget {
   const _PartyCard({
     required this.icon,

@@ -4,10 +4,12 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
 import 'main_shell_tab.dart';
+import 'order_list_filter_bar.dart';
 
-/// Pedidos en preparación o en tránsito (pestaña Pedidos del importador).
+/// Ciclo post-validación MotoLink: aprobado → preparación → tránsito → entregado (pestaña Pedidos).
 class ImporterActiveOrdersPanel extends StatefulWidget {
   const ImporterActiveOrdersPanel({super.key});
 
@@ -21,10 +23,23 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
+  late final TextEditingController _searchCtrl;
+  String? _statusFilter;
+
+  static List<OrderStatusFilterOption> get _statusOptions =>
+      TransactionRequestStatus.importerPipeline
+          .map(
+            (s) => OrderStatusFilterOption(
+              status: s,
+              label: TransactionRequestStatus.labelEs(s),
+            ),
+          )
+          .toList();
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl = TextEditingController();
     MainShellTabController.registerImporterPedidosReload(() => _load());
     _load();
   }
@@ -32,6 +47,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   @override
   void dispose() {
     MainShellTabController.registerImporterPedidosReload(null);
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -55,6 +71,19 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         _loading = false;
       });
     }
+  }
+
+  void _clearFilters() {
+    _searchCtrl.clear();
+    setState(() => _statusFilter = null);
+  }
+
+  List<TransactionRequestModel> get _filtered {
+    return TransactionRequestFilterUtils.apply(
+      _rows,
+      searchQuery: _searchCtrl.text,
+      statusFilter: _statusFilter,
+    );
   }
 
   void _toggleExpand(String id) {
@@ -127,8 +156,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Aquí verás los pedidos en preparación y en tránsito. '
-                'Desde «Validados», marca «En preparación» para que aparezcan aquí.',
+                'Aquí verás el ciclo completo del pedido tras la validación de MotoLink: '
+                'desde aprobado hasta entregado. Los que aún están solo aprobados '
+                'también aparecen aquí; la pestaña «Validados» agrupa los que esperan tu primera acción.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
               ),
@@ -137,34 +167,80 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         ),
       );
     }
+
+    final filtered = _filtered;
     return Stack(
       children: [
-        RefreshIndicator(
-          onRefresh: _load,
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: _rows.length,
-            itemBuilder: (context, i) {
-              final r = _rows[i];
-              final next = TransactionRequestStatus.nextForImporter(r.status);
-              final headline =
-                  TransactionRequestStatus.importerOperationalHeadline(r.status);
-              return ImporterExpandableOrderCard(
-                request: r,
-                expanded: _expandedRequestId == r.id,
-                onToggle: () => _toggleExpand(r.id),
-                statusLabel: TransactionRequestStatus.labelEs(r.status),
-                operationalHeadline: headline,
-                nextStatus: next,
-                nextActionLabel: next != null
-                    ? TransactionRequestStatus.actionLabelForNext(next)
-                    : null,
-                onAdvance: next != null
-                    ? () => _advance(context, r, next)
-                    : null,
-              );
-            },
+        Positioned.fill(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderListFilterBar(
+                searchController: _searchCtrl,
+                onSearchChanged: (_) => setState(() {}),
+                hintText: 'Buscar por producto, SKU o aliado',
+                statusOptions: _statusOptions,
+                selectedStatus: _statusFilter,
+                onStatusChanged: (s) => setState(() => _statusFilter = s),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 48),
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Ningún pedido coincide con los filtros.',
+                                  style: TextStyle(color: Colors.grey.shade700),
+                                ),
+                                TextButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Limpiar filtros'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final r = filtered[i];
+                            final next =
+                                TransactionRequestStatus.nextForImporter(
+                              r.status,
+                            );
+                            final headline = TransactionRequestStatus
+                                .importerOperationalHeadline(r.status);
+                            return ImporterExpandableOrderCard(
+                              request: r,
+                              expanded: _expandedRequestId == r.id,
+                              onToggle: () => _toggleExpand(r.id),
+                              statusLabel:
+                                  TransactionRequestStatus.labelEs(r.status),
+                              operationalHeadline: headline,
+                              nextStatus: next,
+                              nextActionLabel: next != null
+                                  ? TransactionRequestStatus.actionLabelForNext(
+                                      next,
+                                    )
+                                  : null,
+                              onAdvance: next != null
+                                  ? () => _advance(context, r, next)
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
           ),
         ),
         if (_loading)

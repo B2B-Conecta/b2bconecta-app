@@ -7,7 +7,7 @@ abstract final class TransactionRequestStatus {
   static const enTransito = 'en_transito';
   static const entregado = 'entregado';
 
-  /// Estados visibles para el importador tras validación MotoLink.
+  /// Ciclo post-validación MotoLink (pestaña Pedidos del importador).
   static const List<String> importerPipeline = [
     aprobadoAdmin,
     enPreparacion,
@@ -15,7 +15,12 @@ abstract final class TransactionRequestStatus {
     entregado,
   ];
 
-  /// Pedidos en curso de fulfillment (pestaña Pedidos del importador).
+  /// Solo aprobados por MotoLink pendientes de la primera acción del importador (pestaña Validados).
+  static const List<String> importerSoloValidadosAdmin = [
+    aprobadoAdmin,
+  ];
+
+  /// Solo preparación y tránsito (legacy / filtros internos si hiciera falta).
   static const List<String> importerActiveFulfillment = [
     enPreparacion,
     enTransito,
@@ -35,6 +40,22 @@ abstract final class TransactionRequestStatus {
 
   /// Entregados o rechazados (pestaña Pedidos cerrados).
   static const List<String> adminClosedOrders = [
+    entregado,
+    rechazado,
+  ];
+
+  /// Pedido en curso post-aprobación (aliado — agrupación en vista Pedidos).
+  static const List<String> aliadoPedidosEnCurso = [
+    aprobadoAdmin,
+    enPreparacion,
+    enTransito,
+  ];
+
+  /// Aliado: pestaña Pedidos = en curso + cerrados (excluye pendiente).
+  static const List<String> aliadoPedidosActivosYCerrados = [
+    aprobadoAdmin,
+    enPreparacion,
+    enTransito,
     entregado,
     rechazado,
   ];
@@ -96,6 +117,26 @@ abstract final class TransactionRequestStatus {
         if (importerPipeline.contains(status)) {
           return 'Pedido activo';
         }
+        return '—';
+    }
+  }
+
+  /// Mensaje corto para el aliado (seguimiento del pedido).
+  static String aliadoTrackingHeadline(String status) {
+    switch (status) {
+      case pendiente:
+        return 'En revisión por MotoLink';
+      case rechazado:
+        return 'Solicitud no aprobada';
+      case aprobadoAdmin:
+        return 'Aprobado · preparación pendiente';
+      case enPreparacion:
+        return 'Tu pedido se está preparando';
+      case enTransito:
+        return 'En tránsito hacia tu taller';
+      case entregado:
+        return 'Pedido completado';
+      default:
         return '—';
     }
   }

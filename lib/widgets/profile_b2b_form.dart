@@ -44,6 +44,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return r != null && r.isNotEmpty;
   }
 
+  /// Importador y aliado no deben ver la opción broker; solo administrador o perfil sin rol aún.
+  bool get _showAdministradorRoleOption {
+    final r = widget.initial?.role?.trim().toLowerCase();
+    if (r == 'importador' || r == 'aliado') return false;
+    return true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -236,30 +243,18 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: _RoleChoiceTile(
-              label: 'Administrador (broker)',
-              icon: Icons.admin_panel_settings_outlined,
-              selected: _role == 'administrador',
-              enabled: !_roleLocked,
-              onTap: _saving || _roleLocked
-                  ? null
-                  : () => setState(() => _role = 'administrador'),
-            ),
-          ),
-          if (_roleLocked) ...[
-            const SizedBox(height: 12),
-            Text(
-              'El tipo de cuenta no puede ser modificado. Contacte a soporte '
-              'técnico para asistencia',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                color: Colors.orange.shade900,
-                fontWeight: FontWeight.w600,
+          if (_showAdministradorRoleOption) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: _RoleChoiceTile(
+                label: 'Administrador (broker)',
+                icon: Icons.admin_panel_settings_outlined,
+                selected: _role == 'administrador',
+                enabled: !_roleLocked,
+                onTap: _saving || _roleLocked
+                    ? null
+                    : () => setState(() => _role = 'administrador'),
               ),
             ),
           ],

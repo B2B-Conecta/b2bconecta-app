@@ -729,7 +729,7 @@ class _ProductGridCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '\$${part.precio.toStringAsFixed(2)}',
+                  '\$${part.precioFinalUnitario.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,

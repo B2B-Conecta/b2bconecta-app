@@ -33,8 +33,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return id.substring(0, 12);
   }
 
-  double get _precioAliadoUnit =>
-      SupabaseService.calculateAliadoUnitPrice(part.precio);
+  double get _precioFinalUnit => part.precioFinalUnitario;
 
   Future<void> _openRequestDialog() async {
     final ownerId = part.ownerId?.trim();
@@ -67,17 +66,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Precio proveedor (ref.): \$${part.precio.toStringAsFixed(2)} / u.',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  Text(
-                    'Precio estimado (+${(SupabaseService.logisticFeeRate * 100).toStringAsFixed(0)}% intermediación): '
-                    '\$${_precioAliadoUnit.toStringAsFixed(2)} / u.',
+                    'Precio final MotoLink: \$${_precioFinalUnit.toStringAsFixed(2)} / u.',
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.brandBlue,
                     ),
+                  ),
+                  Text(
+                    'Referencia importador (mayorista): \$${part.precio.toStringAsFixed(2)} / u.',
+                    style: const TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -100,9 +98,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     builder: (context, v, _) {
                       final q = int.tryParse(v.text) ?? 0;
                       final safe = q.clamp(1, maxQty);
-                      final total = _precioAliadoUnit * safe;
+                      final total = _precioFinalUnit * safe;
                       return Text(
-                        'Total estimado: \$${total.toStringAsFixed(2)}',
+                        'Total: \$${total.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
@@ -277,9 +275,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 4),
                       Text(
-                        '\$${part.precio.toStringAsFixed(2)}',
+                        'Precio final MotoLink',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '\$${_precioFinalUnit.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
@@ -287,14 +295,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          'Precio estimado para ti (incl. intermediación): '
-                          '\$${_precioAliadoUnit.toStringAsFixed(2)} / u.',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.brandBlue,
+                          'Incluye comisión MotoLink sobre referencia mayorista '
+                          '(\$${part.precio.toStringAsFixed(2)} / u.).',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: Colors.grey.shade700,
                           ),
                         ),
                       ),

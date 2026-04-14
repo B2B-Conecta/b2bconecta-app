@@ -13,6 +13,7 @@ import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import '../utils/broker_pricing.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -20,11 +21,11 @@ class SupabaseService {
   static const _productImagesBucket = 'product-images';
   static const _profileDocumentsBucket = 'profile-documents';
 
-  /// Fee de logística / intermediación (10 %). Cambiar aquí para ajustar precio aliado.
-  static const double logisticFeeRate = 0.10;
+  /// Comisión MotoLink sobre precio mayorista (misma base que [BrokerPricing.feeRate]).
+  static double get logisticFeeRate => BrokerPricing.feeRate;
 
   static double calculateAliadoUnitPrice(double precioUnitarioProveedor) {
-    return precioUnitarioProveedor * (1 + logisticFeeRate);
+    return BrokerPricing.finalUnitPrice(precioUnitarioProveedor);
   }
 
   static SupabaseClient get _client => Supabase.instance.client;

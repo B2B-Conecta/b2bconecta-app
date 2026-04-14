@@ -1,3 +1,5 @@
+import '../utils/broker_pricing.dart';
+
 /// Modelo de repuesto. Los datos provienen de la tabla Supabase `products`
 /// (`owner_id` → `profiles.id`).
 class PartModel {
@@ -26,6 +28,8 @@ class PartModel {
   final String nombre;
   final String? descripcion;
   final String? compatibilidad;
+
+  /// Precio mayorista USD cargado por el importador (`products.price_usd`).
   final double precio;
   final int stock;
   final String? imagenUrl;
@@ -37,6 +41,9 @@ class PartModel {
   final bool isActive;
 
   final String? category;
+
+  /// Precio unitario final MotoLink (mayorista + comisión broker) para catálogo y pedidos aliado.
+  double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
   factory PartModel.fromJson(Map<String, dynamic> json) {
     // Tabla `products`: owner_id, name, description, compatibility, price_usd, stock, image_url.

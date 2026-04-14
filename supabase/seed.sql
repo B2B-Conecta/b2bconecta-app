@@ -1,5 +1,5 @@
 -- =============================================================================
--- MotoLink Pro — datos de desarrollo (seed)
+-- MotoLink — datos de desarrollo (seed)
 -- =============================================================================
 -- Aplicar al remoto enlazado (desde la raíz del repo, con `supabase link` hecho):
 --   supabase db query --linked -f supabase/seed.sql
@@ -154,7 +154,7 @@ values
   ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'aprobado', 3, now()),
   ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'aprobado', 3, now()),
   ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'aprobado', 3, now()),
-  ('a3000001-0000-4000-8000-000000000001', 'MotoLink Pro (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, now())
+  ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,

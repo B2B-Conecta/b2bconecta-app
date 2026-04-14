@@ -47,7 +47,7 @@ class MotolinkAppBar extends StatelessWidget implements PreferredSizeWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'MotoLink Pro',
+                  'MotoLink',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,

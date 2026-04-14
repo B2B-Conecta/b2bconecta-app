@@ -39,7 +39,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           title: const Text('Contraseña actualizada'),
           content: const Text(
             'Tu contraseña se ha guardado. Inicia sesión de nuevo con el correo '
-            'y la nueva contraseña para entrar a MotoLink Pro.',
+            'y la nueva contraseña para entrar a MotoLink.',
           ),
           actions: [
             FilledButton(

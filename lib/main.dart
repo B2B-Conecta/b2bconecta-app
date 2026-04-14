@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MotoLink Pro',
+      title: 'MotoLink',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       home: const AuthGate(),

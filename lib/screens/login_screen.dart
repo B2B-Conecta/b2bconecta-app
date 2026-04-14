@@ -230,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'MotoLink Pro',
+                'MotoLink',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 26,

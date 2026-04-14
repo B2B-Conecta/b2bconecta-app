@@ -102,7 +102,7 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Icono de la app (launcher) = logo oficial MotoLink Pro.
+# Icono de la app (launcher) = logo oficial MotoLink.
 flutter_launcher_icons:
   android: true
   ios: true

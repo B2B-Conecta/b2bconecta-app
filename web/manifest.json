@@ -1,6 +1,6 @@
 {
-    "name": "motolink_pro_app",
-    "short_name": "motolink_pro_app",
+    "name": "MotoLink",
+    "short_name": "MotoLink",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

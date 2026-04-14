@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Tokens de diseño MotoLink Pro (paleta derivada del logo oficial: azul + naranja).
+/// Tokens de diseño MotoLink (paleta derivada del logo oficial: azul + naranja).
 class AppColors {
   AppColors._();
 

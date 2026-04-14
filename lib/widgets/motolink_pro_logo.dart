@@ -8,7 +8,7 @@ abstract final class MotoLinkProLogoHeights {
   static const double login = 152;
 }
 
-/// Logo oficial MotoLink Pro sin fondo (`assets/logo-oficial-motolinkpro-nobg.png` embebido
+/// Logo oficial MotoLink sin fondo (`assets/logo-oficial-motolinkpro-nobg.png` embebido
 /// para que siempre se pinte, también en web con `file://` o fallos de AssetManifest).
 class MotoLinkProLogo extends StatelessWidget {
   const MotoLinkProLogo({

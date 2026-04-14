@@ -11,7 +11,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Bienvenido a MotoLink Pro'), findsOneWidget);
-    expect(find.text('INGRESAR'), findsOneWidget);
+    expect(find.text('MotoLink'), findsOneWidget);
+    expect(find.text('Iniciar Sesión'), findsOneWidget);
   });
 }

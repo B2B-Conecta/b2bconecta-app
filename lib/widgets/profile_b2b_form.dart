@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'aliado_kyc_documents_section.dart';
+import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). La dirección fiscal es solo UI
@@ -47,6 +48,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   double? _openExposure;
   bool _loadingExposure = false;
 
+  /// Recrea [AuthorizationStatusSection] al actualizar documentos KYC.
+  int _authSectionTick = 0;
+
   /// Rol ya persistido: el selector no puede cambiarse (RLS / negocio).
   bool get _roleLocked {
     final r = widget.initial?.role?.trim();
@@ -60,6 +64,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   bool get _persistedAsAliado {
     return widget.initial?.role?.trim().toLowerCase() == 'aliado';
+  }
+
+  bool get _persistedAsImportador {
+    return widget.initial?.role?.trim().toLowerCase() == 'importador';
+  }
+
+  void _bumpAuthorizationSection() {
+    setState(() => _authSectionTick++);
   }
 
   @override
@@ -404,6 +416,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               'Av. Principal, Local 12, Zona Industrial...',
             ),
           ),
+          if (_roleLocked && (_persistedAsAliado || _persistedAsImportador)) ...[
+            const SizedBox(height: 20),
+            AuthorizationStatusSection(
+              key: ValueKey<int>(_authSectionTick),
+              profile: widget.initial,
+            ),
+          ],
           if (_persistedAsAliado) ...[
             const SizedBox(height: 20),
             _sectionLabel('CUPO AUTORIZADO (MOTOLINK)'),
@@ -411,7 +430,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 20),
             AliadoKycDocumentsSection(
               kycStatus: widget.initial?.kycStatus,
-              onChanged: widget.onRelatedDataChanged,
+              onChanged: () {
+                _bumpAuthorizationSection();
+                widget.onRelatedDataChanged?.call();
+              },
             ),
           ],
           const SizedBox(height: 20),

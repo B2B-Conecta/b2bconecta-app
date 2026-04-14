@@ -6,6 +6,7 @@ import '../models/cash_phase_exception.dart';
 import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
 import '../models/credit_limit_exception.dart';
+import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
 import '../models/part_model.dart';
@@ -593,10 +594,34 @@ class SupabaseService {
     );
   }
 
+  /// Broker: fija el estado de revisión de un documento concreto del aliado.
+  /// [note] obligatoria si [status] es rechazado (validación en servidor).
+  static Future<void> adminSetProfileDocumentReviewStatus({
+    required String aliadoId,
+    required String docType,
+    required String status,
+    String? note,
+  }) async {
+    await _client.rpc(
+      'admin_set_profile_document_review_status',
+      params: <String, dynamic>{
+        'p_aliado_id': aliadoId,
+        'p_doc_type': docType,
+        'p_status': status,
+        'p_note': note,
+      },
+    );
+  }
+
   /// Aliado: marca documentación en revisión (`en_revision`).
   static Future<void> aliadoSubmitKycForReview() async {
     await _client.rpc('aliado_submit_kyc_for_review');
   }
+
+  static const _profileDocumentsSelect = 'id, profile_id, doc_type, '
+      'storage_path, file_name, created_at, review_status, review_note, '
+      'reviewed_at, reviewed_by, '
+      'reviewer:profiles!reviewed_by(business_name)';
 
   /// Documentos subidos por el aliado autenticado.
   static Future<List<ProfileDocumentModel>> fetchMyProfileDocuments() async {
@@ -605,7 +630,7 @@ class SupabaseService {
 
     final response = await _client
         .from('profile_documents')
-        .select()
+        .select(_profileDocumentsSelect)
         .eq('profile_id', uid)
         .order('doc_type', ascending: true);
 
@@ -624,7 +649,7 @@ class SupabaseService {
 
     final response = await _client
         .from('profile_documents')
-        .select()
+        .select(_profileDocumentsSelect)
         .eq('profile_id', aliadoId)
         .order('doc_type', ascending: true);
 
@@ -698,6 +723,7 @@ class SupabaseService {
       'doc_type': docType,
       'storage_path': path,
       'file_name': fileName,
+      'review_status': DocumentReviewStatus.pendiente,
     });
   }
 

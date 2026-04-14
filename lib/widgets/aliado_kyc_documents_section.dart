@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/aliado_doc_type.dart';
+import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
 import '../services/supabase_service.dart';
@@ -66,6 +67,16 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
       if (d.docType == type) return d;
     }
     return null;
+  }
+
+  String _formatReviewedAt(DateTime? utc) {
+    if (utc == null) return '';
+    final l = utc.toLocal();
+    final mm = l.month.toString().padLeft(2, '0');
+    final dd = l.day.toString().padLeft(2, '0');
+    final hh = l.hour.toString().padLeft(2, '0');
+    final min = l.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/${l.year} $hh:$min';
   }
 
   Future<void> _pickAndUpload(String docType) async {
@@ -136,7 +147,9 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
   @override
   Widget build(BuildContext context) {
     final st = widget.kycStatus?.trim();
-    final canSendReview = st == KycStatus.pendiente || st == KycStatus.rechazado;
+    final canSendReview = st == KycStatus.pendiente ||
+        st == KycStatus.rechazado ||
+        st == KycStatus.enRevision;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -173,42 +186,131 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
           )
         else
           ...AliadoDocType.all.map((type) {
-            final has = _docFor(type) != null;
+            final doc = _docFor(type);
+            final has = doc != null;
+            final rs = doc?.reviewStatus?.trim();
             final busy = _busyDocType == type;
+            final statusLine = !has
+                ? 'Sin archivo'
+                : DocumentReviewStatus.labelEs(
+                    (rs == null || rs.isEmpty)
+                        ? DocumentReviewStatus.pendiente
+                        : rs,
+                  );
+            final note = doc?.reviewNote?.trim();
+            final reviewer = doc?.reviewerBusinessName?.trim();
+            final reviewedHint = (doc != null && doc.reviewedAt != null)
+                ? 'Revisión MotoLink: ${_formatReviewedAt(doc.reviewedAt)}'
+                    '${reviewer != null && reviewer.isNotEmpty ? ' · $reviewer' : ''}'
+                : null;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 10),
               child: Material(
                 color: Colors.white,
-                borderRadius: AppDecorations.radius12,
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppDecorations.radius12,
-                    side: BorderSide(color: Colors.grey.shade300),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppDecorations.radius12,
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AliadoDocType.labelEs(type),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  statusLine,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: has
+                                        ? AppColors.textSecondary
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
+                                if (reviewedHint != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    reviewedHint,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                                if (note != null && note.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.orange.shade200,
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            Icons.feedback_outlined,
+                                            size: 18,
+                                            color: Colors.orange.shade900,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              note,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                height: 1.4,
+                                                color: Colors.grey.shade900,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (busy)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4, top: 4),
+                              child: SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          else
+                            TextButton(
+                              onPressed: () => _pickAndUpload(type),
+                              child: Text(has ? 'Cambiar' : 'Subir'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                  title: Text(
-                    AliadoDocType.labelEs(type),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  subtitle: Text(
-                    has ? 'Archivo cargado' : 'Sin archivo',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: has ? AppColors.successGreen : Colors.grey.shade600,
-                    ),
-                  ),
-                  trailing: busy
-                      ? const SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : TextButton(
-                          onPressed: () => _pickAndUpload(type),
-                          child: Text(has ? 'Cambiar' : 'Subir'),
-                        ),
                 ),
               ),
             );

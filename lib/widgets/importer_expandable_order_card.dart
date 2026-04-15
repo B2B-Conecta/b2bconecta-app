@@ -17,6 +17,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.nextStatus,
     this.nextActionLabel,
     this.onAdvance,
+    this.expandedFooter,
   });
 
   final TransactionRequestModel request;
@@ -27,6 +28,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final String? nextStatus;
   final String? nextActionLabel;
   final VoidCallback? onAdvance;
+  final Widget? expandedFooter;
 
   @override
   Widget build(BuildContext context) {
@@ -131,12 +133,29 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               onAdvance != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onAdvance,
-                  child: Text(nextActionLabel!),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: onAdvance,
+                      child: Text(nextActionLabel!),
+                    ),
+                  ),
+                  if (nextStatus == TransactionRequestStatus.entregado) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Marque entregado cuando el aliado ya recibió el pedido en su taller. '
+                      'Se descuenta su inventario y se actualiza el crédito del aliado.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.3,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           AnimatedSize(
@@ -164,6 +183,10 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         TransactionRequestAliadoContactSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestLifecycleSection(request: r),
+                        if (expandedFooter != null) ...[
+                          const SizedBox(height: 12),
+                          expandedFooter!,
+                        ],
                       ],
                     ),
                   )

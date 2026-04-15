@@ -13,12 +13,14 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.statusLabel,
+    this.expandedFooter,
   });
 
   final TransactionRequestModel request;
   final bool expanded;
   final VoidCallback onToggle;
   final String statusLabel;
+  final Widget? expandedFooter;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +108,31 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (r.status == TransactionRequestStatus.enPreparacion &&
+                              r.aliadoPagoEstadoResumenEs != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              r.aliadoPagoEstadoResumenEs!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.brandBlue.withOpacity(0.95),
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                          if (r.status == TransactionRequestStatus.enTransito &&
+                              r.hasTransitEta) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Llegada estimada: ~${r.transitEtaResumenEs} desde el envío',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.brandBlue.withOpacity(0.95),
+                              ),
+                            ),
+                          ],
                           if (r.aliadoCreditScore != null) ...[
                             const SizedBox(height: 4),
                             Text(
@@ -154,6 +181,10 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         TransactionRequestImporterContactSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestLifecycleSection(request: r),
+                        if (expandedFooter != null) ...[
+                          const SizedBox(height: 12),
+                          expandedFooter!,
+                        ],
                       ],
                     ),
                   )

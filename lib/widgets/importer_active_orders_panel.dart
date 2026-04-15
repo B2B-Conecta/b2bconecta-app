@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
+import 'importer_order_invoice_section.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
@@ -235,6 +236,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                               onAdvance: next != null
                                   ? () => _advance(context, r, next)
                                   : null,
+                              expandedFooter: ImporterOrderInvoiceSection(
+                                request: r,
+                                onChanged: _load,
+                              ),
                             );
                           },
                         ),

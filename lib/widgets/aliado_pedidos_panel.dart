@@ -6,6 +6,8 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'aliado_expandable_order_card.dart';
+import 'aliado_order_pago_section.dart';
+import 'order_motolink_thread_section.dart';
 import 'order_list_filter_bar.dart';
 
 /// Pedidos en curso y cerrados del aliado (pestaña Pedidos).
@@ -204,6 +206,23 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   expanded: _expandedRequestId == r.id,
                                   onToggle: () => _toggleExpand(r.id),
                                   statusLabel: _label(r.status),
+                                  expandedFooter: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      AliadoOrderPagoSection(
+                                        request: r,
+                                        onChanged: _load,
+                                      ),
+                                      OrderMotolinkThreadSection(
+                                        key: ValueKey<String>(
+                                          'trm-aliado-${r.id}',
+                                        ),
+                                        transactionRequestId: r.id,
+                                        allowReplyAsAliado: _esEnCurso(r.status),
+                                        allowReplyAsAdmin: false,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -215,6 +234,23 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   expanded: _expandedRequestId == r.id,
                                   onToggle: () => _toggleExpand(r.id),
                                   statusLabel: _label(r.status),
+                                  expandedFooter: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      AliadoOrderPagoSection(
+                                        request: r,
+                                        onChanged: _load,
+                                      ),
+                                      OrderMotolinkThreadSection(
+                                        key: ValueKey<String>(
+                                          'trm-aliado-${r.id}',
+                                        ),
+                                        transactionRequestId: r.id,
+                                        allowReplyAsAliado: _esEnCurso(r.status),
+                                        allowReplyAsAdmin: false,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],

@@ -12,6 +12,8 @@ import '../models/kyc_verification_exception.dart';
 import '../models/part_model.dart';
 import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
+import '../models/pago_revision_estado.dart';
+import '../models/transaction_request_message_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../utils/broker_pricing.dart';
@@ -21,6 +23,11 @@ class SupabaseService {
 
   static const _productImagesBucket = 'product-images';
   static const _profileDocumentsBucket = 'profile-documents';
+  static const _orderInvoicesBucket = 'order-invoices';
+  static const _orderAllyInvoicesBucket = 'order-ally-invoices';
+  static const _orderPaymentProofsBucket = 'order-payment-proofs';
+
+  static String? get currentUserId => _currentUserId;
 
   /// Comisión MotoLink sobre precio mayorista (misma base que [BrokerPricing.feeRate]).
   static double get logisticFeeRate => BrokerPricing.feeRate;
@@ -366,6 +373,22 @@ class SupabaseService {
     at_en_preparacion,
     at_en_transito,
     at_entregado,
+    proveedor_factura_storage_path,
+    proveedor_factura_file_name,
+    proveedor_factura_submitted_at,
+    transit_eta_days,
+    transit_eta_hours,
+    transit_eta_set_at,
+    factura_aliado_storage_path,
+    factura_aliado_file_name,
+    factura_aliado_submitted_at,
+    pago_metodo,
+    comprobante_pago_storage_path,
+    comprobante_pago_file_name,
+    comprobante_pago_submitted_at,
+    pago_estado_revision,
+    pago_comprobante_rechazo_nota,
+    pago_aprobado_at,
     products ( name, sku, price_usd ),
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone ),
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
@@ -881,7 +904,351 @@ class SupabaseService {
     await _client.from('transaction_requests').update(payload).eq('id', id);
   }
 
-  /// Avanza el estado del pedido (importador): cadena aprobado → preparación → tránsito → entregado.
+  /// URL firmada (1 h) para abrir una factura de pedido (`order-invoices`).
+  static Future<String> createSignedUrlForOrderInvoice(String storagePath) async {
+    return _client.storage
+        .from(_orderInvoicesBucket)
+        .createSignedUrl(storagePath, 3600);
+  }
+
+  /// Factura oficial MotoLink al aliado (`order-ally-invoices`).
+  static Future<String> createSignedUrlForFacturaAliado(String storagePath) async {
+    return _client.storage
+        .from(_orderAllyInvoicesBucket)
+        .createSignedUrl(storagePath, 3600);
+  }
+
+  /// Comprobante de pago del aliado (`order-payment-proofs`).
+  static Future<String> createSignedUrlForComprobantePago(String storagePath) async {
+    return _client.storage
+        .from(_orderPaymentProofsBucket)
+        .createSignedUrl(storagePath, 3600);
+  }
+
+  /// MotoLink: sube o reemplaza la factura oficial al aliado (pedido en preparación).
+  static Future<void> adminSubmitFacturaAliadoOrder({
+    required String transactionRequestId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final profile = await fetchMyProfile();
+    if (profile?.role?.trim().toLowerCase() != 'administrador') {
+      throw StateError('Solo MotoLink puede adjuntar la factura oficial al aliado.');
+    }
+
+    final row = await _client
+        .from('transaction_requests')
+        .select(
+          'status, proveedor_factura_storage_path, pago_estado_revision',
+        )
+        .eq('id', transactionRequestId)
+        .maybeSingle();
+
+    if (row == null) throw StateError('Pedido no encontrado.');
+    final m = Map<String, dynamic>.from(row);
+    if (m['status']?.toString() != TransactionRequestStatus.enPreparacion) {
+      throw StateError('Solo aplica con el pedido en preparación.');
+    }
+    final prov = m['proveedor_factura_storage_path']?.toString().trim();
+    if (prov == null || prov.isEmpty) {
+      throw StateError(
+        'El importador debe haber adjuntado antes la factura del proveedor.',
+      );
+    }
+    final pe = m['pago_estado_revision']?.toString().trim();
+    if (pe == PagoRevisionEstado.enRevision) {
+      throw StateError(
+        'Hay un comprobante en revisión. Resuélvalo antes de cambiar la factura.',
+      );
+    }
+    if (pe == PagoRevisionEstado.aprobado) {
+      throw StateError('El pago ya fue aprobado; no puede reemplazar la factura.');
+    }
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) safeBase = 'factura_aliado.$ext';
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path = '$transactionRequestId/${stamp}_$safeBase';
+
+    final existing = await _client
+        .from('transaction_requests')
+        .select('factura_aliado_storage_path')
+        .eq('id', transactionRequestId)
+        .maybeSingle();
+    if (existing != null) {
+      final oldPath = Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
+          ?.toString()
+          .trim();
+      if (oldPath != null && oldPath.isNotEmpty) {
+        try {
+          await _client.storage.from(_orderAllyInvoicesBucket).remove([oldPath]);
+        } catch (_) {}
+      }
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderAllyInvoicesBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    await _client.from('transaction_requests').update({
+      'factura_aliado_storage_path': path,
+      'factura_aliado_file_name': fileName.trim(),
+      'factura_aliado_submitted_at': DateTime.now().toUtc().toIso8601String(),
+      'pago_estado_revision': PagoRevisionEstado.pendiente,
+      'pago_metodo': null,
+      'comprobante_pago_storage_path': null,
+      'comprobante_pago_file_name': null,
+      'comprobante_pago_submitted_at': null,
+      'pago_comprobante_rechazo_nota': null,
+      'pago_aprobado_at': null,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', transactionRequestId);
+  }
+
+  /// Aliado: sube foto del comprobante y envía a revisión MotoLink.
+  static Future<void> aliadoSubmitComprobantePago({
+    required String transactionRequestId,
+    required String metodo,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use imagen o PDF.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path = '$transactionRequestId/${stamp}_$safeBase';
+
+    final row = await _client
+        .from('transaction_requests')
+        .select('comprobante_pago_storage_path')
+        .eq('id', transactionRequestId)
+        .eq('aliado_id', uid)
+        .maybeSingle();
+    if (row != null) {
+      final oldPath = Map<String, dynamic>.from(row)['comprobante_pago_storage_path']
+          ?.toString()
+          .trim();
+      if (oldPath != null && oldPath.isNotEmpty) {
+        try {
+          await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
+        } catch (_) {}
+      }
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    try {
+      await _client.rpc(
+        'aliado_registra_comprobante_pago',
+        params: <String, dynamic>{
+          'p_request_id': transactionRequestId,
+          'p_metodo': metodo,
+          'p_storage_path': path,
+          'p_file_name': fileName.trim(),
+        },
+      );
+    } catch (e) {
+      try {
+        await _client.storage.from(_orderPaymentProofsBucket).remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  static Future<void> adminAprobarPagoAliado(String requestId) async {
+    await _client.rpc(
+      'admin_aprobar_pago_aliado',
+      params: <String, dynamic>{'p_request_id': requestId},
+    );
+  }
+
+  static Future<void> adminRechazarComprobantePago({
+    required String requestId,
+    required String nota,
+  }) async {
+    await _client.rpc(
+      'admin_rechazar_comprobante_pago',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_nota': nota.trim(),
+      },
+    );
+  }
+
+  /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación.
+  static Future<void> importerSubmitOrderInvoice({
+    required String transactionRequestId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final row = await _client
+        .from('transaction_requests')
+        .select(
+          'owner_id, status, proveedor_factura_storage_path',
+        )
+        .eq('id', transactionRequestId)
+        .maybeSingle();
+
+    if (row == null) {
+      throw StateError('Pedido no encontrado.');
+    }
+    final m = Map<String, dynamic>.from(row);
+    if (m['owner_id']?.toString() != uid) {
+      throw StateError('No autorizado a adjuntar factura en este pedido.');
+    }
+    if (m['status']?.toString() != TransactionRequestStatus.enPreparacion) {
+      throw StateError(
+        'Solo puede adjuntar la factura mientras el pedido está en preparación.',
+      );
+    }
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) {
+      safeBase = 'factura.$ext';
+    }
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path = '$transactionRequestId/${stamp}_$safeBase';
+
+    final oldPath = m['proveedor_factura_storage_path']?.toString().trim();
+    if (oldPath != null && oldPath.isNotEmpty) {
+      try {
+        await _client.storage.from(_orderInvoicesBucket).remove([oldPath]);
+      } catch (_) {}
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderInvoicesBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    await _client.from('transaction_requests').update({
+      'proveedor_factura_storage_path': path,
+      'proveedor_factura_file_name': fileName.trim(),
+      'proveedor_factura_submitted_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', transactionRequestId);
+  }
+
+  /// MotoLink: pasa el pedido a en tránsito con días y/u horas estimadas hasta el aliado.
+  static Future<void> adminMarcaPedidoEnTransito({
+    required String requestId,
+    required int transitEtaDays,
+    required int transitEtaHours,
+  }) async {
+    await _client.rpc(
+      'admin_marca_pedido_en_transito',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_transit_eta_days': transitEtaDays,
+        'p_transit_eta_hours': transitEtaHours,
+      },
+    );
+  }
+
+  static const _trMessagesSelect =
+      'id, transaction_request_id, author_id, author_role, body, created_at';
+
+  static Future<List<TransactionRequestMessageModel>>
+      fetchTransactionRequestMessages(String transactionRequestId) async {
+    if (transactionRequestId.isEmpty) return [];
+
+    final response = await _client
+        .from('transaction_request_messages')
+        .select(_trMessagesSelect)
+        .eq('transaction_request_id', transactionRequestId)
+        .order('created_at', ascending: true);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) => TransactionRequestMessageModel.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
+  static Future<void> insertTransactionRequestMessageAsAliado({
+    required String transactionRequestId,
+    required String body,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final t = body.trim();
+    if (t.isEmpty) return;
+
+    await _client.from('transaction_request_messages').insert({
+      'transaction_request_id': transactionRequestId,
+      'author_id': uid,
+      'author_role': 'aliado',
+      'body': t,
+    });
+  }
+
+  static Future<void> insertTransactionRequestMessageAsAdmin({
+    required String transactionRequestId,
+    required String body,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final t = body.trim();
+    if (t.isEmpty) return;
+
+    await _client.from('transaction_request_messages').insert({
+      'transaction_request_id': transactionRequestId,
+      'author_id': uid,
+      'author_role': 'administrador',
+      'body': t,
+    });
+  }
+
+  /// Avanza el estado del pedido (importador): aprobado → preparación; tránsito → entregado.
   static Future<void> importerAdvanceTransactionRequest({
     required String id,
     required String newStatus,

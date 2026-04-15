@@ -88,12 +88,13 @@ abstract final class TransactionRequestStatus {
   }
 
   /// Siguiente estado que puede aplicar el importador, o null si es terminal o no aplica.
+  /// `en_preparacion` → `en_transito` lo registra MotoLink (con factura y días de ETA).
   static String? nextForImporter(String current) {
     switch (current) {
       case aprobadoAdmin:
         return enPreparacion;
       case enPreparacion:
-        return enTransito;
+        return null;
       case enTransito:
         return entregado;
       default:

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/pago_metodo.dart';
+import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
@@ -231,12 +233,27 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
           ),
           _TimelineRow(
             label: 'En preparación (importador)',
-            value: formatEsShortDateTime(r.atEnPreparacion),
+            value: _prepValue(r),
             isDone: r.atEnPreparacion != null,
           ),
           _TimelineRow(
-            label: 'En tránsito',
-            value: formatEsShortDateTime(r.atEnTransito),
+            label: 'Factura MotoLink al aliado',
+            value: _facturaAliadoTimeline(r),
+            isDone: r.hasFacturaAliado,
+          ),
+          _TimelineRow(
+            label: 'Comprobante de pago',
+            value: _comprobantePagoTimeline(r),
+            isDone: r.hasComprobantePago,
+          ),
+          _TimelineRow(
+            label: 'Pago aprobado (MotoLink)',
+            value: formatEsShortDateTime(r.pagoAprobadoAt),
+            isDone: r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado,
+          ),
+          _TimelineRow(
+            label: 'En tránsito (MotoLink)',
+            value: _transitoValue(r),
             isDone: r.atEnTransito != null,
           ),
           _TimelineRow(
@@ -248,6 +265,54 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  static String _prepValue(TransactionRequestModel r) {
+    final d = formatEsShortDateTime(r.atEnPreparacion);
+    if (!r.hasProveedorFactura) return d;
+    final fn = r.proveedorFacturaFileName?.trim();
+    final extra = (fn != null && fn.isNotEmpty)
+        ? '\nFactura digital: $fn'
+        : '\nFactura digital enviada';
+    final at = formatEsShortDateTime(r.proveedorFacturaSubmittedAt);
+    final tail = at != '—' ? ' ($at)' : '';
+    return '$d$extra$tail';
+  }
+
+  static String _transitoValue(TransactionRequestModel r) {
+    final d = formatEsShortDateTime(r.atEnTransito);
+    final eta = r.transitEtaResumenEs;
+    if (eta == null) return d;
+    return '$d\nEntrega estimada al aliado: $eta';
+  }
+
+  static String _facturaAliadoTimeline(TransactionRequestModel r) {
+    if (!r.hasFacturaAliado) return '—';
+    final fn = r.facturaAliadoFileName?.trim();
+    final t = formatEsShortDateTime(r.facturaAliadoSubmittedAt);
+    if (fn != null && fn.isNotEmpty) return '$fn\n$t';
+    return t;
+  }
+
+  static String _comprobantePagoTimeline(TransactionRequestModel r) {
+    final pr = r.pagoEstadoRevision?.trim();
+    if (pr == PagoRevisionEstado.aprobado && !r.hasComprobantePago) {
+      return 'Aprobado (ver fecha arriba)';
+    }
+    if (!r.hasComprobantePago) {
+      if (r.hasFacturaAliado &&
+          (pr == null ||
+              pr.isEmpty ||
+              pr == PagoRevisionEstado.pendiente ||
+              pr == PagoRevisionEstado.rechazado)) {
+        return 'Pendiente de envío por el aliado';
+      }
+      return '—';
+    }
+    final met = r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty
+        ? PagoMetodo.labelEs(r.pagoMetodo!)
+        : 'Método —';
+    return '$met · ${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}';
   }
 }
 

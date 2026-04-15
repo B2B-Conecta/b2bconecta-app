@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'admin_order_pre_transit_section.dart';
 import 'order_list_filter_bar.dart';
+import 'order_motolink_thread_section.dart';
 
 /// Pedidos activos del broker (pestaña Pedidos): no entregados ni rechazados.
 class AdminActiveOrdersPanel extends StatefulWidget {
@@ -101,6 +102,131 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     });
   }
 
+  Widget _buildAdminExpandedFooter(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (r.status == TransactionRequestStatus.enPreparacion)
+          AdminOrderPreTransitSection(
+            request: r,
+            onRefresh: _load,
+            onMarcarEnTransito: () => _promptMarkEnTransito(context, r),
+          ),
+        const Divider(height: 20),
+        OrderMotolinkThreadSection(
+          key: ValueKey<String>('trm-admin-${r.id}'),
+          transactionRequestId: r.id,
+          allowReplyAsAliado: false,
+          allowReplyAsAdmin: true,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _promptMarkEnTransito(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) async {
+    final ctrlDays = TextEditingController(text: '0');
+    final ctrlHours = TextEditingController(text: '0');
+    ({int days, int hours})? eta;
+    try {
+      eta = await showDialog<({int days, int hours})>(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text('Tiempo estimado de tránsito'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Indique días y horas aproximadas hasta que el envío llegue al taller del aliado. '
+                  'Si el aliado está cerca, puede dejar 0 días y solo horas.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrlDays,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Días (0–365)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ctrlHours,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Horas (0–23)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final d = int.tryParse(ctrlDays.text.trim()) ?? 0;
+                  final h = int.tryParse(ctrlHours.text.trim()) ?? 0;
+                  if (d < 0 || d > 365 || h < 0 || h > 23) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Use días entre 0 y 365, y horas entre 0 y 23.'),
+                      ),
+                    );
+                    return;
+                  }
+                  if (d == 0 && h == 0) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Indique al menos un día o una hora de tránsito estimado.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(ctx, (days: d, hours: h));
+                },
+                child: const Text('Confirmar'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      ctrlDays.dispose();
+      ctrlHours.dispose();
+    }
+    if (eta == null || !context.mounted) return;
+    try {
+      await SupabaseService.adminMarcaPedidoEnTransito(
+        requestId: r.id,
+        transitEtaDays: eta.days,
+        transitEtaHours: eta.hours,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido marcado en tránsito.')),
+      );
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _rows.isEmpty) {
@@ -189,6 +315,8 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
                             expanded: _expandedRequestId == r.id,
                             onToggle: () => _toggleExpand(r.id),
                             statusLabel: _statusLabel(r.status),
+                            expandedFooter:
+                                _buildAdminExpandedFooter(context, r),
                           );
                         },
                       ),

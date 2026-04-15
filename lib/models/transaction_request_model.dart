@@ -1,3 +1,5 @@
+import 'pago_revision_estado.dart';
+
 /// Fila de `transaction_requests` con joins opcionales (producto, aliado, importador).
 class TransactionRequestModel {
   const TransactionRequestModel({
@@ -27,6 +29,22 @@ class TransactionRequestModel {
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
+    this.proveedorFacturaStoragePath,
+    this.proveedorFacturaFileName,
+    this.proveedorFacturaSubmittedAt,
+    this.transitEtaDays,
+    this.transitEtaHours,
+    this.transitEtaSetAt,
+    this.facturaAliadoStoragePath,
+    this.facturaAliadoFileName,
+    this.facturaAliadoSubmittedAt,
+    this.pagoMetodo,
+    this.comprobantePagoStoragePath,
+    this.comprobantePagoFileName,
+    this.comprobantePagoSubmittedAt,
+    this.pagoEstadoRevision,
+    this.pagoComprobanteRechazoNota,
+    this.pagoAprobadoAt,
   });
 
   final String id;
@@ -55,6 +73,92 @@ class TransactionRequestModel {
   final String? ownerBusinessName;
   final String? ownerRif;
   final String? ownerPhone;
+
+  /// Factura digital del importador (Storage `order-invoices`).
+  final String? proveedorFacturaStoragePath;
+  final String? proveedorFacturaFileName;
+  final DateTime? proveedorFacturaSubmittedAt;
+
+  /// Estimación de tránsito (registra MotoLink al pasar a `en_transito`).
+  final int? transitEtaDays;
+  final int? transitEtaHours;
+  final DateTime? transitEtaSetAt;
+
+  /// Factura oficial MotoLink al aliado (`order-ally-invoices`).
+  final String? facturaAliadoStoragePath;
+  final String? facturaAliadoFileName;
+  final DateTime? facturaAliadoSubmittedAt;
+
+  /// Pago del aliado: método, comprobante (`order-payment-proofs`) y revisión MotoLink.
+  final String? pagoMetodo;
+  final String? comprobantePagoStoragePath;
+  final String? comprobantePagoFileName;
+  final DateTime? comprobantePagoSubmittedAt;
+  final String? pagoEstadoRevision;
+  final String? pagoComprobanteRechazoNota;
+  final DateTime? pagoAprobadoAt;
+
+  int get _etaDaysCoalesced => transitEtaDays ?? 0;
+  int get _etaHoursCoalesced => transitEtaHours ?? 0;
+
+  /// Hay al menos un día o una hora de ETA registrada.
+  bool get hasTransitEta =>
+      _etaDaysCoalesced > 0 || _etaHoursCoalesced > 0;
+
+  /// Texto breve en español, p. ej. «2 días y 4 horas» o «6 horas».
+  String? get transitEtaResumenEs {
+    if (!hasTransitEta) return null;
+    final parts = <String>[];
+    final d = _etaDaysCoalesced;
+    final h = _etaHoursCoalesced;
+    if (d > 0) {
+      parts.add(d == 1 ? '1 día' : '$d días');
+    }
+    if (h > 0) {
+      parts.add(h == 1 ? '1 hora' : '$h horas');
+    }
+    return parts.join(' y ');
+  }
+
+  bool get hasProveedorFactura =>
+      proveedorFacturaStoragePath != null &&
+      proveedorFacturaStoragePath!.trim().isNotEmpty;
+
+  bool get hasFacturaAliado =>
+      facturaAliadoStoragePath != null &&
+      facturaAliadoStoragePath!.trim().isNotEmpty;
+
+  bool get hasComprobantePago =>
+      comprobantePagoStoragePath != null &&
+      comprobantePagoStoragePath!.trim().isNotEmpty;
+
+  /// `pendiente` si ya hay factura MotoLink pero aún no hay estado persistido.
+  String get pagoEstadoRevisionEfectivo {
+    if (!hasFacturaAliado) return PagoRevisionEstado.pendiente;
+    final r = pagoEstadoRevision?.trim();
+    if (r == null || r.isEmpty) return PagoRevisionEstado.pendiente;
+    return r;
+  }
+
+  /// Mensaje corto para el aliado durante `en_preparacion` (pago / comprobante).
+  String? get aliadoPagoEstadoResumenEs {
+    if (status != 'en_preparacion') return null;
+    if (!hasFacturaAliado) {
+      return 'Esperando factura oficial de MotoLink para pagar.';
+    }
+    switch (pagoEstadoRevisionEfectivo) {
+      case PagoRevisionEstado.pendiente:
+        return 'Factura lista · realice el pago y adjunte el comprobante.';
+      case PagoRevisionEstado.enRevision:
+        return 'Comprobante en revisión por MotoLink.';
+      case PagoRevisionEstado.rechazado:
+        return 'Comprobante no aceptado · puede enviar otro.';
+      case PagoRevisionEstado.aprobado:
+        return 'Pago aprobado · MotoLink marcará el envío en tránsito.';
+      default:
+        return null;
+    }
+  }
 
   factory TransactionRequestModel.fromJson(Map<String, dynamic> json) {
     final products = json['products'];
@@ -118,7 +222,34 @@ class TransactionRequestModel {
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),
+      proveedorFacturaStoragePath:
+          _nullableText(json['proveedor_factura_storage_path']),
+      proveedorFacturaFileName:
+          _nullableText(json['proveedor_factura_file_name']),
+      proveedorFacturaSubmittedAt: _parseDate(json['proveedor_factura_submitted_at']),
+      transitEtaDays: _asNullableInt(json['transit_eta_days']),
+      transitEtaHours: _asNullableInt(json['transit_eta_hours']),
+      transitEtaSetAt: _parseDate(json['transit_eta_set_at']),
+      facturaAliadoStoragePath: _nullableText(json['factura_aliado_storage_path']),
+      facturaAliadoFileName: _nullableText(json['factura_aliado_file_name']),
+      facturaAliadoSubmittedAt: _parseDate(json['factura_aliado_submitted_at']),
+      pagoMetodo: _nullableText(json['pago_metodo']),
+      comprobantePagoStoragePath:
+          _nullableText(json['comprobante_pago_storage_path']),
+      comprobantePagoFileName: _nullableText(json['comprobante_pago_file_name']),
+      comprobantePagoSubmittedAt:
+          _parseDate(json['comprobante_pago_submitted_at']),
+      pagoEstadoRevision: _nullableText(json['pago_estado_revision']),
+      pagoComprobanteRechazoNota:
+          _nullableText(json['pago_comprobante_rechazo_nota']),
+      pagoAprobadoAt: _parseDate(json['pago_aprobado_at']),
     );
+  }
+
+  static int? _asNullableInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    return int.tryParse(v.toString());
   }
 
   static int _asInt(dynamic v) {

@@ -15,6 +15,41 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
 /// Admin: lista de aliados con edición de `credit_limit`.
+/// Mensaje legible cuando falla el RPC de KYC global (evita mostrar `PostgresException` crudo).
+String _kycGlobalStatusRpcUserMessage(Object error) {
+  final raw = switch (error) {
+    PostgrestException e => e.message,
+    _ => _extractMessageFromRpcExceptionString(error.toString()),
+  };
+  final t = raw.trim();
+  if (t.isEmpty) {
+    return 'No se pudo actualizar el estado KYC. Inténtelo de nuevo.';
+  }
+  if (t.contains('deben estar registrados los 6 documentos obligatorios') ||
+      t.contains('archivo cargado por tipo')) {
+    return 'No puede aprobar el KYC todavía: el aliado debe tener cargados los 6 '
+        'documentos obligatorios (un archivo por tipo). Pulse «Revisar documentación '
+        '(por documento)» para ver qué falta.';
+  }
+  if (t.contains('cada documento obligatorio debe tener') ||
+      (t.contains('documento obligatorio') && t.contains('aprobado'))) {
+    return 'No puede aprobar el KYC global hasta que los 6 documentos estén aprobados '
+        'uno a uno. Use «Revisar documentación (por documento)».';
+  }
+  if (t.startsWith('No se puede marcar KYC')) return t;
+  return t.length > 280 ? '${t.substring(0, 277)}…' : t;
+}
+
+String _extractMessageFromRpcExceptionString(String s) {
+  const needle = 'message: ';
+  final i = s.indexOf(needle);
+  if (i < 0) return s;
+  final from = i + needle.length;
+  final codeAt = s.indexOf(', code:', from);
+  if (codeAt > from) return s.substring(from, codeAt).trim();
+  return s;
+}
+
 class AdminAliadosCreditPanel extends StatefulWidget {
   const AdminAliadosCreditPanel({super.key});
 
@@ -135,6 +170,7 @@ class _AliadoCreditCard extends StatefulWidget {
 class _AliadoCreditCardState extends State<_AliadoCreditCard> {
   late final TextEditingController _limitCtrl;
   bool _saving = false;
+  bool _savingKyc = false;
 
   @override
   void initState() {
@@ -157,6 +193,48 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     if (oldWidget.profile.creditLimit != widget.profile.creditLimit) {
       final lim = widget.profile.creditLimit;
       _limitCtrl.text = lim != null ? lim.toStringAsFixed(2) : '';
+    }
+  }
+
+  String _kycDropdownValue() {
+    final s = widget.profile.kycStatus?.trim();
+    if (s == null || s.isEmpty) return KycStatus.pendiente;
+    switch (s) {
+      case KycStatus.pendiente:
+      case KycStatus.enRevision:
+      case KycStatus.aprobado:
+      case KycStatus.rechazado:
+        return s;
+      default:
+        return KycStatus.pendiente;
+    }
+  }
+
+  Future<void> _setAliadoKycGlobal(String status) async {
+    setState(() => _savingKyc = true);
+    try {
+      await SupabaseService.adminSetAliadoKycStatus(
+        aliadoId: widget.profile.id,
+        status: status,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('KYC global actualizado a «${KycStatus.labelEs(status)}».'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_kycGlobalStatusRpcUserMessage(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _savingKyc = false);
     }
   }
 
@@ -431,6 +509,12 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                                     onReject: docFor(type) == null
                                         ? null
                                         : () => unawaited(promptReject(type)),
+                                    onEnRevision: docFor(type) == null
+                                        ? null
+                                        : () => setReview(
+                                              type,
+                                              DocumentReviewStatus.enRevision,
+                                            ),
                                   ),
                               ],
                             ),
@@ -568,6 +652,58 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 color: AppColors.brandBlue,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Puede corregir el estado global o el de cada archivo en cualquier momento. '
+              'Para marcar «Aprobado» global, el servidor exige los 6 documentos cargados y aprobados uno a uno.',
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _kycDropdownValue(),
+              decoration: InputDecoration(
+                labelText: 'Estado KYC global (admin)',
+                filled: true,
+                fillColor: AppColors.fieldFill,
+                border: OutlineInputBorder(
+                  borderRadius: AppDecorations.radius12,
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: KycStatus.pendiente,
+                  child: Text('Pendiente de envío'),
+                ),
+                DropdownMenuItem(
+                  value: KycStatus.enRevision,
+                  child: Text('En revisión MotoLink'),
+                ),
+                DropdownMenuItem(
+                  value: KycStatus.aprobado,
+                  child: Text('Aprobado'),
+                ),
+                DropdownMenuItem(
+                  value: KycStatus.rechazado,
+                  child: Text('Rechazado'),
+                ),
+              ],
+              onChanged: _savingKyc
+                  ? null
+                  : (v) {
+                      if (v == null) return;
+                      unawaited(_setAliadoKycGlobal(v));
+                    },
+            ),
+            if (_savingKyc)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _openDocReviewSheet,
@@ -840,6 +976,7 @@ class _DocReviewTile extends StatelessWidget {
     required this.onOpen,
     required this.onApprove,
     required this.onReject,
+    this.onEnRevision,
   });
 
   final String docType;
@@ -848,6 +985,7 @@ class _DocReviewTile extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+  final VoidCallback? onEnRevision;
 
   @override
   Widget build(BuildContext context) {
@@ -979,6 +1117,11 @@ class _DocReviewTile extends StatelessWidget {
                       ),
                       onPressed: busy ? null : onReject,
                       child: const Text('Rechazar…'),
+                    ),
+                  if (onEnRevision != null)
+                    TextButton(
+                      onPressed: busy ? null : onEnRevision,
+                      child: const Text('Marcar en revisión'),
                     ),
                 ],
               ),

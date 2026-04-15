@@ -12,9 +12,9 @@
 --
 -- Requiere migración `20260407120000_broker_transaction_requests.sql` (tabla transaction_requests).
 -- Contenido: 11 usuarios auth + perfiles (estado, ciudad, direccion) + esquema
--- inventario (sku, is_active, category) + 140 productos + solicitudes broker de ejemplo.
+-- inventario (sku, is_active, category) + 140 productos. Sin pedidos predefinidos; KYC aliados en pendiente.
 -- Re-ejecutar: aplica DDL idempotente, borra productos de importadores seed,
--- inserta productos + mensajes de ejemplo; usuarios/perfiles solo si no existen.
+-- inserta productos; usuarios/perfiles solo si no existen.
 -- =============================================================================
 
 create extension if not exists pgcrypto;
@@ -145,7 +145,7 @@ alter table public.profiles
 alter table public.profiles
   add column if not exists direccion text;
 
--- Perfiles B2B (aliados demo: 3/3 entregas contado para no bloquear pedidos de prueba).
+-- Perfiles B2B (aliados: KYC pendiente, sin entregas contado prellenadas).
 -- Campo direccion: domicilio fiscal / casa matriz (referencia para facturación; demo seed).
 insert into public.profiles (
   id, business_name, rif, role, phone, credit_score, credit_limit, kyc_status,
@@ -159,9 +159,9 @@ values
   ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, null, 0, 'Aragua', 'Maracay', 'Casa matriz: Zona industrial San Jacinto, callejón B, nave 5 (acceso fiscal), Maracay 2103, Edo. Aragua.', now()),
   ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, null, 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Av. 5 de Julio, Edif. Industrial La Limpia, módulo 3, locales 301-302, Maracaibo 4005, Edo. Zulia.', now()),
   ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, null, 0, 'Táchira', 'San Cristóbal', 'Domicilio fiscal: Av. Principal de Capacho, galpón MotoZone (área de despacho y facturación), San Cristóbal 5001, Edo. Táchira.', now()),
-  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'aprobado', 3, 'Miranda', 'Caracas', 'Domicilio fiscal del taller: Av. Francisco de Miranda, Los Ruices, local 14 (frente estación), sector fiscal Caracas 1070.', now()),
-  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'aprobado', 3, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
-  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'aprobado', 3, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
+  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'pendiente', 0, 'Miranda', 'Caracas', 'Domicilio fiscal del taller: Av. Francisco de Miranda, Los Ruices, local 14 (frente estación), sector fiscal Caracas 1070.', now()),
+  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'pendiente', 0, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
+  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'pendiente', 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
   ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, null, null, null, now())
 on conflict (id) do update set
   business_name = excluded.business_name,
@@ -373,50 +373,10 @@ values
   ('a1000007-0000-4000-8000-000000000007', 'Aceite 2T mezcla', '1L', 7.2, 60, '2T aire', null, 'IMP7-019', true, 'Accesorios'),
   ('a1000007-0000-4000-8000-000000000007', 'Filtro aire papel OEM style', 'Rectangular', 11.0, 46, 'Scooter 150', null, 'IMP7-020', false, 'Accesorios');
 
--- Solicitudes broker de ejemplo (re-ejecución: quita filas demo por SKU + aliado)
-delete from public.transaction_requests tr
-using public.products p
-where tr.product_id = p.id
-  and p.sku in ('IMP1-001', 'IMP2-001')
-  and tr.aliado_id in (
-    'a2000001-0000-4000-8000-000000000001'::uuid,
-    'a2000002-0000-4000-8000-000000000002'::uuid
-  );
-
-insert into public.transaction_requests (
-  aliado_id, product_id, owner_id, status, cantidad,
-  precio_unitario_proveedor, precio_unitario_aliado, precio_total, notas_admin
-)
-select
+-- Sin pedidos de ejemplo: limpia solicitudes previas de los aliados seed (re-ejecución idempotente).
+delete from public.transaction_requests
+where aliado_id in (
   'a2000001-0000-4000-8000-000000000001'::uuid,
-  p.id,
-  p.owner_id,
-  'pendiente',
-  2,
-  p.price_usd::numeric,
-  round(p.price_usd * 1.1, 4),
-  round(p.price_usd * 1.1 * 2, 2),
-  null
-from public.products p
-where p.sku = 'IMP1-001'
-limit 1;
-
-insert into public.transaction_requests (
-  aliado_id, product_id, owner_id, status, cantidad,
-  precio_unitario_proveedor, precio_unitario_aliado, precio_total, notas_admin,
-  at_aprobado_admin
-)
-select
   'a2000002-0000-4000-8000-000000000002'::uuid,
-  p.id,
-  p.owner_id,
-  'aprobado_admin',
-  1,
-  p.price_usd::numeric,
-  round(p.price_usd * 1.1, 4),
-  round(p.price_usd * 1.1, 2),
-  'Validado demo seed.',
-  now()
-from public.products p
-where p.sku = 'IMP2-001'
-limit 1;
+  'a2000003-0000-4000-8000-000000000003'::uuid
+);

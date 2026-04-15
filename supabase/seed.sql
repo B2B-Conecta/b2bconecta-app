@@ -11,8 +11,8 @@
 -- Admin broker: admin@motolink.seed
 --
 -- Requiere migración `20260407120000_broker_transaction_requests.sql` (tabla transaction_requests).
--- Contenido: 11 usuarios auth + perfiles + esquema inventario (sku, is_active,
--- category) + 140 productos + solicitudes broker de ejemplo.
+-- Contenido: 11 usuarios auth + perfiles (estado, ciudad, direccion) + esquema
+-- inventario (sku, is_active, category) + 140 productos + solicitudes broker de ejemplo.
 -- Re-ejecutar: aplica DDL idempotente, borra productos de importadores seed,
 -- inserta productos + mensajes de ejemplo; usuarios/perfiles solo si no existen.
 -- =============================================================================
@@ -138,23 +138,31 @@ alter table public.profiles
   add constraint profiles_role_check
   check (role in ('importador', 'aliado', 'administrador'));
 
--- Perfiles B2B (aliados demo: 3/3 entregas contado para no bloquear pedidos de prueba)
+alter table public.profiles
+  add column if not exists estado text;
+alter table public.profiles
+  add column if not exists ciudad text;
+alter table public.profiles
+  add column if not exists direccion text;
+
+-- Perfiles B2B (aliados demo: 3/3 entregas contado para no bloquear pedidos de prueba).
+-- Campo direccion: domicilio fiscal / casa matriz (referencia para facturación; demo seed).
 insert into public.profiles (
   id, business_name, rif, role, phone, credit_score, credit_limit, kyc_status,
-  primeros_pedidos_contado_entregados, created_at
+  primeros_pedidos_contado_entregados, estado, ciudad, direccion, created_at
 )
 values
-  ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', 100, 100000, null, 0, now()),
-  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, null, 0, now()),
-  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, null, 0, now()),
-  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, null, 0, now()),
-  ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, null, 0, now()),
-  ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, null, 0, now()),
-  ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, null, 0, now()),
-  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'aprobado', 3, now()),
-  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'aprobado', 3, now()),
-  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'aprobado', 3, now()),
-  ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, now())
+  ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', 100, 100000, null, 0, 'Distrito Capital', 'Caracas', 'Domicilio fiscal: Torre Empresarial Delta, Av. Francisco de Miranda, piso 4 ofic. 4-B, Urb. Los Palos Grandes, Caracas 1060 (mismo RIF J-401234567).', now()),
+  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, null, 0, 'Miranda', 'Los Teques', 'Casa matriz fiscal: Calle Bolívar esq. Guaicaipuro, galpón 7, Zona Industrial La Mariposa, Los Teques 1201, Edo. Miranda.', now()),
+  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, null, 0, 'Carabobo', 'Valencia', 'Domicilio fiscal: Av. Bolívar Norte, sector San Blas, nave 12 (galpón logístico), Valencia 2001, Edo. Carabobo.', now()),
+  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, null, 0, 'Lara', 'Barquisimeto', 'Domicilio fiscal: Carrera 19 entre calles 7 y 8, edificio LuzMoto, piso PB local 2, Parroquia Concepción, Barquisimeto 3001.', now()),
+  ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, null, 0, 'Aragua', 'Maracay', 'Casa matriz: Zona industrial San Jacinto, callejón B, nave 5 (acceso fiscal), Maracay 2103, Edo. Aragua.', now()),
+  ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, null, 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Av. 5 de Julio, Edif. Industrial La Limpia, módulo 3, locales 301-302, Maracaibo 4005, Edo. Zulia.', now()),
+  ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, null, 0, 'Táchira', 'San Cristóbal', 'Domicilio fiscal: Av. Principal de Capacho, galpón MotoZone (área de despacho y facturación), San Cristóbal 5001, Edo. Táchira.', now()),
+  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'aprobado', 3, 'Miranda', 'Caracas', 'Domicilio fiscal del taller: Av. Francisco de Miranda, Los Ruices, local 14 (frente estación), sector fiscal Caracas 1070.', now()),
+  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'aprobado', 3, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
+  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'aprobado', 3, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
+  ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, null, null, null, now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,
@@ -163,7 +171,10 @@ on conflict (id) do update set
   credit_score = excluded.credit_score,
   credit_limit = excluded.credit_limit,
   kyc_status = excluded.kyc_status,
-  primeros_pedidos_contado_entregados = excluded.primeros_pedidos_contado_entregados;
+  primeros_pedidos_contado_entregados = excluded.primeros_pedidos_contado_entregados,
+  estado = excluded.estado,
+  ciudad = excluded.ciudad,
+  direccion = excluded.direccion;
 
 -- =============================================================================
 -- Esquema inventario B2B (idempotente). Debe existir antes de insertar productos.

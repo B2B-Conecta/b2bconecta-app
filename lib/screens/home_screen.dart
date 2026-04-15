@@ -26,6 +26,16 @@ const _kCategorySearchTokens = <String, String?>{
   'Eléctrico': 'eléctric',
 };
 
+String _ownerLocationLine(PartModel part) {
+  final e = part.ownerEstado?.trim();
+  final c = part.ownerCiudad?.trim();
+  if ((e == null || e.isEmpty) && (c == null || c.isEmpty)) return '';
+  if (e != null && e.isNotEmpty && c != null && c.isNotEmpty) {
+    return '$e · $c';
+  }
+  return e ?? c ?? '';
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -54,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final TextEditingController _searchController;
   late final TextEditingController _minPriceController;
   late final TextEditingController _maxPriceController;
+  late final TextEditingController _ownerEstadoFilterController;
+  late final TextEditingController _ownerCiudadFilterController;
   late final Future<List<ImporterOption>> _importersFuture;
 
   @override
@@ -62,6 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController = TextEditingController();
     _minPriceController = TextEditingController();
     _maxPriceController = TextEditingController();
+    _ownerEstadoFilterController = TextEditingController();
+    _ownerCiudadFilterController = TextEditingController();
     if (widget.homeRole == AppHomeRole.aliado) {
       _importersFuture = SupabaseService.fetchImporterOptions();
       _partsFuture = _fetchProducts(reset: true);
@@ -80,6 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     _minPriceController.dispose();
     _maxPriceController.dispose();
+    _ownerEstadoFilterController.dispose();
+    _ownerCiudadFilterController.dispose();
     super.dispose();
   }
 
@@ -110,9 +126,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final combined = [userQ, if (catToken != null && catToken.isNotEmpty) catToken]
         .where((e) => e.isNotEmpty)
         .join(' ');
+    final oe = _ownerEstadoFilterController.text.trim();
+    final oc = _ownerCiudadFilterController.text.trim();
     return CatalogFilters(
       searchQuery: combined.isEmpty ? null : combined,
       ownerId: _selectedOwnerId,
+      ownerEstado: oe.isEmpty ? null : oe,
+      ownerCiudad: oc.isEmpty ? null : oc,
       minPrice: minP,
       maxPrice: maxP,
       onlyActiveProducts: true,
@@ -131,6 +151,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.clear();
     _minPriceController.clear();
     _maxPriceController.clear();
+    _ownerEstadoFilterController.clear();
+    _ownerCiudadFilterController.clear();
     setState(() {
       _selectedOwnerId = null;
       _selectedCategoryLabel = 'Todos';
@@ -216,6 +238,44 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Expanded(
                     child: TextField(
+                      controller: _ownerEstadoFilterController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: 'Estado del importador',
+                        hintText: 'Ej. Miranda',
+                        filled: true,
+                        fillColor: AppColors.fieldFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _ownerCiudadFilterController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: 'Ciudad del importador',
+                        hintText: 'Ej. Valencia',
+                        filled: true,
+                        fillColor: AppColors.fieldFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
                       controller: _minPriceController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -290,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   InputDecoration _searchDecoration() {
     return InputDecoration(
-      hintText: 'Buscar repuestos...',
+      hintText: 'Repuesto, estado o ciudad del importador…',
       hintStyle: const TextStyle(color: AppColors.textSecondary),
       prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
       filled: true,
@@ -465,6 +525,44 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _ownerCiudadFilterController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _applyFiltersFromUi(),
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                hintText: 'Ciudad del importador',
+                hintStyle: const TextStyle(color: AppColors.textSecondary),
+                prefixIcon: Icon(
+                  Icons.location_city_outlined,
+                  color: Colors.grey.shade600,
+                  size: 22,
+                ),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppColors.brandOrange,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _chipRow(
               children: _kCategoryLabels
@@ -518,13 +616,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                         ),
                         ...importers.map(
-                          (o) => _filterChip(
-                            label: o.businessName,
-                            selected: _selectedOwnerId == o.id,
-                            onSelected: () {
-                              setState(() => _selectedOwnerId = o.id);
-                              _applyFiltersFromUi();
-                            },
+                          (o) => Tooltip(
+                            message: o.ubicacionLine,
+                            waitDuration: const Duration(milliseconds: 400),
+                            child: _filterChip(
+                              label: o.businessName,
+                              selected: _selectedOwnerId == o.id,
+                              onSelected: () {
+                                setState(() => _selectedOwnerId = o.id);
+                                _applyFiltersFromUi();
+                              },
+                            ),
                           ),
                         ),
                       ],
@@ -607,7 +709,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisCount: _kCrossAxisCount,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          childAspectRatio: 0.7,
+                          // Altura extra para importador + estado/ciudad + precio/stock sin overflow.
+                          childAspectRatio: 0.64,
                         ),
                         itemCount: parts.length,
                         itemBuilder: (context, index) {
@@ -669,6 +772,7 @@ class _ProductGridCard extends StatelessWidget {
     final importer = (part.ownerBusinessName ?? '').trim();
     final importerLine =
         importer.isNotEmpty ? importer.toUpperCase() : 'SIN IMPORTADOR';
+    final locLine = _ownerLocationLine(part);
 
     return InkWell(
       onTap: onTap,
@@ -714,29 +818,42 @@ class _ProductGridCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 4),
+                if (locLine.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    locLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 2),
                 Expanded(
                   child: Text(
                     part.nombre,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
-                      height: 1.2,
+                      height: 1.15,
                     ),
                   ),
                 ),
                 Text(
                   '\$${part.precioFinalUnitario.toStringAsFixed(2)}',
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
                     color: AppColors.brand,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Row(
                   children: [
                     Container(

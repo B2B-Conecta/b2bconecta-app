@@ -11,6 +11,8 @@ class ProfileModel {
     this.creditLimit,
     this.kycStatus,
     this.primerosPedidosContadoEntregados,
+    this.estado,
+    this.ciudad,
   });
 
   final String id;
@@ -32,16 +34,32 @@ class ProfileModel {
   /// Entregas completadas contadas hacia la fase “primeros 3 pedidos contado” (0–3).
   final int? primerosPedidosContadoEntregados;
 
+  /// Estado / ciudad (Venezuela u otro) para catálogo y pedidos.
+  final String? estado;
+  final String? ciudad;
+
+  bool get hasRegisteredLocation {
+    final e = estado?.trim();
+    final c = ciudad?.trim();
+    return e != null &&
+        e.isNotEmpty &&
+        c != null &&
+        c.isNotEmpty;
+  }
+
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
   bool get isComplete {
     final r = role?.trim().toLowerCase();
     final hasRole =
         r == 'importador' || r == 'aliado' || r == 'administrador';
-    return businessName != null &&
+    final base = businessName != null &&
         businessName!.trim().isNotEmpty &&
         rif != null &&
         rif!.trim().isNotEmpty &&
         hasRole;
+    if (!base) return false;
+    if (r == 'administrador') return true;
+    return hasRegisteredLocation;
   }
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -79,6 +97,8 @@ class ProfileModel {
       creditLimit: cl,
       kycStatus: _text(json['kyc_status']),
       primerosPedidosContadoEntregados: pce,
+      estado: _text(json['estado']),
+      ciudad: _text(json['ciudad']),
     );
   }
 

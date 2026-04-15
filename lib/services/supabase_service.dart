@@ -9,6 +9,7 @@ import '../models/credit_limit_exception.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
+import '../models/profile_location_exception.dart';
 import '../models/part_model.dart';
 import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
@@ -62,6 +63,8 @@ class SupabaseService {
     required String rif,
     required String role,
     String? phone,
+    String? estado,
+    String? ciudad,
   }) async {
     final uid = _currentUserId;
     if (uid == null) {
@@ -88,6 +91,11 @@ class SupabaseService {
       payload['phone'] = p;
     }
 
+    final es = estado?.trim();
+    payload['estado'] = (es == null || es.isEmpty) ? null : es;
+    final ci = ciudad?.trim();
+    payload['ciudad'] = (ci == null || ci.isEmpty) ? null : ci;
+
     await _client.from('profiles').upsert(payload);
   }
 
@@ -96,7 +104,7 @@ class SupabaseService {
   static Future<List<ImporterOption>> fetchImporterOptions() async {
     final response = await _client
         .from('profiles')
-        .select('id, business_name')
+        .select('id, business_name, estado, ciudad')
         .eq('role', 'importador')
         .order('business_name', ascending: true);
     final list = response as List<dynamic>;
@@ -105,7 +113,12 @@ class SupabaseService {
           final m = Map<String, dynamic>.from(row as Map);
           final id = m['id']?.toString() ?? '';
           final name = m['business_name']?.toString().trim() ?? '';
-          return ImporterOption(id: id, businessName: name);
+          return ImporterOption(
+            id: id,
+            businessName: name,
+            estado: m['estado']?.toString(),
+            ciudad: m['ciudad']?.toString(),
+          );
         })
         .where((o) => o.id.isNotEmpty && o.businessName.isNotEmpty)
         .toList();
@@ -114,10 +127,26 @@ class SupabaseService {
   /// Número total de filas que cumplen [filters] (respeta RLS).
   static Future<int> fetchProductsCount({CatalogFilters? filters}) async {
     final f = filters ?? CatalogFilters.empty;
-    dynamic q = _client.from('products').select('id');
+    final embed = _catalogProfileSelect(f);
+    dynamic q = _client.from('products').select('id, $embed');
     q = _applyCatalogFilters(q, f);
     final res = await q.count(CountOption.exact);
     return (res as PostgrestResponse<dynamic>).count;
+  }
+
+  static bool _catalogNeedsProfileInner(CatalogFilters filters) {
+    final sq = filters.searchQuery?.trim();
+    final oe = filters.ownerEstado?.trim();
+    final oc = filters.ownerCiudad?.trim();
+    return (sq != null && sq.isNotEmpty) ||
+        (oe != null && oe.isNotEmpty) ||
+        (oc != null && oc.isNotEmpty);
+  }
+
+  static String _catalogProfileSelect(CatalogFilters filters) {
+    return _catalogNeedsProfileInner(filters)
+        ? 'profiles!inner(business_name, estado, ciudad)'
+        : 'profiles(business_name, estado, ciudad)';
   }
 
   /// Métricas del inventario del usuario actual (importador).
@@ -833,7 +862,15 @@ class SupabaseService {
     if (role != 'aliado') {
       throw StateError('Solo los aliados pueden crear solicitudes de pedido.');
     }
-    final ks = profile?.kycStatus?.trim();
+    if (profile == null) {
+      throw StateError('No se encontró el perfil del aliado.');
+    }
+    if (!profile.hasRegisteredLocation) {
+      throw ProfileLocationException(
+        'Registre estado y ciudad en Mi perfil para poder solicitar pedidos.',
+      );
+    }
+    final ks = profile.kycStatus?.trim();
     if (ks != KycStatus.aprobado) {
       if (ks == KycStatus.enRevision) {
         throw KycVerificationException(
@@ -849,14 +886,14 @@ class SupabaseService {
         'Debe completar la verificación documental en su perfil y obtener la aprobación de MotoLink antes de pedir.',
       );
     }
-    final limit = profile?.creditLimit;
+    final limit = profile.creditLimit;
     if (limit == null) {
       throw CreditLimitException(
         'MotoLink debe asignar un límite de crédito antes de solicitar pedidos. '
         'Cuando su cupo esté autorizado, podrá continuar.',
       );
     }
-    final pce = profile?.primerosPedidosContadoEntregados ?? 0;
+    final pce = profile.primerosPedidosContadoEntregados ?? 0;
     if (pce < CashPhasePolicy.entregasRequeridas) {
       final openCnt = await fetchOpenTransactionRequestCountForCurrentAliado();
       if (openCnt >= 1) {
@@ -1275,8 +1312,8 @@ class SupabaseService {
     CatalogFilters? filters,
   }) async {
     final f = filters ?? CatalogFilters.empty;
-    dynamic query =
-        _client.from('products').select('*, profiles(business_name)');
+    final embed = _catalogProfileSelect(f);
+    dynamic query = _client.from('products').select('*, $embed');
     query = _applyCatalogFilters(query, f);
     final response = await query
         .order('id', ascending: true)
@@ -1289,7 +1326,11 @@ class SupabaseService {
 
   /// Evita que `%` y `_` del usuario actúen como comodines en `ilike`.
   static String _sanitizeIlike(String input) {
-    return input.replaceAll('%', ' ').replaceAll('_', ' ');
+    return input
+        .replaceAll('%', ' ')
+        .replaceAll('_', ' ')
+        .replaceAll(RegExp(r'[(),.]'), ' ')
+        .trim();
   }
 
   static dynamic _applyCatalogFilters(
@@ -1300,7 +1341,26 @@ class SupabaseService {
     final search = filters.searchQuery?.trim();
     if (search != null && search.isNotEmpty) {
       final safe = _sanitizeIlike(search);
-      q = q.ilike('name', '%$safe%');
+      if (safe.isNotEmpty) {
+        final pat = '*$safe*';
+        q = q.or(
+          'name.ilike.$pat,profiles.estado.ilike.$pat,profiles.ciudad.ilike.$pat',
+        );
+      }
+    }
+    final est = filters.ownerEstado?.trim();
+    if (est != null && est.isNotEmpty) {
+      final s = _sanitizeIlike(est);
+      if (s.isNotEmpty) {
+        q = q.filter('profiles.estado', 'ilike', '%$s%');
+      }
+    }
+    final ciu = filters.ownerCiudad?.trim();
+    if (ciu != null && ciu.isNotEmpty) {
+      final s = _sanitizeIlike(ciu);
+      if (s.isNotEmpty) {
+        q = q.filter('profiles.ciudad', 'ilike', '%$s%');
+      }
     }
     if (filters.ownerId != null && filters.ownerId!.trim().isNotEmpty) {
       q = q.eq('owner_id', filters.ownerId!.trim());

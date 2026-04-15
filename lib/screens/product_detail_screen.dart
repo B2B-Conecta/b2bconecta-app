@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/credit_limit_exception.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/kyc_verification_exception.dart';
+import '../models/profile_location_exception.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -173,6 +174,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       );
     } on CashPhaseException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on ProfileLocationException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

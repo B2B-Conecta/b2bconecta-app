@@ -7,6 +7,8 @@ class PartModel {
     required this.id,
     this.ownerId,
     this.ownerBusinessName,
+    this.ownerEstado,
+    this.ownerCiudad,
     required this.nombre,
     this.descripcion,
     this.compatibilidad,
@@ -25,6 +27,11 @@ class PartModel {
 
   /// Nombre comercial del dueño (join `profiles`).
   final String? ownerBusinessName;
+
+  /// Ubicación del importador (`profiles.estado` / `ciudad`).
+  final String? ownerEstado;
+  final String? ownerCiudad;
+
   final String nombre;
   final String? descripcion;
   final String? compatibilidad;
@@ -54,6 +61,7 @@ class PartModel {
     final imagenRaw = json['image_url'] ?? json['imagen_url'];
 
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
+    final loc = _ownerLocationFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
     final isActive = isActiveRaw is bool
@@ -64,6 +72,8 @@ class PartModel {
       id: json['id']?.toString() ?? '',
       ownerId: _nullableUuid(json['owner_id']),
       ownerBusinessName: ownerBusinessName,
+      ownerEstado: loc.$1,
+      ownerCiudad: loc.$2,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
@@ -80,6 +90,8 @@ class PartModel {
     String? id,
     String? ownerId,
     String? ownerBusinessName,
+    String? ownerEstado,
+    String? ownerCiudad,
     String? nombre,
     String? descripcion,
     String? compatibilidad,
@@ -94,6 +106,8 @@ class PartModel {
       id: id ?? this.id,
       ownerId: ownerId ?? this.ownerId,
       ownerBusinessName: ownerBusinessName ?? this.ownerBusinessName,
+      ownerEstado: ownerEstado ?? this.ownerEstado,
+      ownerCiudad: ownerCiudad ?? this.ownerCiudad,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       compatibilidad: compatibilidad ?? this.compatibilidad,
@@ -128,6 +142,19 @@ class PartModel {
       }
     }
     return null;
+  }
+
+  static (String?, String?) _ownerLocationFromProfiles(dynamic profiles) {
+    if (profiles == null) return (null, null);
+    Map<String, dynamic>? m;
+    if (profiles is Map) {
+      m = Map<String, dynamic>.from(profiles);
+    } else if (profiles is List && profiles.isNotEmpty) {
+      final first = profiles.first;
+      if (first is Map) m = Map<String, dynamic>.from(first);
+    }
+    if (m == null) return (null, null);
+    return (_nullableText(m['estado']), _nullableText(m['ciudad']));
   }
 
   static String? _nullableText(dynamic value) {

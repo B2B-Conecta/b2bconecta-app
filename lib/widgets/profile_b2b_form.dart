@@ -41,6 +41,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   late final TextEditingController _businessNameController;
   late final TextEditingController _rifController;
   late final TextEditingController _phoneController;
+  late final TextEditingController _estadoController;
+  late final TextEditingController _ciudadController;
   late final TextEditingController _fiscalAddressController;
   late final TextEditingController _emailDisplayController;
   String _role = 'importador';
@@ -70,6 +72,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'importador';
   }
 
+  bool get _ubicacionObligatoria {
+    final r = _role.trim().toLowerCase();
+    return r == 'importador' || r == 'aliado';
+  }
+
   void _bumpAuthorizationSection() {
     setState(() => _authSectionTick++);
   }
@@ -82,6 +89,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         TextEditingController(text: i?.businessName ?? '');
     _rifController = TextEditingController(text: i?.rif ?? '');
     _phoneController = TextEditingController(text: i?.phone ?? '');
+    _estadoController = TextEditingController(text: i?.estado ?? '');
+    _ciudadController = TextEditingController(text: i?.ciudad ?? '');
     _fiscalAddressController = TextEditingController();
     _emailDisplayController = TextEditingController(
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
@@ -118,6 +127,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _businessNameController.dispose();
     _rifController.dispose();
     _phoneController.dispose();
+    _estadoController.dispose();
+    _ciudadController.dispose();
     _fiscalAddressController.dispose();
     _emailDisplayController.dispose();
     super.dispose();
@@ -238,6 +249,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         rif: _rifController.text,
         role: _role,
         phone: _phoneController.text,
+        estado: _estadoController.text,
+        ciudad: _ciudadController.text,
       );
       if (!mounted) return;
       widget.onSaved();
@@ -406,6 +419,37 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             keyboardType: TextInputType.phone,
             decoration: _fieldDecoration('+58 412 1234567'),
           ),
+          if (_ubicacionObligatoria) ...[
+            const SizedBox(height: 16),
+            _sectionLabel('UBICACIÓN (ESTADO / CIUDAD)'),
+            Text(
+              'Visible en el catálogo para ubicar proveedores y talleres. '
+              'Los aliados deben completarla para poder solicitar pedidos.',
+              style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _estadoController,
+              textCapitalization: TextCapitalization.words,
+              decoration: _fieldDecoration('Estado (ej: Miranda)'),
+              validator: (v) {
+                if (!_ubicacionObligatoria) return null;
+                if (v == null || v.trim().isEmpty) return 'Indique el estado';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _ciudadController,
+              textCapitalization: TextCapitalization.words,
+              decoration: _fieldDecoration('Ciudad (ej: Los Teques)'),
+              validator: (v) {
+                if (!_ubicacionObligatoria) return null;
+                if (v == null || v.trim().isEmpty) return 'Indique la ciudad';
+                return null;
+              },
+            ),
+          ],
           const SizedBox(height: 16),
           _sectionLabel('DIRECCIÓN FISCAL'),
           TextFormField(

@@ -424,7 +424,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             _sectionLabel('UBICACIÓN (ESTADO / CIUDAD)'),
             Text(
               'Visible en el catálogo para ubicar proveedores y talleres. '
-              'Los aliados deben completarla para poder solicitar pedidos.',
+              'Complete también la dirección fiscal más abajo: estado, ciudad y domicilio '
+              'son obligatorios para solicitar pedidos.',
               style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 10),
@@ -449,17 +450,36 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 return null;
               },
             ),
-          ],
-          const SizedBox(height: 16),
-          _sectionLabel('DIRECCIÓN FISCAL'),
-          TextFormField(
-            controller: _fiscalAddressController,
-            maxLines: 3,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: _fieldDecoration(
-              'Av. Principal, Local 12, Zona Industrial...',
+            const SizedBox(height: 16),
+            _sectionLabel('DIRECCIÓN FISCAL'),
+            TextFormField(
+              controller: _fiscalAddressController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _fieldDecoration(
+                'Av. Principal, Local 12, Zona Industrial...',
+              ),
+              validator: (v) {
+                if (!_ubicacionObligatoria) return null;
+                if (v == null || v.trim().isEmpty) {
+                  return 'Indique la dirección fiscal (domicilio de la empresa)';
+                }
+                return null;
+              },
             ),
-          ),
+          ],
+          if (!_ubicacionObligatoria) ...[
+            const SizedBox(height: 16),
+            _sectionLabel('DIRECCIÓN FISCAL'),
+            TextFormField(
+              controller: _fiscalAddressController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _fieldDecoration(
+                'Av. Principal, Local 12, Zona Industrial...',
+              ),
+            ),
+          ],
           if (_roleLocked && (_persistedAsAliado || _persistedAsImportador)) ...[
             const SizedBox(height: 20),
             AuthorizationStatusSection(

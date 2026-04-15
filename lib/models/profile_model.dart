@@ -42,13 +42,17 @@ class ProfileModel {
   /// Domicilio fiscal / dirección de la empresa (`profiles.direccion`).
   final String? direccion;
 
+  /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
     final e = estado?.trim();
     final c = ciudad?.trim();
+    final d = direccion?.trim();
     return e != null &&
         e.isNotEmpty &&
         c != null &&
-        c.isNotEmpty;
+        c.isNotEmpty &&
+        d != null &&
+        d.isNotEmpty;
   }
 
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).

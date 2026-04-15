@@ -870,7 +870,7 @@ class SupabaseService {
     }
     if (!profile.hasRegisteredLocation) {
       throw ProfileLocationException(
-        'Registre estado y ciudad en Mi perfil para poder solicitar pedidos.',
+        'Registre estado, ciudad y dirección fiscal en Mi perfil para poder solicitar pedidos.',
       );
     }
     final ks = profile.kycStatus?.trim();

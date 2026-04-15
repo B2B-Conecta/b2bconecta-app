@@ -10,8 +10,7 @@ import 'aliado_kyc_documents_section.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
 
-/// Formulario perfil B2B (referencia: Mi Perfil B2B). La dirección fiscal es solo UI
-/// (no se persiste en Supabase con el esquema actual).
+/// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
   const ProfileB2BForm({
     super.key,
@@ -91,7 +90,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _phoneController = TextEditingController(text: i?.phone ?? '');
     _estadoController = TextEditingController(text: i?.estado ?? '');
     _ciudadController = TextEditingController(text: i?.ciudad ?? '');
-    _fiscalAddressController = TextEditingController();
+    _fiscalAddressController = TextEditingController(text: i?.direccion ?? '');
     _emailDisplayController = TextEditingController(
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
@@ -251,6 +250,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         phone: _phoneController.text,
         estado: _estadoController.text,
         ciudad: _ciudadController.text,
+        direccion: _fiscalAddressController.text,
       );
       if (!mounted) return;
       widget.onSaved();

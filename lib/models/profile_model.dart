@@ -13,6 +13,7 @@ class ProfileModel {
     this.primerosPedidosContadoEntregados,
     this.estado,
     this.ciudad,
+    this.direccion,
   });
 
   final String id;
@@ -37,6 +38,9 @@ class ProfileModel {
   /// Estado / ciudad (Venezuela u otro) para catálogo y pedidos.
   final String? estado;
   final String? ciudad;
+
+  /// Domicilio fiscal / dirección de la empresa (`profiles.direccion`).
+  final String? direccion;
 
   bool get hasRegisteredLocation {
     final e = estado?.trim();
@@ -99,6 +103,7 @@ class ProfileModel {
       primerosPedidosContadoEntregados: pce,
       estado: _text(json['estado']),
       ciudad: _text(json['ciudad']),
+      direccion: _text(json['direccion']),
     );
   }
 

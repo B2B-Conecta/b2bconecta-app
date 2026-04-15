@@ -65,6 +65,7 @@ class SupabaseService {
     String? phone,
     String? estado,
     String? ciudad,
+    String? direccion,
   }) async {
     final uid = _currentUserId;
     if (uid == null) {
@@ -95,6 +96,8 @@ class SupabaseService {
     payload['estado'] = (es == null || es.isEmpty) ? null : es;
     final ci = ciudad?.trim();
     payload['ciudad'] = (ci == null || ci.isEmpty) ? null : ci;
+    final dir = direccion?.trim();
+    payload['direccion'] = (dir == null || dir.isEmpty) ? null : dir;
 
     await _client.from('profiles').upsert(payload);
   }

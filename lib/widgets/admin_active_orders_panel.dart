@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_order_pre_transit_section.dart';
+import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 import 'order_motolink_thread_section.dart';
 
@@ -50,13 +51,37 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    MainShellTabController.registerAdminActivosNotificationDeepLink(
+      _onNotificationAdminActivosDeepLink,
+    );
     _load();
   }
 
   @override
   void dispose() {
+    MainShellTabController.registerAdminActivosNotificationDeepLink(null);
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onNotificationAdminActivosDeepLink() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    } else if (!_loading) {
+      _load();
+    }
+  }
+
+  void _tryExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    }
   }
 
   Future<void> _load() async {
@@ -72,6 +97,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
         _loading = false;
         _expandedRequestId = null;
       });
+      _tryExpandFromPendingNotification();
     } catch (e) {
       if (!mounted) return;
       setState(() {

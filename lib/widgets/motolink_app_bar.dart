@@ -18,10 +18,12 @@ class MotolinkAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onNotificationTap,
     this.extraActions,
     this.logoHeight = MotolinkAppBarLogoSizes.importador,
+    this.unreadNotifications = 0,
   });
 
   final VoidCallback? onNotificationTap;
   final List<Widget>? extraActions;
+  final int unreadNotifications;
 
   /// Alto del [MotoLinkProLogo] (p. ej. [MotolinkAppBarLogoSizes.aliado] para talleres).
   final double logoHeight;
@@ -81,18 +83,34 @@ class MotolinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                 color: AppColors.textSecondary,
                 onPressed: onNotificationTap,
               ),
-              Positioned(
-                right: 10,
-                top: 10,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.brandOrange,
-                    shape: BoxShape.circle,
+              if (unreadNotifications > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.rectangle,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
+                    child: Text(
+                      unreadNotifications > 99
+                          ? '99+'
+                          : unreadNotifications.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

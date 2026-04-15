@@ -42,14 +42,38 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     super.initState();
     _searchCtrl = TextEditingController();
     MainShellTabController.registerImporterPedidosReload(() => _load());
+    MainShellTabController.registerPedidosNotificationDeepLink(
+      _onNotificationPedidosDeepLink,
+    );
     _load();
   }
 
   @override
   void dispose() {
     MainShellTabController.registerImporterPedidosReload(null);
+    MainShellTabController.registerPedidosNotificationDeepLink(null);
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onNotificationPedidosDeepLink() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    } else if (!_loading) {
+      _load();
+    }
+  }
+
+  void _tryExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    }
   }
 
   Future<void> _load() async {
@@ -65,6 +89,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         _rows = rows;
         _loading = false;
       });
+      _tryExpandFromPendingNotification();
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
+import '../services/notification_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/admin_active_orders_panel.dart';
@@ -14,6 +15,7 @@ import '../widgets/importer_active_orders_panel.dart';
 import '../widgets/importer_validated_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
 import '../widgets/motolink_app_bar.dart';
+import '../widgets/notification_center_sheet.dart';
 import '../widgets/profile_b2b_form.dart';
 import 'account_settings_screen.dart';
 import 'home_screen.dart';
@@ -36,20 +38,46 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _tabIndex = 0;
   late ProfileModel _profile;
+  late final NotificationProvider _notifications;
 
   @override
   void initState() {
     super.initState();
     _profile = widget.profile;
+    _notifications = NotificationProvider(homeRole: widget.homeRole)
+      ..addListener(_onNotificationsChanged)
+      ..start();
     MainShellTabController.register((index) {
       if (mounted) setState(() => _tabIndex = index);
+    });
+    MainShellTabController.registerNotificationsReload(() {
+      if (!mounted) return;
+      _notifications.reload();
     });
   }
 
   @override
   void dispose() {
+    _notifications.removeListener(_onNotificationsChanged);
+    _notifications.dispose();
     MainShellTabController.unregister();
     super.dispose();
+  }
+
+  void _onNotificationsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openNotificationCenter() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => NotificationCenterSheet(provider: _notifications),
+    );
   }
 
   Future<void> _refreshProfile() async {
@@ -64,7 +92,8 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
         logoHeight: MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: () {},
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,6 +140,8 @@ class _MainShellState extends State<MainShell> {
             profile: _profile,
             homeRole: AppHomeRole.administrador,
             onProfileSaved: _refreshProfile,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
           ),
         ],
       ),
@@ -166,13 +197,27 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(
         index: _tabIndex,
         children: [
-          HomeScreen(homeRole: widget.homeRole),
-          _OrdersTab(homeRole: widget.homeRole),
-          _MessagesTab(homeRole: widget.homeRole),
+          HomeScreen(
+            homeRole: widget.homeRole,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+          ),
+          _OrdersTab(
+            homeRole: widget.homeRole,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+          ),
+          _MessagesTab(
+            homeRole: widget.homeRole,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: widget.homeRole,
             onProfileSaved: _refreshProfile,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
           ),
         ],
       ),
@@ -252,9 +297,15 @@ class _MainShellState extends State<MainShell> {
 }
 
 class _OrdersTab extends StatelessWidget {
-  const _OrdersTab({required this.homeRole});
+  const _OrdersTab({
+    required this.homeRole,
+    required this.onNotificationTap,
+    required this.unreadNotifications,
+  });
 
   final AppHomeRole homeRole;
+  final VoidCallback onNotificationTap;
+  final int unreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +315,8 @@ class _OrdersTab extends StatelessWidget {
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: () {},
+        onNotificationTap: onNotificationTap,
+        unreadNotifications: unreadNotifications,
       ),
       body: switch (homeRole) {
         AppHomeRole.importador => const ImporterActiveOrdersPanel(),
@@ -276,9 +328,15 @@ class _OrdersTab extends StatelessWidget {
 }
 
 class _MessagesTab extends StatelessWidget {
-  const _MessagesTab({required this.homeRole});
+  const _MessagesTab({
+    required this.homeRole,
+    required this.onNotificationTap,
+    required this.unreadNotifications,
+  });
 
   final AppHomeRole homeRole;
+  final VoidCallback onNotificationTap;
+  final int unreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +346,8 @@ class _MessagesTab extends StatelessWidget {
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: () {},
+        onNotificationTap: onNotificationTap,
+        unreadNotifications: unreadNotifications,
       ),
       body: switch (homeRole) {
         AppHomeRole.administrador => const SizedBox.shrink(),
@@ -304,11 +363,15 @@ class _ProfileTab extends StatelessWidget {
     required this.profile,
     required this.homeRole,
     required this.onProfileSaved,
+    required this.onNotificationTap,
+    required this.unreadNotifications,
   });
 
   final ProfileModel profile;
   final AppHomeRole homeRole;
   final Future<void> Function() onProfileSaved;
+  final VoidCallback onNotificationTap;
+  final int unreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +381,8 @@ class _ProfileTab extends StatelessWidget {
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: () {},
+        onNotificationTap: onNotificationTap,
+        unreadNotifications: unreadNotifications,
         extraActions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

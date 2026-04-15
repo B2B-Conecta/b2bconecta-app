@@ -40,9 +40,13 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.homeRole = AppHomeRole.importador,
+    this.onNotificationTap,
+    this.unreadNotifications = 0,
   });
 
   final AppHomeRole homeRole;
+  final VoidCallback? onNotificationTap;
+  final int unreadNotifications;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -431,7 +435,8 @@ class _HomeScreenState extends State<HomeScreen> {
       logoHeight: widget.homeRole == AppHomeRole.aliado
           ? MotolinkAppBarLogoSizes.aliado
           : MotolinkAppBarLogoSizes.importador,
-      onNotificationTap: () {},
+      onNotificationTap: widget.onNotificationTap,
+      unreadNotifications: widget.unreadNotifications,
     );
 
     if (widget.homeRole == AppHomeRole.administrador) {

@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'aliado_expandable_order_card.dart';
 import 'aliado_order_pago_section.dart';
+import 'main_shell_tab.dart';
 import 'order_motolink_thread_section.dart';
 import 'order_list_filter_bar.dart';
 
@@ -40,13 +41,37 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    MainShellTabController.registerPedidosNotificationDeepLink(
+      _onNotificationPedidosDeepLink,
+    );
     _load();
   }
 
   @override
   void dispose() {
+    MainShellTabController.registerPedidosNotificationDeepLink(null);
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onNotificationPedidosDeepLink() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    } else if (!_loading) {
+      _load();
+    }
+  }
+
+  void _tryExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    }
   }
 
   Future<void> _load() async {
@@ -63,6 +88,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         _loading = false;
         _expandedRequestId = null;
       });
+      _tryExpandFromPendingNotification();
     } catch (e) {
       if (!mounted) return;
       setState(() {

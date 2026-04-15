@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/transaction_request_message_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'main_shell_tab.dart';
 
 /// Hilo de mensajes aliado ↔ MotoLink sobre un pedido.
 class OrderMotolinkThreadSection extends StatefulWidget {
@@ -29,9 +31,11 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   bool _loading = true;
   bool _sending = false;
   String? _error;
+  RealtimeChannel? _messagesChannel;
 
   @override
   void dispose() {
+    SupabaseService.unsubscribeChannel(_messagesChannel);
     _ctrl.dispose();
     super.dispose();
   }
@@ -39,6 +43,14 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   @override
   void initState() {
     super.initState();
+    SupabaseService.markNotificationsReadForRelatedOrder(widget.transactionRequestId)
+        .then((_) => MainShellTabController.requestNotificationsReload());
+    _messagesChannel = SupabaseService.subscribeToTransactionRequestMessages(
+      transactionRequestId: widget.transactionRequestId,
+      onInsert: () {
+        if (mounted) _load();
+      },
+    );
     _load();
   }
 

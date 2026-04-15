@@ -7,6 +7,7 @@ import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
 import '../models/credit_limit_exception.dart';
 import '../models/document_review_status.dart';
+import '../models/in_app_notification_model.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
@@ -40,6 +41,224 @@ class SupabaseService {
   static SupabaseClient get _client => Supabase.instance.client;
 
   static String? get _currentUserId => _client.auth.currentUser?.id;
+
+  static const _notificationsSelect =
+      'id, user_id, title, body, type, is_read, related_id, created_at';
+
+  /// Notificaciones in-app del usuario actual (más recientes primero).
+  static Future<List<InAppNotificationModel>> fetchMyNotifications({
+    int limit = 100,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) return const [];
+
+    final response = await _client
+        .from('notifications')
+        .select(_notificationsSelect)
+        .eq('user_id', uid)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) => InAppNotificationModel.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
+  /// Marca una notificación como leída.
+  static Future<void> markNotificationAsRead(String notificationId) async {
+    if (notificationId.trim().isEmpty) return;
+    await _client
+        .from('notifications')
+        .update(<String, dynamic>{'is_read': true})
+        .eq('id', notificationId);
+  }
+
+  /// Marca todas las notificaciones del usuario actual como leídas.
+  static Future<void> markAllNotificationsAsRead() async {
+    final uid = _currentUserId;
+    if (uid == null) return;
+    await _client
+        .from('notifications')
+        .update(<String, dynamic>{'is_read': true})
+        .eq('user_id', uid)
+        .eq('is_read', false);
+  }
+
+  /// Marca como leídas las notificaciones de chat/pedido con [related_id] = id de pedido.
+  static Future<void> markNotificationsReadForRelatedOrder(String transactionRequestId) async {
+    final uid = _currentUserId;
+    final rid = transactionRequestId.trim();
+    if (uid == null || rid.isEmpty) return;
+    await _client
+        .from('notifications')
+        .update(<String, dynamic>{'is_read': true})
+        .eq('user_id', uid)
+        .eq('related_id', rid)
+        .eq('is_read', false);
+  }
+
+  /// Elimina notificaciones antiguas del usuario actual.
+  /// Por defecto borra solo leídas con más de [olderThanDays] días.
+  static Future<void> deleteOldNotifications({
+    int olderThanDays = 30,
+    bool onlyRead = true,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) return;
+    final days = olderThanDays < 1 ? 1 : olderThanDays;
+    final cutoff = DateTime.now()
+        .toUtc()
+        .subtract(Duration(days: days))
+        .toIso8601String();
+
+    dynamic q = _client
+        .from('notifications')
+        .delete()
+        .eq('user_id', uid)
+        .lt('created_at', cutoff);
+
+    if (onlyRead) {
+      q = q.eq('is_read', true);
+    }
+    await q;
+  }
+
+  /// Elimina notificaciones puntuales del usuario actual.
+  static Future<void> deleteNotificationsByIds(List<String> notificationIds) async {
+    final uid = _currentUserId;
+    if (uid == null) return;
+    final ids = notificationIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    if (ids.isEmpty) return;
+    await _client
+        .from('notifications')
+        .delete()
+        .eq('user_id', uid)
+        .inFilter('id', ids);
+  }
+
+  /// Ficha de pedido por ID (respeta RLS del usuario actual).
+  static Future<TransactionRequestModel?> fetchTransactionRequestById(
+    String requestId,
+  ) async {
+    final id = requestId.trim();
+    if (id.isEmpty) return null;
+    final row = await _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .eq('id', id)
+        .maybeSingle();
+    if (row == null) return null;
+    return TransactionRequestModel.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  /// Resumen para notificaciones (producto + aliado) por IDs de pedidos.
+  static Future<Map<String, NotificationOrderSummary>>
+      fetchNotificationOrderSummariesByRequestIds(
+    List<String> requestIds,
+  ) async {
+    final ids = requestIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    if (ids.isEmpty) return const {};
+
+    final rows = await _client
+        .from('transaction_requests')
+        .select('id, products(name), aliado:profiles!transaction_requests_aliado_id_fkey(business_name)')
+        .inFilter('id', ids);
+    final list = rows as List<dynamic>;
+    final out = <String, NotificationOrderSummary>{};
+    for (final row in list) {
+      final m = Map<String, dynamic>.from(row as Map);
+      final id = m['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final prod = m['products'];
+      final ali = m['aliado'];
+      String? productName;
+      String? aliadoBusinessName;
+      if (prod is Map) {
+        productName = prod['name']?.toString().trim();
+      }
+      if (ali is Map) {
+        aliadoBusinessName = ali['business_name']?.toString().trim();
+      }
+      out[id] = NotificationOrderSummary(
+        productName: (productName != null && productName.isNotEmpty)
+            ? productName
+            : null,
+        aliadoBusinessName:
+            (aliadoBusinessName != null && aliadoBusinessName.isNotEmpty)
+                ? aliadoBusinessName
+                : null,
+      );
+    }
+    return out;
+  }
+
+  /// Realtime: escucha nuevas notificaciones para el usuario autenticado.
+  static RealtimeChannel subscribeToMyNotifications({
+    required void Function(InAppNotificationModel notification) onInsert,
+  }) {
+    final uid = _currentUserId;
+    if (uid == null) {
+      throw StateError('No hay sesión activa para escuchar notificaciones.');
+    }
+    final channel = _client.channel('notifications:user:$uid');
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'notifications',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: uid,
+      ),
+      callback: (payload) {
+        final m = Map<String, dynamic>.from(payload.newRecord);
+        onInsert(InAppNotificationModel.fromJson(m));
+      },
+    );
+    channel.subscribe();
+    return channel;
+  }
+
+  /// Realtime: nuevos mensajes en el hilo de un pedido (misma tabla que inserta el chat).
+  static RealtimeChannel subscribeToTransactionRequestMessages({
+    required String transactionRequestId,
+    required void Function() onInsert,
+  }) {
+    final id = transactionRequestId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('transactionRequestId vacío');
+    }
+    final channel = _client.channel('trm:req:$id');
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'transaction_request_messages',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'transaction_request_id',
+        value: id,
+      ),
+      callback: (_) => onInsert(),
+    );
+    channel.subscribe();
+    return channel;
+  }
+
+  static Future<void> unsubscribeChannel(RealtimeChannel? channel) async {
+    if (channel == null) return;
+    await _client.removeChannel(channel);
+  }
 
   /// Perfil del usuario autenticado (`id` = `auth.uid()`). `null` si no hay fila.
   static Future<ProfileModel?> fetchMyProfile() async {
@@ -1398,4 +1617,14 @@ class InventoryMetrics {
   final int totalProducts;
   final int outOfStock;
   final int paused;
+}
+
+class NotificationOrderSummary {
+  const NotificationOrderSummary({
+    this.productName,
+    this.aliadoBusinessName,
+  });
+
+  final String? productName;
+  final String? aliadoBusinessName;
 }

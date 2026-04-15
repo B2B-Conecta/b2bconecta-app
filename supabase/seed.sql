@@ -38,7 +38,7 @@ seed_users (id, email) as (
     ('a2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motolink.seed'),
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
     ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
-    ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed')
+    ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed'),
 )
 insert into auth.users (
   instance_id,

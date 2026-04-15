@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 /// Permite cambiar la pestaña del [MainShell] desde hijos o rutas apiladas
@@ -11,7 +12,10 @@ class MainShellTabController {
   static String? _pendingNotificationRelatedId;
   static VoidCallback? _pedidosNotificationDeepLink;
   static VoidCallback? _adminActivosNotificationDeepLink;
+  static VoidCallback? _adminPorValidarNotificationDeepLink;
+  static VoidCallback? _adminCreditoKycNotificationDeepLink;
   static VoidCallback? _notificationsReload;
+  static GlobalKey? _kycDocumentationSectionKey;
 
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
@@ -22,7 +26,10 @@ class MainShellTabController {
     _pendingNotificationRelatedId = null;
     _pedidosNotificationDeepLink = null;
     _adminActivosNotificationDeepLink = null;
+    _adminPorValidarNotificationDeepLink = null;
+    _adminCreditoKycNotificationDeepLink = null;
     _notificationsReload = null;
+    _kycDocumentationSectionKey = null;
   }
 
   /// [ImporterInventoryDashboard] registra [reload] para refrescar stock tras entrega.
@@ -30,7 +37,8 @@ class MainShellTabController {
     _refreshImporterInventory = reload;
   }
 
-  static void notifyImporterInventoryReload() => _refreshImporterInventory?.call();
+  static void notifyImporterInventoryReload() =>
+      _refreshImporterInventory?.call();
 
   /// [ImporterActiveOrdersPanel] registra [reload] al entrar en la pestaña Pedidos o tras avances.
   static void registerImporterPedidosReload(VoidCallback? reload) {
@@ -48,8 +56,21 @@ class MainShellTabController {
   }
 
   /// [AdminActiveOrdersPanel] expande el pedido del chat tras deep link.
-  static void registerAdminActivosNotificationDeepLink(VoidCallback? onNavigate) {
+  static void registerAdminActivosNotificationDeepLink(
+      VoidCallback? onNavigate) {
     _adminActivosNotificationDeepLink = onNavigate;
+  }
+
+  /// [AdminPendingValidationPanel] expande la solicitud en la pestaña Por validar.
+  static void registerAdminPorValidarNotificationDeepLink(
+      VoidCallback? onNavigate) {
+    _adminPorValidarNotificationDeepLink = onNavigate;
+  }
+
+  /// [AdminAliadosCreditPanel] expande la fila del aliado en Límites de crédito (KYC).
+  static void registerAdminCreditoKycNotificationDeepLink(
+      VoidCallback? onNavigate) {
+    _adminCreditoKycNotificationDeepLink = onNavigate;
   }
 
   /// Pestaña Pedidos (índice 1) + expande pedido vinculado a la notificación [mensaje].
@@ -65,6 +86,45 @@ class MainShellTabController {
     _goTo?.call(0);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminActivosNotificationDeepLink?.call();
+    });
+  }
+
+  /// Admin: pestaña Por validar (índice 2) + expande la solicitud vinculada.
+  static void navigateToAdminPorValidarForNotification() {
+    _goTo?.call(2);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminPorValidarNotificationDeepLink?.call();
+    });
+  }
+
+  /// [ProfileB2BForm] (aliado) ancla la sección de documentación para deep links.
+  static void registerKycDocumentationSectionKey(GlobalKey? key) {
+    _kycDocumentationSectionKey = key;
+  }
+
+  /// Pestaña Perfil (índice 3): scroll a documentación KYC del aliado/importador.
+  static void navigateToProfileKycDocumentation() {
+    _goTo?.call(3);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        final ctx = _kycDocumentationSectionKey?.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 420),
+            curve: Curves.easeOutCubic,
+            alignment: 0.12,
+          );
+        }
+      });
+    });
+  }
+
+  /// Admin: pestaña Crédito (índice 3) donde se revisa KYC / cupos de aliados.
+  static void navigateToAdminCreditoForKycNotification() {
+    _goTo?.call(3);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminCreditoKycNotificationDeepLink?.call();
     });
   }
 

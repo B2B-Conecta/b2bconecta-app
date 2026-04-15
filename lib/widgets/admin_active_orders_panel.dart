@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -240,6 +241,11 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
         transitEtaDays: eta.days,
         transitEtaHours: eta.hours,
       );
+      if (!context.mounted) return;
+      FocusManager.instance.primaryFocus?.unfocus();
+      // Evita desmontar el subárbol del pedido en el mismo frame que aún tiene foco/herencia activa.
+      await SchedulerBinding.instance.endOfFrame;
+      await Future<void>.delayed(Duration.zero);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pedido marcado en tránsito.')),

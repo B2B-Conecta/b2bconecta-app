@@ -112,6 +112,12 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAllNotifications() async {
+    await SupabaseService.deleteAllMyNotifications();
+    _items.clear();
+    notifyListeners();
+  }
+
   Future<void> handleTap(InAppNotificationModel n) async {
     await markAsRead(n.id);
     _deepLinkToInteractiveOrders(n);
@@ -119,6 +125,26 @@ class NotificationProvider extends ChangeNotifier {
 
   void _deepLinkToInteractiveOrders(InAppNotificationModel n) {
     MainShellTabController.setPendingNotificationRelatedId(n.relatedId);
+    if (n.type.trim() == 'kyc') {
+      switch (homeRole) {
+        case AppHomeRole.administrador:
+          MainShellTabController.navigateToAdminCreditoForKycNotification();
+          return;
+        case AppHomeRole.aliado:
+        case AppHomeRole.importador:
+          MainShellTabController.navigateToProfileKycDocumentation();
+          return;
+      }
+    }
+    final type = n.type.trim();
+    final legacyPorValidar = homeRole == AppHomeRole.administrador &&
+        type == 'envio' &&
+        n.title.trim() == 'Nueva solicitud por validar';
+    if (homeRole == AppHomeRole.administrador &&
+        (type == 'validacion' || legacyPorValidar)) {
+      MainShellTabController.navigateToAdminPorValidarForNotification();
+      return;
+    }
     switch (homeRole) {
       case AppHomeRole.administrador:
         MainShellTabController.navigateToAdminActivosForNotification();

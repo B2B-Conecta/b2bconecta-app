@@ -10,7 +10,8 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 
-/// Factura MotoLink, método de pago y comprobante (pedido en preparación).
+/// Factura MotoLink, método de pago y comprobante.
+/// En preparación: edición según estado de revisión. Tras confirmación o con pedido cerrado: solo consulta.
 class AliadoOrderPagoSection extends StatefulWidget {
   const AliadoOrderPagoSection({
     super.key,
@@ -34,7 +35,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     super.initState();
     final m = widget.request.pagoMetodo?.trim();
     _metodoSeleccionado =
-        (m != null && m.isNotEmpty && PagoMetodo.values.contains(m)) ? m : PagoMetodo.pagoMovil;
+        (m != null && m.isNotEmpty && PagoMetodo.values.contains(m))
+            ? m
+            : PagoMetodo.pagoMovil;
   }
 
   @override
@@ -43,7 +46,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     if (oldWidget.request.id != widget.request.id) {
       final m = widget.request.pagoMetodo?.trim();
       _metodoSeleccionado =
-          (m != null && m.isNotEmpty && PagoMetodo.values.contains(m)) ? m : PagoMetodo.pagoMovil;
+          (m != null && m.isNotEmpty && PagoMetodo.values.contains(m))
+              ? m
+              : PagoMetodo.pagoMovil;
     }
   }
 
@@ -126,31 +131,54 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
+  bool _puedeEditarMetodoYComprobante(TransactionRequestModel r) {
+    if (r.status != TransactionRequestStatus.enPreparacion) return false;
+    if (!r.hasFacturaAliado) return false;
+    final pe = r.pagoEstadoRevisionEfectivo;
+    return pe == PagoRevisionEstado.pendiente ||
+        pe == PagoRevisionEstado.rechazado;
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
-    if (r.status != TransactionRequestStatus.enPreparacion) {
-      return const SizedBox.shrink();
-    }
+    final mostrar = r.status == TransactionRequestStatus.enPreparacion ||
+        r.tieneDocumentacionFacturaPago;
+    if (!mostrar) return const SizedBox.shrink();
 
     final pe = r.pagoEstadoRevisionEfectivo;
-    final puedeEnviarComprobante =
-        r.hasFacturaAliado &&
-            (pe == PagoRevisionEstado.pendiente || pe == PagoRevisionEstado.rechazado);
+    final referenciaHistorica =
+        r.status != TransactionRequestStatus.enPreparacion &&
+            r.tieneDocumentacionFacturaPago;
+    final puedeEditar = _puedeEditarMetodoYComprobante(r);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Factura y pago',
-          style: TextStyle(
+        Text(
+          referenciaHistorica
+              ? 'Factura y pago (referencia)'
+              : 'Factura y pago',
+          style: const TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
             color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
-        if (r.aliadoPagoEstadoResumenEs != null)
+        if (referenciaHistorica)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Documentación confirmada · solo consulta (conservada aunque el pedido ya esté entregado).',
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+        if (!referenciaHistorica && r.aliadoPagoEstadoResumenEs != null)
           Text(
             r.aliadoPagoEstadoResumenEs!,
             style: TextStyle(
@@ -160,7 +188,29 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               height: 1.25,
             ),
           ),
-        const SizedBox(height: 8),
+        if (!referenciaHistorica && r.aliadoPagoEstadoResumenEs != null)
+          const SizedBox(height: 8),
+        if (referenciaHistorica) ...[
+          Text(
+            'Estado del pago: ${_etiquetaEstadoPago(pe)}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (!r.hasFacturaAliado &&
+            referenciaHistorica &&
+            r.hasComprobantePago) ...[
+          OutlinedButton.icon(
+            onPressed: () => _abrirComprobante(context),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: const Text('Ver comprobante de pago'),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (r.hasFacturaAliado) ...[
           Text(
             'Factura MotoLink: ${r.facturaAliadoFileName ?? 'documento'}',
@@ -176,10 +226,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             icon: const Icon(Icons.download_outlined, size: 18),
             label: const Text('Ver / descargar factura'),
           ),
-        ] else
+        ] else if (!referenciaHistorica)
           Text(
             'Cuando MotoLink emita la factura oficial, podrá descargarla aquí y continuar con el pago.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.25),
+            style: TextStyle(
+                fontSize: 12, color: Colors.grey.shade700, height: 1.25),
           ),
         if (r.hasFacturaAliado) ...[
           const SizedBox(height: 14),
@@ -192,37 +243,44 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
           ),
           const SizedBox(height: 6),
-          DropdownButtonFormField<String>(
-            value: _metodoSeleccionado,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
+          if (puedeEditar)
+            DropdownButtonFormField<String>(
+              value: _metodoSeleccionado,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: PagoMetodo.values
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(PagoMetodo.labelEs(c)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _metodoSeleccionado = v),
+            )
+          else
+            Text(
+              r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty
+                  ? PagoMetodo.labelEs(r.pagoMetodo!)
+                  : '—',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
             ),
-            items: PagoMetodo.values
-                .map(
-                  (c) => DropdownMenuItem(
-                    value: c,
-                    child: Text(PagoMetodo.labelEs(c)),
-                  ),
-                )
-                .toList(),
-            onChanged: puedeEnviarComprobante
-                ? (v) => setState(() => _metodoSeleccionado = v)
-                : null,
-          ),
           if (r.hasComprobantePago) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: () => _abrirComprobante(context),
               icon: const Icon(Icons.image_outlined, size: 18),
-              label: const Text('Ver mi comprobante'),
+              label: const Text('Ver comprobante de pago'),
             ),
           ],
-          if (puedeEnviarComprobante) ...[
+          if (puedeEditar) ...[
             const SizedBox(height: 10),
             Text(
               'Adjunte una foto clara del comprobante (Pago Móvil, Zelle o transferencia).',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
+              style: TextStyle(
+                  fontSize: 11, color: Colors.grey.shade700, height: 1.25),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -247,7 +305,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               ),
             ),
           ],
-          if (pe == PagoRevisionEstado.enRevision)
+          if (!referenciaHistorica && pe == PagoRevisionEstado.enRevision)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
@@ -255,7 +313,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ),
-          if (pe == PagoRevisionEstado.aprobado)
+          if (!referenciaHistorica && pe == PagoRevisionEstado.aprobado)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
@@ -267,19 +325,36 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 ),
               ),
             ),
-          if (pe == PagoRevisionEstado.rechazado &&
+          if (!referenciaHistorica &&
+              pe == PagoRevisionEstado.rechazado &&
               r.pagoComprobanteRechazoNota != null &&
               r.pagoComprobanteRechazoNota!.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'MotoLink: ${r.pagoComprobanteRechazoNota}',
-                style: TextStyle(fontSize: 11, color: Colors.red.shade900, height: 1.3),
+                style: TextStyle(
+                    fontSize: 11, color: Colors.red.shade900, height: 1.3),
               ),
             ),
         ],
         const SizedBox(height: 8),
       ],
     );
+  }
+
+  static String _etiquetaEstadoPago(String pe) {
+    switch (pe) {
+      case PagoRevisionEstado.pendiente:
+        return 'Pendiente';
+      case PagoRevisionEstado.enRevision:
+        return 'En revisión';
+      case PagoRevisionEstado.aprobado:
+        return 'Confirmado';
+      case PagoRevisionEstado.rechazado:
+        return 'Rechazado';
+      default:
+        return pe;
+    }
   }
 }

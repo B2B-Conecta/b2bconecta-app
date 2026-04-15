@@ -143,6 +143,13 @@ class SupabaseService {
         .inFilter('id', ids);
   }
 
+  /// Elimina todas las notificaciones del usuario actual.
+  static Future<void> deleteAllMyNotifications() async {
+    final uid = _currentUserId;
+    if (uid == null) return;
+    await _client.from('notifications').delete().eq('user_id', uid);
+  }
+
   /// Ficha de pedido por ID (respeta RLS del usuario actual).
   static Future<TransactionRequestModel?> fetchTransactionRequestById(
     String requestId,

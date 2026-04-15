@@ -132,6 +132,10 @@ class TransactionRequestModel {
       comprobantePagoStoragePath != null &&
       comprobantePagoStoragePath!.trim().isNotEmpty;
 
+  /// Hay factura MotoLink y/o comprobante para mostrar (p. ej. como referencia con pedido entregado).
+  bool get tieneDocumentacionFacturaPago =>
+      hasFacturaAliado || hasComprobantePago;
+
   /// `pendiente` si ya hay factura MotoLink pero aún no hay estado persistido.
   String get pagoEstadoRevisionEfectivo {
     if (!hasFacturaAliado) return PagoRevisionEstado.pendiente;

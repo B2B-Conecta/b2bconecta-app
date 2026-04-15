@@ -13,6 +13,8 @@ import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'kyc_status_highlight_widgets.dart';
+import 'main_shell_tab.dart';
 
 /// Admin: lista de aliados con edición de `credit_limit`.
 /// Mensaje legible cuando falla el RPC de KYC global (evita mostrar `PostgresException` crudo).
@@ -62,11 +64,90 @@ class _AdminAliadosCreditPanelState extends State<AdminAliadosCreditPanel> {
   List<ProfileModel> _rows = [];
   bool _loading = true;
   String? _error;
+  final Map<String, ExpansionTileController> _expansionControllers = {};
+  final Map<String, GlobalKey> _cardKeys = {};
 
   @override
   void initState() {
     super.initState();
+    MainShellTabController.registerAdminCreditoKycNotificationDeepLink(
+      _onNotificationCreditoKycDeepLink,
+    );
     _load();
+  }
+
+  @override
+  void dispose() {
+    MainShellTabController.registerAdminCreditoKycNotificationDeepLink(null);
+    super.dispose();
+  }
+
+  void _onNotificationCreditoKycDeepLink() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      _expandAliadoAndScroll(pending);
+    } else if (!_loading) {
+      unawaited(_load());
+    }
+  }
+
+  void _tryExpandFromPendingKycNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      _expandAliadoAndScroll(pending);
+    } else if (!_loading) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+    }
+  }
+
+  void _expandAliadoAndScroll(String profileId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _cardKeys[profileId]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutCubic,
+          alignment: 0.12,
+        );
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _expansionControllers[profileId]?.expand();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final ctx2 = _cardKeys[profileId]?.currentContext;
+          if (ctx2 != null) {
+            Scrollable.ensureVisible(
+              ctx2,
+              duration: const Duration(milliseconds: 360),
+              curve: Curves.easeOutCubic,
+              alignment: 0.06,
+            );
+          }
+        });
+      });
+    });
+  }
+
+  Widget _buildAliadoCard(ProfileModel p) {
+    final c = _expansionControllers.putIfAbsent(
+      p.id,
+      () => ExpansionTileController(),
+    );
+    final gk = _cardKeys.putIfAbsent(p.id, GlobalKey.new);
+    return _AliadoCreditCard(
+      key: ValueKey<String>(p.id),
+      profile: p,
+      onSaved: _load,
+      expansionController: c,
+      cardKey: gk,
+    );
   }
 
   Future<void> _load() async {
@@ -81,6 +162,7 @@ class _AdminAliadosCreditPanelState extends State<AdminAliadosCreditPanel> {
         _rows = rows;
         _loading = false;
       });
+      _tryExpandFromPendingKycNotification();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -135,19 +217,15 @@ class _AdminAliadosCreditPanelState extends State<AdminAliadosCreditPanel> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.separated(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        itemCount: _rows.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, i) {
-          final p = _rows[i];
-          return _AliadoCreditCard(
-            key: ValueKey<String>(p.id),
-            profile: p,
-            onSaved: _load,
-          );
-        },
+        children: [
+          for (var i = 0; i < _rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _buildAliadoCard(_rows[i]),
+          ],
+        ],
       ),
     );
   }
@@ -158,10 +236,14 @@ class _AliadoCreditCard extends StatefulWidget {
     super.key,
     required this.profile,
     required this.onSaved,
+    required this.expansionController,
+    required this.cardKey,
   });
 
   final ProfileModel profile;
   final Future<void> Function() onSaved;
+  final ExpansionTileController expansionController;
+  final GlobalKey cardKey;
 
   @override
   State<_AliadoCreditCard> createState() => _AliadoCreditCardState();
@@ -220,7 +302,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('KYC global actualizado a «${KycStatus.labelEs(status)}».'),
+          content:
+              Text('KYC global actualizado a «${KycStatus.labelEs(status)}».'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -304,7 +387,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                   String? busyType;
 
                   Future<void> refreshDocs() async {
-                    final fresh = await SupabaseService.fetchProfileDocumentsForAliado(
+                    final fresh =
+                        await SupabaseService.fetchProfileDocumentsForAliado(
                       widget.profile.id,
                     );
                     if (ctx.mounted) {
@@ -542,209 +626,212 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     final name = (widget.profile.businessName ?? '—').trim();
     final rif = (widget.profile.rif ?? '—').trim();
     final lim = widget.profile.creditLimit;
-    final cupoResumen = lim != null
-        ? '\$${lim.toStringAsFixed(2)} USD'
-        : 'Sin cupo asignado';
+    final cupoResumen =
+        lim != null ? '\$${lim.toStringAsFixed(2)} USD' : 'Sin cupo asignado';
 
-    return Material(
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppDecorations.radius12,
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-          shape: const Border(),
-          collapsedShape: const Border(),
-          title: Text(
-            name,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'RIF: $rif',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _AdminKycSummaryChip(kycStatus: widget.profile.kycStatus),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.fieldFill,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            size: 14,
-                            color: Colors.grey.shade700,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            cupoResumen,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Pulse la fila para cupo, KYC y acciones',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          children: [
-            Text(
-              'Score: ${widget.profile.creditScore ?? '—'}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Fase contado: ${widget.profile.primerosPedidosContadoEntregados ?? 0}/'
-              '${CashPhasePolicy.entregasRequeridas} entregas completadas',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'KYC global: ${KycStatus.labelEs(widget.profile.kycStatus)}',
+    return KeyedSubtree(
+      key: widget.cardKey,
+      child: Material(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppDecorations.radius12,
+          side: BorderSide(color: Colors.grey.shade300),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            controller: widget.expansionController,
+            tilePadding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            title: Text(
+              name,
               style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.brandBlue,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Puede corregir el estado global o el de cada archivo en cualquier momento. '
-              'Para marcar «Aprobado» global, el servidor exige los 6 documentos cargados y aprobados uno a uno.',
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.35,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              value: _kycDropdownValue(),
-              decoration: InputDecoration(
-                labelText: 'Estado KYC global (admin)',
-                filled: true,
-                fillColor: AppColors.fieldFill,
-                border: OutlineInputBorder(
-                  borderRadius: AppDecorations.radius12,
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: KycStatus.pendiente,
-                  child: Text('Pendiente de envío'),
-                ),
-                DropdownMenuItem(
-                  value: KycStatus.enRevision,
-                  child: Text('En revisión MotoLink'),
-                ),
-                DropdownMenuItem(
-                  value: KycStatus.aprobado,
-                  child: Text('Aprobado'),
-                ),
-                DropdownMenuItem(
-                  value: KycStatus.rechazado,
-                  child: Text('Rechazado'),
-                ),
-              ],
-              onChanged: _savingKyc
-                  ? null
-                  : (v) {
-                      if (v == null) return;
-                      unawaited(_setAliadoKycGlobal(v));
-                    },
-            ),
-            if (_savingKyc)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: LinearProgressIndicator(minHeight: 2),
-              ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _openDocReviewSheet,
-              icon: const Icon(Icons.fact_check_outlined, size: 20),
-              label: const Text('Revisar documentación (por documento)'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _limitCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
-              ],
-              decoration: InputDecoration(
-                labelText: 'Límite de crédito (USD)',
-                hintText: 'Ej: 50000.00',
-                filled: true,
-                fillColor: AppColors.fieldFill,
-                border: OutlineInputBorder(
-                  borderRadius: AppDecorations.radius12,
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RIF: $rif',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _AdminKycSummaryChip(kycStatus: widget.profile.kycStatus),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.fieldFill,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              cupoResumen,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  : const Text('Guardar límite'),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pulse la fila para cupo, KYC y acciones',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
+            children: [
+              Text(
+                'Score: ${widget.profile.creditScore ?? '—'}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Fase contado: ${widget.profile.primerosPedidosContadoEntregados ?? 0}/'
+                '${CashPhasePolicy.entregasRequeridas} entregas completadas',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'KYC global: ${KycStatus.labelEs(widget.profile.kycStatus)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.brandBlue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Puede corregir el estado global o el de cada archivo en cualquier momento. '
+                'Para marcar «Aprobado» global, el servidor exige los 6 documentos cargados y aprobados uno a uno.',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _kycDropdownValue(),
+                decoration: InputDecoration(
+                  labelText: 'Estado KYC global (admin)',
+                  filled: true,
+                  fillColor: AppColors.fieldFill,
+                  border: OutlineInputBorder(
+                    borderRadius: AppDecorations.radius12,
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: KycStatus.pendiente,
+                    child: Text('Pendiente de envío'),
+                  ),
+                  DropdownMenuItem(
+                    value: KycStatus.enRevision,
+                    child: Text('En revisión MotoLink'),
+                  ),
+                  DropdownMenuItem(
+                    value: KycStatus.aprobado,
+                    child: Text('Aprobado'),
+                  ),
+                  DropdownMenuItem(
+                    value: KycStatus.rechazado,
+                    child: Text('Rechazado'),
+                  ),
+                ],
+                onChanged: _savingKyc
+                    ? null
+                    : (v) {
+                        if (v == null) return;
+                        unawaited(_setAliadoKycGlobal(v));
+                      },
+              ),
+              if (_savingKyc)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _openDocReviewSheet,
+                icon: const Icon(Icons.fact_check_outlined, size: 20),
+                label: const Text('Revisar documentación (por documento)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _limitCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Límite de crédito (USD)',
+                  hintText: 'Ej: 50000.00',
+                  filled: true,
+                  fillColor: AppColors.fieldFill,
+                  border: OutlineInputBorder(
+                    borderRadius: AppDecorations.radius12,
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Guardar límite'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -994,9 +1081,7 @@ class _DocReviewTile extends StatelessWidget {
     final statusLabel = !has
         ? 'Sin archivo'
         : DocumentReviewStatus.labelEs(
-            (rs == null || rs.isEmpty)
-                ? DocumentReviewStatus.pendiente
-                : rs,
+            (rs == null || rs.isEmpty) ? DocumentReviewStatus.pendiente : rs,
           );
     final note = doc?.reviewNote?.trim();
     final reviewer = doc?.reviewerBusinessName?.trim();
@@ -1005,11 +1090,23 @@ class _DocReviewTile extends StatelessWidget {
             '${reviewer != null && reviewer.isNotEmpty ? ' · $reviewer (MotoLink)' : ' · MotoLink'}'
         : null;
 
+    final effectiveStatus = !has
+        ? null
+        : ((rs == null || rs.isEmpty) ? DocumentReviewStatus.pendiente : rs);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: kycDocumentReviewTileBorderColor(
+                has: has, status: effectiveStatus),
+            width: 1.4,
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -1022,14 +1119,11 @@ class _DocReviewTile extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                statusLabel,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
-                ),
+              const SizedBox(height: 8),
+              KycDocumentReviewStatusHighlight(
+                statusLabel: statusLabel,
+                hasFile: has,
+                effectiveStatus: effectiveStatus,
               ),
               if (reviewedLine != null) ...[
                 const SizedBox(height: 4),

@@ -7,6 +7,7 @@ import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'kyc_status_highlight_widgets.dart';
 
 /// Subida de documentos legales/comerciales y envío a revisión MotoLink.
 class AliadoKycDocumentsSection extends StatefulWidget {
@@ -162,17 +163,8 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Estado: ${KycStatus.labelEs(st)}',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: st == KycStatus.aprobado
-                ? AppColors.successGreen
-                : AppColors.textSecondary,
-          ),
-        ),
+        const SizedBox(height: 8),
+        KycAliadoGlobalStatusHighlight(kycStatus: st),
         const SizedBox(height: 12),
         if (_loading)
           const Padding(
@@ -197,6 +189,11 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                         ? DocumentReviewStatus.pendiente
                         : rs,
                   );
+            final effectiveStatus = !has
+                ? null
+                : ((rs == null || rs.isEmpty)
+                    ? DocumentReviewStatus.pendiente
+                    : rs);
             final note = doc?.reviewNote?.trim();
             final reviewer = doc?.reviewerBusinessName?.trim();
             final reviewedHint = (doc != null && doc.reviewedAt != null)
@@ -207,9 +204,16 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
               padding: const EdgeInsets.only(bottom: 10),
               child: Material(
                 color: Colors.white,
+                clipBehavior: Clip.antiAlias,
                 shape: RoundedRectangleBorder(
                   borderRadius: AppDecorations.radius12,
-                  side: BorderSide(color: Colors.grey.shade300),
+                  side: BorderSide(
+                    color: kycDocumentReviewTileBorderColor(
+                      has: has,
+                      status: effectiveStatus,
+                    ),
+                    width: 1.4,
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
@@ -221,7 +225,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                         children: [
                           Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text(
                                   AliadoDocType.labelEs(type),
@@ -230,19 +234,14 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                                     fontSize: 14,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  statusLine,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: has
-                                        ? AppColors.textSecondary
-                                        : Colors.grey.shade600,
-                                  ),
+                                const SizedBox(height: 8),
+                                KycDocumentReviewStatusHighlight(
+                                  statusLabel: statusLine,
+                                  hasFile: has,
+                                  effectiveStatus: effectiveStatus,
                                 ),
                                 if (reviewedHint != null) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Text(
                                     reviewedHint,
                                     style: TextStyle(

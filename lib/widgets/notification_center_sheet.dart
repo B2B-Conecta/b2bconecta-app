@@ -100,22 +100,36 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                         onSelected: (value) async {
                           if (value == 1) {
                             setState(() => _selectionMode = true);
+                          } else if (value == 0) {
+                            await _confirmAndDeleteAll(context);
                           } else if (value == 30) {
                             await _confirmAndDeleteOld(context, 30);
                           } else if (value == 60) {
                             await _confirmAndDeleteOld(context, 60);
                           }
                         },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem<int>(
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<int>(
                             value: 1,
                             child: Text('Seleccionar notificaciones'),
                           ),
-                          PopupMenuItem<int>(
+                          if (items.isNotEmpty)
+                            PopupMenuItem<int>(
+                              value: 0,
+                              child: Text(
+                                'Eliminar todas',
+                                style: TextStyle(
+                                  color: Colors.red.shade700,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          if (items.isNotEmpty) const PopupMenuDivider(),
+                          const PopupMenuItem<int>(
                             value: 30,
                             child: Text('Eliminar viejas (30+ días)'),
                           ),
-                          PopupMenuItem<int>(
+                          const PopupMenuItem<int>(
                             value: 60,
                             child: Text('Eliminar viejas (60+ días)'),
                           ),
@@ -310,6 +324,10 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon = Icons.local_shipping_outlined;
         bg = Colors.green.shade600;
         break;
+      case 'validacion':
+        icon = Icons.fact_check_outlined;
+        bg = AppColors.brandBlue;
+        break;
       default:
         icon = Icons.notifications_none_outlined;
         bg = Colors.orange.shade700;
@@ -343,6 +361,18 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
     if (p != null && p.isNotEmpty) return 'Producto: $p';
     if (a != null && a.isNotEmpty) return 'Aliado: $a';
     return '';
+  }
+
+  Future<void> _confirmAndDeleteAll(BuildContext context) async {
+    final ok = await _showDeleteDialog(
+      context: context,
+      title: 'Eliminar todas las notificaciones',
+      message:
+          'Se borrarán todas las notificaciones de tu cuenta. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar todas',
+    );
+    if (ok != true) return;
+    await widget.provider.deleteAllNotifications();
   }
 
   Future<void> _confirmAndDeleteOld(BuildContext context, int days) async {

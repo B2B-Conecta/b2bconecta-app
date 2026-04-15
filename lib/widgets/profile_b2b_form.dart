@@ -6,6 +6,7 @@ import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'main_shell_tab.dart';
 import 'aliado_kyc_documents_section.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
@@ -51,6 +52,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   /// Recrea [AuthorizationStatusSection] al actualizar documentos KYC.
   int _authSectionTick = 0;
+
+  /// Ancla scroll desde notificaciones KYC → sección documentación aliado.
+  final GlobalKey _kycDocumentationSectionKey = GlobalKey();
 
   /// Rol ya persistido: el selector no puede cambiarse (RLS / negocio).
   bool get _roleLocked {
@@ -100,6 +104,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     }
     if (_persistedAsAliado) {
       _loadOpenExposure();
+      MainShellTabController.registerKycDocumentationSectionKey(
+        _kycDocumentationSectionKey,
+      );
     }
   }
 
@@ -123,6 +130,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   @override
   void dispose() {
+    if (_persistedAsAliado) {
+      MainShellTabController.registerKycDocumentationSectionKey(null);
+    }
     _businessNameController.dispose();
     _rifController.dispose();
     _phoneController.dispose();
@@ -492,12 +502,15 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             _sectionLabel('CUPO AUTORIZADO (MOTOLINK)'),
             _aliadoCreditSummary(),
             const SizedBox(height: 20),
-            AliadoKycDocumentsSection(
-              kycStatus: widget.initial?.kycStatus,
-              onChanged: () {
-                _bumpAuthorizationSection();
-                widget.onRelatedDataChanged?.call();
-              },
+            KeyedSubtree(
+              key: _kycDocumentationSectionKey,
+              child: AliadoKycDocumentsSection(
+                kycStatus: widget.initial?.kycStatus,
+                onChanged: () {
+                  _bumpAuthorizationSection();
+                  widget.onRelatedDataChanged?.call();
+                },
+              ),
             ),
           ],
           const SizedBox(height: 20),

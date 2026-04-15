@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
 /// Solicitudes pendientes de aprobación o rechazo (pestaña Por validar — admin).
@@ -29,13 +30,39 @@ class _AdminPendingValidationPanelState
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    MainShellTabController.registerAdminPorValidarNotificationDeepLink(
+      _onNotificationPorValidarDeepLink,
+    );
     _load();
   }
 
   @override
   void dispose() {
+    MainShellTabController.registerAdminPorValidarNotificationDeepLink(null);
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onNotificationPorValidarDeepLink() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    } else if (!_loading) {
+      _load();
+    }
+  }
+
+  void _tryExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    if (_rows.any((r) => r.id == pending)) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+      setState(() => _expandedRequestId = pending);
+    } else if (!_loading) {
+      MainShellTabController.consumePendingNotificationRelatedId();
+    }
   }
 
   Future<void> _load() async {
@@ -51,6 +78,7 @@ class _AdminPendingValidationPanelState
         _loading = false;
         _expandedRequestId = null;
       });
+      _tryExpandFromPendingNotification();
     } catch (e) {
       if (!mounted) return;
       setState(() {

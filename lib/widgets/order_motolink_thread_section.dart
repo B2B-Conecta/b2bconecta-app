@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/transaction_request_message_model.dart';
@@ -44,17 +45,25 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   void initState() {
     super.initState();
     SupabaseService.markNotificationsReadForRelatedOrder(widget.transactionRequestId)
-        .then((_) => MainShellTabController.requestNotificationsReload());
+        .then((_) {
+      // Evita setState del shell en el mismo frame que desmonta subárboles (p. ej. paso a tránsito).
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        MainShellTabController.requestNotificationsReload();
+      });
+    });
     _messagesChannel = SupabaseService.subscribeToTransactionRequestMessages(
       transactionRequestId: widget.transactionRequestId,
       onInsert: () {
-        if (mounted) _load();
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _load();
+        });
       },
     );
     _load();
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -195,7 +204,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                     ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      child: SelectableText(
+                      child: Text(
                         m.body,
                         style: const TextStyle(fontSize: 13, height: 1.35),
                       ),

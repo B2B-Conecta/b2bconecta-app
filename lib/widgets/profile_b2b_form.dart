@@ -75,6 +75,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'importador';
   }
 
+  bool get _persistedAsTransportista {
+    return widget.initial?.role?.trim().toLowerCase() == 'transportista';
+  }
+
   bool get _ubicacionObligatoria {
     final r = _role.trim().toLowerCase();
     return r == 'importador' || r == 'aliado';
@@ -99,7 +103,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
     final r = i?.role?.trim().toLowerCase();
-    if (r == 'importador' || r == 'aliado' || r == 'administrador') {
+    if (r == 'importador' ||
+        r == 'aliado' ||
+        r == 'administrador' ||
+        r == 'transportista') {
       _role = r!;
     }
     if (_persistedAsAliado) {
@@ -107,6 +114,17 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       MainShellTabController.registerKycDocumentationSectionKey(
         _kycDocumentationSectionKey,
       );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileB2BForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_persistedAsAliado) return;
+    if (oldWidget.initial?.id != widget.initial?.id ||
+        oldWidget.initial?.creditoConsumidoAcumulado !=
+            widget.initial?.creditoConsumidoAcumulado) {
+      _loadOpenExposure();
     }
   }
 
@@ -165,8 +183,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   }
 
   Widget _aliadoCreditSummary() {
-    final lim = widget.initial?.creditLimit;
+    final limMostrado = widget.initial?.limiteCreditoMostradoAliado;
+    final limRaw = widget.initial?.creditLimit;
     final exp = _openExposure ?? 0.0;
+    final cons = widget.initial?.creditoConsumidoAcumulado ?? 0.0;
+    final disponible =
+        ((limMostrado ?? 0) - exp - cons).clamp(0.0, double.infinity);
     final pce = widget.initial?.primerosPedidosContadoEntregados ?? 0;
     final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
     return DecoratedBox(
@@ -195,16 +217,18 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               const SizedBox(height: 12),
             ],
             Text(
-              lim == null
+              limRaw == null && !enFaseContado
                   ? 'Pendiente: MotoLink asignará su límite de crédito (pestaña Crédito).'
-                  : 'Límite autorizado: \$${lim.toStringAsFixed(2)}',
+                  : enFaseContado
+                      ? 'Límite mostrado (fase contado): \$${(limMostrado ?? 0).toStringAsFixed(2)}'
+                      : 'Límite autorizado: \$${(limMostrado ?? 0).toStringAsFixed(2)}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
-            if (lim != null) ...[
+            if (limRaw != null || enFaseContado) ...[
               const SizedBox(height: 10),
               if (_loadingExposure)
                 const LinearProgressIndicator(minHeight: 3)
@@ -218,7 +242,15 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Disponible estimado: \$${(lim - exp).clamp(0.0, double.infinity).toStringAsFixed(2)}',
+                  'Crédito imputado (entregas con línea MotoLink): \$${cons.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Disponible estimado: \$${disponible.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -352,47 +384,60 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ),
           const SizedBox(height: 24),
           _sectionLabel('TIPO DE CUENTA'),
-          Row(
-            children: [
-              Expanded(
-                child: _RoleChoiceTile(
-                  label: 'Importador',
-                  icon: Icons.local_shipping_outlined,
-                  selected: _role == 'importador',
-                  enabled: !_roleLocked,
-                  onTap: _saving || _roleLocked
-                      ? null
-                      : () => setState(() => _role = 'importador'),
-                ),
+          if (_persistedAsTransportista)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Chip(
+                avatar: Icon(Icons.local_shipping_outlined,
+                    size: 18, color: AppColors.brandBlue),
+                label: const Text('Transportista · despacho'),
+                backgroundColor: AppColors.fieldFill,
+                side: BorderSide(color: Colors.grey.shade300),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _RoleChoiceTile(
+                    label: 'Importador',
+                    icon: Icons.local_shipping_outlined,
+                    selected: _role == 'importador',
+                    enabled: !_roleLocked,
+                    onTap: _saving || _roleLocked
+                        ? null
+                        : () => setState(() => _role = 'importador'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _RoleChoiceTile(
+                    label: 'Aliado',
+                    icon: Icons.person_outline,
+                    selected: _role == 'aliado',
+                    enabled: !_roleLocked,
+                    onTap: _saving || _roleLocked
+                        ? null
+                        : () => setState(() => _role = 'aliado'),
+                  ),
+                ),
+              ],
+            ),
+            if (_showAdministradorRoleOption) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
                 child: _RoleChoiceTile(
-                  label: 'Aliado',
-                  icon: Icons.person_outline,
-                  selected: _role == 'aliado',
+                  label: 'Administrador (broker)',
+                  icon: Icons.admin_panel_settings_outlined,
+                  selected: _role == 'administrador',
                   enabled: !_roleLocked,
                   onTap: _saving || _roleLocked
                       ? null
-                      : () => setState(() => _role = 'aliado'),
+                      : () => setState(() => _role = 'administrador'),
                 ),
               ),
             ],
-          ),
-          if (_showAdministradorRoleOption) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: _RoleChoiceTile(
-                label: 'Administrador (broker)',
-                icon: Icons.admin_panel_settings_outlined,
-                selected: _role == 'administrador',
-                enabled: !_roleLocked,
-                onTap: _saving || _roleLocked
-                    ? null
-                    : () => setState(() => _role = 'administrador'),
-              ),
-            ),
           ],
           const SizedBox(height: 20),
           _sectionLabel('NOMBRE DEL NEGOCIO'),

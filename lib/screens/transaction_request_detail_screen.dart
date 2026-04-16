@@ -172,6 +172,7 @@ class _TransactionRequestDetailScreenState
       case AppHomeRole.importador:
         return TransactionRequestAliadoContactSection(request: r);
       case AppHomeRole.administrador:
+      case AppHomeRole.transportista:
         return TransactionRequestPartiesContactSection(request: r);
     }
   }

@@ -13,6 +13,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.statusLabel,
+    this.onConfirmarRecepcion,
+    this.confirmarRecepcionBusy = false,
     this.expandedFooter,
   });
 
@@ -20,6 +22,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final String statusLabel;
+  /// Cuando el pedido está en tránsito: el aliado cierra el ciclo confirmando recepción.
+  final VoidCallback? onConfirmarRecepcion;
+  final bool confirmarRecepcionBusy;
   final Widget? expandedFooter;
 
   @override
@@ -156,6 +161,43 @@ class AliadoExpandableOrderCard extends StatelessWidget {
               ),
             ),
           ),
+          if (onConfirmarRecepcion != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: confirmarRecepcionBusy ? null : onConfirmarRecepcion,
+                    icon: confirmarRecepcionBusy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.inventory_2_outlined, size: 20),
+                    label: Text(
+                      confirmarRecepcionBusy
+                          ? 'Confirmando…'
+                          : 'Confirmar recepción en tu taller',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Marca este paso cuando hayas recibido la mercancía. Se cierra el pedido y queda '
+                    'registrada la fecha de entrega para MotoLink y el importador.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeInOut,

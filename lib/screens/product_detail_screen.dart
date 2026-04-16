@@ -5,6 +5,7 @@ import '../models/credit_limit_exception.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
+import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -45,8 +46,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
+    if (part.stock < 1) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No hay unidades disponibles. El importador debe actualizar el inventario.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final qtyController = TextEditingController(text: '1');
-    final maxQty = part.stock < 1 ? 1 : part.stock;
+    final maxQty = part.stock;
 
     bool? ok;
     var qtyText = '1';
@@ -112,6 +126,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
+                    'La cantidad quedará fija para todo el pedido; el stock se descuenta cuando el aliado confirma la entrega.',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
                     'La solicitud quedará pendiente de aprobación por MotoLink. '
                     'El importador solo la verá tras validación.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
@@ -139,8 +158,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (ok != true || !mounted) return;
 
-    var q = int.tryParse(qtyText) ?? 1;
-    q = q.clamp(1, maxQty);
+    var requested = int.tryParse(qtyText.trim()) ?? 1;
+    if (requested < 1) requested = 1;
+
+    var q = requested;
+    if (requested > maxQty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Stock limitado'),
+          content: Text(
+            'Actualmente hay $maxQty unidad(es) disponible(s). '
+            'Indicó $requested. La solicitud se enviará solo por $maxQty unidades.',
+            style: const TextStyle(height: 1.35),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Volver'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Continuar con $maxQty'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      q = maxQty;
+    } else {
+      q = requested;
+    }
 
     setState(() => _submitting = true);
     try {
@@ -182,6 +230,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       );
     } on ProfileLocationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on StockInsufficientException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -433,18 +489,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ],
             ),
-            child: ElevatedButton(
-              onPressed: _submitting ? null : _openRequestDialog,
-              child: _submitting
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Solicitar pedido'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (part.stock < 1) ...[
+                  Text(
+                    'Sin stock disponible',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                ElevatedButton(
+                  onPressed: (_submitting || part.stock < 1) ? null : _openRequestDialog,
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Solicitar pedido'),
+                ),
+              ],
             ),
           ),
         ],

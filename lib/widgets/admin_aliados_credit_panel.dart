@@ -253,6 +253,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
   late final TextEditingController _limitCtrl;
   bool _saving = false;
   bool _savingKyc = false;
+  double? _openExposure;
+  bool _loadingExposure = false;
 
   @override
   void initState() {
@@ -261,6 +263,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     _limitCtrl = TextEditingController(
       text: lim != null ? lim.toStringAsFixed(2) : '',
     );
+    _loadExposure();
   }
 
   @override
@@ -269,12 +272,40 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     super.dispose();
   }
 
+  Future<void> _loadExposure() async {
+    setState(() => _loadingExposure = true);
+    try {
+      final v =
+          await SupabaseService.fetchOpenCreditExposureForAliado(widget.profile.id);
+      if (!mounted) return;
+      setState(() {
+        _openExposure = v;
+        _loadingExposure = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _openExposure = null;
+        _loadingExposure = false;
+      });
+    }
+  }
+
   @override
   void didUpdateWidget(covariant _AliadoCreditCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.profile.creditLimit != widget.profile.creditLimit) {
+    if (oldWidget.profile.id != widget.profile.id) {
       final lim = widget.profile.creditLimit;
       _limitCtrl.text = lim != null ? lim.toStringAsFixed(2) : '';
+      _loadExposure();
+    } else if (oldWidget.profile.creditLimit != widget.profile.creditLimit) {
+      final lim = widget.profile.creditLimit;
+      _limitCtrl.text = lim != null ? lim.toStringAsFixed(2) : '';
+    }
+    if (oldWidget.profile.id == widget.profile.id &&
+        oldWidget.profile.creditoConsumidoAcumulado !=
+            widget.profile.creditoConsumidoAcumulado) {
+      _loadExposure();
     }
   }
 
@@ -626,8 +657,16 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     final name = (widget.profile.businessName ?? '—').trim();
     final rif = (widget.profile.rif ?? '—').trim();
     final lim = widget.profile.creditLimit;
-    final cupoResumen =
-        lim != null ? '\$${lim.toStringAsFixed(2)} USD' : 'Sin cupo asignado';
+    final cons = widget.profile.creditoConsumidoAcumulado ?? 0;
+    final exp = _openExposure ?? 0;
+    final disp = lim != null
+        ? (lim - cons - exp).clamp(0.0, double.infinity)
+        : null;
+    final cupoResumen = lim == null
+        ? 'Sin cupo asignado'
+        : _loadingExposure
+            ? '\$${lim.toStringAsFixed(2)} USD asignado'
+            : '\$${lim.toStringAsFixed(2)} asignado · \$${disp!.toStringAsFixed(2)} disp.';
 
     return KeyedSubtree(
       key: widget.cardKey,
@@ -795,6 +834,69 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 onPressed: _openDocReviewSheet,
                 icon: const Icon(Icons.fact_check_outlined, size: 20),
                 label: const Text('Revisar documentación (por documento)'),
+              ),
+              const SizedBox(height: 12),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.fieldFill,
+                  borderRadius: AppDecorations.radius12,
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Uso del cupo (referencia)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_loadingExposure)
+                        const LinearProgressIndicator(minHeight: 3)
+                      else ...[
+                        Text(
+                          'Límite definido: ${lim != null ? '\$${lim.toStringAsFixed(2)}' : '—'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Compromiso en pedidos abiertos: \$${exp.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Imputado en entregas (crédito MotoLink): \$${cons.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          lim != null
+                              ? 'Disponible estimado: \$${disp!.toStringAsFixed(2)}'
+                              : 'Disponible estimado: —',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandBlue,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(

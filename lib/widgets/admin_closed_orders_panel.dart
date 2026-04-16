@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'efectivo_respaldo_registrar.dart';
 import 'order_list_filter_bar.dart';
 
 /// Pedidos entregados o rechazados (pestaña Pedidos cerrados — admin).
@@ -183,6 +184,10 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
                               statusLabel: _statusLabel(r.status),
+                              expandedFooter: EfectivoRespaldoRegistrar(
+                                request: r,
+                                onRegistered: _load,
+                              ),
                             );
                           },
                         ),

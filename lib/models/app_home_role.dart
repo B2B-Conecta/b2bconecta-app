@@ -8,4 +8,7 @@ enum AppHomeRole {
 
   /// Broker MotoLink: bandeja de aprobación.
   administrador,
+
+  /// Despacho / cobro en ruta (pedidos activos, respaldo efectivo).
+  transportista,
 }

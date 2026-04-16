@@ -125,7 +125,8 @@ class NotificationProvider extends ChangeNotifier {
 
   void _deepLinkToInteractiveOrders(InAppNotificationModel n) {
     MainShellTabController.setPendingNotificationRelatedId(n.relatedId);
-    if (n.type.trim() == 'kyc') {
+    final t0 = n.type.trim();
+    if (t0 == 'kyc') {
       switch (homeRole) {
         case AppHomeRole.administrador:
           MainShellTabController.navigateToAdminCreditoForKycNotification();
@@ -134,7 +135,13 @@ class NotificationProvider extends ChangeNotifier {
         case AppHomeRole.importador:
           MainShellTabController.navigateToProfileKycDocumentation();
           return;
+        case AppHomeRole.transportista:
+          return;
       }
+    }
+    if (t0 == 'credito' && homeRole == AppHomeRole.administrador) {
+      MainShellTabController.navigateToAdminCreditoForKycNotification();
+      return;
     }
     final type = n.type.trim();
     final legacyPorValidar = homeRole == AppHomeRole.administrador &&
@@ -147,6 +154,7 @@ class NotificationProvider extends ChangeNotifier {
     }
     switch (homeRole) {
       case AppHomeRole.administrador:
+      case AppHomeRole.transportista:
         MainShellTabController.navigateToAdminActivosForNotification();
         return;
       case AppHomeRole.aliado:

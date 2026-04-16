@@ -7,13 +7,21 @@ import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_order_pre_transit_section.dart';
+import 'efectivo_respaldo_registrar.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 import 'order_motolink_thread_section.dart';
+import 'transaction_request_admin_sections.dart';
 
 /// Pedidos activos del broker (pestaña Pedidos): no entregados ni rechazados.
 class AdminActiveOrdersPanel extends StatefulWidget {
-  const AdminActiveOrdersPanel({super.key});
+  const AdminActiveOrdersPanel({
+    super.key,
+    this.isTransportistaView = false,
+  });
+
+  /// Solo despacho: contacto + respaldo efectivo + hilo (sin acciones de broker).
+  final bool isTransportistaView;
 
   @override
   State<AdminActiveOrdersPanel> createState() => _AdminActiveOrdersPanelState();
@@ -133,9 +141,37 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     BuildContext context,
     TransactionRequestModel r,
   ) {
+    if (widget.isTransportistaView) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TransactionRequestPartiesContactSection(request: r),
+          const SizedBox(height: 12),
+          EfectivoRespaldoRegistrar(
+            request: r,
+            onRegistered: _load,
+          ),
+          const Divider(height: 20),
+          OrderMotolinkThreadSection(
+            key: ValueKey<String>('trm-trans-${r.id}'),
+            transactionRequestId: r.id,
+            allowReplyAsAliado: false,
+            allowReplyAsAdmin: false,
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (r.status == TransactionRequestStatus.enTransito)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: EfectivoRespaldoRegistrar(
+              request: r,
+              onRegistered: _load,
+            ),
+          ),
         if (r.status == TransactionRequestStatus.enPreparacion)
           AdminOrderPreTransitSection(
             request: r,

@@ -47,6 +47,7 @@ class _ImporterOrderInvoiceSectionState
   Future<void> _pickAndUpload(BuildContext context) async {
     final r = widget.request;
     if (r.status != TransactionRequestStatus.enPreparacion) return;
+    if (r.hasFacturaAliado) return;
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -101,6 +102,8 @@ class _ImporterOrderInvoiceSectionState
     if (!mostrar) return const SizedBox.shrink();
 
     final soloLectura = r.status != TransactionRequestStatus.enPreparacion;
+    final facturaConfirmadaPorMotoLink = r.hasFacturaAliado;
+    final puedeEditarFactura = !soloLectura && !facturaConfirmadaPorMotoLink;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,7 +131,9 @@ class _ImporterOrderInvoiceSectionState
           )
         else
           Text(
-            'MotoLink usará este archivo como referencia para emitir la factura al aliado a nombre de MotoLink.',
+            facturaConfirmadaPorMotoLink
+                ? 'Factura confirmada por MotoLink. Ya no se puede reemplazar en esta orden.'
+                : 'MotoLink usará este archivo como referencia para emitir la factura al aliado a nombre de MotoLink.',
             style: TextStyle(
               fontSize: 11,
               height: 1.35,
@@ -159,7 +164,9 @@ class _ImporterOrderInvoiceSectionState
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: _busy ? null : () => _pickAndUpload(context),
+              onPressed: _busy || !puedeEditarFactura
+                  ? null
+                  : () => _pickAndUpload(context),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -175,7 +182,9 @@ class _ImporterOrderInvoiceSectionState
                   if (!_busy) const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      r.hasProveedorFactura
+                      !puedeEditarFactura
+                          ? 'Factura confirmada por MotoLink'
+                          : r.hasProveedorFactura
                           ? 'Reemplazar factura'
                           : 'Adjuntar factura digital (PDF o imagen)',
                       textAlign: TextAlign.center,

@@ -143,18 +143,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                       child: Text(nextActionLabel!),
                     ),
                   ),
-                  if (nextStatus == TransactionRequestStatus.entregado) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Marque entregado cuando el aliado ya recibió el pedido en su taller. '
-                      'Se descuenta su inventario y se actualiza el crédito del aliado.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        height: 1.3,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

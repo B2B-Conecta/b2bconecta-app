@@ -99,7 +99,8 @@ class _ProfileGateState extends State<ProfileGate> {
         final roleNorm = profile?.role?.trim().toLowerCase();
         final hasValidRole = roleNorm == 'importador' ||
             roleNorm == 'aliado' ||
-            roleNorm == 'administrador';
+            roleNorm == 'administrador' ||
+            roleNorm == 'transportista';
         final needsOnboarding =
             profile == null || !hasValidRole || !profile.isComplete;
 
@@ -117,6 +118,9 @@ class _ProfileGateState extends State<ProfileGate> {
             break;
           case 'administrador':
             homeRole = AppHomeRole.administrador;
+            break;
+          case 'transportista':
+            homeRole = AppHomeRole.transportista;
             break;
           default:
             homeRole = AppHomeRole.importador;

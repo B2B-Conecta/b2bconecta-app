@@ -8,10 +8,11 @@
 -- Contraseña común (11 usuarios): SeedPass123!
 -- Importadores: importador1@motolink.seed … importador7@motolink.seed
 -- Aliados:      aliado1@motolink.seed … aliado3@motolink.seed
+-- Transportista: transportista1@motolink.seed
 -- Admin broker: admin@motolink.seed
 --
 -- Requiere migración `20260407120000_broker_transaction_requests.sql` (tabla transaction_requests).
--- Contenido: 11 usuarios auth + perfiles (estado, ciudad, direccion) + esquema
+-- Contenido: 12 usuarios auth + perfiles (estado, ciudad, direccion) + esquema
 -- inventario (sku, is_active, category) + 140 productos. Sin pedidos predefinidos; KYC aliados en pendiente.
 -- Re-ejecutar: aplica DDL idempotente, borra productos de importadores seed,
 -- inserta productos; usuarios/perfiles solo si no existen.
@@ -39,6 +40,7 @@ seed_users (id, email) as (
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
     ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
     ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed'),
+    ('a4000001-0000-4000-8000-000000000001'::uuid, 'transportista1@motolink.seed')
 )
 insert into auth.users (
   instance_id,
@@ -116,7 +118,8 @@ from (
     ('a2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motolink.seed'),
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
     ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
-    ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed')
+    ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed'),
+    ('a4000001-0000-4000-8000-000000000001'::uuid, 'transportista1@motolink.seed')
 ) as s(id, email)
 where exists (select 1 from auth.users u where u.id = s.id)
   and not exists (
@@ -136,7 +139,7 @@ alter table public.profiles
   drop constraint if exists profiles_role_check;
 alter table public.profiles
   add constraint profiles_role_check
-  check (role in ('importador', 'aliado', 'administrador'));
+  check (role in ('importador', 'aliado', 'administrador', 'transportista'));
 
 alter table public.profiles
   add column if not exists estado text;
@@ -144,6 +147,8 @@ alter table public.profiles
   add column if not exists ciudad text;
 alter table public.profiles
   add column if not exists direccion text;
+alter table public.profiles
+  add column if not exists credito_consumido_acumulado numeric(14, 2) not null default 0;
 
 -- Perfiles B2B (aliados: KYC pendiente, sin entregas contado prellenadas).
 -- Campo direccion: domicilio fiscal / casa matriz (referencia para facturación; demo seed).
@@ -159,10 +164,11 @@ values
   ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, null, 0, 'Aragua', 'Maracay', 'Casa matriz: Zona industrial San Jacinto, callejón B, nave 5 (acceso fiscal), Maracay 2103, Edo. Aragua.', now()),
   ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, null, 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Av. 5 de Julio, Edif. Industrial La Limpia, módulo 3, locales 301-302, Maracaibo 4005, Edo. Zulia.', now()),
   ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, null, 0, 'Táchira', 'San Cristóbal', 'Domicilio fiscal: Av. Principal de Capacho, galpón MotoZone (área de despacho y facturación), San Cristóbal 5001, Edo. Táchira.', now()),
-  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 50000, 'pendiente', 0, 'Miranda', 'Caracas', 'Domicilio fiscal del taller: Av. Francisco de Miranda, Los Ruices, local 14 (frente estación), sector fiscal Caracas 1070.', now()),
-  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 35000, 'pendiente', 0, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
-  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 75000, 'pendiente', 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
-  ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, null, null, null, now())
+  ('a2000001-0000-4000-8000-000000000001', 'Taller Los Ruices', 'J-501111111', 'aliado', '+58 414-2000001', 85, 0, 'pendiente', 0, 'Miranda', 'Caracas', 'Domicilio fiscal del taller: Av. Francisco de Miranda, Los Ruices, local 14 (frente estación), sector fiscal Caracas 1070.', now()),
+  ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 0, 'pendiente', 0, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
+  ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 0, 'pendiente', 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
+  ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, null, null, null, now()),
+  ('a4000001-0000-4000-8000-000000000001', 'MotoLink Despacho', 'J-300000002', 'transportista', '+58 414-4000001', 100, null, null, 0, null, null, null, now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,

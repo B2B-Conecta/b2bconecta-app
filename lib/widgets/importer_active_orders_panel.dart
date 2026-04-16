@@ -10,7 +10,7 @@ import 'importer_order_invoice_section.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
-/// Ciclo post-validación MotoLink: aprobado → preparación → tránsito → entregado (pestaña Pedidos).
+/// Ciclo post-validación MotoLink: aprobado → preparación; tránsito y entrega los cierra MotoLink / el aliado (pestaña Pedidos).
 class ImporterActiveOrdersPanel extends StatefulWidget {
   const ImporterActiveOrdersPanel({super.key});
 
@@ -129,16 +129,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         newStatus: next,
       );
       if (!context.mounted) return;
-      if (next == TransactionRequestStatus.entregado) {
-        MainShellTabController.notifyImporterInventoryReload();
-      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            next == TransactionRequestStatus.entregado
-                ? 'Pedido marcado como entregado. Inventario y crédito del aliado actualizados.'
-                : 'Estado actualizado.',
-          ),
+        const SnackBar(
+          content: Text('Estado actualizado.'),
           behavior: SnackBarBehavior.floating,
         ),
       );

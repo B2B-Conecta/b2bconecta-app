@@ -312,6 +312,10 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon = Icons.verified_user_outlined;
         bg = Colors.red.shade600;
         break;
+      case 'credito':
+        icon = Icons.account_balance_outlined;
+        bg = Colors.teal.shade700;
+        break;
       case 'pago':
         icon = Icons.payments_outlined;
         bg = Colors.red.shade700;

@@ -146,6 +146,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 10),
+                        TransactionRequestEvidenceDocumentsSection(request: r),
+                        const SizedBox(height: 12),
                         TransactionRequestLifecycleSection(request: r),
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 8),

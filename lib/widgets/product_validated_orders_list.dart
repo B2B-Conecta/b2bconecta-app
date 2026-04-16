@@ -105,16 +105,9 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
         MainShellTabController.goTo(1);
         MainShellTabController.notifyImporterPedidosReload();
       }
-      if (next == TransactionRequestStatus.entregado) {
-        MainShellTabController.notifyImporterInventoryReload();
-      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            next == TransactionRequestStatus.entregado
-                ? 'Pedido marcado como entregado. Inventario y crédito del aliado actualizados.'
-                : 'Estado actualizado.',
-          ),
+        const SnackBar(
+          content: Text('Estado actualizado.'),
           behavior: SnackBarBehavior.floating,
         ),
       );

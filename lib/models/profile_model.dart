@@ -1,3 +1,5 @@
+import 'cash_phase_policy.dart';
+
 /// Perfil B2B en Supabase (`profiles`), alineado a `auth.users.id`.
 class ProfileModel {
   const ProfileModel({
@@ -11,6 +13,7 @@ class ProfileModel {
     this.creditLimit,
     this.kycStatus,
     this.primerosPedidosContadoEntregados,
+    this.creditoConsumidoAcumulado,
     this.estado,
     this.ciudad,
     this.direccion,
@@ -20,7 +23,7 @@ class ProfileModel {
   final String? businessName;
   final String? rif;
 
-  /// `importador`, `aliado` o `administrador` (broker).
+  /// `importador`, `aliado`, `administrador` (broker) o `transportista`.
   final String? role;
   final String? phone;
   final DateTime? createdAt;
@@ -34,6 +37,9 @@ class ProfileModel {
 
   /// Entregas completadas contadas hacia la fase “primeros 3 pedidos contado” (0–3).
   final int? primerosPedidosContadoEntregados;
+
+  /// Suma de pedidos entregados pagados con `credito_sistema` (tope vs [creditLimit]).
+  final double? creditoConsumidoAcumulado;
 
   /// Estado / ciudad (Venezuela u otro) para catálogo y pedidos.
   final String? estado;
@@ -55,18 +61,40 @@ class ProfileModel {
         d.isNotEmpty;
   }
 
+  /// Aliado en fase “primeros pedidos contado” (menos de [CashPhasePolicy.entregasRequeridas] entregas).
+  bool get esAliadoEnFaseContado {
+    if (role?.trim().toLowerCase() != 'aliado') return false;
+    return (primerosPedidosContadoEntregados ?? 0) < CashPhasePolicy.entregasRequeridas;
+  }
+
+  /// Cupo mostrado al aliado: en fase contado se trata como 0 (sin línea revolvente).
+  double? get limiteCreditoMostradoAliado {
+    if (!esAliadoEnFaseContado) return creditLimit;
+    return 0;
+  }
+
+  /// Disponible revolvente: límite menos crédito ya consumido en entregas a crédito menos suma de pedidos abiertos.
+  double? cupoDisponible(double sumaPrecioTotalPedidosAbiertos) {
+    final lim = creditLimit;
+    if (lim == null) return null;
+    final cons = creditoConsumidoAcumulado ?? 0;
+    return lim - cons - sumaPrecioTotalPedidosAbiertos;
+  }
+
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
   bool get isComplete {
     final r = role?.trim().toLowerCase();
-    final hasRole =
-        r == 'importador' || r == 'aliado' || r == 'administrador';
+    final hasRole = r == 'importador' ||
+        r == 'aliado' ||
+        r == 'administrador' ||
+        r == 'transportista';
     final base = businessName != null &&
         businessName!.trim().isNotEmpty &&
         rif != null &&
         rif!.trim().isNotEmpty &&
         hasRole;
     if (!base) return false;
-    if (r == 'administrador') return true;
+    if (r == 'administrador' || r == 'transportista') return true;
     return hasRegisteredLocation;
   }
 
@@ -92,6 +120,14 @@ class ProfileModel {
     } else if (pceRaw != null) {
       pce = int.tryParse(pceRaw.toString());
     }
+    double? cca;
+    final ccaRaw = json['credito_consumido_acumulado'];
+    if (ccaRaw is num) {
+      cca = ccaRaw.toDouble();
+    } else if (ccaRaw != null) {
+      cca = double.tryParse(ccaRaw.toString());
+    }
+
     return ProfileModel(
       id: json['id']?.toString() ?? '',
       businessName: _text(json['business_name']),
@@ -105,6 +141,7 @@ class ProfileModel {
       creditLimit: cl,
       kycStatus: _text(json['kyc_status']),
       primerosPedidosContadoEntregados: pce,
+      creditoConsumidoAcumulado: cca,
       estado: _text(json['estado']),
       ciudad: _text(json['ciudad']),
       direccion: _text(json['direccion']),

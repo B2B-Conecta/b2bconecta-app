@@ -89,6 +89,7 @@ abstract final class TransactionRequestStatus {
 
   /// Siguiente estado que puede aplicar el importador, o null si es terminal o no aplica.
   /// `en_preparacion` → `en_transito` lo registra MotoLink (con factura y días de ETA).
+  /// La entrega la confirma el aliado (`en_transito` → `entregado`), no el importador.
   static String? nextForImporter(String current) {
     switch (current) {
       case aprobadoAdmin:
@@ -96,10 +97,16 @@ abstract final class TransactionRequestStatus {
       case enPreparacion:
         return null;
       case enTransito:
-        return entregado;
+        return null;
       default:
         return null;
     }
+  }
+
+  /// Solo el aliado puede cerrar el ciclo: `en_transito` → `entregado`.
+  static String? nextForAliado(String current) {
+    if (current == enTransito) return entregado;
+    return null;
   }
 
   static String actionLabelForNext(String nextStatus) {
@@ -109,7 +116,7 @@ abstract final class TransactionRequestStatus {
       case enTransito:
         return 'Marcar en tránsito';
       case entregado:
-        return 'Marcar entregado';
+        return 'Confirmar recepción en tu taller';
       default:
         return 'Avanzar';
     }
@@ -122,6 +129,8 @@ abstract final class TransactionRequestStatus {
         return 'Pedido cerrado';
       case rechazado:
         return '—';
+      case enTransito:
+        return 'En tránsito · el aliado confirma la entrega';
       default:
         if (importerPipeline.contains(status)) {
           return 'Pedido activo';

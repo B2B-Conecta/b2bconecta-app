@@ -11,6 +11,7 @@ import '../models/in_app_notification_model.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
+import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
 import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
@@ -302,7 +303,8 @@ class SupabaseService {
     final existingRole = existing?.role?.trim().toLowerCase();
     final roleAlreadySet = existingRole == 'importador' ||
         existingRole == 'aliado' ||
-        existingRole == 'administrador';
+        existingRole == 'administrador' ||
+        existingRole == 'transportista';
 
     final payload = <String, dynamic>{
       'id': uid,
@@ -647,6 +649,9 @@ class SupabaseService {
     pago_estado_revision,
     pago_comprobante_rechazo_nota,
     pago_aprobado_at,
+    efectivo_respaldo_storage_path,
+    efectivo_respaldo_file_name,
+    efectivo_respaldo_submitted_at,
     products ( name, sku, price_usd ),
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone ),
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
@@ -1035,15 +1040,12 @@ class SupabaseService {
     }
   }
 
-  /// Suma `precio_total` de pedidos abiertos del aliado autenticado (vs. `credit_limit`).
-  static Future<double> fetchOpenCreditExposureForCurrentAliado() async {
-    final uid = _currentUserId;
-    if (uid == null) return 0;
-
+  /// Suma `precio_total` de pedidos abiertos de un aliado (vs. `credit_limit`).
+  static Future<double> fetchOpenCreditExposureForAliado(String aliadoId) async {
     final response = await _client
         .from('transaction_requests')
         .select('precio_total')
-        .eq('aliado_id', uid)
+        .eq('aliado_id', aliadoId)
         .inFilter('status', TransactionRequestStatus.aliadoCreditExposureStatuses);
 
     final list = response as List<dynamic>;
@@ -1056,6 +1058,13 @@ class SupabaseService {
       }
     }
     return sum;
+  }
+
+  /// Suma `precio_total` de pedidos abiertos del aliado autenticado (vs. `credit_limit`).
+  static Future<double> fetchOpenCreditExposureForCurrentAliado() async {
+    final uid = _currentUserId;
+    if (uid == null) return 0;
+    return fetchOpenCreditExposureForAliado(uid);
   }
 
   /// Cantidad de pedidos abiertos (misma lista que el cupo).
@@ -1115,15 +1124,29 @@ class SupabaseService {
         'Debe completar la verificación documental en su perfil y obtener la aprobación de MotoLink antes de pedir.',
       );
     }
-    final limit = profile.creditLimit;
-    if (limit == null) {
-      throw CreditLimitException(
-        'MotoLink debe asignar un límite de crédito antes de solicitar pedidos. '
-        'Cuando su cupo esté autorizado, podrá continuar.',
+    final prodRes = await _client
+        .from('products')
+        .select('stock')
+        .eq('id', productId)
+        .eq('owner_id', ownerId)
+        .maybeSingle();
+    if (prodRes == null) {
+      throw StateError('No se encontró el producto para este importador.');
+    }
+    final stockRaw = Map<String, dynamic>.from(prodRes)['stock'];
+    final stock = stockRaw is int
+        ? stockRaw
+        : int.tryParse(stockRaw.toString()) ?? 0;
+    if (cantidad > stock) {
+      throw StockInsufficientException(
+        'Stock insuficiente: hay $stock unidad(es) disponible(s). '
+        'Reduzca la cantidad o intente más tarde cuando el importador reponga inventario.',
       );
     }
+
     final pce = profile.primerosPedidosContadoEntregados ?? 0;
-    if (pce < CashPhasePolicy.entregasRequeridas) {
+    final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
+    if (enFaseContado) {
       final openCnt = await fetchOpenTransactionRequestCountForCurrentAliado();
       if (openCnt >= 1) {
         throw CashPhaseException(
@@ -1132,26 +1155,44 @@ class SupabaseService {
           'podrá solicitar otro.',
         );
       }
-    }
-    final exposure = await fetchOpenCreditExposureForCurrentAliado();
-    if (exposure + total > limit + _creditTol) {
-      throw CreditLimitException(
-        'Este pedido (\$${total.toStringAsFixed(2)}) más su compromiso en pedidos '
-        'abiertos (\$${exposure.toStringAsFixed(2)}) supera su límite autorizado '
-        '(\$${limit.toStringAsFixed(2)}).',
-      );
+    } else {
+      final limit = profile.creditLimit;
+      if (limit == null) {
+        throw CreditLimitException(
+          'MotoLink debe asignar un límite de crédito antes de solicitar pedidos. '
+          'Cuando su cupo esté autorizado, podrá continuar.',
+        );
+      }
+      final exposure = await fetchOpenCreditExposureForCurrentAliado();
+      final consumido = profile.creditoConsumidoAcumulado ?? 0;
+      final usado = exposure + consumido;
+      if (usado + total > limit + _creditTol) {
+        throw CreditLimitException(
+          'Este pedido (\$${total.toStringAsFixed(2)}) más su uso actual '
+          '(\$${usado.toStringAsFixed(2)}: pedidos abiertos + entregas a crédito) '
+          'supera su límite autorizado (\$${limit.toStringAsFixed(2)}).',
+        );
+      }
     }
 
-    await _client.from('transaction_requests').insert({
-      'aliado_id': uid,
-      'product_id': productId,
-      'owner_id': ownerId,
-      'status': 'pendiente',
-      'cantidad': cantidad,
-      'precio_unitario_proveedor': precioUnitarioProveedor,
-      'precio_unitario_aliado': unitAliado,
-      'precio_total': total,
-    });
+    try {
+      await _client.from('transaction_requests').insert({
+        'aliado_id': uid,
+        'product_id': productId,
+        'owner_id': ownerId,
+        'status': 'pendiente',
+        'cantidad': cantidad,
+        'precio_unitario_proveedor': precioUnitarioProveedor,
+        'precio_unitario_aliado': unitAliado,
+        'precio_total': total,
+      });
+    } on PostgrestException catch (e) {
+      final m = e.message.toLowerCase();
+      if (m.contains('stock insuficiente')) {
+        throw StockInsufficientException(e.message);
+      }
+      rethrow;
+    }
   }
 
   static Future<void> adminUpdateTransactionRequest({
@@ -1186,6 +1227,13 @@ class SupabaseService {
 
   /// Comprobante de pago del aliado (`order-payment-proofs`).
   static Future<String> createSignedUrlForComprobantePago(String storagePath) async {
+    return _client.storage
+        .from(_orderPaymentProofsBucket)
+        .createSignedUrl(storagePath, 3600);
+  }
+
+  /// Respaldo fotográfico de cobro en efectivo (mismo bucket; prefijo `efectivo_respaldo_`).
+  static Future<String> createSignedUrlForEfectivoRespaldo(String storagePath) async {
     return _client.storage
         .from(_orderPaymentProofsBucket)
         .createSignedUrl(storagePath, 3600);
@@ -1311,14 +1359,20 @@ class SupabaseService {
 
     final row = await _client
         .from('transaction_requests')
-        .select('comprobante_pago_storage_path')
+        .select('comprobante_pago_storage_path, pago_estado_revision')
         .eq('id', transactionRequestId)
         .eq('aliado_id', uid)
         .maybeSingle();
     if (row != null) {
-      final oldPath = Map<String, dynamic>.from(row)['comprobante_pago_storage_path']
-          ?.toString()
-          .trim();
+      final m = Map<String, dynamic>.from(row);
+      final pe = m['pago_estado_revision']?.toString().trim();
+      if (pe == PagoRevisionEstado.aprobado) {
+        throw StateError(
+          'El pago ya fue aprobado por MotoLink; no puede modificar el comprobante.',
+        );
+      }
+      final oldPath =
+          m['comprobante_pago_storage_path']?.toString().trim();
       if (oldPath != null && oldPath.isNotEmpty) {
         try {
           await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
@@ -1354,6 +1408,61 @@ class SupabaseService {
     }
   }
 
+  /// Aliado: solicita pago con línea de crédito MotoLink (sin archivo; revisión admin).
+  static Future<void> aliadoDeclararPagoCreditoSistema({
+    required String transactionRequestId,
+  }) async {
+    await _client.rpc(
+      'aliado_declara_pago_credito_sistema',
+      params: <String, dynamic>{'p_request_id': transactionRequestId},
+    );
+  }
+
+  /// MotoLink o transportista: sube foto respaldo y registra vía RPC.
+  static Future<void> registrarRespaldoCobroEfectivo({
+    required String transactionRequestId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use imagen o PDF.');
+    }
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) safeBase = 'respaldo.$ext';
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path =
+        '$transactionRequestId/efectivo_respaldo_${stamp}_$safeBase';
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    try {
+      await _client.rpc(
+        'registrar_respaldo_cobro_efectivo',
+        params: <String, dynamic>{
+          'p_request_id': transactionRequestId,
+          'p_storage_path': path,
+          'p_file_name': fileName.trim(),
+        },
+      );
+    } catch (e) {
+      try {
+        await _client.storage.from(_orderPaymentProofsBucket).remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
   static Future<void> adminAprobarPagoAliado(String requestId) async {
     await _client.rpc(
       'admin_aprobar_pago_aliado',
@@ -1374,7 +1483,8 @@ class SupabaseService {
     );
   }
 
-  /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación.
+  /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación
+  /// y antes de que MotoLink confirme la factura oficial al aliado.
   static Future<void> importerSubmitOrderInvoice({
     required String transactionRequestId,
     required Uint8List bytes,
@@ -1386,7 +1496,7 @@ class SupabaseService {
     final row = await _client
         .from('transaction_requests')
         .select(
-          'owner_id, status, proveedor_factura_storage_path',
+          'owner_id, status, proveedor_factura_storage_path, factura_aliado_storage_path',
         )
         .eq('id', transactionRequestId)
         .maybeSingle();
@@ -1401,6 +1511,12 @@ class SupabaseService {
     if (m['status']?.toString() != TransactionRequestStatus.enPreparacion) {
       throw StateError(
         'Solo puede adjuntar la factura mientras el pedido está en preparación.',
+      );
+    }
+    final facturaAliadoPath = m['factura_aliado_storage_path']?.toString().trim();
+    if (facturaAliadoPath != null && facturaAliadoPath.isNotEmpty) {
+      throw StateError(
+        'MotoLink ya confirmó la factura del pedido; no puede reemplazar la factura del proveedor.',
       );
     }
 
@@ -1514,7 +1630,15 @@ class SupabaseService {
     });
   }
 
-  /// Avanza el estado del pedido (importador): aprobado → preparación; tránsito → entregado.
+  /// Cierra el pedido (aliado): `en_transito` → `entregado` (RPC en base de datos).
+  static Future<void> aliadoMarcarPedidoEntregado(String transactionRequestId) async {
+    await _client.rpc(
+      'aliado_marca_pedido_entregado',
+      params: {'p_request_id': transactionRequestId},
+    );
+  }
+
+  /// Avanza el estado del pedido (importador): solo `aprobado_admin` → `en_preparacion`.
   static Future<void> importerAdvanceTransactionRequest({
     required String id,
     required String newStatus,
@@ -1603,6 +1727,8 @@ class SupabaseService {
     if (filters.onlyActiveProducts) {
       q = q.eq('is_active', true);
     }
+    // Catálogo B2B (aliados): no listar productos sin inventario.
+    q = q.gt('stock', 0);
     return q;
   }
 }

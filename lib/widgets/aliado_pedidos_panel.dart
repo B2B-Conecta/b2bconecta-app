@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -21,11 +22,14 @@ class AliadoPedidosPanel extends StatefulWidget {
 
 class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   List<TransactionRequestModel> _rows = [];
+  ProfileModel? _profile;
+  double _openCreditExposureSum = 0;
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
+  String? _entregaBusyId;
 
   static List<OrderStatusFilterOption> get _statusOptions =>
       TransactionRequestStatus.aliadoPedidosActivosYCerrados
@@ -82,9 +86,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     try {
       final rows =
           await SupabaseService.fetchMyPedidosActivosYCerradosForAliado();
+      final profile = await SupabaseService.fetchMyProfile();
+      final exposure =
+          await SupabaseService.fetchOpenCreditExposureForCurrentAliado();
       if (!mounted) return;
       setState(() {
         _rows = rows;
+        _profile = profile;
+        _openCreditExposureSum = exposure;
         _loading = false;
         _expandedRequestId = null;
       });
@@ -115,6 +124,35 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     setState(() {
       _expandedRequestId = _expandedRequestId == id ? null : id;
     });
+  }
+
+  Future<void> _confirmarEntrega(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) async {
+    if (_entregaBusyId != null) return;
+    setState(() => _entregaBusyId = r.id);
+    try {
+      await SupabaseService.aliadoMarcarPedidoEntregado(r.id);
+      MainShellTabController.notifyImporterInventoryReload();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Recepción confirmada. El pedido queda cerrado y registrado para MotoLink.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _entregaBusyId = null);
+    }
   }
 
   String _label(String s) => TransactionRequestStatus.labelEs(s);
@@ -232,11 +270,21 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   expanded: _expandedRequestId == r.id,
                                   onToggle: () => _toggleExpand(r.id),
                                   statusLabel: _label(r.status),
+                                  onConfirmarRecepcion:
+                                      r.status ==
+                                              TransactionRequestStatus.enTransito
+                                          ? () => _confirmarEntrega(context, r)
+                                          : null,
+                                  confirmarRecepcionBusy:
+                                      _entregaBusyId == r.id,
                                   expandedFooter: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       AliadoOrderPagoSection(
                                         request: r,
+                                        profile: _profile,
+                                        openCreditExposureSum:
+                                            _openCreditExposureSum,
                                         onChanged: _load,
                                       ),
                                       OrderMotolinkThreadSection(
@@ -260,11 +308,21 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   expanded: _expandedRequestId == r.id,
                                   onToggle: () => _toggleExpand(r.id),
                                   statusLabel: _label(r.status),
+                                  onConfirmarRecepcion:
+                                      r.status ==
+                                              TransactionRequestStatus.enTransito
+                                          ? () => _confirmarEntrega(context, r)
+                                          : null,
+                                  confirmarRecepcionBusy:
+                                      _entregaBusyId == r.id,
                                   expandedFooter: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       AliadoOrderPagoSection(
                                         request: r,
+                                        profile: _profile,
+                                        openCreditExposureSum:
+                                            _openCreditExposureSum,
                                         onChanged: _load,
                                       ),
                                       OrderMotolinkThreadSection(

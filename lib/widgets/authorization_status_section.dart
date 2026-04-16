@@ -163,6 +163,11 @@ class _AliadoAuthorizationCard extends StatelessWidget {
     final cupoOk = profile.creditLimit != null;
     final kycGlobal = profile.kycStatus?.trim();
     final kycOk = kycGlobal == KycStatus.aprobado;
+    final cupoLabelEs = cupoOk
+        ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} USD · '
+            '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD ya imputados por entregas a crédito. '
+            'Los pedidos en curso también comprometen cupo.'
+        : 'Pendiente: MotoLink debe asignar su límite de crédito (pestaña Crédito).';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -207,9 +212,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             const SizedBox(height: 6),
             _CheckRow(
               ok: cupoOk,
-              label: cupoOk
-                  ? 'Cupo MotoLink asignado (${profile.creditLimit!.toStringAsFixed(2)} USD).'
-                  : 'Pendiente: MotoLink debe asignar su límite de crédito (pestaña Crédito).',
+              label: cupoLabelEs,
             ),
             const SizedBox(height: 6),
             _CheckRow(

@@ -1,4 +1,6 @@
+import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
+import 'transaction_request_status.dart';
 
 /// Fila de `transaction_requests` con joins opcionales (producto, aliado, importador).
 class TransactionRequestModel {
@@ -45,6 +47,9 @@ class TransactionRequestModel {
     this.pagoEstadoRevision,
     this.pagoComprobanteRechazoNota,
     this.pagoAprobadoAt,
+    this.efectivoRespaldoStoragePath,
+    this.efectivoRespaldoFileName,
+    this.efectivoRespaldoSubmittedAt,
   });
 
   final String id;
@@ -98,6 +103,11 @@ class TransactionRequestModel {
   final String? pagoComprobanteRechazoNota;
   final DateTime? pagoAprobadoAt;
 
+  /// Foto respaldo de cobro en efectivo (`order-payment-proofs`), registra transportista/MotoLink.
+  final String? efectivoRespaldoStoragePath;
+  final String? efectivoRespaldoFileName;
+  final DateTime? efectivoRespaldoSubmittedAt;
+
   int get _etaDaysCoalesced => transitEtaDays ?? 0;
   int get _etaHoursCoalesced => transitEtaHours ?? 0;
 
@@ -132,6 +142,10 @@ class TransactionRequestModel {
       comprobantePagoStoragePath != null &&
       comprobantePagoStoragePath!.trim().isNotEmpty;
 
+  bool get hasEfectivoRespaldo =>
+      efectivoRespaldoStoragePath != null &&
+      efectivoRespaldoStoragePath!.trim().isNotEmpty;
+
   /// Hay factura MotoLink y/o comprobante para mostrar (p. ej. como referencia con pedido entregado).
   bool get tieneDocumentacionFacturaPago =>
       hasFacturaAliado || hasComprobantePago;
@@ -146,9 +160,38 @@ class TransactionRequestModel {
 
   /// Mensaje corto para el aliado durante `en_preparacion` (pago / comprobante).
   String? get aliadoPagoEstadoResumenEs {
-    if (status != 'en_preparacion') return null;
+    if (status != TransactionRequestStatus.enPreparacion) return null;
     if (!hasFacturaAliado) {
       return 'Esperando factura oficial de MotoLink para pagar.';
+    }
+    final metodo = pagoMetodo?.trim();
+    if (metodo == PagoMetodo.efectivo) {
+      switch (pagoEstadoRevisionEfectivo) {
+        case PagoRevisionEstado.pendiente:
+          return 'Factura lista · confirme que pagará en efectivo (revisión MotoLink).';
+        case PagoRevisionEstado.enRevision:
+          return 'Pago en efectivo en revisión por MotoLink.';
+        case PagoRevisionEstado.rechazado:
+          return 'Declaración no aceptada · puede intentar de nuevo.';
+        case PagoRevisionEstado.aprobado:
+          return 'Pago en efectivo confirmado · MotoLink marcará el envío en tránsito.';
+        default:
+          return null;
+      }
+    }
+    if (metodo == PagoMetodo.creditoSistema) {
+      switch (pagoEstadoRevisionEfectivo) {
+        case PagoRevisionEstado.pendiente:
+          return 'Factura lista · solicite el pago con la línea de crédito MotoLink.';
+        case PagoRevisionEstado.enRevision:
+          return 'Solicitud de crédito en revisión por MotoLink.';
+        case PagoRevisionEstado.rechazado:
+          return 'Solicitud no aceptada · puede reintentar.';
+        case PagoRevisionEstado.aprobado:
+          return 'Pago con crédito confirmado · MotoLink marcará el envío en tránsito.';
+        default:
+          return null;
+      }
     }
     switch (pagoEstadoRevisionEfectivo) {
       case PagoRevisionEstado.pendiente:
@@ -162,6 +205,18 @@ class TransactionRequestModel {
       default:
         return null;
     }
+  }
+
+  /// Transportista o MotoLink pueden subir foto respaldo si aplica.
+  bool get puedeRegistrarRespaldoEfectivo {
+    if (pagoMetodo?.trim() != PagoMetodo.efectivo) return false;
+    if (hasEfectivoRespaldo) return false;
+    if (status == TransactionRequestStatus.enPreparacion) {
+      return pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
+    }
+    if (status == TransactionRequestStatus.enTransito) return true;
+    if (status == TransactionRequestStatus.entregado) return true;
+    return false;
   }
 
   factory TransactionRequestModel.fromJson(Map<String, dynamic> json) {
@@ -247,6 +302,12 @@ class TransactionRequestModel {
       pagoComprobanteRechazoNota:
           _nullableText(json['pago_comprobante_rechazo_nota']),
       pagoAprobadoAt: _parseDate(json['pago_aprobado_at']),
+      efectivoRespaldoStoragePath:
+          _nullableText(json['efectivo_respaldo_storage_path']),
+      efectivoRespaldoFileName:
+          _nullableText(json['efectivo_respaldo_file_name']),
+      efectivoRespaldoSubmittedAt:
+          _parseDate(json['efectivo_respaldo_submitted_at']),
     );
   }
 

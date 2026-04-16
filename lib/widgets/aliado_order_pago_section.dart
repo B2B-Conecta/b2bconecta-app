@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
+import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -17,10 +18,16 @@ class AliadoOrderPagoSection extends StatefulWidget {
     super.key,
     required this.request,
     required this.onChanged,
+    this.profile,
+    this.openCreditExposureSum,
   });
 
   final TransactionRequestModel request;
   final VoidCallback onChanged;
+  final ProfileModel? profile;
+
+  /// Suma de `precio_total` de pedidos abiertos del aliado (misma regla que el cupo en servidor).
+  final double? openCreditExposureSum;
 
   @override
   State<AliadoOrderPagoSection> createState() => _AliadoOrderPagoSectionState();
@@ -30,25 +37,42 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   String? _metodoSeleccionado;
   bool _busy = false;
 
+  static const double _creditTol = 0.01;
+
+  List<String> get _metodosPermitidos {
+    if (widget.profile?.esAliadoEnFaseContado ?? false) {
+      return PagoMetodo.valuesFaseContado;
+    }
+    final cl = widget.profile?.creditLimit;
+    if (cl != null && cl > 0) {
+      return PagoMetodo.valuesPostContadoConCredito;
+    }
+    return PagoMetodo.values;
+  }
+
+  void _syncMetodoSeleccionado() {
+    final permitidos = _metodosPermitidos;
+    final m = widget.request.pagoMetodo?.trim();
+    if (m != null && m.isNotEmpty && permitidos.contains(m)) {
+      _metodoSeleccionado = m;
+    } else {
+      _metodoSeleccionado = permitidos.first;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    final m = widget.request.pagoMetodo?.trim();
-    _metodoSeleccionado =
-        (m != null && m.isNotEmpty && PagoMetodo.values.contains(m))
-            ? m
-            : PagoMetodo.pagoMovil;
+    _syncMetodoSeleccionado();
   }
 
   @override
   void didUpdateWidget(covariant AliadoOrderPagoSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.request.id != widget.request.id) {
-      final m = widget.request.pagoMetodo?.trim();
-      _metodoSeleccionado =
-          (m != null && m.isNotEmpty && PagoMetodo.values.contains(m))
-              ? m
-              : PagoMetodo.pagoMovil;
+    if (oldWidget.request.id != widget.request.id ||
+        oldWidget.profile?.primerosPedidosContadoEntregados !=
+            widget.profile?.primerosPedidosContadoEntregados) {
+      _syncMetodoSeleccionado();
     }
   }
 
@@ -87,13 +111,16 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   Future<void> _subirComprobante(BuildContext context) async {
     final r = widget.request;
     final metodo = _metodoSeleccionado;
-    if (metodo == null || !PagoMetodo.values.contains(metodo)) {
+    if (metodo == null || !_metodosPermitidos.contains(metodo)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Seleccione un método de pago.')),
       );
       return;
     }
-
+    if (metodo == PagoMetodo.creditoSistema) {
+      await _declararCreditoSistema(context);
+      return;
+    }
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
@@ -115,8 +142,12 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comprobante enviado. MotoLink lo revisará.'),
+        SnackBar(
+          content: Text(
+            metodo == PagoMetodo.efectivo
+                ? 'Comprobante de efectivo enviado. MotoLink lo revisará.'
+                : 'Comprobante enviado. MotoLink lo revisará.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -131,9 +162,76 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
-  bool _puedeEditarMetodoYComprobante(TransactionRequestModel r) {
+  Future<void> _declararCreditoSistema(BuildContext context) async {
+    final r = widget.request;
+    setState(() => _busy = true);
+    try {
+      final profileFresh = await SupabaseService.fetchMyProfile();
+      final lim = profileFresh?.creditLimit;
+      final cons = profileFresh?.creditoConsumidoAcumulado ?? 0;
+      final exposure =
+          await SupabaseService.fetchOpenCreditExposureForCurrentAliado();
+      if (lim != null && exposure + cons > lim + _creditTol) {
+        if (!context.mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Cupo insuficiente'),
+            content: const Text(
+              'Con su línea actual no alcanza para los pedidos abiertos más el crédito '
+              'ya utilizado en entregas. Use Pago Móvil, Zelle, transferencia o efectivo, '
+              'o consulte con MotoLink.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      await SupabaseService.aliadoDeclararPagoCreditoSistema(
+        transactionRequestId: r.id,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Solicitud enviada. MotoLink revisará el uso de su línea de crédito.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      widget.onChanged();
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = e.toString();
+      final friendly = msg.contains('CUPO_INSUFICIENTE')
+          ? 'No tiene cupo suficiente para esta operación. Elija otro medio de pago o consulte con MotoLink.'
+          : msg;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendly)),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Mientras el pago no esté aprobado por MotoLink, el aliado puede adjuntar o reemplazar comprobante.
+  bool _puedeModificarComprobante(TransactionRequestModel r) {
     if (r.status != TransactionRequestStatus.enPreparacion) return false;
     if (!r.hasFacturaAliado) return false;
+    final pe = r.pagoEstadoRevisionEfectivo;
+    if (pe == PagoRevisionEstado.aprobado) return false;
+    return pe == PagoRevisionEstado.pendiente ||
+        pe == PagoRevisionEstado.enRevision ||
+        pe == PagoRevisionEstado.rechazado;
+  }
+
+  /// Cambiar método solo antes de enviar a revisión o tras rechazo (no durante revisión).
+  bool _puedeCambiarMetodo(TransactionRequestModel r) {
     final pe = r.pagoEstadoRevisionEfectivo;
     return pe == PagoRevisionEstado.pendiente ||
         pe == PagoRevisionEstado.rechazado;
@@ -150,7 +248,15 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     final referenciaHistorica =
         r.status != TransactionRequestStatus.enPreparacion &&
             r.tieneDocumentacionFacturaPago;
-    final puedeEditar = _puedeEditarMetodoYComprobante(r);
+    final puedeModificarComprobante = _puedeModificarComprobante(r);
+    final puedeCambiarMetodo =
+        puedeModificarComprobante && _puedeCambiarMetodo(r);
+    final expSum = widget.openCreditExposureSum;
+    final dispoCred = expSum != null && widget.profile != null
+        ? widget.profile!.cupoDisponible(expSum)
+        : null;
+    final bloquearCreditoBtn =
+        dispoCred != null && dispoCred <= _creditTol;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,14 +349,14 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
           ),
           const SizedBox(height: 6),
-          if (puedeEditar)
+          if (puedeCambiarMetodo)
             DropdownButtonFormField<String>(
               value: _metodoSeleccionado,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
-              items: PagoMetodo.values
+              items: _metodosPermitidos
                   .map(
                     (c) => DropdownMenuItem(
                       value: c,
@@ -275,41 +381,105 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               label: const Text('Ver comprobante de pago'),
             ),
           ],
-          if (puedeEditar) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Adjunte una foto clara del comprobante (Pago Móvil, Zelle o transferencia).',
-              style: TextStyle(
-                  fontSize: 11, color: Colors.grey.shade700, height: 1.25),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _busy ? null : () => _subirComprobante(context),
-                child: _busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        r.hasComprobantePago &&
-                                (pe == PagoRevisionEstado.rechazado)
-                            ? 'Enviar nuevo comprobante'
-                            : 'Adjuntar comprobante de pago',
-                      ),
+          if (puedeModificarComprobante && _metodoSeleccionado != null) ...[
+            if (_metodoSeleccionado == PagoMetodo.creditoSistema) ...[
+              const SizedBox(height: 10),
+              if (bloquearCreditoBtn) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Text(
+                    'No tiene cupo disponible con la línea actual (pedidos abiertos más crédito '
+                    'ya utilizado en entregas). Elija Pago Móvil, Zelle, transferencia o efectivo.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.amber.shade900,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Text(
+                'El importe se imputará a su línea de crédito autorizada por MotoLink. '
+                'El cupo se ajusta al confirmar la entrega del pedido.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade700,
+                  height: 1.25,
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: (_busy || bloquearCreditoBtn)
+                      ? null
+                      : () => _declararCreditoSistema(context),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          pe == PagoRevisionEstado.rechazado
+                              ? 'Reintentar solicitud de crédito'
+                              : 'Solicitar pago con línea de crédito MotoLink',
+                        ),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 10),
+              Text(
+                pe == PagoRevisionEstado.enRevision
+                    ? 'Si subió un archivo por error, puede reemplazarlo; el nuevo quedará otra vez en revisión por MotoLink.'
+                    : _metodoSeleccionado == PagoMetodo.efectivo
+                        ? 'Adjunte su comprobante/soporte del pago en efectivo. Este archivo lo registra el aliado.'
+                        : 'Adjunte una foto clara del comprobante (Pago Móvil, Zelle o transferencia).',
+                style: TextStyle(
+                    fontSize: 11, color: Colors.grey.shade700, height: 1.25),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _busy ? null : () => _subirComprobante(context),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _labelBotonComprobante(r, pe),
+                        ),
+                ),
+              ),
+            ],
           ],
           if (!referenciaHistorica && pe == PagoRevisionEstado.enRevision)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Su comprobante está en revisión. MotoLink le avisará al aprobarlo.',
+                r.pagoMetodo?.trim() == PagoMetodo.creditoSistema
+                    ? 'Solicitud de crédito en revisión. MotoLink le avisará al aprobarla.'
+                    : r.pagoMetodo?.trim() == PagoMetodo.efectivo
+                        ? 'Comprobante en revisión. MotoLink le avisará al aprobarlo. '
+                            'Puede reemplazar el archivo con el botón de arriba si hubo un error.'
+                        : 'Comprobante en revisión. MotoLink le avisará al aprobarlo. '
+                            'Puede reemplazar el archivo con el botón de arriba si hubo un error.',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ),
@@ -317,7 +487,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Pago confirmado. MotoLink marcará pronto el envío en tránsito.',
+                r.pagoMetodo?.trim() == PagoMetodo.creditoSistema
+                    ? 'Pago con crédito del sistema confirmado. MotoLink marcará pronto el envío en tránsito.'
+                    : r.pagoMetodo?.trim() == PagoMetodo.efectivo
+                        ? 'Pago en efectivo confirmado. MotoLink marcará pronto el envío en tránsito.'
+                        : 'Pago confirmado. MotoLink marcará pronto el envío en tránsito.',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -341,6 +515,22 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         const SizedBox(height: 8),
       ],
     );
+  }
+
+  static String _labelBotonComprobante(
+    TransactionRequestModel r,
+    String pe,
+  ) {
+    if (pe == PagoRevisionEstado.enRevision && r.hasComprobantePago) {
+      return 'Reemplazar comprobante';
+    }
+    if (pe == PagoRevisionEstado.rechazado) {
+      return 'Enviar nuevo comprobante';
+    }
+    if (r.pagoMetodo?.trim() == PagoMetodo.efectivo) {
+      return 'Adjuntar comprobante de efectivo';
+    }
+    return 'Adjuntar comprobante de pago';
   }
 
   static String _etiquetaEstadoPago(String pe) {

@@ -194,6 +194,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                 : ((rs == null || rs.isEmpty)
                     ? DocumentReviewStatus.pendiente
                     : rs);
+            final esAprobado = effectiveStatus == DocumentReviewStatus.aprobado;
             final note = doc?.reviewNote?.trim();
             final reviewer = doc?.reviewerBusinessName?.trim();
             final reviewedHint = (doc != null && doc.reviewedAt != null)
@@ -304,10 +305,28 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                           else
                             TextButton(
                               onPressed: () => _pickAndUpload(type),
-                              child: Text(has ? 'Cambiar' : 'Subir'),
+                              child: Text(
+                                !has
+                                    ? 'Subir'
+                                    : esAprobado
+                                        ? 'Actualizar documento'
+                                        : 'Cambiar',
+                              ),
                             ),
                         ],
                       ),
+                      if (has && esAprobado) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'La versión aprobada no se borra: se archiva una copia y la nueva '
+                          'queda pendiente de revisión MotoLink.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            height: 1.3,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

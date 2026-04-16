@@ -7,6 +7,7 @@ class ProfileDocumentModel {
     required this.storagePath,
     this.fileName,
     this.createdAt,
+    this.isCurrent = true,
     this.reviewStatus,
     this.reviewNote,
     this.reviewedAt,
@@ -20,6 +21,9 @@ class ProfileDocumentModel {
   final String storagePath;
   final String? fileName;
   final DateTime? createdAt;
+
+  /// Versión vigente del tipo de documento (solo una por `doc_type`).
+  final bool isCurrent;
 
   /// Revisión individual MotoLink (`pendiente` … `aprobado`).
   final String? reviewStatus;
@@ -54,6 +58,9 @@ class ProfileDocumentModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
+      isCurrent: json['is_current'] is bool
+          ? json['is_current'] as bool
+          : (json['is_current']?.toString().toLowerCase() != 'false'),
       reviewStatus: _text(json['review_status']),
       reviewNote: _text(json['review_note']),
       reviewedAt: json['reviewed_at'] != null

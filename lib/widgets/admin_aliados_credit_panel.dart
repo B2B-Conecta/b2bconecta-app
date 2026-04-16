@@ -408,11 +408,26 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
             builder: (context, scrollController) {
               return StatefulBuilder(
                 builder: (context, setModalState) {
-                  ProfileDocumentModel? docFor(String t) {
+                  ProfileDocumentModel? currentDocFor(String t) {
                     for (final d in docs) {
-                      if (d.docType == t) return d;
+                      if (d.docType == t && d.isCurrent) return d;
                     }
                     return null;
+                  }
+
+                  List<ProfileDocumentModel> historyDocsFor(String t) {
+                    final list = <ProfileDocumentModel>[];
+                    for (final d in docs) {
+                      if (d.docType == t && !d.isCurrent) list.add(d);
+                    }
+                    list.sort((a, b) {
+                      final ca =
+                          a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                      final cb =
+                          b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                      return cb.compareTo(ca);
+                    });
+                    return list;
                   }
 
                   String? busyType;
@@ -463,7 +478,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                   }
 
                   Future<void> promptReject(String type) async {
-                    final d = docFor(type);
+                    final d = currentDocFor(type);
                     final note = await _promptRejectionNoteForDoc(
                       ctx,
                       docLabel: AliadoDocType.labelEs(type),
@@ -597,10 +612,11 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                                 for (final type in AliadoDocType.all)
                                   _DocReviewTile(
                                     docType: type,
-                                    doc: docFor(type),
+                                    doc: currentDocFor(type),
+                                    olderVersions: historyDocsFor(type),
                                     busy: busyType == type,
                                     onOpen: () async {
-                                      final d = docFor(type);
+                                      final d = currentDocFor(type);
                                       if (d == null) return;
                                       final url = await SupabaseService
                                           .createSignedUrlForProfileDocument(
@@ -615,16 +631,30 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                                         );
                                       }
                                     },
-                                    onApprove: docFor(type) == null
+                                    onOpenVersion: (d) async {
+                                      final url = await SupabaseService
+                                          .createSignedUrlForProfileDocument(
+                                        d.storagePath,
+                                      );
+                                      final uri = Uri.parse(url);
+                                      if (ctx.mounted &&
+                                          await canLaunchUrl(uri)) {
+                                        await launchUrl(
+                                          uri,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      }
+                                    },
+                                    onApprove: currentDocFor(type) == null
                                         ? null
                                         : () => setReview(
                                               type,
                                               DocumentReviewStatus.aprobado,
                                             ),
-                                    onReject: docFor(type) == null
+                                    onReject: currentDocFor(type) == null
                                         ? null
                                         : () => unawaited(promptReject(type)),
-                                    onEnRevision: docFor(type) == null
+                                    onEnRevision: currentDocFor(type) == null
                                         ? null
                                         : () => setReview(
                                               type,
@@ -1161,8 +1191,10 @@ class _DocReviewTile extends StatelessWidget {
   const _DocReviewTile({
     required this.docType,
     required this.doc,
+    this.olderVersions = const [],
     required this.busy,
     required this.onOpen,
+    required this.onOpenVersion,
     required this.onApprove,
     required this.onReject,
     this.onEnRevision,
@@ -1170,8 +1202,10 @@ class _DocReviewTile extends StatelessWidget {
 
   final String docType;
   final ProfileDocumentModel? doc;
+  final List<ProfileDocumentModel> olderVersions;
   final bool busy;
   final VoidCallback onOpen;
+  final Future<void> Function(ProfileDocumentModel d) onOpenVersion;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
   final VoidCallback? onEnRevision;
@@ -1250,6 +1284,79 @@ class _DocReviewTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+              if (olderVersions.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Historial (comparar con la versión en revisión)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ...olderVersions.map(
+                  (h) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Material(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        onTap: busy
+                            ? null
+                            : () => unawaited(onOpenVersion(h)),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.history,
+                                size: 16,
+                                color: Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      h.fileName ?? 'Archivo',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade900,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${DocumentReviewStatus.labelEs(h.reviewStatus ?? DocumentReviewStatus.pendiente)} · '
+                                      '${_formatReviewInstant(h.createdAt)}',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.open_in_new,
+                                size: 16,
+                                color: Colors.grey.shade700,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               if (note != null && note.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 DecoratedBox(

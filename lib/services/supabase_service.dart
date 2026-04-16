@@ -905,7 +905,7 @@ class SupabaseService {
   }
 
   static const _profileDocumentsSelect = 'id, profile_id, doc_type, '
-      'storage_path, file_name, created_at, review_status, review_note, '
+      'storage_path, file_name, created_at, is_current, review_status, review_note, '
       'reviewed_at, reviewed_by, '
       'reviewer:profiles!reviewed_by(business_name)';
 
@@ -918,6 +918,7 @@ class SupabaseService {
         .from('profile_documents')
         .select(_profileDocumentsSelect)
         .eq('profile_id', uid)
+        .eq('is_current', true)
         .order('doc_type', ascending: true);
 
     final list = response as List<dynamic>;
@@ -927,7 +928,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Admin: documentos de un aliado (paths en Storage).
+  /// Admin: todas las versiones de documentos de un aliado (vigente + histórico).
   static Future<List<ProfileDocumentModel>> fetchProfileDocumentsForAliado(
     String aliadoId,
   ) async {
@@ -937,7 +938,7 @@ class SupabaseService {
         .from('profile_documents')
         .select(_profileDocumentsSelect)
         .eq('profile_id', aliadoId)
-        .order('doc_type', ascending: true);
+        .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
     return list
@@ -955,7 +956,8 @@ class SupabaseService {
         .createSignedUrl(storagePath, 3600);
   }
 
-  /// Sube o reemplaza un documento KYC (PDF / imagen).
+  /// Sube una **nueva versión** de documento KYC (PDF / imagen).
+  /// Las versiones anteriores permanecen en Storage y en BD; el trigger marca `is_current`.
   static Future<void> uploadAliadoProfileDocument({
     required String docType,
     required Uint8List bytes,
@@ -972,28 +974,6 @@ class SupabaseService {
     final path =
         '$uid/${docType}_${DateTime.now().microsecondsSinceEpoch}.$ext';
 
-    final existing = await _client
-        .from('profile_documents')
-        .select('storage_path')
-        .eq('profile_id', uid)
-        .eq('doc_type', docType)
-        .maybeSingle();
-
-    if (existing != null) {
-      final oldPath = Map<String, dynamic>.from(existing)['storage_path']
-          ?.toString();
-      if (oldPath != null && oldPath.isNotEmpty) {
-        try {
-          await _client.storage.from(_profileDocumentsBucket).remove([oldPath]);
-        } catch (_) {}
-      }
-      await _client
-          .from('profile_documents')
-          .delete()
-          .eq('profile_id', uid)
-          .eq('doc_type', docType);
-    }
-
     final contentType = _mimeForProfileDocExtension(ext);
     await _client.storage.from(_profileDocumentsBucket).uploadBinary(
           path,
@@ -1004,13 +984,21 @@ class SupabaseService {
           ),
         );
 
-    await _client.from('profile_documents').insert({
-      'profile_id': uid,
-      'doc_type': docType,
-      'storage_path': path,
-      'file_name': fileName,
-      'review_status': DocumentReviewStatus.pendiente,
-    });
+    try {
+      await _client.from('profile_documents').insert({
+        'profile_id': uid,
+        'doc_type': docType,
+        'storage_path': path,
+        'file_name': fileName,
+        'review_status': DocumentReviewStatus.pendiente,
+        'is_current': true,
+      });
+    } catch (e) {
+      try {
+        await _client.storage.from(_profileDocumentsBucket).remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   static String _profileDocExtension(String fileName) {

@@ -388,7 +388,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             Align(
               alignment: Alignment.centerLeft,
               child: Chip(
-                avatar: Icon(Icons.local_shipping_outlined,
+                avatar: const Icon(Icons.local_shipping_outlined,
                     size: 18, color: AppColors.brandBlue),
                 label: const Text('Transportista · despacho'),
                 backgroundColor: AppColors.fieldFill,

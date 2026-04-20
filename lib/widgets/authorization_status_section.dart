@@ -256,7 +256,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
                         children: [
                           Text(
                             line,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
                               height: 1.35,
                               color: AppColors.textSecondary,
@@ -309,7 +309,7 @@ class _CheckRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               height: 1.35,
               color: AppColors.textSecondary,

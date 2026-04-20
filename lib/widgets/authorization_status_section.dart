@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/aliado_doc_type.dart';
+import '../models/cash_phase_policy.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
@@ -160,14 +161,38 @@ class _AliadoAuthorizationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final faseContado = profile.esAliadoEnFaseContado;
     final cupoOk = profile.creditLimit != null;
     final kycGlobal = profile.kycStatus?.trim();
     final kycOk = kycGlobal == KycStatus.aprobado;
-    final cupoLabelEs = cupoOk
-        ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} USD · '
-            '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD ya imputados por entregas a crédito. '
-            'Los pedidos en curso también comprometen cupo.'
-        : 'Pendiente: MotoLink debe asignar su límite de crédito (pestaña Crédito).';
+
+    final cupoLabelEs = faseContado &&
+            profile.puedeUsarLineaCreditoMotoLinkPreactivada
+        ? 'MotoLink le habilitó el cupo desde el inicio (confianza): '
+            '${profile.creditLimit!.toStringAsFixed(2)} USD. '
+            'Puede usar la línea de crédito aun en fase contado. '
+            '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD ya imputados por entregas a crédito; '
+            'los pedidos abiertos también comprometen cupo.'
+        : faseContado
+            ? 'Primeros pedidos (contado): con RIF y domicilio fiscal puede pedir hasta '
+                '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad. '
+                'El cupo revolvente y la documentación completa se revisan al solicitar línea de crédito MotoLink.'
+            : (cupoOk
+                ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} USD · '
+                    '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD ya imputados por entregas a crédito. '
+                    'Los pedidos en curso también comprometen cupo.'
+                : 'Pendiente: MotoLink debe asignar su límite de crédito (pestaña Crédito).');
+
+    final kycLabelEs = faseContado && !kycOk
+        ? 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
+            'No bloquea pedidos en contado mientras tenga RIF y domicilio fiscal; '
+            'la revisión completa de documentos aplica al solicitar crédito MotoLink.'
+        : (kycOk
+            ? 'Verificación documental aprobada (todos los documentos requeridos).'
+            : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}.');
+
+    final cupoRowOk = faseContado || cupoOk;
+    final kycRowOk = faseContado || kycOk;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -183,7 +208,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  kycOk && cupoOk
+                  kycRowOk && cupoRowOk
                       ? Icons.check_circle_outline
                       : Icons.info_outline,
                   size: 22,
@@ -211,15 +236,13 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _CheckRow(
-              ok: cupoOk,
+              ok: cupoRowOk,
               label: cupoLabelEs,
             ),
             const SizedBox(height: 6),
             _CheckRow(
-              ok: kycOk,
-              label: kycOk
-                  ? 'Verificación documental aprobada (todos los documentos requeridos).'
-                  : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}.',
+              ok: kycRowOk,
+              label: kycLabelEs,
             ),
             const SizedBox(height: 10),
             const Text(

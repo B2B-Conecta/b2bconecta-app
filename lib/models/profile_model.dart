@@ -14,6 +14,7 @@ class ProfileModel {
     this.kycStatus,
     this.primerosPedidosContadoEntregados,
     this.creditoConsumidoAcumulado,
+    this.creditoPreactivadoPorAdmin = false,
     this.estado,
     this.ciudad,
     this.direccion,
@@ -41,6 +42,17 @@ class ProfileModel {
   /// Suma de pedidos entregados pagados con `credito_sistema` (tope vs [creditLimit]).
   final double? creditoConsumidoAcumulado;
 
+  /// Admin MotoLink: puede usar línea de crédito aun en fase contado (confianza / historial).
+  final bool creditoPreactivadoPorAdmin;
+
+  /// Cupo asignado y autorizado para usar en la app aunque [esAliadoEnFaseContado].
+  bool get puedeUsarLineaCreditoMotoLinkPreactivada {
+    final lim = creditLimit;
+    return creditoPreactivadoPorAdmin &&
+        lim != null &&
+        lim > 0;
+  }
+
   /// Estado / ciudad (Venezuela u otro) para catálogo y pedidos.
   final String? estado;
   final String? ciudad;
@@ -61,16 +73,18 @@ class ProfileModel {
         d.isNotEmpty;
   }
 
-  /// Aliado en fase “primeros pedidos contado” (menos de [CashPhasePolicy.entregasRequeridas] entregas).
+  /// `true` mientras no haya completado las primeras [CashPhasePolicy.entregasRequeridas] entregas
+  /// en modalidad contado (onboarding). Tras esa fase puede seguir pagando al contado (p. ej. efectivo o transferencia)
+  /// según las opciones del pedido, además de crédito MotoLink si aplica.
   bool get esAliadoEnFaseContado {
     if (role?.trim().toLowerCase() != 'aliado') return false;
     return (primerosPedidosContadoEntregados ?? 0) < CashPhasePolicy.entregasRequeridas;
   }
 
-  /// Cupo mostrado al aliado: en fase contado se trata como 0 (sin línea revolvente).
+  /// Cupo mostrado al aliado: en fase contado es 0 salvo [creditoPreactivadoPorAdmin] con cupo asignado.
   double? get limiteCreditoMostradoAliado {
-    if (!esAliadoEnFaseContado) return creditLimit;
-    return 0;
+    if (esAliadoEnFaseContado && !creditoPreactivadoPorAdmin) return 0;
+    return creditLimit;
   }
 
   /// Disponible revolvente: límite menos crédito ya consumido en entregas a crédito menos suma de pedidos abiertos.
@@ -128,6 +142,11 @@ class ProfileModel {
       cca = double.tryParse(ccaRaw.toString());
     }
 
+    final cpaRaw = json['credito_preactivado_por_admin'];
+    final cpa = cpaRaw is bool
+        ? cpaRaw
+        : (cpaRaw?.toString().toLowerCase() == 'true');
+
     return ProfileModel(
       id: json['id']?.toString() ?? '',
       businessName: _text(json['business_name']),
@@ -142,6 +161,7 @@ class ProfileModel {
       kycStatus: _text(json['kyc_status']),
       primerosPedidosContadoEntregados: pce,
       creditoConsumidoAcumulado: cca,
+      creditoPreactivadoPorAdmin: cpa,
       estado: _text(json['estado']),
       ciudad: _text(json['ciudad']),
       direccion: _text(json['direccion']),

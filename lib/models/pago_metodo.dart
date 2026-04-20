@@ -1,4 +1,8 @@
 /// Método de pago del aliado (`transaction_requests.pago_metodo`).
+///
+/// En los **primeros pedidos contado** (onboarding) la UI solo ofrece [valuesFaseContado].
+/// **Después** de esa fase, con KYC aprobado y cupo puede usarse [creditoSistema]; transferencia y
+/// efectivo **siguen** disponibles para compras al contado junto con el resto de medios.
 abstract final class PagoMetodo {
   static const pagoMovil = 'pago_movil';
   static const zelleDivisas = 'zelle_divisas';
@@ -10,10 +14,10 @@ abstract final class PagoMetodo {
 
   static const values = [pagoMovil, zelleDivisas, transferencia, efectivo];
 
-  /// Fase contado (primeros N entregas): solo transferencia y efectivo.
+  /// Solo durante onboarding (primeras entregas contado): transferencia y efectivo.
   static const valuesFaseContado = [transferencia, efectivo];
 
-  /// Post fase contado: métodos habituales + crédito del sistema (si aplica en UI).
+  /// Tras onboarding: todos los medios habituales + crédito MotoLink (si hay cupo en perfil).
   static const valuesPostContadoConCredito = [
     pagoMovil,
     zelleDivisas,

@@ -251,6 +251,7 @@ class _AliadoCreditCard extends StatefulWidget {
 
 class _AliadoCreditCardState extends State<_AliadoCreditCard> {
   late final TextEditingController _limitCtrl;
+  late bool _creditoPreactivadoDraft;
   bool _saving = false;
   bool _savingKyc = false;
   double? _openExposure;
@@ -263,6 +264,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     _limitCtrl = TextEditingController(
       text: lim != null ? lim.toStringAsFixed(2) : '',
     );
+    _creditoPreactivadoDraft = widget.profile.creditoPreactivadoPorAdmin;
     _loadExposure();
   }
 
@@ -297,10 +299,14 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     if (oldWidget.profile.id != widget.profile.id) {
       final lim = widget.profile.creditLimit;
       _limitCtrl.text = lim != null ? lim.toStringAsFixed(2) : '';
+      _creditoPreactivadoDraft = widget.profile.creditoPreactivadoPorAdmin;
       _loadExposure();
-    } else if (oldWidget.profile.creditLimit != widget.profile.creditLimit) {
+    } else if (oldWidget.profile.creditLimit != widget.profile.creditLimit ||
+        oldWidget.profile.creditoPreactivadoPorAdmin !=
+            widget.profile.creditoPreactivadoPorAdmin) {
       final lim = widget.profile.creditLimit;
       _limitCtrl.text = lim != null ? lim.toStringAsFixed(2) : '';
+      _creditoPreactivadoDraft = widget.profile.creditoPreactivadoPorAdmin;
     }
     if (oldWidget.profile.id == widget.profile.id &&
         oldWidget.profile.creditoConsumidoAcumulado !=
@@ -368,6 +374,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
       await SupabaseService.adminSetAliadoCreditLimit(
         aliadoId: widget.profile.id,
         creditLimit: v,
+        creditoPreactivadoPorAdmin:
+            _creditoPreactivadoDraft && v > 0,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -743,6 +751,28 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _AdminKycSummaryChip(kycStatus: widget.profile.kycStatus),
+                      if (widget.profile.creditoPreactivadoPorAdmin)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFF2E7D32).withOpacity(0.35),
+                            ),
+                          ),
+                          child: const Text(
+                            'Crédito anticipado',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1B5E20),
+                            ),
+                          ),
+                        ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -929,6 +959,30 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 ),
               ),
               const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _creditoPreactivadoDraft,
+                onChanged: _saving
+                    ? null
+                    : (on) => setState(() => _creditoPreactivadoDraft = on),
+                title: const Text(
+                  'Crédito desde el inicio (MotoLink)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  'Autoriza usar la línea de crédito aunque el aliado aún esté en la fase contado '
+                  '(confianza o historial). Requiere un cupo mayor que cero.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: _limitCtrl,
                 keyboardType: const TextInputType.numberWithOptions(

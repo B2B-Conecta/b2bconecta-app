@@ -49,8 +49,12 @@ class PartModel {
 
   final String? category;
 
-  /// Precio unitario final MotoLink (mayorista + comisión broker) para catálogo y pedidos aliado.
+  /// Precio unitario final MotoLink (mayorista + comisión broker).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
+
+  /// Precio de venta al aliado: mismo que [precioFinalUnitario] salvo en fase contado (descuento promocional).
+  double precioUnitarioParaAliado({required bool faseContado}) =>
+      BrokerPricing.unitPriceForAliado(precio, faseContado: faseContado);
 
   factory PartModel.fromJson(Map<String, dynamic> json) {
     // Tabla `products`: owner_id, name, description, compatibility, price_usd, stock, image_url.

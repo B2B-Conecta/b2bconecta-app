@@ -7,6 +7,7 @@ import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
+import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
@@ -24,8 +25,25 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _submitting = false;
+  ProfileModel? _profile;
 
   PartModel get part => widget.part;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final p = await SupabaseService.fetchMyProfile();
+    if (mounted) setState(() => _profile = p);
+  }
+
+  bool get _faseContado => _profile?.esAliadoEnFaseContado ?? false;
+
+  double get _precioVentaUnit =>
+      part.precioUnitarioParaAliado(faseContado: _faseContado);
 
   String get _skuDisplay {
     final sku = part.sku?.trim();
@@ -34,8 +52,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (id.length <= 14) return id;
     return id.substring(0, 12);
   }
-
-  double get _precioFinalUnit => part.precioFinalUnitario;
 
   Future<void> _openRequestDialog() async {
     final ownerId = part.ownerId?.trim();
@@ -81,16 +97,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Precio final MotoLink: \$${_precioFinalUnit.toStringAsFixed(2)} / u.',
+                    '\$${_precioVentaUnit.toStringAsFixed(2)} / u.',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: AppColors.brandBlue,
                     ),
-                  ),
-                  Text(
-                    'Referencia importador (mayorista): \$${part.precio.toStringAsFixed(2)} / u.',
-                    style: const TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -113,7 +125,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     builder: (context, v, _) {
                       final q = int.tryParse(v.text) ?? 0;
                       final safe = q.clamp(1, maxQty);
-                      final total = _precioFinalUnit * safe;
+                      final total = _precioVentaUnit * safe;
                       return Text(
                         'Total: \$${total.toStringAsFixed(2)}',
                         style: const TextStyle(
@@ -342,7 +354,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Precio final MotoLink',
+                        'Precio',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -352,23 +364,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '\$${_precioFinalUnit.toStringAsFixed(2)}',
+                        '\$${_precioVentaUnit.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
                           color: AppColors.brand,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Incluye comisión MotoLink sobre referencia mayorista '
-                          '(\$${part.precio.toStringAsFixed(2)} / u.).',
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: Colors.grey.shade700,
-                          ),
                         ),
                       ),
                       const SizedBox(height: 10),

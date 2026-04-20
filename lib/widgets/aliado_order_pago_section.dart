@@ -39,11 +39,17 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
 
   static const double _creditTol = 0.01;
 
+  /// Primeros pedidos: solo transferencia/efectivo. Después: resto de medios + crédito si hay cupo;
+  /// transferencia y efectivo siguen en [PagoMetodo.values] / [PagoMetodo.valuesPostContadoConCredito].
   List<String> get _metodosPermitidos {
-    if (widget.profile?.esAliadoEnFaseContado ?? false) {
+    final p = widget.profile;
+    if (p?.esAliadoEnFaseContado ?? false) {
+      if (p?.puedeUsarLineaCreditoMotoLinkPreactivada ?? false) {
+        return PagoMetodo.valuesPostContadoConCredito;
+      }
       return PagoMetodo.valuesFaseContado;
     }
-    final cl = widget.profile?.creditLimit;
+    final cl = p?.creditLimit;
     if (cl != null && cl > 0) {
       return PagoMetodo.valuesPostContadoConCredito;
     }
@@ -71,7 +77,8 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.request.id != widget.request.id ||
         oldWidget.profile?.primerosPedidosContadoEntregados !=
-            widget.profile?.primerosPedidosContadoEntregados) {
+            widget.profile?.primerosPedidosContadoEntregados ||
+        oldWidget.profile?.creditLimit != widget.profile?.creditLimit) {
       _syncMetodoSeleccionado();
     }
   }
@@ -349,6 +356,34 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
           ),
           const SizedBox(height: 6),
+          if (!referenciaHistorica && widget.profile != null) ...[
+            if (widget.profile!.esAliadoEnFaseContado)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'En sus primeros pedidos en contado solo puede elegir transferencia o efectivo. '
+                  'Después podrá usar la línea MotoLink si tiene KYC aprobado y cupo, u otros medios.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.35,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'La línea de crédito MotoLink requiere KYC aprobado y cupo asignado. '
+                  'Transferencia y efectivo siguen disponibles para compras al contado.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.35,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+          ],
           if (puedeCambiarMetodo)
             DropdownButtonFormField<String>(
               value: _metodoSeleccionado,

@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/aliado_doc_type.dart';
+import '../models/cash_phase_policy.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
@@ -15,10 +16,18 @@ class AliadoKycDocumentsSection extends StatefulWidget {
     super.key,
     required this.kycStatus,
     this.onChanged,
+    this.esAliadoEnFaseContado = false,
+    this.primerosPedidosContadoEntregados,
   });
 
   final String? kycStatus;
   final VoidCallback? onChanged;
+
+  /// Mientras no se completen las entregas iniciales en contado, no se envía expediente a MotoLink.
+  final bool esAliadoEnFaseContado;
+
+  /// Para mensajes X / N en la advertencia.
+  final int? primerosPedidosContadoEntregados;
 
   @override
   State<AliadoKycDocumentsSection> createState() =>
@@ -124,6 +133,33 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
   }
 
   Future<void> _submitReview() async {
+    if (widget.esAliadoEnFaseContado) {
+      final pce = widget.primerosPedidosContadoEntregados ?? 0;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Fase inicial pendiente'),
+          content: SingleChildScrollView(
+            child: Text(
+              'Aún está en la fase de contado (primeros '
+              '${CashPhasePolicy.entregasRequeridas} pedidos). '
+              'Lleva $pce de ${CashPhasePolicy.entregasRequeridas} entregas registradas.\n\n'
+              'Complete esa fase antes de enviar la documentación a revisión MotoLink. '
+              'Puede seguir subiendo archivos aquí como borrador; el envío oficial quedará '
+              'habilitado al completar los requisitos iniciales.',
+              style: const TextStyle(height: 1.4),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     setState(() => _submittingReview = true);
     try {
       await SupabaseService.aliadoSubmitKycForReview();
@@ -151,6 +187,8 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
     final canSendReview = st == KycStatus.pendiente ||
         st == KycStatus.rechazado ||
         st == KycStatus.enRevision;
+    final pce = widget.primerosPedidosContadoEntregados ?? 0;
+    final bloqueoFaseInicial = widget.esAliadoEnFaseContado;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -165,6 +203,39 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
         ),
         const SizedBox(height: 8),
         KycAliadoGlobalStatusHighlight(kycStatus: st),
+        if (bloqueoFaseInicial) ...[
+          const SizedBox(height: 12),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber.shade900, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Fase inicial: $pce / ${CashPhasePolicy.entregasRequeridas} entregas en contado. '
+                      'El botón «Enviar a revisión MotoLink» se habilita al completar esa fase. '
+                      'Puede subir archivos mientras tanto.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: Colors.grey.shade900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         if (_loading)
           const Padding(

@@ -72,6 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late final TextEditingController _ownerCiudadFilterController;
   late final Future<List<ImporterOption>> _importersFuture;
 
+  /// Alineado con el precio en ficha (descuento en fase contado).
+  bool _aliadoFaseContado = false;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +87,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _importersFuture = SupabaseService.fetchImporterOptions();
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
+      SupabaseService.fetchMyProfile().then((p) {
+        if (!mounted) return;
+        setState(() {
+          _aliadoFaseContado = p?.esAliadoEnFaseContado ?? false;
+        });
+      });
     } else if (widget.homeRole == AppHomeRole.administrador) {
       _importersFuture = Future.value(const []);
       _partsFuture = Future.value(const []);
@@ -722,6 +731,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           final p = parts[index];
                           return _ProductGridCard(
                             part: p,
+                            faseContadoAliado: _aliadoFaseContado,
                             onTap: () {
                               Navigator.of(context).push<void>(
                                 MaterialPageRoute<void>(
@@ -767,9 +777,14 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _ProductGridCard extends StatelessWidget {
-  const _ProductGridCard({required this.part, this.onTap});
+  const _ProductGridCard({
+    required this.part,
+    this.faseContadoAliado = false,
+    this.onTap,
+  });
 
   final PartModel part;
+  final bool faseContadoAliado;
   final VoidCallback? onTap;
 
   @override
@@ -851,7 +866,7 @@ class _ProductGridCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '\$${part.precioFinalUnitario.toStringAsFixed(2)}',
+                  '\$${part.precioUnitarioParaAliado(faseContado: faseContadoAliado).toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,

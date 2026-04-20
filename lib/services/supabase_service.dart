@@ -35,8 +35,14 @@ class SupabaseService {
   /// Comisión MotoLink sobre precio mayorista (misma base que [BrokerPricing.feeRate]).
   static double get logisticFeeRate => BrokerPricing.feeRate;
 
-  static double calculateAliadoUnitPrice(double precioUnitarioProveedor) {
-    return BrokerPricing.finalUnitPrice(precioUnitarioProveedor);
+  static double calculateAliadoUnitPrice(
+    double precioUnitarioProveedor, {
+    bool faseContado = false,
+  }) {
+    return BrokerPricing.unitPriceForAliado(
+      precioUnitarioProveedor,
+      faseContado: faseContado,
+    );
   }
 
   static SupabaseClient get _client => Supabase.instance.client;
@@ -853,15 +859,18 @@ class SupabaseService {
   }
 
   /// Broker: actualiza el cupo negociable del aliado (`profiles.credit_limit`).
+  /// [creditoPreactivadoPorAdmin]: puede usar línea MotoLink aun en fase contado (solo si admin lo autoriza).
   static Future<void> adminSetAliadoCreditLimit({
     required String aliadoId,
     required double creditLimit,
+    bool creditoPreactivadoPorAdmin = false,
   }) async {
     await _client.rpc(
       'admin_set_aliado_credit_limit',
       params: <String, dynamic>{
         'p_aliado_id': aliadoId,
         'p_credit_limit': creditLimit,
+        'p_credito_preactivado': creditoPreactivadoPorAdmin,
       },
     );
   }
@@ -1080,9 +1089,6 @@ class SupabaseService {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
 
-    final unitAliado = calculateAliadoUnitPrice(precioUnitarioProveedor);
-    final total = unitAliado * cantidad;
-
     final profile = await fetchMyProfile();
     final role = profile?.role?.trim().toLowerCase();
     if (role != 'aliado') {
@@ -1096,22 +1102,48 @@ class SupabaseService {
         'Registre estado, ciudad y dirección fiscal en Mi perfil para poder solicitar pedidos.',
       );
     }
-    final ks = profile.kycStatus?.trim();
-    if (ks != KycStatus.aprobado) {
-      if (ks == KycStatus.enRevision) {
+
+    final pce = profile.primerosPedidosContadoEntregados ?? 0;
+    final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
+
+    if (enFaseContado) {
+      final rif = profile.rif?.trim();
+      if (rif == null || rif.isEmpty) {
         throw KycVerificationException(
-          'Su documentación está en revisión. MotoLink le avisará al aprobarla.',
+          'Registre su RIF comercial en Mi perfil para solicitar pedidos en contado.',
         );
       }
+      final ks = profile.kycStatus?.trim();
       if (ks == KycStatus.rechazado) {
         throw KycVerificationException(
-          'Su documentación fue rechazada. Actualice los archivos en su perfil y vuelva a enviar a revisión.',
+          'Su documentación fue rechazada. Actualice los datos en su perfil antes de solicitar pedidos.',
         );
       }
-      throw KycVerificationException(
-        'Debe completar la verificación documental en su perfil y obtener la aprobación de MotoLink antes de pedir.',
-      );
+    } else {
+      final ks = profile.kycStatus?.trim();
+      if (ks != KycStatus.aprobado) {
+        if (ks == KycStatus.enRevision) {
+          throw KycVerificationException(
+            'Su documentación está en revisión. MotoLink le avisará al aprobarla.',
+          );
+        }
+        if (ks == KycStatus.rechazado) {
+          throw KycVerificationException(
+            'Su documentación fue rechazada. Actualice los archivos en su perfil y vuelva a enviar a revisión.',
+          );
+        }
+        throw KycVerificationException(
+          'Debe completar la verificación documental en su perfil y obtener la aprobación de MotoLink antes de pedir.',
+        );
+      }
     }
+
+    final unitAliado = calculateAliadoUnitPrice(
+      precioUnitarioProveedor,
+      faseContado: enFaseContado,
+    );
+    final total = unitAliado * cantidad;
+
     final prodRes = await _client
         .from('products')
         .select('stock')
@@ -1132,8 +1164,6 @@ class SupabaseService {
       );
     }
 
-    final pce = profile.primerosPedidosContadoEntregados ?? 0;
-    final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
     if (enFaseContado) {
       final openCnt = await fetchOpenTransactionRequestCountForCurrentAliado();
       if (openCnt >= 1) {

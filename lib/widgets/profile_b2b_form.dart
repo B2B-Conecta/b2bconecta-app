@@ -8,6 +8,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'main_shell_tab.dart';
 import 'aliado_kyc_documents_section.dart';
+import 'aliado_solicitar_credito_sheet.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
 
@@ -128,6 +129,46 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     }
   }
 
+  void _scrollToKycDocumentation() {
+    final target = _kycDocumentationSectionKey.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.12,
+    );
+  }
+
+  void _onSolicitarCreditoContinuar() {
+    final p = widget.initial;
+    if (p == null) return;
+    final rifOk = p.rif?.trim().isNotEmpty ?? false;
+    if (!rifOk || !p.hasRegisteredLocation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Indique RIF y domicilio fiscal (estado, ciudad y dirección) '
+            'en este formulario antes de cargar la documentación.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    _scrollToKycDocumentation();
+  }
+
+  void _openSolicitarCreditoSheet() {
+    final p = widget.initial;
+    if (p == null) return;
+    AliadoSolicitarCreditoSheet.show(
+      context,
+      profile: p,
+      onContinuar: _onSolicitarCreditoContinuar,
+    );
+  }
+
   Future<void> _loadOpenExposure() async {
     setState(() => _loadingExposure = true);
     try {
@@ -191,6 +232,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         ((limMostrado ?? 0) - exp - cons).clamp(0.0, double.infinity);
     final pce = widget.initial?.primerosPedidosContadoEntregados ?? 0;
     final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
+    final preact =
+        widget.initial?.puedeUsarLineaCreditoMotoLinkPreactivada ?? false;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.fieldFill,
@@ -214,12 +257,25 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (preact) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'MotoLink le habilitó el cupo desde el inicio: puede usar la línea de crédito '
+                  'en pedidos y pagos aun en esta fase.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: AppColors.brandBlue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
             ],
             Text(
               limRaw == null && !enFaseContado
                   ? 'Pendiente: MotoLink asignará su límite de crédito (pestaña Crédito).'
-                  : enFaseContado
+                  : enFaseContado && !preact
                       ? 'Límite mostrado (fase contado): \$${(limMostrado ?? 0).toStringAsFixed(2)}'
                       : 'Límite autorizado: \$${(limMostrado ?? 0).toStringAsFixed(2)}',
               style: const TextStyle(
@@ -228,7 +284,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 color: AppColors.textPrimary,
               ),
             ),
-            if (limRaw != null || enFaseContado) ...[
+            if (limRaw != null || enFaseContado || preact) ...[
               const SizedBox(height: 10),
               if (_loadingExposure)
                 const LinearProgressIndicator(minHeight: 3)
@@ -545,12 +601,42 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           if (_persistedAsAliado) ...[
             const SizedBox(height: 20),
             _sectionLabel('CUPO AUTORIZADO (MOTOLINK)'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: AppColors.brandBlue,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: widget.initial == null ? null : _openSolicitarCreditoSheet,
+                icon: const Icon(Icons.credit_score_outlined, size: 22),
+                label: const Text(
+                  'Solicitar crédito MotoLink',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Revise requisitos, su progreso en la fase inicial y la documentación requerida.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 12),
             _aliadoCreditSummary(),
             const SizedBox(height: 20),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
               child: AliadoKycDocumentsSection(
                 kycStatus: widget.initial?.kycStatus,
+                esAliadoEnFaseContado:
+                    widget.initial?.esAliadoEnFaseContado ?? false,
+                primerosPedidosContadoEntregados:
+                    widget.initial?.primerosPedidosContadoEntregados,
                 onChanged: () {
                   _bumpAuthorizationSection();
                   widget.onRelatedDataChanged?.call();

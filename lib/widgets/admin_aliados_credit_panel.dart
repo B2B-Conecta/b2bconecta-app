@@ -988,11 +988,13 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
               ),
             ),
             children: [
-              Text(
-                'Score: ${widget.profile.creditScore ?? '—'}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 6),
+              if (widget.profile.debeMostrarCreditoMotoLinkAsignado) ...[
+                Text(
+                  'Crédito MotoLink asignado: \$${(widget.profile.creditLimit ?? 0).toStringAsFixed(2)} USD',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 6),
+              ],
               Text(
                 'Fase contado: ${widget.profile.primerosPedidosContadoEntregados ?? 0}/'
                 '${CashPhasePolicy.entregasRequeridas} entregas completadas',

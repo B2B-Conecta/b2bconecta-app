@@ -225,22 +225,25 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         TransactionRequestPartiesContactSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestDestinoEntregaSection(request: r),
-                        if (r.aliadoCreditScore != null) ...[
+                        if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
                               Icon(
-                                Icons.credit_score_outlined,
+                                Icons.account_balance_wallet_outlined,
                                 size: 18,
                                 color: Colors.grey.shade700,
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                'Credit score (aliado): ${r.aliadoCreditScore}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.brandBlue,
+                              Expanded(
+                                child: Text(
+                                  'Crédito MotoLink asignado (aliado): '
+                                  '\$${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} USD',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.brandBlue,
+                                  ),
                                 ),
                               ),
                             ],

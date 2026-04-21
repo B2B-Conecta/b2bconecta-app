@@ -100,6 +100,9 @@ class ProfileModel {
     return lim != null && lim > 0;
   }
 
+  /// Resumen de cupo en Créditos admin: solo con línea MotoLink asignada (`credit_limit` > 0).
+  bool get debeMostrarCreditoMotoLinkAsignado => tieneLineaCreditoMotoLink;
+
   /// Cupo mostrado al aliado: en fase contado es 0 salvo [creditoPreactivadoPorAdmin] con cupo asignado.
   double? get limiteCreditoMostradoAliado {
     if (esAliadoEnFaseContado && !creditoPreactivadoPorAdmin) return 0;

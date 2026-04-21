@@ -30,7 +30,7 @@ class TransactionRequestModel {
     this.aliadoBusinessName,
     this.aliadoRif,
     this.aliadoPhone,
-    this.aliadoCreditScore,
+    this.aliadoCreditLimit,
     this.aliadoEstado,
     this.aliadoCiudad,
     this.aliadoDireccion,
@@ -91,7 +91,8 @@ class TransactionRequestModel {
   final String? aliadoBusinessName;
   final String? aliadoRif;
   final String? aliadoPhone;
-  final int? aliadoCreditScore;
+  /// Límite MotoLink del aliado (`credit_limit`; embed en listados de pedido).
+  final double? aliadoCreditLimit;
 
   /// Ubicación fiscal del aliado (desde `profiles` al listar el pedido).
   final String? aliadoEstado;
@@ -211,6 +212,9 @@ class TransactionRequestModel {
     if (at == null) return false;
     return businessDaysElapsedAfterUtcDate(at.toUtc()) >= 3;
   }
+
+  /// Muestra línea MotoLink en ficha de pedido (`credit_limit` > 0).
+  bool get muestraCreditoMotoLinkAsignadoEnPedido => (aliadoCreditLimit ?? 0) > 0;
 
   /// Dirección fiscal del aliado cuando el pedido usa perfil (texto multilínea).
   String? get aliadoDireccionFiscalMultilineaEs {
@@ -349,12 +353,12 @@ class TransactionRequestModel {
       ownerMap = Map<String, dynamic>.from(ownerRaw);
     }
 
-    int? credit;
-    final cs = aliadoMap?['credit_score'];
-    if (cs is int) {
-      credit = cs;
-    } else if (cs != null) {
-      credit = int.tryParse(cs.toString());
+    double? aliadoLim;
+    final cl = aliadoMap?['credit_limit'];
+    if (cl is num) {
+      aliadoLim = cl.toDouble();
+    } else if (cl != null) {
+      aliadoLim = double.tryParse(cl.toString());
     }
 
     return TransactionRequestModel(
@@ -390,7 +394,7 @@ class TransactionRequestModel {
       aliadoBusinessName: _nullableText(aliadoMap?['business_name']),
       aliadoRif: _nullableText(aliadoMap?['rif']),
       aliadoPhone: _nullableText(aliadoMap?['phone']),
-      aliadoCreditScore: credit,
+      aliadoCreditLimit: aliadoLim,
       aliadoEstado: _nullableText(aliadoMap?['estado']),
       aliadoCiudad: _nullableText(aliadoMap?['ciudad']),
       aliadoDireccion: _nullableText(aliadoMap?['direccion']),

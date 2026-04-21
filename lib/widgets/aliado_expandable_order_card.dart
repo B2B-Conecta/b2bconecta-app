@@ -210,10 +210,11 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (r.aliadoCreditScore != null) ...[
+                          if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Tu crédito: ${r.aliadoCreditScore}',
+                              'Crédito MotoLink asignado: '
+                              '\$${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} USD',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,

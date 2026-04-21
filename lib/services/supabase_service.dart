@@ -745,7 +745,7 @@ class SupabaseService {
     destino_entrega_texto,
     destino_entrega_maps_url,
     products ( name, sku, price_usd ),
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone, estado, ciudad, direccion, fiscal_maps_url ),
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url ),
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
   ''';
 

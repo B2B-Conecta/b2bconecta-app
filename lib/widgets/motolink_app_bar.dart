@@ -2,77 +2,185 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../models/profile_model.dart';
+import '../models/profile_role_labels.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'motolink_pro_logo.dart';
 
 /// Altura del logo en AppBar: importadores (compacto) vs aliados (más visible).
 abstract final class MotolinkAppBarLogoSizes {
-  static const double importador = 40;
-  static const double aliado = 52;
+  static const double importador = 36;
+  static const double aliado = 44;
 }
 
-/// AppBar blanco con logo, “Marketplace B2B” y campana con badge (naranja marca).
-class MotolinkAppBar extends StatelessWidget implements PreferredSizeWidget {
+/// Barra superior: a la izquierda marca del usuario (logo opcional, nombre, rol);
+/// a la derecha MotoLink + descripción; campana de notificaciones.
+class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   const MotolinkAppBar({
     super.key,
+    this.currentUserProfile,
     this.onNotificationTap,
     this.extraActions,
     this.logoHeight = MotolinkAppBarLogoSizes.importador,
     this.unreadNotifications = 0,
   });
 
+  /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra MotoLink a la derecha.
+  final ProfileModel? currentUserProfile;
+
   final VoidCallback? onNotificationTap;
   final List<Widget>? extraActions;
   final int unreadNotifications;
 
-  /// Alto del [MotoLinkProLogo] (p. ej. [MotolinkAppBarLogoSizes.aliado] para talleres).
+  /// Alto del logo MotoLink a la derecha y referencia del logo de usuario.
   final double logoHeight;
 
   @override
   Size get preferredSize =>
-      Size.fromHeight(math.max(kToolbarHeight, logoHeight + 10));
+      Size.fromHeight(math.max(kToolbarHeight, logoHeight + 18));
+
+  @override
+  State<MotolinkAppBar> createState() => _MotolinkAppBarState();
+}
+
+class _MotolinkAppBarState extends State<MotolinkAppBar> {
+  String? _signedLogoUrl;
+  Object? _logoRequestKey;
+
+  @override
+  void didUpdateWidget(covariant MotolinkAppBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final path = widget.currentUserProfile?.logoStoragePath?.trim();
+    final oldPath = oldWidget.currentUserProfile?.logoStoragePath?.trim();
+    if (path != oldPath) {
+      _resolveLogo(path);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveLogo(widget.currentUserProfile?.logoStoragePath?.trim());
+  }
+
+  void _resolveLogo(String? path) {
+    if (path == null || path.isEmpty) {
+      setState(() {
+        _signedLogoUrl = null;
+        _logoRequestKey = null;
+      });
+      return;
+    }
+    final key = Object();
+    _logoRequestKey = key;
+    SupabaseService.createSignedUrlForProfileLogo(path).then((url) {
+      if (!mounted || _logoRequestKey != key) return;
+      setState(() => _signedLogoUrl = url);
+    }).catchError((_) {
+      if (!mounted || _logoRequestKey != key) return;
+      setState(() => _signedLogoUrl = null);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final p = widget.currentUserProfile;
+    final name = p?.businessName?.trim();
+    final roleLabel = ProfileRoleLabels.labelEs(p?.role);
+    final lh = widget.logoHeight;
+
     return AppBar(
-      toolbarHeight: math.max(kToolbarHeight, logoHeight + 8),
+      toolbarHeight: math.max(kToolbarHeight, lh + 14),
       automaticallyImplyLeading: false,
-      titleSpacing: 16,
+      titleSpacing: 12,
       title: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          MotoLinkProLogo(height: logoHeight),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'MotoLink',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: AppColors.brandBlue,
-                    height: 1.1,
+          if (p != null) ...[
+            Expanded(
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _signedLogoUrl != null
+                        ? Image.network(
+                            _signedLogoUrl!,
+                            width: lh,
+                            height: lh,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                MotoLinkProLogo(height: lh),
+                          )
+                        : MotoLinkProLogo(height: lh),
                   ),
-                ),
-                Text(
-                  'Marketplace B2B',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.1,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          (name != null && name.isNotEmpty)
+                              ? name
+                              : 'Mi cuenta',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                            height: 1.15,
+                          ),
+                        ),
+                        Text(
+                          roleLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
+                            color: Colors.grey.shade700,
+                            height: 1.15,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
+          ] else
+            const Spacer(),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'MotoLink',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: AppColors.brandBlue,
+                  height: 1.1,
+                ),
+              ),
+              Text(
+                'Marketplace B2B',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                  height: 1.1,
+                ),
+              ),
+            ],
           ),
         ],
       ),
       actions: [
-        ...?extraActions,
+        ...?widget.extraActions,
         Padding(
           padding: const EdgeInsets.only(right: 8),
           child: Stack(
@@ -81,9 +189,9 @@ class MotolinkAppBar extends StatelessWidget implements PreferredSizeWidget {
               IconButton(
                 icon: const Icon(Icons.notifications_none_outlined),
                 color: AppColors.textSecondary,
-                onPressed: onNotificationTap,
+                onPressed: widget.onNotificationTap,
               ),
-              if (unreadNotifications > 0)
+              if (widget.unreadNotifications > 0)
                 Positioned(
                   right: 6,
                   top: 6,
@@ -98,9 +206,9 @@ class MotolinkAppBar extends StatelessWidget implements PreferredSizeWidget {
                       borderRadius: BorderRadius.all(Radius.circular(10)),
                     ),
                     child: Text(
-                      unreadNotifications > 99
+                      widget.unreadNotifications > 99
                           ? '99+'
-                          : unreadNotifications.toString(),
+                          : widget.unreadNotifications.toString(),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,

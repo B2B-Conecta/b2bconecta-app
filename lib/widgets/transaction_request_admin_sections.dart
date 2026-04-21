@@ -159,6 +159,8 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
     final usa = r.destinoEntregaUsaPerfil;
     final texto = r.destinoEntregaTexto?.trim();
     final mapsUrl = r.destinoEntregaMapsUrl?.trim();
+    final fiscalBloque = r.aliadoDireccionFiscalMultilineaEs;
+    final mapsPerfil = r.aliadoFiscalMapsUrl?.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,17 +174,34 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        if (usa)
-          Text(
-            'Entrega en la dirección fiscal registrada en Mi perfil del aliado '
-            '(estado, ciudad y domicilio).',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade800,
-              height: 1.35,
+        if (usa) ...[
+          if (fiscalBloque != null && fiscalBloque.isNotEmpty)
+            Text(
+              fiscalBloque,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade800,
+                height: 1.4,
+              ),
+            )
+          else
+            Text(
+              'Dirección fiscal del aliado aún no disponible en esta vista.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+                height: 1.35,
+              ),
             ),
-          )
-        else ...[
+          if (mapsPerfil != null && mapsPerfil.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _openMaps(context, mapsPerfil),
+              icon: const Icon(Icons.map_outlined, size: 18),
+              label: const Text('Ubicación fiscal en mapa (perfil aliado)'),
+            ),
+          ],
+        ] else ...[
           Text(
             texto != null && texto.isNotEmpty
                 ? texto

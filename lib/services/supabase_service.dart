@@ -29,6 +29,7 @@ class SupabaseService {
   static const _orderInvoicesBucket = 'order-invoices';
   static const _orderAllyInvoicesBucket = 'order-ally-invoices';
   static const _orderPaymentProofsBucket = 'order-payment-proofs';
+  static const _profileLogosBucket = 'profile-logos';
 
   static String? get currentUserId => _currentUserId;
 
@@ -299,6 +300,7 @@ class SupabaseService {
     String? estado,
     String? ciudad,
     String? direccion,
+    String? fiscalMapsUrl,
   }) async {
     final uid = _currentUserId;
     if (uid == null) {
@@ -333,7 +335,85 @@ class SupabaseService {
     final dir = direccion?.trim();
     payload['direccion'] = (dir == null || dir.isEmpty) ? null : dir;
 
+    final fmu = fiscalMapsUrl?.trim();
+    if (fmu != null && fmu.isNotEmpty) {
+      final u = Uri.tryParse(fmu);
+      if (u == null ||
+          !u.hasScheme ||
+          (u.scheme != 'http' && u.scheme != 'https')) {
+        throw ArgumentError('El enlace de mapa debe ser una URL http o https.');
+      }
+      payload['fiscal_maps_url'] = fmu;
+    } else {
+      payload['fiscal_maps_url'] = null;
+    }
+
     await _client.from('profiles').upsert(payload);
+  }
+
+  /// URL firmada (1 h) para el logo en `profile-logos`.
+  static Future<String> createSignedUrlForProfileLogo(String storagePath) async {
+    final p = storagePath.trim();
+    if (p.isEmpty) {
+      throw ArgumentError('Ruta de logo vacía.');
+    }
+    return _client.storage
+        .from(_profileLogosBucket)
+        .createSignedUrl(p, 3600);
+  }
+
+  /// Sube o reemplaza el logo del perfil y actualiza `profiles.logo_storage_path`.
+  static Future<void> uploadMyProfileLogo({
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final ext = fileExtension.trim().toLowerCase().replaceAll('.', '');
+    if (ext != 'png' && ext != 'jpg' && ext != 'jpeg' && ext != 'webp') {
+      throw ArgumentError('Use PNG, JPG o WEBP.');
+    }
+
+    final prof = await fetchMyProfile();
+    final oldPath = prof?.logoStoragePath?.trim();
+
+    final path = '$uid/logo_${DateTime.now().microsecondsSinceEpoch}.$ext';
+    final ct = ext == 'png'
+        ? 'image/png'
+        : ext == 'webp'
+            ? 'image/webp'
+            : 'image/jpeg';
+    await _client.storage.from(_profileLogosBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: ct, upsert: true),
+        );
+
+    await _client.from('profiles').update({
+      'logo_storage_path': path,
+    }).eq('id', uid);
+
+    if (oldPath != null && oldPath.isNotEmpty && oldPath != path) {
+      try {
+        await _client.storage.from(_profileLogosBucket).remove([oldPath]);
+      } catch (_) {}
+    }
+  }
+
+  /// Quita el logo personalizado (vuelve al marcador por defecto en la app).
+  static Future<void> clearMyProfileLogo() async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final prof = await fetchMyProfile();
+    final oldPath = prof?.logoStoragePath?.trim();
+    await _client.from('profiles').update({
+      'logo_storage_path': null,
+    }).eq('id', uid);
+    if (oldPath != null && oldPath.isNotEmpty) {
+      try {
+        await _client.storage.from(_profileLogosBucket).remove([oldPath]);
+      } catch (_) {}
+    }
   }
 
   /// Importadores (`role = importador`) para el filtro del catálogo.
@@ -664,7 +744,7 @@ class SupabaseService {
     destino_entrega_texto,
     destino_entrega_maps_url,
     products ( name, sku, price_usd ),
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone ),
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone, estado, ciudad, direccion, fiscal_maps_url ),
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
   ''';
 

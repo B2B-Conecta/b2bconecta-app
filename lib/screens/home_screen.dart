@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
+import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/importer_inventory_dashboard.dart';
@@ -39,11 +40,13 @@ String _ownerLocationLine(PartModel part) {
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
+    required this.profile,
     this.homeRole = AppHomeRole.importador,
     this.onNotificationTap,
     this.unreadNotifications = 0,
   });
 
+  final ProfileModel profile;
   final AppHomeRole homeRole;
   final VoidCallback? onNotificationTap;
   final int unreadNotifications;
@@ -87,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _importersFuture = SupabaseService.fetchImporterOptions();
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
+      _aliadoFaseContado = widget.profile.esAliadoEnFaseContado;
       SupabaseService.fetchMyProfile().then((p) {
         if (!mounted) return;
         setState(() {
@@ -441,6 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final appBar = MotolinkAppBar(
+      currentUserProfile: widget.profile,
       logoHeight: widget.homeRole == AppHomeRole.aliado
           ? MotolinkAppBarLogoSizes.aliado
           : MotolinkAppBarLogoSizes.importador,

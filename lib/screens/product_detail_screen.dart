@@ -181,9 +181,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           'Dirección fiscal de Mi perfil',
                           style: TextStyle(fontSize: 13),
                         ),
-                        subtitle: fiscal.isEmpty
-                            ? null
-                            : Text(
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (fiscal.isNotEmpty)
+                              Text(
                                 fiscal,
                                 style: TextStyle(
                                   fontSize: 11,
@@ -191,6 +193,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   height: 1.25,
                                 ),
                               ),
+                            if (_profile?.fiscalMapsUrl == null ||
+                                _profile!.fiscalMapsUrl!.trim().isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Opcional: puede añadir un enlace de Maps en Mi perfil para compartir la ubicación.',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.blueGrey.shade700,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       RadioListTile<bool>(
                         dense: true,
@@ -374,6 +391,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+      if (usaDestinoPerfil) {
+        final m = _profile?.fiscalMapsUrl?.trim();
+        if (m == null || m.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Sugerencia: agregue en Mi perfil un enlace de Google Maps a su domicilio fiscal '
+                'para que el equipo y socios abran la ubicación en mapa.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     } on CreditLimitException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

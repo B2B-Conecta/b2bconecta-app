@@ -30,6 +30,10 @@ class TransactionRequestModel {
     this.aliadoRif,
     this.aliadoPhone,
     this.aliadoCreditScore,
+    this.aliadoEstado,
+    this.aliadoCiudad,
+    this.aliadoDireccion,
+    this.aliadoFiscalMapsUrl,
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
@@ -87,6 +91,13 @@ class TransactionRequestModel {
   final String? aliadoRif;
   final String? aliadoPhone;
   final int? aliadoCreditScore;
+
+  /// Ubicación fiscal del aliado (desde `profiles` al listar el pedido).
+  final String? aliadoEstado;
+  final String? aliadoCiudad;
+  final String? aliadoDireccion;
+  final String? aliadoFiscalMapsUrl;
+
   final String? ownerBusinessName;
   final String? ownerRif;
   final String? ownerPhone;
@@ -167,9 +178,31 @@ class TransactionRequestModel {
   bool get tieneDocumentacionFacturaPago =>
       hasFacturaAliado || hasComprobantePago;
 
+  /// Dirección fiscal del aliado cuando el pedido usa perfil (texto multilínea).
+  String? get aliadoDireccionFiscalMultilineaEs {
+    if (!destinoEntregaUsaPerfil) return null;
+    final parts = <String>[];
+    final e = aliadoEstado?.trim();
+    final c = aliadoCiudad?.trim();
+    final d = aliadoDireccion?.trim();
+    if (e != null && e.isNotEmpty) parts.add(e);
+    if (c != null && c.isNotEmpty) parts.add(c);
+    if (d != null && d.isNotEmpty) parts.add(d);
+    if (parts.isEmpty) return null;
+    return parts.join('\n');
+  }
+
   /// Una línea para fichas compactas de pedido.
   String get destinoEntregaLineaCompactaEs {
     if (destinoEntregaUsaPerfil) {
+      final e = aliadoEstado?.trim();
+      final c = aliadoCiudad?.trim();
+      if ((e != null && e.isNotEmpty) || (c != null && c.isNotEmpty)) {
+        final bits = <String>[];
+        if (e != null && e.isNotEmpty) bits.add(e);
+        if (c != null && c.isNotEmpty) bits.add(c);
+        return 'Entrega: ${bits.join(' · ')}';
+      }
       return 'Entrega: dirección fiscal del perfil';
     }
     final t = destinoEntregaTexto?.trim();
@@ -317,6 +350,10 @@ class TransactionRequestModel {
       aliadoRif: _nullableText(aliadoMap?['rif']),
       aliadoPhone: _nullableText(aliadoMap?['phone']),
       aliadoCreditScore: credit,
+      aliadoEstado: _nullableText(aliadoMap?['estado']),
+      aliadoCiudad: _nullableText(aliadoMap?['ciudad']),
+      aliadoDireccion: _nullableText(aliadoMap?['direccion']),
+      aliadoFiscalMapsUrl: _nullableText(aliadoMap?['fiscal_maps_url']),
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),

@@ -18,6 +18,8 @@ class ProfileModel {
     this.estado,
     this.ciudad,
     this.direccion,
+    this.logoStoragePath,
+    this.fiscalMapsUrl,
   });
 
   final String id;
@@ -59,6 +61,12 @@ class ProfileModel {
 
   /// Domicilio fiscal / dirección de la empresa (`profiles.direccion`).
   final String? direccion;
+
+  /// Logo del negocio en Storage (`profile-logos/{uid}/...`); opcional.
+  final String? logoStoragePath;
+
+  /// Enlace público (p. ej. Google Maps) a la ubicación fiscal; opcional.
+  final String? fiscalMapsUrl;
 
   /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
@@ -172,6 +180,8 @@ class ProfileModel {
       estado: _text(json['estado']),
       ciudad: _text(json['ciudad']),
       direccion: _text(json['direccion']),
+      logoStoragePath: _text(json['logo_storage_path']),
+      fiscalMapsUrl: _text(json['fiscal_maps_url']),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,6 +7,7 @@ import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'aliado_kyc_documents_section.dart';
 import 'aliado_solicitar_credito_sheet.dart';
@@ -45,9 +47,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   late final TextEditingController _estadoController;
   late final TextEditingController _ciudadController;
   late final TextEditingController _fiscalAddressController;
+  late final TextEditingController _fiscalMapsUrlController;
   late final TextEditingController _emailDisplayController;
   String _role = 'importador';
   bool _saving = false;
+  bool _logoBusy = false;
   double? _openExposure;
   bool _loadingExposure = false;
 
@@ -100,6 +104,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _estadoController = TextEditingController(text: i?.estado ?? '');
     _ciudadController = TextEditingController(text: i?.ciudad ?? '');
     _fiscalAddressController = TextEditingController(text: i?.direccion ?? '');
+    _fiscalMapsUrlController =
+        TextEditingController(text: i?.fiscalMapsUrl ?? '');
     _emailDisplayController = TextEditingController(
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
@@ -198,8 +204,66 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _estadoController.dispose();
     _ciudadController.dispose();
     _fiscalAddressController.dispose();
+    _fiscalMapsUrlController.dispose();
     _emailDisplayController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickProfileLogo() async {
+    setState(() => _logoBusy = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final f = result.files.single;
+      final bytes = f.bytes;
+      if (bytes == null || bytes.isEmpty) return;
+      final name = f.name.toLowerCase();
+      String ext = 'png';
+      if (name.endsWith('.jpg') || name.endsWith('.jpeg')) ext = 'jpg';
+      if (name.endsWith('.webp')) ext = 'webp';
+      await SupabaseService.uploadMyProfileLogo(
+        bytes: bytes,
+        fileExtension: ext,
+      );
+      if (!mounted) return;
+      widget.onSaved();
+      widget.onRelatedDataChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logo actualizado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo subir el logo: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
+  }
+
+  Future<void> _clearProfileLogo() async {
+    setState(() => _logoBusy = true);
+    try {
+      await SupabaseService.clearMyProfileLogo();
+      if (!mounted) return;
+      widget.onSaved();
+      widget.onRelatedDataChanged?.call();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
   }
 
   InputDecoration _fieldDecoration(String hint) {
@@ -350,6 +414,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         estado: _estadoController.text,
         ciudad: _ciudadController.text,
         direccion: _fiscalAddressController.text,
+        fiscalMapsUrl: _fiscalMapsUrlController.text,
       );
       if (!mounted) return;
       widget.onSaved();
@@ -406,18 +471,56 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 8),
           ],
           Center(
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.brand.withOpacity(0.12),
-                borderRadius: AppDecorations.radius12,
-              ),
-              child: const Icon(
-                Icons.business_outlined,
-                size: 36,
-                color: AppColors.brand,
-              ),
+            child: Column(
+              children: [
+                ClipRRect(
+                  borderRadius: AppDecorations.radius12,
+                  child: Container(
+                    width: 88,
+                    height: 88,
+                    color: AppColors.brand.withOpacity(0.08),
+                    child: _ProfileLogoBox(
+                      storagePath: widget.initial?.logoStoragePath,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: (_saving || _logoBusy) ? null : _pickProfileLogo,
+                      icon: _logoBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.upload_outlined, size: 18),
+                      label: Text(
+                        widget.initial?.logoStoragePath != null &&
+                                widget.initial!.logoStoragePath!.trim().isNotEmpty
+                            ? 'Cambiar logo'
+                            : 'Subir logo (opcional)',
+                      ),
+                    ),
+                    if (widget.initial?.logoStoragePath != null &&
+                        widget.initial!.logoStoragePath!.trim().isNotEmpty)
+                      TextButton(
+                        onPressed: (_saving || _logoBusy) ? null : _clearProfileLogo,
+                        child: Text(
+                          'Quitar',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ),
+                  ],
+                ),
+                Text(
+                  'Si no sube imagen, se muestra el logo MotoLink en la barra superior.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -579,6 +682,19 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 return null;
               },
             ),
+            const SizedBox(height: 14),
+            _sectionLabel('ENLACE GOOGLE MAPS (OPCIONAL)'),
+            Text(
+              'Pegue un enlace público (compartir ubicación) para que MotoLink, importadores '
+              'y transportistas abran su domicilio fiscal en el mapa. Recomendado si aún no lo tiene.',
+              style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _fiscalMapsUrlController,
+              keyboardType: TextInputType.url,
+              decoration: _fieldDecoration('https://maps.app.goo.gl/...'),
+            ),
           ],
           if (!_ubicacionObligatoria) ...[
             const SizedBox(height: 16),
@@ -675,6 +791,51 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileLogoBox extends StatelessWidget {
+  const _ProfileLogoBox({this.storagePath});
+
+  final String? storagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = storagePath?.trim();
+    if (p == null || p.isEmpty) {
+      return Center(
+        child: MotoLinkProLogo(height: 48),
+      );
+    }
+    return FutureBuilder<String>(
+      future: SupabaseService.createSignedUrlForProfileLogo(p),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        final url = snap.data;
+        if (url == null || snap.hasError) {
+          return const Center(
+            child: Icon(Icons.business_outlined, size: 40, color: AppColors.brand),
+          );
+        }
+        return Image.network(
+          url,
+          width: 88,
+          height: 88,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Center(
+            child: MotoLinkProLogo(height: 48),
+          ),
+        );
+      },
     );
   }
 }

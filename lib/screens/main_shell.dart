@@ -91,6 +91,7 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
+        currentUserProfile: _profile,
         logoHeight: MotolinkAppBarLogoSizes.importador,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
@@ -198,16 +199,19 @@ class _MainShellState extends State<MainShell> {
         index: _tabIndex,
         children: [
           HomeScreen(
+            profile: _profile,
             homeRole: widget.homeRole,
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
           ),
           _OrdersTab(
+            profile: _profile,
             homeRole: widget.homeRole,
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
           ),
           _MessagesTab(
+            profile: _profile,
             homeRole: widget.homeRole,
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
@@ -353,11 +357,13 @@ class _MainShellState extends State<MainShell> {
 
 class _OrdersTab extends StatelessWidget {
   const _OrdersTab({
+    required this.profile,
     required this.homeRole,
     required this.onNotificationTap,
     required this.unreadNotifications,
   });
 
+  final ProfileModel profile;
   final AppHomeRole homeRole;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
@@ -367,6 +373,7 @@ class _OrdersTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
+        currentUserProfile: profile,
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
@@ -385,11 +392,13 @@ class _OrdersTab extends StatelessWidget {
 
 class _MessagesTab extends StatelessWidget {
   const _MessagesTab({
+    required this.profile,
     required this.homeRole,
     required this.onNotificationTap,
     required this.unreadNotifications,
   });
 
+  final ProfileModel profile;
   final AppHomeRole homeRole;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
@@ -399,6 +408,7 @@ class _MessagesTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
+        currentUserProfile: profile,
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
@@ -435,6 +445,7 @@ class _ProfileTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
+        currentUserProfile: profile,
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
@@ -459,7 +470,7 @@ class _ProfileTab extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: ProfileB2BForm(
             key: ValueKey<Object>(
-              '${profile.id}_${profile.businessName}_${profile.rif}_${profile.role}_${profile.kycStatus}_${profile.primerosPedidosContadoEntregados}_${profile.creditLimit}_${profile.creditoPreactivadoPorAdmin}',
+              '${profile.id}_${profile.businessName}_${profile.rif}_${profile.role}_${profile.kycStatus}_${profile.primerosPedidosContadoEntregados}_${profile.creditLimit}_${profile.creditoPreactivadoPorAdmin}_${profile.logoStoragePath}_${profile.fiscalMapsUrl}',
             ),
             initial: profile,
             onRelatedDataChanged: onProfileSaved,

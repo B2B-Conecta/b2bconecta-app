@@ -197,26 +197,14 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
     }
 
     final pe = r.pagoEstadoRevisionEfectivo;
-    final puedeTransito = r.hasProveedorFactura &&
-        r.hasFacturaAliado &&
-        pe == PagoRevisionEstado.aprobado;
+    final puedeTransito =
+        r.hasProveedorFactura && r.hasFacturaAliado;
 
     String? bloqueoTransito;
     if (!r.hasProveedorFactura) {
       bloqueoTransito = 'Falta factura del proveedor (importador).';
     } else if (!r.hasFacturaAliado) {
       bloqueoTransito = 'Adjunte la factura oficial al aliado.';
-    } else if (pe != PagoRevisionEstado.aprobado) {
-      final pm = r.pagoMetodo?.trim();
-      if (pm == PagoMetodo.efectivo) {
-        bloqueoTransito =
-            'Apruebe la declaración de pago en efectivo del aliado.';
-      } else if (pm == PagoMetodo.creditoSistema) {
-        bloqueoTransito =
-            'Apruebe la solicitud de pago con crédito del sistema del aliado.';
-      } else {
-        bloqueoTransito = 'Apruebe el comprobante de pago del aliado.';
-      }
     }
 
     return Column(
@@ -224,7 +212,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
       children: [
         const Divider(height: 20),
         const Text(
-          'Facturación y pago (antes de tránsito)',
+          'Facturación y pago',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
@@ -233,7 +221,9 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         ),
         const SizedBox(height: 8),
         Text(
-          '1) Factura proveedor · 2) Factura MotoLink al aliado · 3) Pago y comprobante · 4) Tránsito',
+          'El aliado solo puede enviar comprobante o declarar pago en la app tras la factura MotoLink al aliado; '
+          'puede hacerlo en cualquier fase activa del pedido. En el cronograma de envío no figura como paso del ciclo. '
+          'Marcar en tránsito solo exige factura del proveedor, factura MotoLink al aliado y ETA; el pago puede regularizarse antes o después.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
         ),
         const SizedBox(height: 12),
@@ -273,7 +263,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         ),
         const SizedBox(height: 4),
         Text(
-          'El aliado la verá en su pedido para pagar y adjuntar comprobante.',
+          'Referencia fiscal para el aliado; habilita en la app la sección de pago y comprobante.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 6),
@@ -339,86 +329,87 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         ),
         const SizedBox(height: 4),
         if (!r.hasFacturaAliado)
-          Text(
-            'Cuando exista la factura oficial, el aliado podrá pagar y subir comprobante.',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          )
-        else ...[
-          Text(
-            'Estado: ${_estadoPagoLabel(r)}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.brandBlue,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Sin factura MotoLink al aliado: el aliado aún no puede enviar comprobante desde la app.',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.25),
             ),
           ),
-          if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty)
-            Text(
-              'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-            ),
-          if (r.hasComprobantePago) ...[
-            Text(
-              'Comprobante: ${r.comprobantePagoFileName ?? 'archivo'} · '
-              '${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 6),
-            OutlinedButton.icon(
-              onPressed: () => _openUrl(
-                context,
-                () => SupabaseService.createSignedUrlForComprobantePago(
-                  r.comprobantePagoStoragePath!.trim(),
-                ),
+        Text(
+          'Estado: ${_estadoPagoLabel(r)}',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.brandBlue,
+          ),
+        ),
+        if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty)
+          Text(
+            'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+          ),
+        if (r.hasComprobantePago) ...[
+          Text(
+            'Comprobante: ${r.comprobantePagoFileName ?? 'archivo'} · '
+            '${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: () => _openUrl(
+              context,
+              () => SupabaseService.createSignedUrlForComprobantePago(
+                r.comprobantePagoStoragePath!.trim(),
               ),
-              icon: const Icon(Icons.receipt_long_outlined, size: 18),
-              label: const Text('Ver comprobante'),
             ),
-          ],
-          if (r.pagoComprobanteRechazoNota != null &&
-              r.pagoComprobanteRechazoNota!.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Último rechazo: ${r.pagoComprobanteRechazoNota}',
-              style: TextStyle(fontSize: 11, color: Colors.red.shade800, height: 1.25),
-            ),
-          ],
-          if (pe == PagoRevisionEstado.enRevision) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton(
-                  onPressed: _busyAprobar ? null : () => _aprobarPago(context),
-                  child: _busyAprobar
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Aprobar pago'),
-                ),
-                OutlinedButton(
-                  onPressed: _busyRechazar ? null : () => _rechazarPago(context),
-                  child: _busyRechazar
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          r.pagoMetodo?.trim() == PagoMetodo.creditoSistema
-                              ? 'Rechazar solicitud'
-                              : 'Rechazar comprobante',
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: const Text('Ver comprobante'),
+          ),
+        ],
+        if (r.pagoComprobanteRechazoNota != null &&
+            r.pagoComprobanteRechazoNota!.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Último rechazo: ${r.pagoComprobanteRechazoNota}',
+            style: TextStyle(fontSize: 11, color: Colors.red.shade800, height: 1.25),
+          ),
+        ],
+        if (pe == PagoRevisionEstado.enRevision) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                onPressed: _busyAprobar ? null : () => _aprobarPago(context),
+                child: _busyAprobar
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
                         ),
-                ),
-              ],
-            ),
-          ],
+                      )
+                    : const Text('Aprobar pago'),
+              ),
+              OutlinedButton(
+                onPressed: _busyRechazar ? null : () => _rechazarPago(context),
+                child: _busyRechazar
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        r.pagoMetodo?.trim() == PagoMetodo.creditoSistema
+                            ? 'Rechazar solicitud'
+                            : 'Rechazar comprobante',
+                      ),
+              ),
+            ],
+          ),
         ],
         EfectivoRespaldoRegistrar(
           request: r,

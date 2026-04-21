@@ -658,6 +658,9 @@ class SupabaseService {
     efectivo_respaldo_storage_path,
     efectivo_respaldo_file_name,
     efectivo_respaldo_submitted_at,
+    destino_entrega_usa_perfil,
+    destino_entrega_texto,
+    destino_entrega_maps_url,
     products ( name, sku, price_usd ),
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_score, phone ),
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
@@ -1085,6 +1088,9 @@ class SupabaseService {
     required String ownerId,
     required int cantidad,
     required double precioUnitarioProveedor,
+    bool destinoEntregaUsaPerfil = true,
+    String? destinoEntregaTexto,
+    String? destinoEntregaMapsUrl,
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -1164,6 +1170,15 @@ class SupabaseService {
       );
     }
 
+    final otroDestinoTexto = destinoEntregaTexto?.trim();
+    final mapsTrim = destinoEntregaMapsUrl?.trim();
+    if (!destinoEntregaUsaPerfil &&
+        (otroDestinoTexto == null || otroDestinoTexto.isEmpty)) {
+      throw ArgumentError(
+        'Indique la dirección de entrega cuando el destino no es el del perfil.',
+      );
+    }
+
     if (enFaseContado) {
       final openCnt = await fetchOpenTransactionRequestCountForCurrentAliado();
       if (openCnt >= 1) {
@@ -1203,6 +1218,12 @@ class SupabaseService {
         'precio_unitario_proveedor': precioUnitarioProveedor,
         'precio_unitario_aliado': unitAliado,
         'precio_total': total,
+        'destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
+        'destino_entrega_texto':
+            destinoEntregaUsaPerfil ? null : otroDestinoTexto,
+        'destino_entrega_maps_url': destinoEntregaUsaPerfil
+            ? null
+            : (mapsTrim != null && mapsTrim.isNotEmpty ? mapsTrim : null),
       });
     } on PostgrestException catch (e) {
       final m = e.message.toLowerCase();

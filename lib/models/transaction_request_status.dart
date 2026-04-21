@@ -68,6 +68,15 @@ abstract final class TransactionRequestStatus {
     rechazado,
   ];
 
+  /// Declaración / comprobante de pago multietapa (excluye solo `rechazado`).
+  static const List<String> aliadoDeclaracionPagoMultietapa = [
+    pendiente,
+    aprobadoAdmin,
+    enPreparacion,
+    enTransito,
+    entregado,
+  ];
+
   static String labelEs(String status) {
     switch (status) {
       case pendiente:

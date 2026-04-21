@@ -50,6 +50,9 @@ class TransactionRequestModel {
     this.efectivoRespaldoStoragePath,
     this.efectivoRespaldoFileName,
     this.efectivoRespaldoSubmittedAt,
+    this.destinoEntregaUsaPerfil = true,
+    this.destinoEntregaTexto,
+    this.destinoEntregaMapsUrl,
   });
 
   final String id;
@@ -108,6 +111,11 @@ class TransactionRequestModel {
   final String? efectivoRespaldoFileName;
   final DateTime? efectivoRespaldoSubmittedAt;
 
+  /// Destino de entrega para esta orden (perfil fiscal u otro + Maps opcional).
+  final bool destinoEntregaUsaPerfil;
+  final String? destinoEntregaTexto;
+  final String? destinoEntregaMapsUrl;
+
   int get _etaDaysCoalesced => transitEtaDays ?? 0;
   int get _etaHoursCoalesced => transitEtaHours ?? 0;
 
@@ -150,6 +158,19 @@ class TransactionRequestModel {
   bool get tieneDocumentacionFacturaPago =>
       hasFacturaAliado || hasComprobantePago;
 
+  /// Una línea para fichas compactas de pedido.
+  String get destinoEntregaLineaCompactaEs {
+    if (destinoEntregaUsaPerfil) {
+      return 'Entrega: dirección fiscal del perfil';
+    }
+    final t = destinoEntregaTexto?.trim();
+    if (t != null && t.isNotEmpty) {
+      if (t.length <= 48) return 'Entrega: $t';
+      return 'Entrega: ${t.substring(0, 46)}…';
+    }
+    return 'Entrega: otro destino';
+  }
+
   /// `pendiente` si ya hay factura MotoLink pero aún no hay estado persistido.
   String get pagoEstadoRevisionEfectivo {
     if (!hasFacturaAliado) return PagoRevisionEstado.pendiente;
@@ -158,11 +179,14 @@ class TransactionRequestModel {
     return r;
   }
 
-  /// Mensaje corto para el aliado durante `en_preparacion` (pago / comprobante).
+  /// Mensaje corto para el aliado en fases donde puede declarar o gestionar el pago.
   String? get aliadoPagoEstadoResumenEs {
-    if (status != TransactionRequestStatus.enPreparacion) return null;
+    if (status == TransactionRequestStatus.rechazado) return null;
+    if (!TransactionRequestStatus.aliadoDeclaracionPagoMultietapa.contains(status)) {
+      return null;
+    }
     if (!hasFacturaAliado) {
-      return 'Esperando factura oficial de MotoLink para pagar.';
+      return 'Tras la factura MotoLink al aliado podrá gestionar el pago aquí; no forma parte del cronograma de envío.';
     }
     final metodo = pagoMetodo?.trim();
     if (metodo == PagoMetodo.efectivo) {
@@ -308,6 +332,9 @@ class TransactionRequestModel {
           _nullableText(json['efectivo_respaldo_file_name']),
       efectivoRespaldoSubmittedAt:
           _parseDate(json['efectivo_respaldo_submitted_at']),
+      destinoEntregaUsaPerfil: json['destino_entrega_usa_perfil'] != false,
+      destinoEntregaTexto: _nullableText(json['destino_entrega_texto']),
+      destinoEntregaMapsUrl: _nullableText(json['destino_entrega_maps_url']),
     );
   }
 

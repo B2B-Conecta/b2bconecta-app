@@ -226,9 +226,14 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
+  bool _estadoPermiteDeclaracionPago(TransactionRequestModel r) {
+    return TransactionRequestStatus.aliadoDeclaracionPagoMultietapa
+        .contains(r.status);
+  }
+
   /// Mientras el pago no esté aprobado por MotoLink, el aliado puede adjuntar o reemplazar comprobante.
   bool _puedeModificarComprobante(TransactionRequestModel r) {
-    if (r.status != TransactionRequestStatus.enPreparacion) return false;
+    if (!_estadoPermiteDeclaracionPago(r)) return false;
     if (!r.hasFacturaAliado) return false;
     final pe = r.pagoEstadoRevisionEfectivo;
     if (pe == PagoRevisionEstado.aprobado) return false;
@@ -247,17 +252,22 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
-    final mostrar = r.status == TransactionRequestStatus.enPreparacion ||
-        r.tieneDocumentacionFacturaPago;
+    final mostrar = r.status != TransactionRequestStatus.rechazado &&
+        (_estadoPermiteDeclaracionPago(r) || r.tieneDocumentacionFacturaPago);
     if (!mostrar) return const SizedBox.shrink();
 
     final pe = r.pagoEstadoRevisionEfectivo;
-    final referenciaHistorica =
-        r.status != TransactionRequestStatus.enPreparacion &&
-            r.tieneDocumentacionFacturaPago;
     final puedeModificarComprobante = _puedeModificarComprobante(r);
+    final referenciaHistorica =
+        r.status == TransactionRequestStatus.entregado &&
+            r.tieneDocumentacionFacturaPago &&
+            !puedeModificarComprobante &&
+            pe == PagoRevisionEstado.aprobado;
     final puedeCambiarMetodo =
         puedeModificarComprobante && _puedeCambiarMetodo(r);
+    final mostrarGestionPago = !referenciaHistorica
+        ? r.hasFacturaAliado
+        : r.tieneDocumentacionFacturaPago;
     final expSum = widget.openCreditExposureSum;
     final dispoCred = expSum != null && widget.profile != null
         ? widget.profile!.cupoDisponible(expSum)
@@ -271,14 +281,25 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         Text(
           referenciaHistorica
               ? 'Factura y pago (referencia)'
-              : 'Factura y pago',
+              : 'Factura MotoLink y pago',
           style: const TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
+        if (!referenciaHistorica)
+          Text(
+            'Comprobante y revisión de MotoLink son parte del expediente del pedido; '
+            'no aparecen en el cronograma de envío. Se habilita al tener factura MotoLink.',
+            style: TextStyle(
+              fontSize: 10.5,
+              height: 1.35,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        if (!referenciaHistorica) const SizedBox(height: 6),
         if (referenciaHistorica)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -341,11 +362,15 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
           ),
         ] else if (!referenciaHistorica)
           Text(
-            'Cuando MotoLink emita la factura oficial, podrá descargarla aquí y continuar con el pago.',
+            'Cuando MotoLink emita la factura oficial al aliado, aquí podrá elegir método de pago '
+            'y adjuntar comprobante (en cualquier fase activa del pedido).',
             style: TextStyle(
-                fontSize: 12, color: Colors.grey.shade700, height: 1.25),
+              fontSize: 12,
+              color: Colors.grey.shade700,
+              height: 1.25,
+            ),
           ),
-        if (r.hasFacturaAliado) ...[
+        if (mostrarGestionPago) ...[
           const SizedBox(height: 14),
           const Text(
             'Método de pago',

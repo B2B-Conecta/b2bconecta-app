@@ -116,6 +116,15 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            r.destinoEntregaLineaCompactaEs,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                              height: 1.25,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -169,6 +178,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           ),
                         ),
                         TransactionRequestAliadoContactSection(request: r),
+                        const SizedBox(height: 12),
+                        TransactionRequestDestinoEntregaSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestLifecycleSection(request: r),
                         if (expandedFooter != null) ...[

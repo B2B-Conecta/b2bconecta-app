@@ -89,6 +89,15 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            r.destinoEntregaLineaCompactaEs,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                              height: 1.25,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -124,6 +133,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           ),
                         ),
                         TransactionRequestPartiesContactSection(request: r),
+                        const SizedBox(height: 12),
+                        TransactionRequestDestinoEntregaSection(request: r),
                         if (r.aliadoCreditScore != null) ...[
                           const SizedBox(height: 8),
                           Row(

@@ -144,6 +144,96 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
   }
 }
 
+/// Destino de entrega indicado por el aliado al solicitar el pedido.
+class TransactionRequestDestinoEntregaSection extends StatelessWidget {
+  const TransactionRequestDestinoEntregaSection({
+    super.key,
+    required this.request,
+  });
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final usa = r.destinoEntregaUsaPerfil;
+    final texto = r.destinoEntregaTexto?.trim();
+    final mapsUrl = r.destinoEntregaMapsUrl?.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Destino de entrega',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (usa)
+          Text(
+            'Entrega en la dirección fiscal registrada en Mi perfil del aliado '
+            '(estado, ciudad y domicilio).',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade800,
+              height: 1.35,
+            ),
+          )
+        else ...[
+          Text(
+            texto != null && texto.isNotEmpty
+                ? texto
+                : 'Otro destino (sin texto guardado)',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade800,
+              height: 1.35,
+            ),
+          ),
+          if (mapsUrl != null && mapsUrl.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _openMaps(context, mapsUrl),
+              icon: const Icon(Icons.map_outlined, size: 18),
+              label: const Text('Abrir enlace en mapa'),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Future<void> _openMaps(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        !(uri.hasScheme &&
+            (uri.scheme == 'http' || uri.scheme == 'https'))) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El enlace de mapa no es válido.')),
+      );
+      return;
+    }
+    try {
+      final ok =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir el mapa.')),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+}
+
 class _PartyCard extends StatelessWidget {
   const _PartyCard({
     required this.icon,
@@ -352,6 +442,16 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'El comprobante de pago y la aprobación de MotoLink quedan en el expediente del pedido '
+          '(apartado «Factura y pago» del aliado, activo tras la factura MotoLink); no forman parte de este cronograma.',
+          style: TextStyle(
+            fontSize: 10.5,
+            height: 1.35,
+            color: Colors.grey.shade700,
+          ),
+        ),
         const SizedBox(height: 8),
         DecoratedBox(
           decoration: BoxDecoration(
@@ -404,23 +504,10 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                   ),
                   Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
-                    label: 'Comprobante de pago',
-                    value: _comprobantePagoTimeline(r),
-                    isDone: _comprobantePagoHecho(r),
-                  ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
-                  _TimelineRow(
                     label: 'Respaldo cobro en efectivo',
                     value: _efectivoRespaldoTimeline(r),
                     isDone: r.hasEfectivoRespaldo,
                     mutedIfEmpty: true,
-                  ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
-                  _TimelineRow(
-                    label: 'Pago aprobado (MotoLink)',
-                    value: formatEsShortDateTime(r.pagoAprobadoAt),
-                    isDone:
-                        r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado,
                   ),
                   Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
@@ -442,16 +529,6 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  static bool _comprobantePagoHecho(TransactionRequestModel r) {
-    if (r.hasComprobantePago) return true;
-    final m = r.pagoMetodo?.trim();
-    final sinArchivo =
-        m == PagoMetodo.efectivo || m == PagoMetodo.creditoSistema;
-    final aprobado =
-        r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
-    return sinArchivo && aprobado;
   }
 
   static String _entregadoTimeline(TransactionRequestModel r) {
@@ -485,57 +562,6 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
     final t = formatEsShortDateTime(r.facturaAliadoSubmittedAt);
     if (fn != null && fn.isNotEmpty) return '$fn\n$t';
     return t;
-  }
-
-  static String _comprobantePagoTimeline(TransactionRequestModel r) {
-    final pr = r.pagoEstadoRevision?.trim();
-    final metodo = r.pagoMetodo?.trim();
-    final credito = metodo == PagoMetodo.creditoSistema;
-    if (pr == PagoRevisionEstado.aprobado &&
-        metodo == PagoMetodo.efectivo &&
-        !r.hasComprobantePago) {
-      return 'Pago en efectivo · sin comprobante bancario · '
-          '${formatEsShortDateTime(r.pagoAprobadoAt)}';
-    }
-    if (pr == PagoRevisionEstado.aprobado &&
-        credito &&
-        !r.hasComprobantePago) {
-      return 'Pago con crédito del sistema MotoLink · '
-          '${formatEsShortDateTime(r.pagoAprobadoAt)}';
-    }
-    if (pr == PagoRevisionEstado.aprobado && !r.hasComprobantePago) {
-      return 'Aprobado · ${formatEsShortDateTime(r.pagoAprobadoAt)}';
-    }
-    if (!r.hasComprobantePago) {
-      if (credito && r.hasFacturaAliado) {
-        if (pr == null ||
-            pr.isEmpty ||
-            pr == PagoRevisionEstado.pendiente) {
-          return 'Pendiente: aliado debe solicitar pago con crédito';
-        }
-        if (pr == PagoRevisionEstado.enRevision) {
-          return 'Solicitud de crédito en revisión por MotoLink';
-        }
-        if (pr == PagoRevisionEstado.rechazado) {
-          return 'Solicitud rechazada · aliado puede reintentar';
-        }
-      }
-      if (r.hasFacturaAliado &&
-          (pr == null ||
-              pr.isEmpty ||
-              pr == PagoRevisionEstado.pendiente ||
-              pr == PagoRevisionEstado.rechazado)) {
-        return 'Pendiente de envío por el aliado';
-      }
-      return '—';
-    }
-    final met = r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty
-        ? PagoMetodo.labelEs(r.pagoMetodo!)
-        : 'Método —';
-    final fn = r.comprobantePagoFileName?.trim();
-    final nameLine =
-        fn != null && fn.isNotEmpty ? '$fn · ' : '';
-    return '$nameLine$met · ${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}';
   }
 
   static String _efectivoRespaldoTimeline(TransactionRequestModel r) {

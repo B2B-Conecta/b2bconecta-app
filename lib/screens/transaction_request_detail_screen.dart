@@ -66,6 +66,8 @@ class _TransactionRequestDetailScreenState
               const SizedBox(height: 12),
               _contactByRole(r),
               const SizedBox(height: 12),
+              TransactionRequestDestinoEntregaSection(request: r),
+              const SizedBox(height: 12),
               TransactionRequestLifecycleSection(request: r),
               if (r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),

@@ -113,8 +113,16 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          if (r.status == TransactionRequestStatus.enPreparacion &&
-                              r.aliadoPagoEstadoResumenEs != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            r.destinoEntregaLineaCompactaEs,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                              height: 1.25,
+                            ),
+                          ),
+                          if (r.aliadoPagoEstadoResumenEs != null) ...[
                             const SizedBox(height: 4),
                             Text(
                               r.aliadoPagoEstadoResumenEs!,
@@ -221,6 +229,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           ),
                         ),
                         TransactionRequestImporterContactSection(request: r),
+                        const SizedBox(height: 12),
+                        TransactionRequestDestinoEntregaSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestLifecycleSection(request: r),
                         if (expandedFooter != null) ...[

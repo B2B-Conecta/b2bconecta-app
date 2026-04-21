@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/credit_limit_exception.dart';
 import '../models/cash_phase_exception.dart';
@@ -45,6 +46,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   double get _precioVentaUnit =>
       part.precioUnitarioParaAliado(faseContado: _faseContado);
 
+  String get _direccionFiscalParaDialogo {
+    final p = _profile;
+    if (p == null) return '';
+    final e = p.estado?.trim();
+    final c = p.ciudad?.trim();
+    final d = p.direccion?.trim();
+    final parts = <String>[];
+    if (e != null && e.isNotEmpty) parts.add(e);
+    if (c != null && c.isNotEmpty) parts.add(c);
+    if (d != null && d.isNotEmpty) parts.add(d);
+    return parts.join(', ');
+  }
+
   String get _skuDisplay {
     final sku = part.sku?.trim();
     if (sku != null && sku.isNotEmpty) return sku;
@@ -76,96 +90,234 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final qtyController = TextEditingController(text: '1');
+    final destinoCtrl = TextEditingController();
+    final mapsCtrl = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
     final maxQty = part.stock;
 
     bool? ok;
     var qtyText = '1';
+    var usaDestinoPerfil = true;
+    var savedDestinoTexto = '';
+    var savedMapsUrl = '';
     try {
       ok = await showDialog<bool>(
         context: context,
         builder: (ctx) {
-          return AlertDialog(
-            title: const Text('Solicitar pedido'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    part.nombre,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$${_precioVentaUnit.toStringAsFixed(2)} / u.',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.brandBlue,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qtyController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      labelText: 'Cantidad (máx. $maxQty)',
-                      filled: true,
-                      fillColor: AppColors.fieldFill,
-                      border: OutlineInputBorder(
-                        borderRadius: AppDecorations.radius12,
-                        borderSide: BorderSide.none,
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              final fiscal = _direccionFiscalParaDialogo;
+              return AlertDialog(
+                title: const Text('Solicitar pedido'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        part.nombre,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: qtyController,
-                    builder: (context, v, _) {
-                      final q = int.tryParse(v.text) ?? 0;
-                      final safe = q.clamp(1, maxQty);
-                      final total = _precioVentaUnit * safe;
-                      return Text(
-                        'Total: \$${total.toStringAsFixed(2)}',
+                      const SizedBox(height: 8),
+                      Text(
+                        '\$${_precioVentaUnit.toStringAsFixed(2)} / u.',
                         style: const TextStyle(
+                          fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: AppColors.brandOrange,
+                          color: AppColors.brandBlue,
                         ),
-                      );
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: qtyController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          labelText: 'Cantidad (máx. $maxQty)',
+                          filled: true,
+                          fillColor: AppColors.fieldFill,
+                          border: OutlineInputBorder(
+                            borderRadius: AppDecorations.radius12,
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: qtyController,
+                        builder: (context, v, _) {
+                          final q = int.tryParse(v.text) ?? 0;
+                          final safe = q.clamp(1, maxQty);
+                          final total = _precioVentaUnit * safe;
+                          return Text(
+                            'Total: \$${total.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: AppColors.brandOrange,
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '¿Dónde entregar?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: Colors.grey.shade900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      RadioListTile<bool>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: true,
+                        groupValue: usaDestinoPerfil,
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => usaDestinoPerfil = v);
+                        },
+                        title: const Text(
+                          'Dirección fiscal de Mi perfil',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        subtitle: fiscal.isEmpty
+                            ? null
+                            : Text(
+                                fiscal,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                  height: 1.25,
+                                ),
+                              ),
+                      ),
+                      RadioListTile<bool>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: false,
+                        groupValue: usaDestinoPerfil,
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => usaDestinoPerfil = v);
+                        },
+                        title: const Text(
+                          'Otro destino (esta orden)',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                      if (!usaDestinoPerfil) ...[
+                        TextField(
+                          controller: destinoCtrl,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            labelText: 'Dirección o referencia de entrega',
+                            hintText:
+                                'Ej.: Av. Principal, local, zona, punto de referencia',
+                            filled: true,
+                            fillColor: AppColors.fieldFill,
+                            border: OutlineInputBorder(
+                              borderRadius: AppDecorations.radius12,
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: mapsCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Enlace Google Maps (opcional)',
+                            hintText: 'https://maps.google.com/...',
+                            filled: true,
+                            fillColor: AppColors.fieldFill,
+                            border: OutlineInputBorder(
+                              borderRadius: AppDecorations.radius12,
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () async {
+                              final q = destinoCtrl.text.trim();
+                              if (q.isEmpty) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Escriba primero una dirección o referencia.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              final uri = Uri.parse(
+                                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(q)}',
+                              );
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            },
+                            icon: const Icon(Icons.map_outlined, size: 18),
+                            label: const Text('Buscar en Google Maps'),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'La cantidad quedará fija para todo el pedido; el stock se descuenta cuando el aliado confirma la entrega.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'La solicitud quedará pendiente de aprobación por MotoLink. '
+                        'El importador solo la verá tras validación.',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancelar'),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      if (!usaDestinoPerfil &&
+                          destinoCtrl.text.trim().isEmpty) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Indique la dirección cuando el destino no es el del perfil.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.pop(ctx, true);
                     },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'La cantidad quedará fija para todo el pedido; el stock se descuenta cuando el aliado confirma la entrega.',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'La solicitud quedará pendiente de aprobación por MotoLink. '
-                    'El importador solo la verá tras validación.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    child: const Text('Enviar solicitud'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Enviar solicitud'),
-              ),
-            ],
+              );
+            },
           );
         },
       );
       qtyText = qtyController.text;
+      savedDestinoTexto = destinoCtrl.text.trim();
+      savedMapsUrl = mapsCtrl.text.trim();
     } finally {
       qtyController.dispose();
+      destinoCtrl.dispose();
+      mapsCtrl.dispose();
     }
 
     if (ok != true || !mounted) return;
@@ -209,6 +361,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ownerId: ownerId,
         cantidad: q,
         precioUnitarioProveedor: part.precio,
+        destinoEntregaUsaPerfil: usaDestinoPerfil,
+        destinoEntregaTexto:
+            usaDestinoPerfil ? null : savedDestinoTexto,
+        destinoEntregaMapsUrl:
+            usaDestinoPerfil ? null : savedMapsUrl,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

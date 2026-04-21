@@ -1114,36 +1114,20 @@ class SupabaseService {
     final pce = profile.primerosPedidosContadoEntregados ?? 0;
     final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
 
-    if (enFaseContado) {
-      final rif = profile.rif?.trim();
-      if (rif == null || rif.isEmpty) {
-        throw KycVerificationException(
-          'Registre su RIF comercial en Mi perfil para solicitar pedidos en contado.',
-        );
-      }
-      final ks = profile.kycStatus?.trim();
-      if (ks == KycStatus.rechazado) {
-        throw KycVerificationException(
-          'Su documentación fue rechazada. Actualice los datos en su perfil antes de solicitar pedidos.',
-        );
-      }
-    } else {
-      final ks = profile.kycStatus?.trim();
-      if (ks != KycStatus.aprobado) {
-        if (ks == KycStatus.enRevision) {
-          throw KycVerificationException(
-            'Su documentación está en revisión. MotoLink le avisará al aprobarla.',
-          );
-        }
-        if (ks == KycStatus.rechazado) {
-          throw KycVerificationException(
-            'Su documentación fue rechazada. Actualice los archivos en su perfil y vuelva a enviar a revisión.',
-          );
-        }
-        throw KycVerificationException(
-          'Debe completar la verificación documental en su perfil y obtener la aprobación de MotoLink antes de pedir.',
-        );
-      }
+    // Misma regla en toda la vida del aliado: RIF + domicilio (ya validado arriba); solo
+    // documentación explícitamente rechazada bloquea pedidos al contado. KYC completo no es
+    // requisito para generar pedidos (sí para cupo y métodos ampliados cuando aplique).
+    final rif = profile.rif?.trim();
+    if (rif == null || rif.isEmpty) {
+      throw KycVerificationException(
+        'Registre su RIF comercial en Mi perfil para solicitar pedidos.',
+      );
+    }
+    final ks = profile.kycStatus?.trim();
+    if (ks == KycStatus.rechazado) {
+      throw KycVerificationException(
+        'Su documentación fue rechazada. Actualice los datos en su perfil antes de solicitar pedidos.',
+      );
     }
 
     final unitAliado = calculateAliadoUnitPrice(
@@ -1192,21 +1176,17 @@ class SupabaseService {
       }
     } else {
       final limit = profile.creditLimit;
-      if (limit == null) {
-        throw CreditLimitException(
-          'MotoLink debe asignar un límite de crédito antes de solicitar pedidos. '
-          'Cuando su cupo esté autorizado, podrá continuar.',
-        );
-      }
-      final exposure = await fetchOpenCreditExposureForCurrentAliado();
-      final consumido = profile.creditoConsumidoAcumulado ?? 0;
-      final usado = exposure + consumido;
-      if (usado + total > limit + _creditTol) {
-        throw CreditLimitException(
-          'Este pedido (\$${total.toStringAsFixed(2)}) más su uso actual '
-          '(\$${usado.toStringAsFixed(2)}: pedidos abiertos + entregas a crédito) '
-          'supera su límite autorizado (\$${limit.toStringAsFixed(2)}).',
-        );
+      if (limit != null && limit > 0) {
+        final exposure = await fetchOpenCreditExposureForCurrentAliado();
+        final consumido = profile.creditoConsumidoAcumulado ?? 0;
+        final usado = exposure + consumido;
+        if (usado + total > limit + _creditTol) {
+          throw CreditLimitException(
+            'Este pedido (\$${total.toStringAsFixed(2)}) más su uso actual '
+            '(\$${usado.toStringAsFixed(2)}: pedidos abiertos + entregas a crédito) '
+            'supera su límite autorizado (\$${limit.toStringAsFixed(2)}).',
+          );
+        }
       }
     }
 

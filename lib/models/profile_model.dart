@@ -81,6 +81,13 @@ class ProfileModel {
     return (primerosPedidosContadoEntregados ?? 0) < CashPhasePolicy.entregasRequeridas;
   }
 
+  /// Cupo MotoLink asignado y usable (> 0). Sin cupo, el aliado puede seguir pidiendo al contado
+  /// (transferencia/efectivo) tras la fase inicial; otros medios y crédito sistema requieren cupo.
+  bool get tieneLineaCreditoMotoLink {
+    final lim = creditLimit;
+    return lim != null && lim > 0;
+  }
+
   /// Cupo mostrado al aliado: en fase contado es 0 salvo [creditoPreactivadoPorAdmin] con cupo asignado.
   double? get limiteCreditoMostradoAliado {
     if (esAliadoEnFaseContado && !creditoPreactivadoPorAdmin) return 0;

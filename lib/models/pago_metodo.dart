@@ -1,8 +1,9 @@
 /// Método de pago del aliado (`transaction_requests.pago_metodo`).
 ///
 /// En los **primeros pedidos contado** (onboarding) la UI solo ofrece [valuesFaseContado].
-/// **Después** de esa fase, con KYC aprobado y cupo puede usarse [creditoSistema]; transferencia y
-/// efectivo **siguen** disponibles para compras al contado junto con el resto de medios.
+/// **Después** de esa fase, sin cupo asignado sigue igual hasta que MotoLink autorice línea (>0);
+/// entonces se ofrecen el resto de medios y [creditoSistema]. Transferencia y efectivo quedan siempre
+/// para compras al contado.
 abstract final class PagoMetodo {
   /// Recargo sobre [precio_base_aliado_total] al elegir efectivo (servidor y cliente alineados).
   static const double recargoEfectivoTasa = 0.04;

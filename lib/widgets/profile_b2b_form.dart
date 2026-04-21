@@ -274,7 +274,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ],
             Text(
               limRaw == null && !enFaseContado
-                  ? 'Pendiente: MotoLink asignará su límite de crédito (pestaña Crédito).'
+                  ? 'Sin cupo asignado: puede solicitar pedidos pagando al contado (transferencia o efectivo). '
+                      'MotoLink puede asignar límite cuando lo solicite (pestaña Crédito).'
                   : enFaseContado && !preact
                       ? 'Límite mostrado (fase contado): \$${(limMostrado ?? 0).toStringAsFixed(2)}'
                       : 'Límite autorizado: \$${(limMostrado ?? 0).toStringAsFixed(2)}',

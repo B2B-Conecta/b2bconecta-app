@@ -162,7 +162,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final faseContado = profile.esAliadoEnFaseContado;
-    final cupoOk = profile.creditLimit != null;
+    final tieneCupo = profile.tieneLineaCreditoMotoLink;
     final kycGlobal = profile.kycStatus?.trim();
     final kycOk = kycGlobal == KycStatus.aprobado;
 
@@ -177,11 +177,12 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             ? 'Primeros pedidos (contado): con RIF y domicilio fiscal puede pedir hasta '
                 '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad. '
                 'El cupo revolvente y la documentación completa se revisan al solicitar línea de crédito MotoLink.'
-            : (cupoOk
+            : tieneCupo
                 ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} USD · '
                     '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD ya imputados por entregas a crédito. '
                     'Los pedidos en curso también comprometen cupo.'
-                : 'Pendiente: MotoLink debe asignar su límite de crédito (pestaña Crédito).');
+                : 'Sin línea de crédito asignada: puede seguir solicitando repuestos pagando al contado '
+                    '(transferencia o efectivo). MotoLink puede habilitar cupo y más medios de pago cuando lo solicite.';
 
     final kycLabelEs = faseContado && !kycOk
         ? 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
@@ -191,7 +192,8 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             ? 'Verificación documental aprobada (todos los documentos requeridos).'
             : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}.');
 
-    final cupoRowOk = faseContado || cupoOk;
+    // La fila resume cupo; operar al contado tras la fase inicial no requiere límite asignado.
+    const cupoRowOk = true;
     final kycRowOk = faseContado || kycOk;
 
     return DecoratedBox(

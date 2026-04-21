@@ -1,8 +1,8 @@
 /// Primeros [entregasRequeridas] pedidos de onboarding: precio promocional contado, reglas de acceso
 /// relajadas (RIF + domicilio) y en la UI de pago solo transferencia/efectivo.
 ///
-/// Tras completar esa fase, nuevos pedidos exigen KYC aprobado para usar crédito MotoLink; el pago al
-/// contado (transferencia/efectivo) y el resto de métodos siguen disponibles según cupo y perfil.
+/// Tras completar esa fase, nuevos pedidos exigen KYC aprobado. Sin cupo MotoLink puede seguir pidiendo
+/// al contado (transferencia/efectivo); Pago Móvil, Zelle y crédito sistema cuando MotoLink asigne cupo.
 abstract final class CashPhasePolicy {
   static const int entregasRequeridas = 3;
 

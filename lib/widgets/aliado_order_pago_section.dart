@@ -44,8 +44,8 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
 
   static String _fmtUsd(double v) => '\$${v.toStringAsFixed(2)}';
 
-  /// Primeros pedidos: solo transferencia/efectivo. Después: resto de medios + crédito si hay cupo;
-  /// transferencia y efectivo siguen en [PagoMetodo.values] / [PagoMetodo.valuesPostContadoConCredito].
+  /// Primeros pedidos: solo transferencia/efectivo. Tras las 3 entregas iniciales: igual hasta que
+  /// MotoLink asigne cupo (>0); entonces Pago Móvil, Zelle y crédito sistema según perfil.
   List<String> get _metodosPermitidos {
     final p = widget.profile;
     if (p?.esAliadoEnFaseContado ?? false) {
@@ -54,11 +54,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
       }
       return PagoMetodo.valuesFaseContado;
     }
-    final cl = p?.creditLimit;
-    if (cl != null && cl > 0) {
+    if (p?.tieneLineaCreditoMotoLink ?? false) {
       return PagoMetodo.valuesPostContadoConCredito;
     }
-    return PagoMetodo.values;
+    return PagoMetodo.valuesFaseContado;
   }
 
   void _syncMetodoSeleccionado() {

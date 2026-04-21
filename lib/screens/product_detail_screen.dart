@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/credit_limit_exception.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/kyc_verification_exception.dart';
+import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
@@ -43,6 +44,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool get _faseContado => _profile?.esAliadoEnFaseContado ?? false;
 
+  bool get _pedidosSuspendidosMorosidad =>
+      _profile?.pedidosSuspendidosMorosidad ?? false;
+
   double get _precioVentaUnit =>
       part.precioUnitarioParaAliado(faseContado: _faseContado);
 
@@ -72,6 +76,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (ownerId == null || ownerId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo identificar al importador.')),
+      );
+      return;
+    }
+
+    if (_pedidosSuspendidosMorosidad) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'MotoLink suspendió nuevos pedidos en su cuenta por morosidad. '
+            'Regularice los pagos de entregas pendientes; cuando reactivemos su cuenta, podrá solicitar de nuevo.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -413,6 +431,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } on PedidosSuspendidosMorosidadException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _loadProfile();
     } on KycVerificationException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -693,8 +720,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                if (_pedidosSuspendidosMorosidad) ...[
+                  Text(
+                    'Nuevos pedidos suspendidos por MotoLink (morosidad). Complete pagos en pedidos entregados.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.red.shade900,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 ElevatedButton(
-                  onPressed: (_submitting || part.stock < 1) ? null : _openRequestDialog,
+                  onPressed: (_submitting ||
+                          part.stock < 1 ||
+                          _pedidosSuspendidosMorosidad)
+                      ? null
+                      : _openRequestDialog,
                   child: _submitting
                       ? const SizedBox(
                           height: 22,

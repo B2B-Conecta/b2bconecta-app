@@ -62,6 +62,7 @@ class AdminAliadosCreditPanel extends StatefulWidget {
 
 class _AdminAliadosCreditPanelState extends State<AdminAliadosCreditPanel> {
   List<ProfileModel> _rows = [];
+  Map<String, bool> _morosoByAliadoId = {};
   bool _loading = true;
   String? _error;
   final Map<String, ExpansionTileController> _expansionControllers = {};
@@ -144,6 +145,7 @@ class _AdminAliadosCreditPanelState extends State<AdminAliadosCreditPanel> {
     return _AliadoCreditCard(
       key: ValueKey<String>(p.id),
       profile: p,
+      tienePedidosMorosos: _morosoByAliadoId[p.id] ?? false,
       onSaved: _load,
       expansionController: c,
       cardKey: gk,
@@ -157,9 +159,16 @@ class _AdminAliadosCreditPanelState extends State<AdminAliadosCreditPanel> {
     });
     try {
       final rows = await SupabaseService.fetchAliadoProfilesForAdmin();
+      Map<String, bool> morosos = {};
+      try {
+        morosos = await SupabaseService.adminAliadosPedidosMorososFlags();
+      } catch (_) {
+        morosos = {};
+      }
       if (!mounted) return;
       setState(() {
         _rows = rows;
+        _morosoByAliadoId = morosos;
         _loading = false;
       });
       _tryExpandFromPendingKycNotification();
@@ -235,12 +244,15 @@ class _AliadoCreditCard extends StatefulWidget {
   const _AliadoCreditCard({
     super.key,
     required this.profile,
+    required this.tienePedidosMorosos,
     required this.onSaved,
     required this.expansionController,
     required this.cardKey,
   });
 
   final ProfileModel profile;
+  /// Entregado + factura MotoLink + pago sin aprobar (servidor).
+  final bool tienePedidosMorosos;
   final Future<void> Function() onSaved;
   final ExpansionTileController expansionController;
   final GlobalKey cardKey;
@@ -254,6 +266,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
   late bool _creditoPreactivadoDraft;
   bool _saving = false;
   bool _savingKyc = false;
+  bool _busySuspension = false;
   double? _openExposure;
   bool _loadingExposure = false;
 
@@ -355,6 +368,119 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
       );
     } finally {
       if (mounted) setState(() => _savingKyc = false);
+    }
+  }
+
+  String _suspensionRpcUserMessage(Object error) {
+    final raw = switch (error) {
+      PostgrestException e => e.message,
+      _ => error.toString(),
+    };
+    final t = raw.trim();
+    if (t.isEmpty) {
+      return 'No se pudo actualizar la suspensión. Inténtelo de nuevo.';
+    }
+    return t.length > 320 ? '${t.substring(0, 317)}…' : t;
+  }
+
+  Future<void> _confirmSuspendPedidos() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Suspender nuevos pedidos'),
+        content: const Text(
+          'El aliado no podrá crear nuevas solicitudes de pedido hasta que MotoLink reactive la cuenta. '
+          'Solo puede hacerse si tiene pedidos morosos (entregados con pago sin aprobar). '
+          'Podrá seguir usando la app para completar pagos en fichas abiertas.',
+          style: TextStyle(height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Suspender'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busySuspension = true);
+    try {
+      await SupabaseService.adminSetAliadoPedidosSuspendidosMorosidad(
+        aliadoId: widget.profile.id,
+        suspend: true,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nuevos pedidos suspendidos para este aliado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_suspensionRpcUserMessage(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busySuspension = false);
+    }
+  }
+
+  Future<void> _confirmReactivarPedidos() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reactivar nuevos pedidos'),
+        content: const Text(
+          'Solo disponible si ya no quedan pedidos morosos (pagos de entregas aprobados por MotoLink). '
+          'El aliado volverá a poder solicitar repuestos desde el catálogo.',
+          style: TextStyle(height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reactivar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busySuspension = true);
+    try {
+      await SupabaseService.adminSetAliadoPedidosSuspendidosMorosidad(
+        aliadoId: widget.profile.id,
+        suspend: false,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cuenta reactivada para nuevos pedidos.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_suspensionRpcUserMessage(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busySuspension = false);
     }
   }
 
@@ -773,6 +899,50 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                             ),
                           ),
                         ),
+                      if (widget.tienePedidosMorosos)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.deepOrange.shade200,
+                            ),
+                          ),
+                          child: Text(
+                            'Moroso',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.deepOrange.shade900,
+                            ),
+                          ),
+                        ),
+                      if (widget.profile.pedidosSuspendidosMorosidad)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.red.shade200,
+                            ),
+                          ),
+                          child: Text(
+                            'Pedidos suspendidos',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.red.shade900,
+                            ),
+                          ),
+                        ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -954,6 +1124,105 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                           ),
                         ),
                       ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: widget.profile.pedidosSuspendidosMorosidad
+                      ? Colors.red.shade50
+                      : AppColors.fieldFill,
+                  borderRadius: AppDecorations.radius12,
+                  border: Border.all(
+                    color: widget.profile.pedidosSuspendidosMorosidad
+                        ? Colors.red.shade200
+                        : Colors.grey.shade300,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.report_gmailerrorred_outlined,
+                            size: 20,
+                            color: Colors.grey.shade800,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Morosidad y nuevos pedidos',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.tienePedidosMorosos
+                            ? 'Este aliado tiene al menos un pedido entregado con factura MotoLink '
+                                'y pago aún no aprobado (criterio de morosidad).'
+                            : 'Sin pedidos morosos según el sistema: no hay entregas con pago pendiente de aprobación.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      if (widget.profile.pedidosSuspendidosMorosidad) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'La cuenta está suspendida para crear nuevos pedidos hasta que MotoLink pulse «Reactivar». '
+                          'El aliado puede seguir atendiendo pagos en pedidos ya abiertos.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red.shade800,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: _busySuspension ||
+                                    !widget.tienePedidosMorosos ||
+                                    widget.profile.pedidosSuspendidosMorosidad
+                                ? null
+                                : _confirmSuspendPedidos,
+                            icon: const Icon(Icons.block, size: 18),
+                            label: const Text('Suspender nuevos pedidos'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _busySuspension ||
+                                    !widget.profile.pedidosSuspendidosMorosidad ||
+                                    widget.tienePedidosMorosos
+                                ? null
+                                : _confirmReactivarPedidos,
+                            icon: const Icon(Icons.undo_outlined, size: 18),
+                            label: const Text('Reactivar nuevos pedidos'),
+                          ),
+                        ],
+                      ),
+                      if (_busySuspension)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: LinearProgressIndicator(minHeight: 2),
+                        ),
                     ],
                   ),
                 ),

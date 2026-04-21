@@ -1,6 +1,7 @@
 import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
+import '../utils/business_calendar.dart';
 
 /// Fila de `transaction_requests` con joins opcionales (producto, aliado, importador).
 class TransactionRequestModel {
@@ -178,6 +179,39 @@ class TransactionRequestModel {
   bool get tieneDocumentacionFacturaPago =>
       hasFacturaAliado || hasComprobantePago;
 
+  /// Pedido entregado, con factura MotoLink, y el pago aún no fue aprobado por MotoLink.
+  bool get pagoMotolinkPendienteTrasEntrega {
+    if (status != TransactionRequestStatus.entregado) return false;
+    if (!hasFacturaAliado) return false;
+    final pe = pagoEstadoRevision?.trim();
+    if (pe == PagoRevisionEstado.aprobado) return false;
+    return true;
+  }
+
+  /// En tránsito con factura pero pago sin aprobar (aviso antes de confirmar recepción).
+  bool get pagoMotolinkPendienteEnTransito {
+    if (status != TransactionRequestStatus.enTransito) return false;
+    if (!hasFacturaAliado) return false;
+    final pe = pagoEstadoRevision?.trim();
+    if (pe == PagoRevisionEstado.aprobado) return false;
+    return true;
+  }
+
+  /// Entregado, con factura MotoLink y pago validado por el broker.
+  bool get pedidoEntregadoYPagado {
+    if (status != TransactionRequestStatus.entregado) return false;
+    if (!hasFacturaAliado) return false;
+    return pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
+  }
+
+  /// Tras entrega, pago aún no aprobado y ya transcurrieron 3+ días hábiles (excl. sáb/dom) desde el día de entrega.
+  bool get pagoPendienteRiesgoCuentaTresDiasHabiles {
+    if (!pagoMotolinkPendienteTrasEntrega) return false;
+    final at = atEntregado;
+    if (at == null) return false;
+    return businessDaysElapsedAfterUtcDate(at.toUtc()) >= 3;
+  }
+
   /// Dirección fiscal del aliado cuando el pedido usa perfil (texto multilínea).
   String? get aliadoDireccionFiscalMultilineaEs {
     if (!destinoEntregaUsaPerfil) return null;
@@ -228,7 +262,14 @@ class TransactionRequestModel {
       return null;
     }
     if (!hasFacturaAliado) {
+      if (status == TransactionRequestStatus.entregado) return null;
       return 'Tras la factura MotoLink al aliado podrá gestionar el pago aquí; no forma parte del cronograma de envío.';
+    }
+    if (status == TransactionRequestStatus.entregado) {
+      if (pagoEstadoRevisionEfectivo == PagoRevisionEstado.aprobado) {
+        return 'Entrega confirmada · pago validado por MotoLink.';
+      }
+      return 'Entrega confirmada · pendiente: comprobante o aprobación de pago por MotoLink.';
     }
     final metodo = pagoMetodo?.trim();
     if (metodo == PagoMetodo.efectivo) {

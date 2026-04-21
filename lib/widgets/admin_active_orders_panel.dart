@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -7,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_order_pre_transit_section.dart';
+import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
@@ -164,7 +166,8 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (r.status == TransactionRequestStatus.enTransito)
+        if (r.status == TransactionRequestStatus.enTransito ||
+            r.status == TransactionRequestStatus.entregado)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: EfectivoRespaldoRegistrar(
@@ -177,6 +180,19 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
             request: r,
             onRefresh: _load,
             onMarcarEnTransito: () => _promptMarkEnTransito(context, r),
+          ),
+        if (r.hasFacturaAliado &&
+            (r.status == TransactionRequestStatus.enTransito ||
+                r.status == TransactionRequestStatus.entregado))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: AdminPagoRevisionSection(
+              request: r,
+              onRefresh: _load,
+              highlightEntregadoPagado:
+                  r.status == TransactionRequestStatus.entregado &&
+                  r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.aprobado,
+            ),
           ),
         const Divider(height: 20),
         OrderMotolinkThreadSection(

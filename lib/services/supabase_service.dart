@@ -13,6 +13,7 @@ import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
+import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
 import '../models/pago_revision_estado.dart';
@@ -974,6 +975,36 @@ class SupabaseService {
     );
   }
 
+  /// Admin: aliados con pedido moroso (entregado, factura MotoLink, pago sin aprobar).
+  static Future<Map<String, bool>> adminAliadosPedidosMorososFlags() async {
+    final res = await _client.rpc('admin_aliados_pedidos_morosos_flags');
+    final list = res as List<dynamic>;
+    final map = <String, bool>{};
+    for (final row in list) {
+      final m = Map<String, dynamic>.from(row as Map);
+      final id = m['aliado_id']?.toString();
+      final mor = m['tiene_morosos'];
+      if (id != null && id.isNotEmpty) {
+        map[id] = mor is bool ? mor : mor?.toString().toLowerCase() == 'true';
+      }
+    }
+    return map;
+  }
+
+  /// Admin: suspende o reactiva la creación de nuevos pedidos por morosidad.
+  static Future<void> adminSetAliadoPedidosSuspendidosMorosidad({
+    required String aliadoId,
+    required bool suspend,
+  }) async {
+    await _client.rpc(
+      'admin_set_aliado_pedidos_suspendidos_morosidad',
+      params: <String, dynamic>{
+        'p_aliado_id': aliadoId,
+        'p_suspend': suspend,
+      },
+    );
+  }
+
   /// Broker: fija el estado de revisión de un documento concreto del aliado.
   /// [note] obligatoria si [status] es rechazado (validación en servidor).
   static Future<void> adminSetProfileDocumentReviewStatus({
@@ -1184,6 +1215,13 @@ class SupabaseService {
     }
     if (profile == null) {
       throw StateError('No se encontró el perfil del aliado.');
+    }
+    if (profile.pedidosSuspendidosMorosidad) {
+      throw PedidosSuspendidosMorosidadException(
+        'MotoLink suspendió temporalmente la creación de nuevos pedidos en su cuenta por morosidad. '
+        'Complete o regularice los pagos pendientes de pedidos ya entregados; cuando MotoLink confirme '
+        'y reactive su cuenta, podrá volver a solicitar repuestos.',
+      );
     }
     if (!profile.hasRegisteredLocation) {
       throw ProfileLocationException(

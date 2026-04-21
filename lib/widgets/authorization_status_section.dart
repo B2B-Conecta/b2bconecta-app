@@ -37,7 +37,9 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile?.id != widget.profile?.id ||
         oldWidget.profile?.kycStatus != widget.profile?.kycStatus ||
-        oldWidget.profile?.creditLimit != widget.profile?.creditLimit) {
+        oldWidget.profile?.creditLimit != widget.profile?.creditLimit ||
+        oldWidget.profile?.pedidosSuspendidosMorosidad !=
+            widget.profile?.pedidosSuspendidosMorosidad) {
       _reloadDocs();
     }
   }
@@ -230,6 +232,36 @@ class _AliadoAuthorizationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
+            if (profile.pedidosSuspendidosMorosidad) ...[
+              Material(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.block, color: Colors.red.shade800, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'MotoLink suspendió la creación de nuevos pedidos por morosidad. '
+                          'Regularice los pagos en pedidos entregados; cuando reactivemos su cuenta, '
+                          'podrá volver a solicitar en el catálogo.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             _CheckRow(
               ok: profile.isComplete,
               label: profile.isComplete

@@ -59,9 +59,20 @@ class _TransactionRequestDetailScreenState
               'No encontramos este pedido o no tienes permisos para verlo.',
             );
           }
-          return ListView(
+            return ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
             children: [
+              if (r.pedidoEntregadoYPagado) ...[
+                _pagoCompletadoBanner(),
+                const SizedBox(height: 12),
+              ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
+                _pagoPendienteBanner(),
+                if (r.pagoPendienteRiesgoCuentaTresDiasHabiles) ...[
+                  const SizedBox(height: 10),
+                  _pagoAtrasoCuentaBanner(),
+                ],
+                const SizedBox(height: 12),
+              ],
               _summaryCard(r),
               const SizedBox(height: 12),
               _contactByRole(r),
@@ -76,6 +87,91 @@ class _TransactionRequestDetailScreenState
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _pagoPendienteBanner() {
+    return Material(
+      color: Colors.deepOrange.shade50,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.payments_outlined, color: Colors.deepOrange.shade800),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Este pedido está entregado pero Pendiente por pagar: falta que el aliado complete el '
+                'comprobante o que MotoLink apruebe el pago.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pagoCompletadoBanner() {
+    return Material(
+      color: Colors.green.shade50,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.green.shade800),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Pedido entregado y pagado: MotoLink validó el pago.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green.shade900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pagoAtrasoCuentaBanner() {
+    return Material(
+      color: Colors.red.shade50,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade800),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Han pasado 3 o más días hábiles sin completar el pago. MotoLink puede restringir la cuenta '
+                'del aliado para pedidos futuros si no se regulariza.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red.shade900,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import 'order_list_filter_bar.dart';
+import 'order_motolink_thread_section.dart';
 
 /// Pedidos entregados o rechazados (pestaña Pedidos cerrados — admin).
 class AdminClosedOrdersPanel extends StatefulWidget {
@@ -184,9 +187,33 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
                               statusLabel: _statusLabel(r.status),
-                              expandedFooter: EfectivoRespaldoRegistrar(
-                                request: r,
-                                onRegistered: _load,
+                              expandedFooter: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (r.hasFacturaAliado)
+                                    AdminPagoRevisionSection(
+                                      request: r,
+                                      onRefresh: _load,
+                                      highlightEntregadoPagado:
+                                          r.status ==
+                                              TransactionRequestStatus.entregado &&
+                                          r.pagoEstadoRevisionEfectivo ==
+                                              PagoRevisionEstado.aprobado,
+                                    ),
+                                  EfectivoRespaldoRegistrar(
+                                    request: r,
+                                    onRegistered: _load,
+                                  ),
+                                  const Divider(height: 20),
+                                  OrderMotolinkThreadSection(
+                                    key: ValueKey<String>(
+                                      'trm-admin-closed-${r.id}',
+                                    ),
+                                    transactionRequestId: r.id,
+                                    allowReplyAsAliado: false,
+                                    allowReplyAsAdmin: true,
+                                  ),
+                                ],
                               ),
                             );
                           },

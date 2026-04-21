@@ -15,6 +15,7 @@ class ProfileModel {
     this.primerosPedidosContadoEntregados,
     this.creditoConsumidoAcumulado,
     this.creditoPreactivadoPorAdmin = false,
+    this.pedidosSuspendidosMorosidad = false,
     this.estado,
     this.ciudad,
     this.direccion,
@@ -46,6 +47,9 @@ class ProfileModel {
 
   /// Admin MotoLink: puede usar línea de crédito aun en fase contado (confianza / historial).
   final bool creditoPreactivadoPorAdmin;
+
+  /// MotoLink suspendió nuevos pedidos por morosidad (entregas con pago sin aprobar).
+  final bool pedidosSuspendidosMorosidad;
 
   /// Cupo asignado y autorizado para usar en la app aunque [esAliadoEnFaseContado].
   bool get puedeUsarLineaCreditoMotoLinkPreactivada {
@@ -162,6 +166,11 @@ class ProfileModel {
         ? cpaRaw
         : (cpaRaw?.toString().toLowerCase() == 'true');
 
+    final psmRaw = json['pedidos_suspendidos_morosidad'];
+    final psm = psmRaw is bool
+        ? psmRaw
+        : (psmRaw?.toString().toLowerCase() == 'true');
+
     return ProfileModel(
       id: json['id']?.toString() ?? '',
       businessName: _text(json['business_name']),
@@ -177,6 +186,7 @@ class ProfileModel {
       primerosPedidosContadoEntregados: pce,
       creditoConsumidoAcumulado: cca,
       creditoPreactivadoPorAdmin: cpa,
+      pedidosSuspendidosMorosidad: psm,
       estado: _text(json['estado']),
       ciudad: _text(json['ciudad']),
       direccion: _text(json['direccion']),

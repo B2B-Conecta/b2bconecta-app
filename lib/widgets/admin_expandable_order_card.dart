@@ -98,6 +98,96 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               height: 1.25,
                             ),
                           ),
+                          if (r.pedidoEntregadoYPagado) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    size: 18,
+                                    color: Colors.green.shade800,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Entregado y pagado: MotoLink validó el pago.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.3,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.green.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.deepOrange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.deepOrange.shade200,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.payments_outlined,
+                                    size: 18,
+                                    color: Colors.deepOrange.shade800,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Pendiente por pagar: el aliado recibió el pedido; falta comprobante '
+                                      'o aprobación MotoLink.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.3,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.deepOrange.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (r.pagoPendienteRiesgoCuentaTresDiasHabiles) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.shade200),
+                                ),
+                                child: Text(
+                                  'Han pasado 3 o más días hábiles sin completar el pago. MotoLink puede '
+                                  'restringir la cuenta del aliado para pedidos futuros si no se regulariza.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.3,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ],
                       ),
                     ),

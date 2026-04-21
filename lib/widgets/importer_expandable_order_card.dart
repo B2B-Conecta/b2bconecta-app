@@ -125,6 +125,72 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               height: 1.25,
                             ),
                           ),
+                          if (r.pedidoEntregadoYPagado) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Text(
+                                'Entregado y pagado: MotoLink validó el pago del aliado.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade900,
+                                ),
+                              ),
+                            ),
+                          ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.deepOrange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.deepOrange.shade200,
+                                ),
+                              ),
+                              child: Text(
+                                'Pendiente por pagar: el aliado confirmó la recepción; MotoLink aún no '
+                                'aprobó el comprobante de pago.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.deepOrange.shade900,
+                                ),
+                              ),
+                            ),
+                            if (r.pagoPendienteRiesgoCuentaTresDiasHabiles) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.shade200),
+                                ),
+                                child: Text(
+                                  '3+ días hábiles sin pago aprobado: MotoLink puede restringir al aliado para '
+                                  'pedidos futuros.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.3,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ],
                       ),
                     ),

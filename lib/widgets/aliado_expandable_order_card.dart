@@ -134,6 +134,70 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
+                          if (r.pedidoEntregadoYPagado) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Text(
+                                'Entregado y pagado: MotoLink validó su pago.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.3,
+                                  color: Colors.green.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.amber.shade300),
+                              ),
+                              child: Text(
+                                'Pago pendiente: MotoLink aún no ha aprobado el comprobante o la declaración de pago. '
+                                'Complete el registro en esta ficha cuando corresponda.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.3,
+                                  color: Colors.amber.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (r.pagoPendienteRiesgoCuentaTresDiasHabiles) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.shade200),
+                                ),
+                                child: Text(
+                                  'Lleva varios días hábiles sin completar el pago. Si no regulariza, MotoLink '
+                                  'podría desactivar su cuenta para nuevos pedidos.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.3,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                           if (r.status == TransactionRequestStatus.enTransito &&
                               r.hasTransitEta) ...[
                             const SizedBox(height: 4),
@@ -195,8 +259,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Marca este paso cuando hayas recibido la mercancía. Se cierra el pedido y queda '
-                    'registrada la fecha de entrega para MotoLink y el importador.',
+                    request.pagoMotolinkPendienteEnTransito
+                        ? 'Puede confirmar la recepción aunque el pago siga pendiente ante MotoLink. '
+                            'El pedido quedará como entregado y deberá completar o esperar la aprobación '
+                            'del comprobante en esta misma ficha.'
+                        : 'Marca este paso cuando hayas recibido la mercancía. Se cierra el pedido y queda '
+                            'registrada la fecha de entrega para MotoLink y el importador.',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.3,

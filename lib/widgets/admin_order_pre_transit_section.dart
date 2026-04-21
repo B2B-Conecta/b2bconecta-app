@@ -2,8 +2,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
+import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -31,8 +31,6 @@ class AdminOrderPreTransitSection extends StatefulWidget {
 
 class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSection> {
   bool _busyFacturaAliado = false;
-  bool _busyAprobar = false;
-  bool _busyRechazar = false;
 
   Future<void> _openUrl(BuildContext context, Future<String> Function() signed) async {
     try {
@@ -90,102 +88,6 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
       );
     } finally {
       if (mounted) setState(() => _busyFacturaAliado = false);
-    }
-  }
-
-  Future<void> _aprobarPago(BuildContext context) async {
-    setState(() => _busyAprobar = true);
-    try {
-      await SupabaseService.adminAprobarPagoAliado(widget.request.id);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pago del aliado aprobado.')),
-      );
-      widget.onRefresh();
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busyAprobar = false);
-    }
-  }
-
-  Future<void> _rechazarPago(BuildContext context) async {
-    final ctrl = TextEditingController();
-    final esCredito =
-        widget.request.pagoMetodo?.trim() == PagoMetodo.creditoSistema;
-    try {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(
-            esCredito
-                ? 'Rechazar solicitud de crédito'
-                : 'Rechazar comprobante',
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                esCredito
-                    ? 'Indique al aliado el motivo (opcional). Podrá solicitar de nuevo el pago con crédito.'
-                    : 'Indique al aliado qué corregir (opcional). Podrá enviar otro comprobante.',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Motivo / indicaciones',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Rechazar'),
-            ),
-          ],
-        ),
-      );
-      if (ok != true || !context.mounted) return;
-
-      final nota = ctrl.text;
-      setState(() => _busyRechazar = true);
-      try {
-        await SupabaseService.adminRechazarComprobantePago(
-          requestId: widget.request.id,
-          nota: nota,
-        );
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              esCredito ? 'Solicitud rechazada.' : 'Comprobante rechazado.',
-            ),
-          ),
-        );
-        widget.onRefresh();
-      } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      } finally {
-        if (mounted) setState(() => _busyRechazar = false);
-      }
-    } finally {
-      ctrl.dispose();
     }
   }
 
@@ -336,81 +238,21 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.25),
             ),
           ),
-        Text(
-          'Estado: ${_estadoPagoLabel(r)}',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.brandBlue,
-          ),
-        ),
-        if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty)
+        if (!r.hasFacturaAliado)
           Text(
-            'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-          ),
-        if (r.hasComprobantePago) ...[
-          Text(
-            'Comprobante: ${r.comprobantePagoFileName ?? 'archivo'} · '
-            '${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-          ),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () => _openUrl(
-              context,
-              () => SupabaseService.createSignedUrlForComprobantePago(
-                r.comprobantePagoStoragePath!.trim(),
-              ),
+            'Estado: ${AdminPagoRevisionSection.estadoPagoLabelEs(r)}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.brandBlue,
             ),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('Ver comprobante'),
           ),
-        ],
-        if (r.pagoComprobanteRechazoNota != null &&
-            r.pagoComprobanteRechazoNota!.trim().isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            'Último rechazo: ${r.pagoComprobanteRechazoNota}',
-            style: TextStyle(fontSize: 11, color: Colors.red.shade800, height: 1.25),
+        if (r.hasFacturaAliado)
+          AdminPagoRevisionSection(
+            request: r,
+            onRefresh: widget.onRefresh,
+            includeSectionTitle: false,
           ),
-        ],
-        if (pe == PagoRevisionEstado.enRevision) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton(
-                onPressed: _busyAprobar ? null : () => _aprobarPago(context),
-                child: _busyAprobar
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Aprobar pago'),
-              ),
-              OutlinedButton(
-                onPressed: _busyRechazar ? null : () => _rechazarPago(context),
-                child: _busyRechazar
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        r.pagoMetodo?.trim() == PagoMetodo.creditoSistema
-                            ? 'Rechazar solicitud'
-                            : 'Rechazar comprobante',
-                      ),
-              ),
-            ],
-          ),
-        ],
         EfectivoRespaldoRegistrar(
           request: r,
           onRegistered: widget.onRefresh,
@@ -439,47 +281,5 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         const SizedBox(height: 12),
       ],
     );
-  }
-
-  static String _estadoPagoLabel(TransactionRequestModel r) {
-    final pe = r.pagoEstadoRevisionEfectivo;
-    final m = r.pagoMetodo?.trim();
-    final efectivo = m == PagoMetodo.efectivo;
-    final credito = m == PagoMetodo.creditoSistema;
-
-    if (credito) {
-      switch (pe) {
-        case PagoRevisionEstado.pendiente:
-          return 'Pendiente de solicitud de crédito del aliado';
-        case PagoRevisionEstado.enRevision:
-          return 'Solicitud de crédito en revisión';
-        case PagoRevisionEstado.aprobado:
-          return 'Pago con crédito del sistema aprobado';
-        case PagoRevisionEstado.rechazado:
-          return 'Solicitud de crédito rechazada (aliado puede reintentar)';
-        default:
-          return pe;
-      }
-    }
-
-    switch (pe) {
-      case PagoRevisionEstado.pendiente:
-        return efectivo
-            ? 'Pendiente de comprobante de efectivo del aliado'
-            : 'Pendiente de comprobante del aliado';
-      case PagoRevisionEstado.enRevision:
-        if (efectivo && !r.hasComprobantePago) {
-          return 'Pago en efectivo en revisión';
-        }
-        return 'Comprobante en revisión';
-      case PagoRevisionEstado.aprobado:
-        return efectivo ? 'Pago en efectivo aprobado' : 'Pago aprobado';
-      case PagoRevisionEstado.rechazado:
-        return efectivo
-            ? 'Comprobante de efectivo rechazado (aliado puede reenviar)'
-            : 'Comprobante rechazado (aliado puede reenviar)';
-      default:
-        return pe;
-    }
   }
 }

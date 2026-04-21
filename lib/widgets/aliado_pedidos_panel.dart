@@ -133,17 +133,30 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     if (_entregaBusyId != null) return;
     setState(() => _entregaBusyId = r.id);
     try {
+      final pagoPendienteAntes = r.pagoMotolinkPendienteEnTransito;
       await SupabaseService.aliadoMarcarPedidoEntregado(r.id);
       MainShellTabController.notifyImporterInventoryReload();
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Recepción confirmada. El pedido queda cerrado y registrado para MotoLink.',
+      if (pagoPendienteAntes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
+              'sigue pendiente de registrar o aprobar por MotoLink. Revise la ficha del pedido.',
+            ),
+            behavior: SnackBarBehavior.floating,
           ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Recepción confirmada. El pedido queda cerrado y registrado para MotoLink.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       await _load();
     } catch (e) {
       if (!context.mounted) return;

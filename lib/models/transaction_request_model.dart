@@ -14,6 +14,8 @@ class TransactionRequestModel {
     required this.precioUnitarioProveedor,
     required this.precioUnitarioAliado,
     required this.precioTotal,
+    required this.precioBaseAliadoTotal,
+    this.stockDescontadoEn,
     this.notasAdmin,
     this.createdAt,
     this.updatedAt,
@@ -64,6 +66,13 @@ class TransactionRequestModel {
   final double precioUnitarioProveedor;
   final double precioUnitarioAliado;
   final double precioTotal;
+
+  /// Total sin recargo por efectivo; [precioTotal] puede incluir +4 % si el método es efectivo.
+  final double precioBaseAliadoTotal;
+
+  /// Inventario descontado al emitir la primera factura MotoLink al aliado.
+  final DateTime? stockDescontadoEn;
+
   final String? notasAdmin;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -284,6 +293,12 @@ class TransactionRequestModel {
       precioUnitarioProveedor: _asDouble(json['precio_unitario_proveedor']),
       precioUnitarioAliado: _asDouble(json['precio_unitario_aliado']),
       precioTotal: _asDouble(json['precio_total']),
+      precioBaseAliadoTotal: () {
+        final v = json['precio_base_aliado_total'];
+        if (v == null) return _asDouble(json['precio_total']);
+        return _asDouble(v);
+      }(),
+      stockDescontadoEn: _parseDate(json['stock_descontado_en']),
       notasAdmin: _nullableText(json['notas_admin']),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())

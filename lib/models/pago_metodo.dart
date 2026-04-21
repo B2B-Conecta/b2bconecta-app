@@ -4,6 +4,9 @@
 /// **Después** de esa fase, con KYC aprobado y cupo puede usarse [creditoSistema]; transferencia y
 /// efectivo **siguen** disponibles para compras al contado junto con el resto de medios.
 abstract final class PagoMetodo {
+  /// Recargo sobre [precio_base_aliado_total] al elegir efectivo (servidor y cliente alineados).
+  static const double recargoEfectivoTasa = 0.04;
+
   static const pagoMovil = 'pago_movil';
   static const zelleDivisas = 'zelle_divisas';
   static const transferencia = 'transferencia';

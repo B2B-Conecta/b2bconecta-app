@@ -39,6 +39,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
 
   static const double _creditTol = 0.01;
 
+  static double _totalConRecargoEfectivo(double base) =>
+      (base * (1 + PagoMetodo.recargoEfectivoTasa) * 100).round() / 100;
+
+  static String _fmtUsd(double v) => '\$${v.toStringAsFixed(2)}';
+
   /// Primeros pedidos: solo transferencia/efectivo. Después: resto de medios + crédito si hay cupo;
   /// transferencia y efectivo siguen en [PagoMetodo.values] / [PagoMetodo.valuesPostContadoConCredito].
   List<String> get _metodosPermitidos {
@@ -249,6 +254,27 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         pe == PagoRevisionEstado.rechazado;
   }
 
+  bool _efectivoEnVista(TransactionRequestModel r, bool puedeCambiarMetodo) {
+    final m = puedeCambiarMetodo
+        ? _metodoSeleccionado?.trim()
+        : r.pagoMetodo?.trim();
+    return m == PagoMetodo.efectivo;
+  }
+
+  /// Antes de enviar comprobante se muestra el total calculado; después, el persistido en servidor.
+  double _totalEfectivoAliado(
+    TransactionRequestModel r,
+    String pe,
+    bool puedeCambiarMetodo,
+  ) {
+    if (!puedeCambiarMetodo ||
+        pe == PagoRevisionEstado.enRevision ||
+        pe == PagoRevisionEstado.aprobado) {
+      return r.precioTotal;
+    }
+    return _totalConRecargoEfectivo(r.precioBaseAliadoTotal);
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
@@ -433,6 +459,55 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                   : '—',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
             ),
+          if (mostrarGestionPago && r.hasFacturaAliado && _efectivoEnVista(r, puedeCambiarMetodo)) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.brandBlue.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.brandBlue.withOpacity(0.25),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Efectivo: se aplica un recargo del '
+                    '${(PagoMetodo.recargoEfectivoTasa * 100).toStringAsFixed(0)} % '
+                    'sobre el total del pedido.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                      color: Colors.blueGrey.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Subtotal (sin recargo): ${_fmtUsd(r.precioBaseAliadoTotal)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade800,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Total a pagar: ${_fmtUsd(_totalEfectivoAliado(r, pe, puedeCambiarMetodo))}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.blueGrey.shade900,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (r.hasComprobantePago) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(

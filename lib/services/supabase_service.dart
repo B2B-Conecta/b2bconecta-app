@@ -631,6 +631,8 @@ class SupabaseService {
     precio_unitario_proveedor,
     precio_unitario_aliado,
     precio_total,
+    precio_base_aliado_total,
+    stock_descontado_en,
     notas_admin,
     created_at,
     updated_at,
@@ -1218,6 +1220,7 @@ class SupabaseService {
         'precio_unitario_proveedor': precioUnitarioProveedor,
         'precio_unitario_aliado': unitAliado,
         'precio_total': total,
+        'precio_base_aliado_total': total,
         'destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
         'destino_entrega_texto':
             destinoEntregaUsaPerfil ? null : otroDestinoTexto,

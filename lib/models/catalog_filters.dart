@@ -8,6 +8,8 @@ class CatalogFilters {
     this.minPrice,
     this.maxPrice,
     this.onlyActiveProducts = true,
+    this.sortReferenceLat,
+    this.sortReferenceLng,
   });
 
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
@@ -32,7 +34,18 @@ class CatalogFilters {
   /// Inventario del importador: `false` para incluir pausados.
   final bool onlyActiveProducts;
 
+  /// Si ambos están definidos, el catálogo aliado se ordena por distancia creciente
+  /// (Haversine) respecto a este punto (p. ej. GPS del aliado).
+  final double? sortReferenceLat;
+  final double? sortReferenceLng;
+
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
+
+  bool get sortByDistanceFromReference =>
+      sortReferenceLat != null &&
+      sortReferenceLng != null &&
+      !sortReferenceLat!.isNaN &&
+      !sortReferenceLng!.isNaN;
 
   bool get hasAnyFilter {
     final q = searchQuery?.trim();
@@ -42,6 +55,33 @@ class CatalogFilters {
         (ownerCiudad != null && ownerCiudad!.trim().isNotEmpty) ||
         minPrice != null ||
         maxPrice != null;
+  }
+
+  CatalogFilters copyWith({
+    String? searchQuery,
+    String? ownerId,
+    String? ownerEstado,
+    String? ownerCiudad,
+    double? minPrice,
+    double? maxPrice,
+    bool? onlyActiveProducts,
+    double? sortReferenceLat,
+    double? sortReferenceLng,
+    bool clearSortReference = false,
+  }) {
+    return CatalogFilters(
+      searchQuery: searchQuery ?? this.searchQuery,
+      ownerId: ownerId ?? this.ownerId,
+      ownerEstado: ownerEstado ?? this.ownerEstado,
+      ownerCiudad: ownerCiudad ?? this.ownerCiudad,
+      minPrice: minPrice ?? this.minPrice,
+      maxPrice: maxPrice ?? this.maxPrice,
+      onlyActiveProducts: onlyActiveProducts ?? this.onlyActiveProducts,
+      sortReferenceLat:
+          clearSortReference ? null : (sortReferenceLat ?? this.sortReferenceLat),
+      sortReferenceLng:
+          clearSortReference ? null : (sortReferenceLng ?? this.sortReferenceLng),
+    );
   }
 }
 

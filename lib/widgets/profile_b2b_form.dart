@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/cash_phase_policy.dart';
@@ -443,6 +444,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         direccion: _fiscalAddressController.text,
         fiscalMapsUrl: _fiscalMapsUrlController.text,
       );
+      await _tryGeocodeAndSaveCoordinates();
       if (!mounted) return;
       widget.onSaved();
     } catch (e, st) {
@@ -461,6 +463,25 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   Future<void> _signOut() async {
     await AuthService.signOut();
+  }
+
+  /// Geocodifica el domicilio fiscal para ordenar el catálogo por proximidad (importador/aliado).
+  Future<void> _tryGeocodeAndSaveCoordinates() async {
+    final role = _role.trim().toLowerCase();
+    if (role != 'importador' && role != 'aliado') return;
+    final dir = _fiscalAddressController.text.trim();
+    final ci = _ciudadController.text.trim();
+    final es = _estadoController.text.trim();
+    if (dir.isEmpty || ci.isEmpty || es.isEmpty) return;
+    try {
+      final loc = await locationFromAddress('$dir, $ci, $es, Venezuela');
+      if (loc.isEmpty) return;
+      final first = loc.first;
+      await SupabaseService.updateMyGeolocation(
+        latitude: first.latitude,
+        longitude: first.longitude,
+      );
+    } catch (_) {}
   }
 
   @override

@@ -5,6 +5,7 @@ import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
+import '../services/geolocator_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/importer_inventory_dashboard.dart';
@@ -26,6 +27,31 @@ const _kCategorySearchTokens = <String, String?>{
   'Motor': 'motor',
   'Eléctrico': 'eléctric',
 };
+
+bool _longDistancePart(PartModel part, ProfileModel profile) {
+  final km = part.distanceKmFromReference;
+  if (km != null && km >= 120) return true;
+  final ae = profile.estado?.trim().toLowerCase();
+  final oe = part.ownerEstado?.trim().toLowerCase();
+  if (ae != null &&
+      ae.isNotEmpty &&
+      oe != null &&
+      oe.isNotEmpty &&
+      ae != oe) {
+    return true;
+  }
+  return false;
+}
+
+String _distanceChipLabel(PartModel part) {
+  final km = part.distanceKmFromReference;
+  if (km == null) return 'Distancia no disponible';
+  if (km < 1) {
+    final m = (km * 1000).round();
+    return 'A $m m de tu ubicación';
+  }
+  return 'A ${km.toStringAsFixed(km < 10 ? 1 : 0)} km de tu ubicación';
+}
 
 String _ownerLocationLine(PartModel part) {
   final e = part.ownerEstado?.trim();
@@ -78,6 +104,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Alineado con el precio en ficha (descuento en fase contado).
   bool _aliadoFaseContado = false;
 
+  /// Filtro rápido «Más cercanos a mí» (GPS + orden Haversine).
+  bool _closestToMeEnabled = false;
+  double? _allySortLat;
+  double? _allySortLng;
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +118,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _ownerEstadoFilterController = TextEditingController();
     _ownerCiudadFilterController = TextEditingController();
     if (widget.homeRole == AppHomeRole.aliado) {
+      final la = widget.profile.latitude;
+      final lo = widget.profile.longitude;
+      if (la != null && lo != null) {
+        _allySortLat = la;
+        _allySortLng = lo;
+      }
       _importersFuture = SupabaseService.fetchImporterOptions();
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
@@ -153,6 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
       minPrice: minP,
       maxPrice: maxP,
       onlyActiveProducts: true,
+      sortReferenceLat: _closestToMeEnabled ? _allySortLat : null,
+      sortReferenceLng: _closestToMeEnabled ? _allySortLng : null,
     );
   }
 
@@ -173,10 +212,64 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedOwnerId = null;
       _selectedCategoryLabel = 'Todos';
+      _closestToMeEnabled = false;
+      final la = widget.profile.latitude;
+      final lo = widget.profile.longitude;
+      _allySortLat = la;
+      _allySortLng = lo;
       _activeFilters = CatalogFilters.empty;
       _partsFuture = _fetchProducts(reset: true);
     });
     _refreshCatalogTotal();
+  }
+
+  Future<void> _onClosestChipSelected(bool selected) async {
+    if (widget.homeRole != AppHomeRole.aliado) return;
+
+    if (!selected) {
+      setState(() {
+        _closestToMeEnabled = false;
+        final la = widget.profile.latitude;
+        final lo = widget.profile.longitude;
+        _allySortLat = la;
+        _allySortLng = lo;
+        _activeFilters = _parseFiltersFromControllers();
+        _partsFuture = _fetchProducts(reset: true);
+      });
+      await _refreshCatalogTotal();
+      return;
+    }
+
+    final pos = await GeolocatorService.getCurrentLatLng();
+    if (!mounted) return;
+    if (pos == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Active el GPS y conceda permiso de ubicación para ordenar por cercanía.',
+          ),
+          backgroundColor: Colors.orange.shade900,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await SupabaseService.updateMyGeolocation(
+        latitude: pos.lat,
+        longitude: pos.lng,
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _closestToMeEnabled = true;
+      _allySortLat = pos.lat;
+      _allySortLng = pos.lng;
+      _activeFilters = _parseFiltersFromControllers();
+      _partsFuture = _fetchProducts(reset: true);
+    });
+    await _refreshCatalogTotal();
   }
 
   Future<List<PartModel>> _fetchProducts({required bool reset}) async {
@@ -657,13 +750,55 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text(
-              '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    FilterChip(
+                      label: const Text('Más cercanos a mí'),
+                      selected: _closestToMeEnabled,
+                      onSelected: _onClosestChipSelected,
+                      avatar: Icon(
+                        Icons.near_me_outlined,
+                        size: 18,
+                        color: _closestToMeEnabled
+                            ? Colors.white
+                            : AppColors.brand,
+                      ),
+                      selectedColor: AppColors.brand,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color:
+                            _closestToMeEnabled ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_closestToMeEnabled) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Orden por distancia en línea recta hasta el almacén del importador (cuando hay coordenadas).',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade700,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           Expanded(
@@ -729,13 +864,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
                           // Altura extra para importador + estado/ciudad + precio/stock sin overflow.
-                          childAspectRatio: 0.64,
+                          childAspectRatio: 0.58,
                         ),
                         itemCount: parts.length,
                         itemBuilder: (context, index) {
                           final p = parts[index];
                           return _ProductGridCard(
                             part: p,
+                            profile: widget.profile,
+                            showDistanceChips:
+                                _activeFilters.sortByDistanceFromReference,
                             faseContadoAliado: _aliadoFaseContado,
                             onTap: () {
                               Navigator.of(context).push<void>(
@@ -784,11 +922,15 @@ class _HomeScreenState extends State<HomeScreen> {
 class _ProductGridCard extends StatelessWidget {
   const _ProductGridCard({
     required this.part,
+    required this.profile,
+    this.showDistanceChips = false,
     this.faseContadoAliado = false,
     this.onTap,
   });
 
   final PartModel part;
+  final ProfileModel profile;
+  final bool showDistanceChips;
   final bool faseContadoAliado;
   final VoidCallback? onTap;
 
@@ -854,6 +996,42 @@ class _ProductGridCard extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       color: Colors.grey.shade600,
                     ),
+                  ),
+                ],
+                if (showDistanceChips) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      Chip(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        label: Text(
+                          _distanceChipLabel(part),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        backgroundColor: AppColors.brandBlue.withOpacity(0.1),
+                        side: BorderSide(color: AppColors.brandBlue.withOpacity(0.35)),
+                      ),
+                      if (_longDistancePart(part, profile))
+                        Chip(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          label: const Text(
+                            'Envío de larga distancia',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          backgroundColor: Colors.deepOrange.shade50,
+                          side: BorderSide(color: Colors.deepOrange.shade200),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 2),

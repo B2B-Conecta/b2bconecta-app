@@ -5,6 +5,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import 'transaction_request_admin_pedido_listo_route_prep_section.dart';
+import 'courier_timeline_widget.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta: un toque en la cabecera despliega contactos, crédito y ciclo del envío.
@@ -308,7 +309,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         const SizedBox(height: 10),
                         TransactionRequestEvidenceDocumentsSection(request: r),
                         const SizedBox(height: 12),
-                        TransactionRequestLifecycleSection(request: r),
+                        CourierTimelineWidget(request: r, compact: true),
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 8),
                           expandedFooter!,

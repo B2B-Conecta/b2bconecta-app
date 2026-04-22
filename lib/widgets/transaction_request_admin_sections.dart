@@ -151,7 +151,8 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   const TransactionRequestDestinoEntregaSection({
     super.key,
     required this.request,
-    /// Quién ve la ficha; MotoLink no ve el CTA de «ruta en vivo» combinada aquí.
+    /// Quién ve la ficha; la tarjeta «Ruta en vivo» solo la ve MotoLink (aliado/importador
+    /// usan el enlace en el paso «En camino» del seguimiento).
     this.viewingAsRole,
   });
 
@@ -209,7 +210,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
           ),
         ],
         if (r.status == TransactionRequestStatus.enTransito &&
-            viewingAsRole != AppHomeRole.administrador) ...[
+            viewingAsRole == AppHomeRole.administrador) ...[
           const SizedBox(height: 14),
           TransactionRequestTransitSupplierToAliadoMapsCta(request: r),
         ],

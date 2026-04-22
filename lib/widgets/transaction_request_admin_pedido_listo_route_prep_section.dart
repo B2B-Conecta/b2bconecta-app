@@ -78,25 +78,42 @@ class _TransactionRequestAdminPedidoListoRoutePrepSectionState
 
   Future<void> _openAliado(BuildContext context) async {
     final r = widget.request;
+    // Si el aliado indicó «otro destino» en el pedido, MotoLink debe usar solo eso
+    // (texto / enlace del pedido), no el mapa ni la dirección fiscal del perfil.
+    if (!r.destinoEntregaUsaPerfil) {
+      final altUrl = r.destinoEntregaMapsUrl?.trim();
+      if (altUrl != null && altUrl.isNotEmpty) {
+        await _openHttpUrl(context, altUrl);
+        return;
+      }
+      final texto = r.destinoEntregaTexto?.trim();
+      if (texto != null && texto.isNotEmpty) {
+        await _launchUri(
+          context,
+          Uri.parse(
+            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(texto)}',
+          ),
+        );
+        return;
+      }
+      final fallbackNombre = r.aliadoBusinessName ?? 'Destino aliado';
+      await _launchUri(
+        context,
+        Uri.parse(
+          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(fallbackNombre)}',
+        ),
+      );
+      return;
+    }
+
     final u = r.aliadoFiscalMapsUrl?.trim();
     if (u != null && u.isNotEmpty) {
       await _openHttpUrl(context, u);
       return;
     }
-    if (!r.destinoEntregaUsaPerfil) {
-      final alt = r.destinoEntregaMapsUrl?.trim();
-      if (alt != null && alt.isNotEmpty) {
-        await _openHttpUrl(context, alt);
-        return;
-      }
-    }
-    final q = r.destinoEntregaUsaPerfil
-        ? (r.aliadoDireccionFiscalMultilineaEs ??
-            r.aliadoBusinessName ??
-            'Taller aliado')
-        : (r.destinoEntregaTexto?.trim().isNotEmpty == true
-            ? r.destinoEntregaTexto!.trim()
-            : (r.aliadoBusinessName ?? 'Destino aliado'));
+    final q = r.aliadoDireccionFiscalMultilineaEs ??
+        r.aliadoBusinessName ??
+        'Taller aliado';
     await _launchUri(
       context,
       Uri.parse(

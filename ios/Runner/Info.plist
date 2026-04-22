@@ -49,5 +49,7 @@
 	<string>Permite tomar fotos para ilustrar tus repuestos en el catálogo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Permite elegir una imagen desde tu galería para el producto.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MotoLink usa tu ubicación para ordenar el catálogo de importadores por cercanía y estimar distancias de envío.</string>
 </dict>
 </plist>

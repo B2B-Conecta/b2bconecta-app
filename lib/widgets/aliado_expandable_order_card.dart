@@ -4,6 +4,7 @@ import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
+import 'courier_timeline_widget.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
@@ -305,7 +306,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           viewingAsRole: AppHomeRole.aliado,
                         ),
                         const SizedBox(height: 12),
-                        TransactionRequestLifecycleSection(request: r),
+                        CourierTimelineWidget(request: r, compact: true),
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),
                           expandedFooter!,

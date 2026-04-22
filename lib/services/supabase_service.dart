@@ -21,6 +21,7 @@ import '../models/transaction_request_message_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../utils/broker_pricing.dart';
+import '../utils/haversine.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -288,6 +289,20 @@ class SupabaseService {
     return ProfileModel.fromJson(Map<String, dynamic>.from(data));
   }
 
+  /// Persiste GPS o geocodificación del domicilio fiscal (`profiles.latitude/longitude`).
+  static Future<void> updateMyGeolocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    await _client.rpc(
+      'update_my_geolocation',
+      params: <String, dynamic>{
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+      },
+    );
+  }
+
   /// Crea o actualiza el perfil B2B (upsert por `id`).
   ///
   /// El campo [role] solo se persiste si el perfil aún no tiene rol definido
@@ -463,8 +478,8 @@ class SupabaseService {
 
   static String _catalogProfileSelect(CatalogFilters filters) {
     return _catalogNeedsProfileInner(filters)
-        ? 'profiles!inner(business_name, estado, ciudad)'
-        : 'profiles(business_name, estado, ciudad)';
+        ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude)'
+        : 'profiles(business_name, estado, ciudad, latitude, longitude)';
   }
 
   /// Métricas del inventario del usuario actual (importador).
@@ -1862,6 +1877,38 @@ class SupabaseService {
     final embed = _catalogProfileSelect(f);
     dynamic query = _client.from('products').select('*, $embed');
     query = _applyCatalogFilters(query, f);
+
+    if (f.sortByDistanceFromReference) {
+      const cap = 800;
+      final response = await query.limit(cap);
+      final list = response as List<dynamic>;
+      final refLat = f.sortReferenceLat!;
+      final refLng = f.sortReferenceLng!;
+      final withDist = list.map((row) {
+        final p = PartModel.fromJson(row as Map<String, dynamic>);
+        final km = Haversine.distanceKm(
+          refLat,
+          refLng,
+          p.ownerLatitude,
+          p.ownerLongitude,
+        );
+        return p.copyWith(distanceKmFromReference: km);
+      }).toList()
+        ..sort((a, b) {
+          final da = a.distanceKmFromReference;
+          final db = b.distanceKmFromReference;
+          if (da == null && db == null) return a.id.compareTo(b.id);
+          if (da == null) return 1;
+          if (db == null) return -1;
+          final c = da.compareTo(db);
+          if (c != 0) return c;
+          return a.id.compareTo(b.id);
+        });
+      if (offset >= withDist.length) return [];
+      final end = (offset + limit).clamp(0, withDist.length);
+      return withDist.sublist(offset, end);
+    }
+
     final response = await query
         .order('id', ascending: true)
         .range(offset, offset + limit - 1);

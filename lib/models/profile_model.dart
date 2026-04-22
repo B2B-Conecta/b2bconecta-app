@@ -21,6 +21,9 @@ class ProfileModel {
     this.direccion,
     this.logoStoragePath,
     this.fiscalMapsUrl,
+    this.latitude,
+    this.longitude,
+    this.locationUpdatedAt,
   });
 
   final String id;
@@ -71,6 +74,11 @@ class ProfileModel {
 
   /// Enlace público (p. ej. Google Maps) a la ubicación fiscal; opcional.
   final String? fiscalMapsUrl;
+
+  /// Coordenadas para catálogo por proximidad (GPS aliado o geocodificación de domicilio fiscal).
+  final double? latitude;
+  final double? longitude;
+  final DateTime? locationUpdatedAt;
 
   /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
@@ -195,7 +203,18 @@ class ProfileModel {
       direccion: _text(json['direccion']),
       logoStoragePath: _text(json['logo_storage_path']),
       fiscalMapsUrl: _text(json['fiscal_maps_url']),
+      latitude: _asDoubleNullable(json['latitude']),
+      longitude: _asDoubleNullable(json['longitude']),
+      locationUpdatedAt: json['location_updated_at'] != null
+          ? DateTime.tryParse(json['location_updated_at'].toString())
+          : null,
     );
+  }
+
+  static double? _asDoubleNullable(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
   }
 
   static String? _text(dynamic v) {

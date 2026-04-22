@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/transaction_request_admin_pedido_listo_route_prep_section.dart';
+import '../widgets/courier_timeline_widget.dart';
 import '../widgets/transaction_request_admin_sections.dart';
 
 class TransactionRequestDetailScreen extends StatefulWidget {
@@ -102,7 +103,7 @@ class _TransactionRequestDetailScreenState
                 ),
               ],
               const SizedBox(height: 12),
-              TransactionRequestLifecycleSection(request: r),
+              CourierTimelineWidget(request: r),
               if (r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _noteCard(r.notasAdmin!.trim()),

@@ -18,6 +18,9 @@ class PartModel {
     this.sku,
     this.isActive = true,
     this.category,
+    this.ownerLatitude,
+    this.ownerLongitude,
+    this.distanceKmFromReference,
   });
 
   final String id;
@@ -49,6 +52,13 @@ class PartModel {
 
   final String? category;
 
+  /// Coordenadas WGS84 del importador (`profiles`), si existen.
+  final double? ownerLatitude;
+  final double? ownerLongitude;
+
+  /// Distancia al punto de referencia del aliado (GPS); la calcula el cliente al ordenar.
+  final double? distanceKmFromReference;
+
   /// Precio unitario final MotoLink (mayorista + comisión broker).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
@@ -66,6 +76,7 @@ class PartModel {
 
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
     final loc = _ownerLocationFromProfiles(json['profiles']);
+    final ownerLatLng = _ownerLatLngFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
     final isActive = isActiveRaw is bool
@@ -78,6 +89,8 @@ class PartModel {
       ownerBusinessName: ownerBusinessName,
       ownerEstado: loc.$1,
       ownerCiudad: loc.$2,
+      ownerLatitude: ownerLatLng.$1,
+      ownerLongitude: ownerLatLng.$2,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
@@ -87,6 +100,7 @@ class PartModel {
       sku: _nullableText(json['sku']),
       isActive: isActive,
       category: _nullableText(json['category']),
+      distanceKmFromReference: null,
     );
   }
 
@@ -105,6 +119,9 @@ class PartModel {
     String? sku,
     bool? isActive,
     String? category,
+    double? ownerLatitude,
+    double? ownerLongitude,
+    double? distanceKmFromReference,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -121,6 +138,10 @@ class PartModel {
       sku: sku ?? this.sku,
       isActive: isActive ?? this.isActive,
       category: category ?? this.category,
+      ownerLatitude: ownerLatitude ?? this.ownerLatitude,
+      ownerLongitude: ownerLongitude ?? this.ownerLongitude,
+      distanceKmFromReference:
+          distanceKmFromReference ?? this.distanceKmFromReference,
     );
   }
 
@@ -146,6 +167,33 @@ class PartModel {
       }
     }
     return null;
+  }
+
+  static (double?, double?) _ownerLatLngFromProfiles(dynamic profiles) {
+    Map<String, dynamic>? m;
+    if (profiles == null) return (null, null);
+    if (profiles is Map) {
+      m = Map<String, dynamic>.from(profiles);
+    } else if (profiles is List && profiles.isNotEmpty) {
+      final first = profiles.first;
+      if (first is Map) m = Map<String, dynamic>.from(first);
+    }
+    if (m == null) return (null, null);
+    final la = m['latitude'];
+    final lo = m['longitude'];
+    double? lat;
+    double? lng;
+    if (la is num) {
+      lat = la.toDouble();
+    } else if (la != null) {
+      lat = double.tryParse(la.toString());
+    }
+    if (lo is num) {
+      lng = lo.toDouble();
+    } else if (lo != null) {
+      lng = double.tryParse(lo.toString());
+    }
+    return (lat, lng);
   }
 
   static (String?, String?) _ownerLocationFromProfiles(dynamic profiles) {

@@ -149,6 +149,12 @@ alter table public.profiles
   add column if not exists direccion text;
 alter table public.profiles
   add column if not exists credito_consumido_acumulado numeric(14, 2) not null default 0;
+alter table public.profiles
+  add column if not exists latitude double precision;
+alter table public.profiles
+  add column if not exists longitude double precision;
+alter table public.profiles
+  add column if not exists location_updated_at timestamptz;
 
 -- Perfiles B2B (aliados: KYC pendiente, sin entregas contado prellenadas).
 -- Campo direccion: domicilio fiscal / casa matriz (referencia para facturación; demo seed).
@@ -181,6 +187,23 @@ on conflict (id) do update set
   estado = excluded.estado,
   ciudad = excluded.ciudad,
   direccion = excluded.direccion;
+
+-- Demo A5: primer importador + primer aliado con coordenadas (pruebas de catálogo por
+-- proximidad sin depender del GPS del dispositivo ni de geocoding en runtime).
+-- Aliado1 (Los Ruices, Caracas) · Importador1 (Los Palos Grandes, Caracas).
+update public.profiles
+set
+  latitude = 10.4289,
+  longitude = -66.8092,
+  location_updated_at = now()
+where id = 'a2000001-0000-4000-8000-000000000001'::uuid;
+
+update public.profiles
+set
+  latitude = 10.4969,
+  longitude = -66.8488,
+  location_updated_at = now()
+where id = 'a1000001-0000-4000-8000-000000000001'::uuid;
 
 -- =============================================================================
 -- Esquema inventario B2B (idempotente). Debe existir antes de insertar productos.

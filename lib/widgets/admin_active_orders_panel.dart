@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../models/app_home_role.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -48,6 +49,12 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
           status: TransactionRequestStatus.enPreparacion,
           label: TransactionRequestStatus.labelEs(
             TransactionRequestStatus.enPreparacion,
+          ),
+        ),
+        OrderStatusFilterOption(
+          status: TransactionRequestStatus.pedidoListo,
+          label: TransactionRequestStatus.labelEs(
+            TransactionRequestStatus.pedidoListo,
           ),
         ),
         OrderStatusFilterOption(
@@ -175,11 +182,12 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
               onRegistered: _load,
             ),
           ),
-        if (r.status == TransactionRequestStatus.enPreparacion)
+        if (r.status == TransactionRequestStatus.enPreparacion ||
+            r.status == TransactionRequestStatus.pedidoListo)
           AdminOrderPreTransitSection(
             request: r,
             onRefresh: _load,
-            onMarcarEnTransito: () => _promptMarkEnTransito(context, r),
+            onMarcarEnTransito: () => _marcarEnTransito(context, r),
           ),
         if (r.hasFacturaAliado &&
             (r.status == TransactionRequestStatus.enTransito ||
@@ -205,94 +213,12 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     );
   }
 
-  Future<void> _promptMarkEnTransito(
+  Future<void> _marcarEnTransito(
     BuildContext context,
     TransactionRequestModel r,
   ) async {
-    final ctrlDays = TextEditingController(text: '0');
-    final ctrlHours = TextEditingController(text: '0');
-    ({int days, int hours})? eta;
     try {
-      eta = await showDialog<({int days, int hours})>(
-        context: context,
-        builder: (ctx) {
-          return AlertDialog(
-            title: const Text('Tiempo estimado de tránsito'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Indique días y horas aproximadas hasta que el envío llegue al taller del aliado. '
-                  'Si el aliado está cerca, puede dejar 0 días y solo horas.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: ctrlDays,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Días (0–365)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: ctrlHours,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Horas (0–23)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final d = int.tryParse(ctrlDays.text.trim()) ?? 0;
-                  final h = int.tryParse(ctrlHours.text.trim()) ?? 0;
-                  if (d < 0 || d > 365 || h < 0 || h > 23) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('Use días entre 0 y 365, y horas entre 0 y 23.'),
-                      ),
-                    );
-                    return;
-                  }
-                  if (d == 0 && h == 0) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Indique al menos un día o una hora de tránsito estimado.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(ctx, (days: d, hours: h));
-                },
-                child: const Text('Confirmar'),
-              ),
-            ],
-          );
-        },
-      );
-    } finally {
-      ctrlDays.dispose();
-      ctrlHours.dispose();
-    }
-    if (eta == null || !context.mounted) return;
-    try {
-      await SupabaseService.adminMarcaPedidoEnTransito(
-        requestId: r.id,
-        transitEtaDays: eta.days,
-        transitEtaHours: eta.hours,
-      );
+      await SupabaseService.adminMarcaPedidoEnTransito(requestId: r.id);
       if (!context.mounted) return;
       FocusManager.instance.primaryFocus?.unfocus();
       // Evita desmontar el subárbol del pedido en el mismo frame que aún tiene foco/herencia activa.
@@ -401,6 +327,10 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
                             statusLabel: _statusLabel(r.status),
                             expandedFooter:
                                 _buildAdminExpandedFooter(context, r),
+                            cardViewerRole: widget.isTransportistaView
+                                ? AppHomeRole.transportista
+                                : AppHomeRole.administrador,
+                            onRequestMutated: _load,
                           );
                         },
                       ),

@@ -720,6 +720,7 @@ class SupabaseService {
     at_aprobado_admin,
     at_rechazado,
     at_en_preparacion,
+    at_pedido_listo,
     at_en_transito,
     at_entregado,
     proveedor_factura_storage_path,
@@ -744,9 +745,10 @@ class SupabaseService {
     destino_entrega_usa_perfil,
     destino_entrega_texto,
     destino_entrega_maps_url,
+    admin_ruta_maps_url,
     products ( name, sku, price_usd ),
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url ),
-    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone )
+    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url )
   ''';
 
   /// Solicitudes del aliado autenticado (todas).
@@ -1403,8 +1405,10 @@ class SupabaseService {
 
     if (row == null) throw StateError('Pedido no encontrado.');
     final m = Map<String, dynamic>.from(row);
-    if (m['status']?.toString() != TransactionRequestStatus.enPreparacion) {
-      throw StateError('Solo aplica con el pedido en preparación.');
+    final st = m['status']?.toString();
+    if (st != TransactionRequestStatus.enPreparacion &&
+        st != TransactionRequestStatus.pedidoListo) {
+      throw StateError('Solo aplica con el pedido en preparación o listo para recolección.');
     }
     final prov = m['proveedor_factura_storage_path']?.toString().trim();
     if (prov == null || prov.isEmpty) {
@@ -1699,11 +1703,12 @@ class SupabaseService {
     }).eq('id', transactionRequestId);
   }
 
-  /// MotoLink: pasa el pedido a en tránsito con días y/u horas estimadas hasta el aliado.
+  /// MotoLink: pasa el pedido a `en_transito`. [transitEtaDays]/[transitEtaHours] son opcionales
+  /// (por defecto 0); el ETA en vivo se espera en el enlace de Google Maps del pedido.
   static Future<void> adminMarcaPedidoEnTransito({
     required String requestId,
-    required int transitEtaDays,
-    required int transitEtaHours,
+    int transitEtaDays = 0,
+    int transitEtaHours = 0,
   }) async {
     await _client.rpc(
       'admin_marca_pedido_en_transito',
@@ -1713,6 +1718,54 @@ class SupabaseService {
         'p_transit_eta_hours': transitEtaHours,
       },
     );
+  }
+
+  /// MotoLink: guarda o borra el enlace de Google Maps de la ruta unificada
+  /// (visible a aliado e importador en tránsito).
+  static Future<void> adminSetTransactionRequestRutaMapsUrl({
+    required String requestId,
+    required String? urlOrNull,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final profile = await fetchMyProfile();
+    if (profile?.role?.trim().toLowerCase() != 'administrador') {
+      throw StateError('Solo MotoLink puede publicar el enlace de ruta.');
+    }
+
+    final row = await _client
+        .from('transaction_requests')
+        .select('status')
+        .eq('id', requestId)
+        .maybeSingle();
+    if (row == null) throw StateError('Pedido no encontrado.');
+    final st = Map<String, dynamic>.from(row)['status']?.toString();
+    if (st != TransactionRequestStatus.pedidoListo &&
+        st != TransactionRequestStatus.enTransito) {
+      throw StateError(
+        'El enlace de ruta solo se puede editar con el pedido listo para recolección o en tránsito.',
+      );
+    }
+
+    final trimmed = urlOrNull?.trim();
+    String? stored;
+    if (trimmed == null || trimmed.isEmpty) {
+      stored = null;
+    } else {
+      final uri = Uri.tryParse(trimmed);
+      if (uri == null ||
+          !uri.hasScheme ||
+          (uri.scheme != 'http' && uri.scheme != 'https')) {
+        throw ArgumentError('Use una URL http(s) válida o deje el campo vacío.');
+      }
+      stored = trimmed;
+    }
+
+    await _client.from('transaction_requests').update({
+      'admin_ruta_maps_url': stored,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', requestId);
   }
 
   static const _trMessagesSelect =
@@ -1778,7 +1831,8 @@ class SupabaseService {
     );
   }
 
-  /// Avanza el estado del pedido (importador): solo `aprobado_admin` → `en_preparacion`.
+  /// Avanza el estado del pedido (importador): `aprobado_admin` → `en_preparacion`,
+  /// `en_preparacion` → `pedido_listo`. El tránsito lo marca MotoLink (RPC).
   static Future<void> importerAdvanceTransactionRequest({
     required String id,
     required String newStatus,

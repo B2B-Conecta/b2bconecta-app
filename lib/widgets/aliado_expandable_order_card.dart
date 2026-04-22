@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
@@ -299,7 +300,10 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         ),
                         TransactionRequestImporterContactSection(request: r),
                         const SizedBox(height: 12),
-                        TransactionRequestDestinoEntregaSection(request: r),
+                        TransactionRequestDestinoEntregaSection(
+                          request: r,
+                          viewingAsRole: AppHomeRole.aliado,
+                        ),
                         const SizedBox(height: 12),
                         TransactionRequestLifecycleSection(request: r),
                         if (expandedFooter != null) ...[

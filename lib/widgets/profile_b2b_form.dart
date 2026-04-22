@@ -386,6 +386,33 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     );
   }
 
+  String _fiscalMapsSectionTitle() {
+    switch (_role.trim().toLowerCase()) {
+      case 'importador':
+        return 'ENLACE GOOGLE MAPS · ALMACÉN / DOMICILIO FISCAL';
+      case 'aliado':
+        return 'ENLACE GOOGLE MAPS · TALLER / DOMICILIO FISCAL';
+      default:
+        return 'ENLACE GOOGLE MAPS (OPCIONAL)';
+    }
+  }
+
+  String _fiscalMapsSectionDescription() {
+    switch (_role.trim().toLowerCase()) {
+      case 'importador':
+        return 'Pegue el enlace «Compartir» de Google Maps apuntando a su almacén o domicilio fiscal. '
+            'MotoLink lo usa como origen al armar la ruta en vivo hacia el taller del aliado cuando el pedido '
+            'está en tránsito (junto con el enlace del aliado en su perfil).';
+      case 'aliado':
+        return 'Pegue el enlace «Compartir» de Google Maps apuntando a su taller o domicilio fiscal. '
+            'MotoLink lo usa como destino al armar la ruta en vivo desde el importador cuando el pedido '
+            'está en tránsito (junto con el enlace del importador en su perfil).';
+      default:
+        return 'Pegue un enlace público (compartir ubicación) para que MotoLink y los participantes '
+            'abran su domicilio fiscal en el mapa.';
+    }
+  }
+
   Widget _sectionLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 4),
@@ -683,17 +710,27 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               },
             ),
             const SizedBox(height: 14),
-            _sectionLabel('ENLACE GOOGLE MAPS (OPCIONAL)'),
+            _sectionLabel(_fiscalMapsSectionTitle()),
             Text(
-              'Pegue un enlace público (compartir ubicación) para que MotoLink, importadores '
-              'y transportistas abran su domicilio fiscal en el mapa. Recomendado si aún no lo tiene.',
+              _fiscalMapsSectionDescription(),
               style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _fiscalMapsUrlController,
               keyboardType: TextInputType.url,
-              decoration: _fieldDecoration('https://maps.app.goo.gl/...'),
+              decoration: _fieldDecoration('https://maps.app.goo.gl/... o maps.google.com/...'),
+              validator: (v) {
+                final t = v?.trim() ?? '';
+                if (t.isEmpty) return null;
+                final u = Uri.tryParse(t);
+                if (u == null ||
+                    !u.hasScheme ||
+                    (u.scheme != 'http' && u.scheme != 'https')) {
+                  return 'Use una URL que empiece por https://';
+                }
+                return null;
+              },
             ),
           ],
           if (!_ubicacionObligatoria) ...[

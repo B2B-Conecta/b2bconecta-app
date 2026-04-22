@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/app_home_role.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
@@ -8,6 +9,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'transaction_request_transit_supplier_ally_maps_cta.dart';
 
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
@@ -149,18 +151,19 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   const TransactionRequestDestinoEntregaSection({
     super.key,
     required this.request,
+    /// Quién ve la ficha; MotoLink no ve el CTA de «ruta en vivo» combinada aquí.
+    this.viewingAsRole,
   });
 
   final TransactionRequestModel request;
+  final AppHomeRole? viewingAsRole;
 
   @override
   Widget build(BuildContext context) {
     final r = request;
     final usa = r.destinoEntregaUsaPerfil;
     final texto = r.destinoEntregaTexto?.trim();
-    final mapsUrl = r.destinoEntregaMapsUrl?.trim();
     final fiscalBloque = r.aliadoDireccionFiscalMultilineaEs;
-    final mapsPerfil = r.aliadoFiscalMapsUrl?.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,14 +196,6 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
                 height: 1.35,
               ),
             ),
-          if (mapsPerfil != null && mapsPerfil.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => _openMaps(context, mapsPerfil),
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('Ubicación fiscal en mapa (perfil aliado)'),
-            ),
-          ],
         ] else ...[
           Text(
             texto != null && texto.isNotEmpty
@@ -212,44 +207,14 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
               height: 1.35,
             ),
           ),
-          if (mapsUrl != null && mapsUrl.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => _openMaps(context, mapsUrl),
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('Abrir enlace en mapa'),
-            ),
-          ],
+        ],
+        if (r.status == TransactionRequestStatus.enTransito &&
+            viewingAsRole != AppHomeRole.administrador) ...[
+          const SizedBox(height: 14),
+          TransactionRequestTransitSupplierToAliadoMapsCta(request: r),
         ],
       ],
     );
-  }
-
-  Future<void> _openMaps(BuildContext context, String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null ||
-        !(uri.hasScheme &&
-            (uri.scheme == 'http' || uri.scheme == 'https'))) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El enlace de mapa no es válido.')),
-      );
-      return;
-    }
-    try {
-      final ok =
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir el mapa.')),
-        );
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
   }
 }
 
@@ -514,6 +479,13 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     label: 'En preparación (importador)',
                     value: _prepValue(r),
                     isDone: r.atEnPreparacion != null,
+                  ),
+                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  _TimelineRow(
+                    label: 'Pedido listo para recolección (importador)',
+                    value: formatEsShortDateTime(r.atPedidoListo),
+                    isDone: r.atPedidoListo != null,
+                    highlight: r.status == TransactionRequestStatus.pedidoListo,
                   ),
                   Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(

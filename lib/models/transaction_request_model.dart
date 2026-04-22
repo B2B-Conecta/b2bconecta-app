@@ -23,6 +23,7 @@ class TransactionRequestModel {
     this.atAprobadoAdmin,
     this.atRechazado,
     this.atEnPreparacion,
+    this.atPedidoListo,
     this.atEnTransito,
     this.atEntregado,
     this.productName,
@@ -38,6 +39,10 @@ class TransactionRequestModel {
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
+    this.ownerEstado,
+    this.ownerCiudad,
+    this.ownerDireccion,
+    this.ownerFiscalMapsUrl,
     this.proveedorFacturaStoragePath,
     this.proveedorFacturaFileName,
     this.proveedorFacturaSubmittedAt,
@@ -60,6 +65,7 @@ class TransactionRequestModel {
     this.destinoEntregaUsaPerfil = true,
     this.destinoEntregaTexto,
     this.destinoEntregaMapsUrl,
+    this.adminRutaMapsUrl,
   });
 
   final String id;
@@ -84,6 +90,7 @@ class TransactionRequestModel {
   final DateTime? atAprobadoAdmin;
   final DateTime? atRechazado;
   final DateTime? atEnPreparacion;
+  final DateTime? atPedidoListo;
   final DateTime? atEnTransito;
   final DateTime? atEntregado;
   final String? productName;
@@ -103,6 +110,10 @@ class TransactionRequestModel {
   final String? ownerBusinessName;
   final String? ownerRif;
   final String? ownerPhone;
+  final String? ownerEstado;
+  final String? ownerCiudad;
+  final String? ownerDireccion;
+  final String? ownerFiscalMapsUrl;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -138,12 +149,18 @@ class TransactionRequestModel {
   final String? destinoEntregaTexto;
   final String? destinoEntregaMapsUrl;
 
+  /// URL de Google Maps de la ruta publicada por MotoLink (visible en tránsito).
+  final String? adminRutaMapsUrl;
+
   int get _etaDaysCoalesced => transitEtaDays ?? 0;
   int get _etaHoursCoalesced => transitEtaHours ?? 0;
 
   /// Hay al menos un día o una hora de ETA registrada.
   bool get hasTransitEta =>
       _etaDaysCoalesced > 0 || _etaHoursCoalesced > 0;
+
+  bool get hasAdminRutaMapsUrl =>
+      adminRutaMapsUrl != null && adminRutaMapsUrl!.trim().isNotEmpty;
 
   /// Texto breve en español, p. ej. «2 días y 4 horas» o «6 horas».
   String? get transitEtaResumenEs {
@@ -216,6 +233,30 @@ class TransactionRequestModel {
   /// Muestra línea MotoLink en ficha de pedido (`credit_limit` > 0).
   bool get muestraCreditoMotoLinkAsignadoEnPedido => (aliadoCreditLimit ?? 0) > 0;
 
+  /// Ubicación fiscal del importador (recolección), desde el perfil del owner.
+  String? get ownerUbicacionFiscalMultilineaEs {
+    final parts = <String>[];
+    final e = ownerEstado?.trim();
+    final c = ownerCiudad?.trim();
+    final d = ownerDireccion?.trim();
+    if (e != null && e.isNotEmpty) parts.add(e);
+    if (c != null && c.isNotEmpty) parts.add(c);
+    if (d != null && d.isNotEmpty) parts.add(d);
+    if (parts.isEmpty) return null;
+    return parts.join('\n');
+  }
+
+  /// Una línea para URLs de mapas / geocodificación (origen recolección).
+  String get ownerUbicacionUnaLineaParaMapa {
+    final m = ownerUbicacionFiscalMultilineaEs?.trim();
+    if (m != null && m.isNotEmpty) {
+      return m.replaceAll('\n', ', ');
+    }
+    final bn = ownerBusinessName?.trim();
+    if (bn != null && bn.isNotEmpty) return bn;
+    return 'Almacén importador';
+  }
+
   /// Dirección fiscal del aliado cuando el pedido usa perfil (texto multilínea).
   String? get aliadoDireccionFiscalMultilineaEs {
     if (!destinoEntregaUsaPerfil) return null;
@@ -228,6 +269,18 @@ class TransactionRequestModel {
     if (d != null && d.isNotEmpty) parts.add(d);
     if (parts.isEmpty) return null;
     return parts.join('\n');
+  }
+
+  /// Texto de destino de entrega (Bloque A2: fiscal o alternativo).
+  String get destinoEntregaTextoParaMapa {
+    if (destinoEntregaUsaPerfil) {
+      return aliadoDireccionFiscalMultilineaEs?.trim().isNotEmpty == true
+          ? aliadoDireccionFiscalMultilineaEs!.replaceAll('\n', ', ')
+          : 'Dirección fiscal del aliado';
+    }
+    final t = destinoEntregaTexto?.trim();
+    if (t != null && t.isNotEmpty) return t;
+    return 'Destino indicado por el aliado';
   }
 
   /// Una línea para fichas compactas de pedido.
@@ -322,7 +375,8 @@ class TransactionRequestModel {
   bool get puedeRegistrarRespaldoEfectivo {
     if (pagoMetodo?.trim() != PagoMetodo.efectivo) return false;
     if (hasEfectivoRespaldo) return false;
-    if (status == TransactionRequestStatus.enPreparacion) {
+    if (status == TransactionRequestStatus.enPreparacion ||
+        status == TransactionRequestStatus.pedidoListo) {
       return pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
     }
     if (status == TransactionRequestStatus.enTransito) return true;
@@ -387,6 +441,7 @@ class TransactionRequestModel {
       atAprobadoAdmin: _parseDate(json['at_aprobado_admin']),
       atRechazado: _parseDate(json['at_rechazado']),
       atEnPreparacion: _parseDate(json['at_en_preparacion']),
+      atPedidoListo: _parseDate(json['at_pedido_listo']),
       atEnTransito: _parseDate(json['at_en_transito']),
       atEntregado: _parseDate(json['at_entregado']),
       productName: productName,
@@ -402,6 +457,10 @@ class TransactionRequestModel {
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),
+      ownerEstado: _nullableText(ownerMap?['estado']),
+      ownerCiudad: _nullableText(ownerMap?['ciudad']),
+      ownerDireccion: _nullableText(ownerMap?['direccion']),
+      ownerFiscalMapsUrl: _nullableText(ownerMap?['fiscal_maps_url']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:
@@ -432,6 +491,7 @@ class TransactionRequestModel {
       destinoEntregaUsaPerfil: json['destino_entrega_usa_perfil'] != false,
       destinoEntregaTexto: _nullableText(json['destino_entrega_texto']),
       destinoEntregaMapsUrl: _nullableText(json['destino_entrega_maps_url']),
+      adminRutaMapsUrl: _nullableText(json['admin_ruta_maps_url']),
     );
   }
 

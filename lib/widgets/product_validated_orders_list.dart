@@ -95,6 +95,16 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     TransactionRequestModel r,
     String next,
   ) async {
+    if (next == TransactionRequestStatus.pedidoListo && !r.hasProveedorFactura) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Adjunte primero la factura digital del proveedor.',
+          ),
+        ),
+      );
+      return;
+    }
     try {
       await SupabaseService.importerAdvanceTransactionRequest(
         id: r.id,

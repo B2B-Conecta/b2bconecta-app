@@ -53,7 +53,9 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
 
   Future<void> _pickFacturaAliado(BuildContext context) async {
     final r = widget.request;
-    if (r.status != TransactionRequestStatus.enPreparacion) return;
+    final st = r.status;
+    if (st != TransactionRequestStatus.enPreparacion &&
+        st != TransactionRequestStatus.pedidoListo) return;
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -94,16 +96,22 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
-    if (r.status != TransactionRequestStatus.enPreparacion) {
+    final st = r.status;
+    if (st != TransactionRequestStatus.enPreparacion &&
+        st != TransactionRequestStatus.pedidoListo) {
       return const SizedBox.shrink();
     }
 
     final pe = r.pagoEstadoRevisionEfectivo;
-    final puedeTransito =
-        r.hasProveedorFactura && r.hasFacturaAliado;
+    final puedeTransito = st == TransactionRequestStatus.pedidoListo &&
+        r.hasProveedorFactura &&
+        r.hasFacturaAliado;
 
     String? bloqueoTransito;
-    if (!r.hasProveedorFactura) {
+    if (st == TransactionRequestStatus.enPreparacion) {
+      bloqueoTransito =
+          'El importador debe marcar «Pedido listo» cuando la mercancía esté lista en despacho.';
+    } else if (!r.hasProveedorFactura) {
       bloqueoTransito = 'Falta factura del proveedor (importador).';
     } else if (!r.hasFacturaAliado) {
       bloqueoTransito = 'Adjunte la factura oficial al aliado.';
@@ -125,10 +133,40 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         Text(
           'El aliado solo puede enviar comprobante o declarar pago en la app tras la factura MotoLink al aliado; '
           'puede hacerlo en cualquier fase activa del pedido. En el cronograma de envío no figura como paso del ciclo. '
-          'Marcar en tránsito solo exige factura del proveedor, factura MotoLink al aliado y ETA; el pago puede regularizarse antes o después.',
+          'Marcar en tránsito solo cuando el pedido está «listo» y con facturas cargadas; el ETA lo consultan '
+          'aliado e importador en el enlace de Google Maps que MotoLink publica en la ficha. El pago puede regularizarse antes o después.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
         ),
         const SizedBox(height: 12),
+        if (st == TransactionRequestStatus.enPreparacion) ...[
+          Material(
+            color: Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.inventory_2_outlined, color: Colors.amber.shade900),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Espere a que el importador marque «Pedido listo»: confirma que la carga está '
+                      'sellada y lista para que MotoLink la retire del almacén.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         Text(
           'Factura del proveedor (referencia interna)',
           style: TextStyle(
@@ -267,11 +305,12 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           ),
         ),
         const SizedBox(height: 6),
-        if (puedeTransito)
+        if (st == TransactionRequestStatus.pedidoListo &&
+            puedeTransito)
           FilledButton.icon(
             onPressed: widget.onMarcarEnTransito,
             icon: const Icon(Icons.local_shipping_outlined, size: 18),
-            label: const Text('Marcar en tránsito (ETA)'),
+            label: const Text('Marcar en tránsito'),
           )
         else
           Text(

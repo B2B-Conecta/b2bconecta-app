@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
+import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
+import 'transaction_request_admin_pedido_listo_route_prep_section.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta: un toque en la cabecera despliega contactos, crédito y ciclo del envío.
@@ -13,6 +16,9 @@ class AdminExpandableOrderCard extends StatelessWidget {
     required this.onToggle,
     required this.statusLabel,
     this.expandedFooter,
+    /// Broker MotoLink vs transportista (afecta CTA de ruta y bloque «pedido listo»).
+    this.cardViewerRole = AppHomeRole.administrador,
+    this.onRequestMutated,
   });
 
   final TransactionRequestModel request;
@@ -20,6 +26,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
   final VoidCallback onToggle;
   final String statusLabel;
   final Widget? expandedFooter;
+  final AppHomeRole cardViewerRole;
+  final VoidCallback? onRequestMutated;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +106,41 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               height: 1.25,
                             ),
                           ),
+                          if (r.status == TransactionRequestStatus.pedidoListo) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.teal.shade200),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.notifications_active_outlined,
+                                    size: 18,
+                                    color: Colors.teal.shade900,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Pedido listo en despacho: cuando el transporte retire la carga, '
+                                      'marcar en tránsito.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.3,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.teal.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           if (r.pedidoEntregadoYPagado) ...[
                             const SizedBox(height: 8),
                             Container(
@@ -224,7 +267,20 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         ),
                         TransactionRequestPartiesContactSection(request: r),
                         const SizedBox(height: 12),
-                        TransactionRequestDestinoEntregaSection(request: r),
+                        TransactionRequestDestinoEntregaSection(
+                          request: r,
+                          viewingAsRole: cardViewerRole,
+                        ),
+                        if ((r.status == TransactionRequestStatus.pedidoListo ||
+                                r.status ==
+                                    TransactionRequestStatus.enTransito) &&
+                            cardViewerRole == AppHomeRole.administrador) ...[
+                          const SizedBox(height: 12),
+                          TransactionRequestAdminPedidoListoRoutePrepSection(
+                            request: r,
+                            onSaved: onRequestMutated,
+                          ),
+                        ],
                         if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
                           const SizedBox(height: 8),
                           Row(

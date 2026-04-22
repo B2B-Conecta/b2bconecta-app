@@ -4,6 +4,8 @@ abstract final class TransactionRequestStatus {
   static const aprobadoAdmin = 'aprobado_admin';
   static const rechazado = 'rechazado';
   static const enPreparacion = 'en_preparacion';
+  /// Importador confirma mercancía lista en despacho (antes del retiro MotoLink).
+  static const pedidoListo = 'pedido_listo';
   static const enTransito = 'en_transito';
   static const entregado = 'entregado';
 
@@ -11,6 +13,7 @@ abstract final class TransactionRequestStatus {
   static const List<String> importerPipeline = [
     aprobadoAdmin,
     enPreparacion,
+    pedidoListo,
     enTransito,
     entregado,
   ];
@@ -23,6 +26,7 @@ abstract final class TransactionRequestStatus {
   /// Solo preparación y tránsito (legacy / filtros internos si hiciera falta).
   static const List<String> importerActiveFulfillment = [
     enPreparacion,
+    pedidoListo,
     enTransito,
   ];
 
@@ -30,6 +34,7 @@ abstract final class TransactionRequestStatus {
   static const List<String> adminOperationalActive = [
     aprobadoAdmin,
     enPreparacion,
+    pedidoListo,
     enTransito,
   ];
 
@@ -48,6 +53,7 @@ abstract final class TransactionRequestStatus {
   static const List<String> aliadoPedidosEnCurso = [
     aprobadoAdmin,
     enPreparacion,
+    pedidoListo,
     enTransito,
   ];
 
@@ -56,6 +62,7 @@ abstract final class TransactionRequestStatus {
     pendiente,
     aprobadoAdmin,
     enPreparacion,
+    pedidoListo,
     enTransito,
   ];
 
@@ -63,6 +70,7 @@ abstract final class TransactionRequestStatus {
   static const List<String> aliadoPedidosActivosYCerrados = [
     aprobadoAdmin,
     enPreparacion,
+    pedidoListo,
     enTransito,
     entregado,
     rechazado,
@@ -73,6 +81,7 @@ abstract final class TransactionRequestStatus {
     pendiente,
     aprobadoAdmin,
     enPreparacion,
+    pedidoListo,
     enTransito,
     entregado,
   ];
@@ -87,6 +96,8 @@ abstract final class TransactionRequestStatus {
         return 'Rechazado';
       case enPreparacion:
         return 'En preparación';
+      case pedidoListo:
+        return 'Pedido listo';
       case enTransito:
         return 'En tránsito';
       case entregado:
@@ -97,14 +108,15 @@ abstract final class TransactionRequestStatus {
   }
 
   /// Siguiente estado que puede aplicar el importador, o null si es terminal o no aplica.
-  /// `en_preparacion` → `en_transito` lo registra MotoLink (con factura y días de ETA).
+  /// `pedido_listo` → `en_transito` lo registra MotoLink (RPC).
   /// La entrega la confirma el aliado (`en_transito` → `entregado`), no el importador.
   static String? nextForImporter(String current) {
     switch (current) {
       case aprobadoAdmin:
         return enPreparacion;
       case enPreparacion:
-        return null;
+        return pedidoListo;
+      case pedidoListo:
       case enTransito:
         return null;
       default:
@@ -122,6 +134,8 @@ abstract final class TransactionRequestStatus {
     switch (nextStatus) {
       case enPreparacion:
         return 'Marcar en preparación';
+      case pedidoListo:
+        return 'Marcar pedido listo para recolección';
       case enTransito:
         return 'Marcar en tránsito';
       case entregado:
@@ -138,6 +152,8 @@ abstract final class TransactionRequestStatus {
         return 'Pedido cerrado';
       case rechazado:
         return '—';
+      case pedidoListo:
+        return 'Listo en despacho · MotoLink marca el tránsito al retirar';
       case enTransito:
         return 'En tránsito · el aliado confirma la entrega';
       default:
@@ -159,6 +175,8 @@ abstract final class TransactionRequestStatus {
         return 'Aprobado · preparación pendiente';
       case enPreparacion:
         return 'Tu pedido se está preparando';
+      case pedidoListo:
+        return 'Mercancía lista · MotoLink coordinará el envío';
       case enTransito:
         return 'En tránsito hacia tu taller';
       case entregado:

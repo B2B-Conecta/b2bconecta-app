@@ -117,12 +117,16 @@ class ProfileModel {
     return creditLimit;
   }
 
-  /// Disponible revolvente: límite menos crédito ya consumido en entregas a crédito menos suma de pedidos abiertos.
-  double? cupoDisponible(double sumaPrecioTotalPedidosAbiertos) {
+  /// Línea disponible: límite − saldo activo (pedidos en curso / cuotas pendientes) −
+  /// [imputadoCerradoAcumulado] (imputado al entregar con crédito sin plan, o al aprobar la **última** cuota del plan).
+  double? cupoDisponible(
+    double exposicionCupoEfectivo,
+    double imputadoCerradoAcumulado,
+  ) {
     final lim = creditLimit;
     if (lim == null) return null;
-    final cons = creditoConsumidoAcumulado ?? 0;
-    return lim - cons - sumaPrecioTotalPedidosAbiertos;
+    return (lim - exposicionCupoEfectivo - imputadoCerradoAcumulado)
+        .clamp(0.0, double.infinity);
   }
 
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).

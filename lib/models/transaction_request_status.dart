@@ -165,12 +165,21 @@ abstract final class TransactionRequestStatus {
   }
 
   /// Mensaje corto para el aliado (seguimiento del pedido).
-  static String aliadoTrackingHeadline(String status) {
+  static String aliadoTrackingHeadline(
+    String status, {
+    bool canceladoPorAliado = false,
+    bool anuladoPorMotolink = false,
+  }) {
     switch (status) {
       case pendiente:
         return 'En revisión por MotoLink';
       case rechazado:
-        return 'Solicitud no aprobada';
+        if (anuladoPorMotolink) {
+          return 'Pedido anulado por MotoLink';
+        }
+        return canceladoPorAliado
+            ? 'Solicitud cancelada (antes de aprobación)'
+            : 'Solicitud no aprobada';
       case aprobadoAdmin:
         return 'Aprobado · preparación pendiente';
       case enPreparacion:

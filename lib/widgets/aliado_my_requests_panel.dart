@@ -5,6 +5,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
+import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
 import 'order_list_filter_bar.dart';
 
@@ -21,6 +22,7 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
+  String? _cancelarBusyId;
   late final TextEditingController _searchCtrl;
 
   @override
@@ -77,7 +79,45 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
     });
   }
 
-  String _label(String s) => TransactionRequestStatus.labelEs(s);
+  String _label(TransactionRequestModel r) =>
+      r.statusLabelEs(aliadoViewer: true);
+
+  Future<void> _cancelarPendiente(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) async {
+    if (_cancelarBusyId != null) return;
+    final m = await showAliadoCancelarPedidoPendienteDialog(context);
+    if (m == null) return;
+    if (!context.mounted) return;
+    setState(() => _cancelarBusyId = r.id);
+    try {
+      await SupabaseService.aliadoCancelaPedidoPendiente(
+        transactionRequestId: r.id,
+        motivo: m,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solicitud cancelada. MotoLink ha sido notificada.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      var msg = e.toString();
+      if (msg.contains('Solo puede cancelar mientras')) {
+        msg =
+            'Solo puede cancelar antes de que MotoLink apruebe la solicitud.';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cancelar: $msg')),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelarBusyId = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +206,13 @@ class _AliadoMyRequestsPanelState extends State<AliadoMyRequestsPanel> {
                               request: r,
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
-                              statusLabel: _label(r.status),
+                              statusLabel: _label(r),
+                              onCancelarSolicitudPendiente: r.status ==
+                                      TransactionRequestStatus.pendiente
+                                  ? () => _cancelarPendiente(context, r)
+                                  : null,
+                              cancelarSolicitudPendienteBusy:
+                                  _cancelarBusyId == r.id,
                             );
                           },
                         ),

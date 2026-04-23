@@ -8,6 +8,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'admin_motolink_anula_pedido_dialog.dart';
 import 'admin_order_pre_transit_section.dart';
 import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
@@ -37,6 +38,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
+  String? _anularMotolinkBusyId;
 
   static List<OrderStatusFilterOption> get _statusOptions => [
         OrderStatusFilterOption(
@@ -138,12 +140,51 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     );
   }
 
-  String _statusLabel(String s) => TransactionRequestStatus.labelEs(s);
+  String _statusLabel(TransactionRequestModel r) => r.statusLabelEs();
 
   void _toggleExpand(String id) {
     setState(() {
       _expandedRequestId = _expandedRequestId == id ? null : id;
     });
+  }
+
+  Future<void> _anularPedidoPorMotolink(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) async {
+    if (_anularMotolinkBusyId != null) return;
+    final m = await showAdminMotolinkAnulaPedidoDialog(
+      context,
+      productName: r.productName ?? 'Producto',
+    );
+    if (m == null) return;
+    if (!context.mounted) return;
+    setState(() => _anularMotolinkBusyId = r.id);
+    try {
+      await SupabaseService.adminAnulaPedidoPorMotolink(
+        transactionRequestId: r.id,
+        motivo: m,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pedido anulado. Se notificó al aliado e importador.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      var msg = e.toString();
+      if (msg.contains('no entregado') || msg.contains('en este estado')) {
+        msg = 'No se puede anular este pedido en su estado actual.';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo anular: $msg')),
+      );
+    } finally {
+      if (mounted) setState(() => _anularMotolinkBusyId = null);
+    }
   }
 
   Widget _buildAdminExpandedFooter(
@@ -166,6 +207,8 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
             transactionRequestId: r.id,
             allowReplyAsAliado: false,
             allowReplyAsAdmin: false,
+            onThreadChanged: _load,
+            orderPrecioTotalUsd: r.precioTotal,
           ),
         ],
       );
@@ -173,6 +216,39 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (r.motolinkPuedeAnularComoAdmin) ...[
+          OutlinedButton.icon(
+            onPressed: _anularMotolinkBusyId != null
+                ? null
+                : () => _anularPedidoPorMotolink(context, r),
+            icon: _anularMotolinkBusyId == r.id
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(Icons.gpp_bad_outlined, size: 20, color: Colors.red.shade800),
+            label: Text(
+              _anularMotolinkBusyId == r.id
+                  ? 'Anulando…'
+                  : 'Anular pedido (MotoLink) — requiere motivo',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red.shade800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Pedido aprobado o en curso: MotoLink puede cerrar la operación. '
+            'Si había plan de cuotas, se limpia; el inventario vuelve si ya se descontó al facturar.',
+            style: TextStyle(
+              fontSize: 10.5,
+              height: 1.35,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (r.status == TransactionRequestStatus.enTransito ||
             r.status == TransactionRequestStatus.entregado)
           Padding(
@@ -208,6 +284,9 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
           transactionRequestId: r.id,
           allowReplyAsAliado: false,
           allowReplyAsAdmin: true,
+          onThreadChanged: _load,
+          orderPrecioTotalUsd: r.precioTotal,
+          creditPlanRescheduleLocked: r.creditPlanLockedForAdminReschedule,
         ),
       ],
     );
@@ -324,7 +403,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
                             request: r,
                             expanded: _expandedRequestId == r.id,
                             onToggle: () => _toggleExpand(r.id),
-                            statusLabel: _statusLabel(r.status),
+                            statusLabel: _statusLabel(r),
                             expandedFooter:
                                 _buildAdminExpandedFooter(context, r),
                             cardViewerRole: widget.isTransportistaView

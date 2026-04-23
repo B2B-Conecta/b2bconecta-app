@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
@@ -242,6 +244,9 @@ class _MainShellState extends State<MainShell> {
             setState(() => _tabIndex = i);
             if (widget.homeRole == AppHomeRole.importador && i == 1) {
               MainShellTabController.notifyImporterPedidosReload();
+            }
+            if (widget.homeRole == AppHomeRole.aliado && i == 3) {
+              unawaited(_refreshProfile());
             }
           },
           items: [

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/aliado_motolink_cupo_snapshot.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
@@ -20,6 +21,7 @@ import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_message_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
 
@@ -730,6 +732,10 @@ class SupabaseService {
     precio_base_aliado_total,
     stock_descontado_en,
     notas_admin,
+    cancelado_por_aliado,
+    aliado_cancelacion_motivo,
+    anulado_por_motolink,
+    motolink_anulacion_motivo,
     created_at,
     updated_at,
     at_aprobado_admin,
@@ -761,6 +767,14 @@ class SupabaseService {
     destino_entrega_texto,
     destino_entrega_maps_url,
     admin_ruta_maps_url,
+    credit_plan_type,
+    credit_plan_confirmed_at,
+    credit_monto_bloqueado,
+    payment_schedule (
+      id, transaction_request_id, installment_index, amount_usd, due_on,
+      pago_metodo, pago_comprobante_storage_path, pago_comprobante_file_name,
+      pago_submitted_at, pago_estado_revision, pago_comprobante_rechazo_nota, pago_aprobado_at
+    ),
     products ( name, sku, price_usd ),
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url ),
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url )
@@ -961,19 +975,25 @@ class SupabaseService {
         .toList();
   }
 
-  /// Broker: actualiza el cupo negociable del aliado (`profiles.credit_limit`).
+  /// Broker: actualiza el cupo negociable del aliado (`profiles.credit_limit`) con auditoría.
   /// [creditoPreactivadoPorAdmin]: puede usar línea MotoLink aun en fase contado (solo si admin lo autoriza).
   static Future<void> adminSetAliadoCreditLimit({
     required String aliadoId,
     required double creditLimit,
     bool creditoPreactivadoPorAdmin = false,
+    required String reason,
   }) async {
+    final t = reason.trim();
+    if (t.isEmpty) {
+      throw ArgumentError('Debe indicar el motivo del ajuste (auditoría de cupo).');
+    }
     await _client.rpc(
       'admin_set_aliado_credit_limit',
       params: <String, dynamic>{
         'p_aliado_id': aliadoId,
         'p_credit_limit': creditLimit,
         'p_credito_preactivado': creditoPreactivadoPorAdmin,
+        'p_reason': t,
       },
     );
   }
@@ -1170,31 +1190,40 @@ class SupabaseService {
     }
   }
 
-  /// Suma `precio_total` de pedidos abiertos de un aliado (vs. `credit_limit`).
+  /// Suma efectiva retenida contra el cupo (incl. cuotas de plan ya liberadas al aprobar pago).
   static Future<double> fetchOpenCreditExposureForAliado(String aliadoId) async {
-    final response = await _client
-        .from('transaction_requests')
-        .select('precio_total')
-        .eq('aliado_id', aliadoId)
-        .inFilter('status', TransactionRequestStatus.aliadoCreditExposureStatuses);
-
-    final list = response as List<dynamic>;
-    var sum = 0.0;
-    for (final row in list) {
-      final m = Map<String, dynamic>.from(row as Map);
-      final pt = m['precio_total'];
-      if (pt is num) {
-        sum += pt.toDouble();
-      }
-    }
-    return sum;
+    if (aliadoId.trim().isEmpty) return 0;
+    final v = await _client.rpc(
+      'aliado_effective_open_exposure',
+      params: <String, dynamic>{'p_aliado_id': aliadoId},
+    );
+    if (v is num) return v.toDouble();
+    return 0.0;
   }
 
-  /// Suma `precio_total` de pedidos abiertos del aliado autenticado (vs. `credit_limit`).
+  /// Suma de bloqueo de cupo en pedidos no rechazados (RPC `aliado_effective_open_exposure`):
+  /// saldo activo; en planes a cuotas baja al aprobar pagos. Incluye entregas con plan y saldo pendiente.
   static Future<double> fetchOpenCreditExposureForCurrentAliado() async {
     final uid = _currentUserId;
     if (uid == null) return 0;
     return fetchOpenCreditExposureForAliado(uid);
+  }
+
+  /// Corte atómico (límite, imputado, saldo activo) para coherente [Disponible] en el perfil.
+  static Future<AliadoMotoLinkCupoSnapshot?> fetchAliadoMotoLinkCupoSnapshot() async {
+    if (_currentUserId == null) return null;
+    final v = await _client.rpc('aliado_motolink_cupo_snapshot');
+    if (v is List && v.isNotEmpty) {
+      final m = v.first;
+      if (m is Map) {
+        return AliadoMotoLinkCupoSnapshot.fromRpcRow(
+          Map<String, dynamic>.from(m),
+        );
+      }
+    } else if (v is Map) {
+      return AliadoMotoLinkCupoSnapshot.fromRpcRow(Map<String, dynamic>.from(v));
+    }
+    return null;
   }
 
   /// Cantidad de pedidos abiertos (misma lista que el cupo).
@@ -1314,11 +1343,10 @@ class SupabaseService {
       if (limit != null && limit > 0) {
         final exposure = await fetchOpenCreditExposureForCurrentAliado();
         final consumido = profile.creditoConsumidoAcumulado ?? 0;
-        final usado = exposure + consumido;
-        if (usado + total > limit + _creditTol) {
+        if (exposure + consumido + total > limit + _creditTol) {
           throw CreditLimitException(
-            'Este pedido (\$${total.toStringAsFixed(2)}) más su uso actual '
-            '(\$${usado.toStringAsFixed(2)}: pedidos abiertos + entregas a crédito) '
+            'Este pedido (\$${total.toStringAsFixed(2)}) más su uso de línea actual '
+            '(\$${(exposure + consumido).toStringAsFixed(2)}: ver perfil) '
             'supera su límite autorizado (\$${limit.toStringAsFixed(2)}).',
           );
         }
@@ -1836,6 +1864,202 @@ class SupabaseService {
       'author_role': 'administrador',
       'body': t,
     });
+  }
+
+  /// Admin MotoLink: anula un pedido ya aprobado / en curso (no pendiente ni entregado), con motivo.
+  static Future<void> adminAnulaPedidoPorMotolink({
+    required String transactionRequestId,
+    required String motivo,
+  }) async {
+    final t = motivo.trim();
+    if (t.length < 3) {
+      throw ArgumentError('Indique un motivo de al menos 3 caracteres.');
+    }
+    await _client.rpc(
+      'admin_anula_pedido_por_motolink',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_motivo': t,
+      },
+    );
+  }
+
+  /// Aliado: cancela pedido en `pendiente` (antes de aprobación MotoLink), con motivo.
+  static Future<void> aliadoCancelaPedidoPendiente({
+    required String transactionRequestId,
+    required String motivo,
+  }) async {
+    final t = motivo.trim();
+    if (t.length < 3) {
+      throw ArgumentError('Indique un motivo de al menos 3 caracteres.');
+    }
+    await _client.rpc(
+      'aliado_cancela_pedido_pendiente',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_motivo': t,
+      },
+    );
+  }
+
+  /// [amountsUsd]: 1–3 importes en USD cuya suma = `precio_total` del pedido.
+  static Future<void> confirmOrderCreditPlan({
+    required String transactionRequestId,
+    required List<double> amountsUsd,
+    required bool montosPersonalizados,
+  }) async {
+    if (amountsUsd.isEmpty || amountsUsd.length > 3) {
+      throw ArgumentError('Debe indicar 1, 2 o 3 importes de cuota.');
+    }
+    final n = amountsUsd.length;
+    var suma = 0.0;
+    for (final a in amountsUsd) {
+      suma += a;
+    }
+    await _client.rpc(
+      'admin_confirm_order_credit_plan',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_amounts_usd': amountsUsd,
+      },
+    );
+    DateTime? confirmadoEn;
+    final trRow = await _client
+        .from('transaction_requests')
+        .select('credit_plan_confirmed_at')
+        .eq('id', transactionRequestId)
+        .maybeSingle();
+    if (trRow != null) {
+      final raw = Map<String, dynamic>.from(trRow)['credit_plan_confirmed_at'];
+      if (raw is String) {
+        confirmadoEn = DateTime.tryParse(raw);
+      }
+    }
+    final atStr = formatEsShortDateTime(confirmadoEn);
+    final w = StringBuffer()..write('MOTO-SISTEMA: ');
+    if (n == 1) {
+      w.write(
+        'MotoLink fijó 1 cuota (contado) por '
+        '\$${suma.toStringAsFixed(2)}. ',
+      );
+    } else {
+      w.write(
+        'MotoLink fijó $n cuotas (cada 15 días) por un total de '
+        '\$${suma.toStringAsFixed(2)}. ',
+      );
+    }
+    if (montosPersonalizados) {
+      w.write('Desglose personalizado. ');
+    }
+    w.write(
+      'Confirmado: $atStr. Vea en la sección Pago importes y vencimientos de cada cuota.',
+    );
+    final body = w.toString();
+    await insertTransactionRequestMessageAsAdmin(
+      transactionRequestId: transactionRequestId,
+      body: body,
+    );
+  }
+
+  /// Sólo total del pedido (hilo de chat / cupo de cuotas).
+  static Future<double?> fetchTransactionRequestPrecioTotal(
+    String transactionRequestId,
+  ) async {
+    final id = transactionRequestId.trim();
+    if (id.isEmpty) return null;
+    final row = await _client
+        .from('transaction_requests')
+        .select('precio_total')
+        .eq('id', id)
+        .maybeSingle();
+    if (row == null) return null;
+    final pt = Map<String, dynamic>.from(row)['precio_total'];
+    if (pt is num) return pt.toDouble();
+    return double.tryParse(pt?.toString() ?? '');
+  }
+
+  /// Comprobante asociado a una fila de [payment_schedule].
+  static Future<void> aliadoSubmitComprobantePagoCuota({
+    required String paymentScheduleId,
+    required String metodo,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use imagen o PDF.');
+    }
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
+
+    final row0 = await _client
+        .from('payment_schedule')
+        .select('transaction_request_id, pago_comprobante_storage_path')
+        .eq('id', paymentScheduleId)
+        .maybeSingle();
+    if (row0 == null) throw StateError('Cuota no encontrada.');
+    final m0 = Map<String, dynamic>.from(row0);
+    final trid = m0['transaction_request_id']?.toString() ?? '';
+    if (trid.isEmpty) throw StateError('Pedido de cuota no válido.');
+    final oldPath = m0['pago_comprobante_storage_path']?.toString().trim();
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path = '$trid/cuota_${paymentScheduleId}_${stamp}_$safeBase';
+    if (oldPath != null && oldPath.isNotEmpty) {
+      try {
+        await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
+      } catch (_) {}
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+    try {
+      await _client.rpc(
+        'aliado_registra_comprobante_pago_cuota',
+        params: <String, dynamic>{
+          'p_schedule_id': paymentScheduleId,
+          'p_metodo': metodo,
+          'p_storage_path': path,
+          'p_file_name': fileName.trim(),
+        },
+      );
+    } catch (e) {
+      try {
+        await _client.storage.from(_orderPaymentProofsBucket).remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  static Future<void> adminAprobarPagoAliadoCuota(String paymentScheduleId) async {
+    await _client.rpc(
+      'admin_aprobar_pago_aliado_cuota',
+      params: <String, dynamic>{'p_schedule_id': paymentScheduleId},
+    );
+  }
+
+  static Future<void> adminRechazarComprobantePagoCuota({
+    required String paymentScheduleId,
+    required String nota,
+  }) async {
+    await _client.rpc(
+      'admin_rechazar_comprobante_pago_cuota',
+      params: <String, dynamic>{
+        'p_schedule_id': paymentScheduleId,
+        'p_nota': nota.trim(),
+      },
+    );
   }
 
   /// Cierra el pedido (aliado): `en_transito` → `entregado` (RPC en base de datos).

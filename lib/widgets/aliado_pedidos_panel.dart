@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
+import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
 import 'aliado_order_pago_section.dart';
 import 'main_shell_tab.dart';
@@ -30,13 +31,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
   String? _entregaBusyId;
+  String? _cancelarBusyId;
 
   static List<OrderStatusFilterOption> get _statusOptions =>
       TransactionRequestStatus.aliadoPedidosActivosYCerrados
           .map(
             (s) => OrderStatusFilterOption(
               status: s,
-              label: TransactionRequestStatus.labelEs(s),
+              label: TransactionRequestStatus.labelEs(
+                s,
+              ),
             ),
           )
           .toList();
@@ -126,6 +130,48 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     });
   }
 
+  Future<void> _cancelarPendiente(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) async {
+    if (_cancelarBusyId != null) return;
+    final m = await showAliadoCancelarPedidoPendienteDialog(context);
+    if (m == null) return;
+    if (!context.mounted) return;
+    setState(() => _cancelarBusyId = r.id);
+    try {
+      await SupabaseService.aliadoCancelaPedidoPendiente(
+        transactionRequestId: r.id,
+        motivo: m,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solicitud cancelada. MotoLink ha sido notificada.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      var msg = e.toString();
+      if (msg.contains('Solo puede cancelar mientras')) {
+        msg =
+            'Solo puede cancelar antes de que MotoLink apruebe la solicitud.';
+      } else if (msg.contains('Debe indicar un motivo') ||
+          msg.contains('3 caracteres')) {
+        msg = 'El motivo es obligatorio (mín. 3 caracteres).';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cancelar: $msg')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _cancelarBusyId = null);
+      }
+    }
+  }
+
   Future<void> _confirmarEntrega(
     BuildContext context,
     TransactionRequestModel r,
@@ -168,7 +214,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     }
   }
 
-  String _label(String s) => TransactionRequestStatus.labelEs(s);
+  String _label(TransactionRequestModel r) =>
+      r.statusLabelEs(aliadoViewer: true);
 
   bool _esEnCurso(String status) =>
       TransactionRequestStatus.aliadoPedidosEnCurso.contains(status);
@@ -282,7 +329,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   request: r,
                                   expanded: _expandedRequestId == r.id,
                                   onToggle: () => _toggleExpand(r.id),
-                                  statusLabel: _label(r.status),
+                                  statusLabel: _label(r),
                                   onConfirmarRecepcion:
                                       r.status ==
                                               TransactionRequestStatus.enTransito
@@ -290,6 +337,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                           : null,
                                   confirmarRecepcionBusy:
                                       _entregaBusyId == r.id,
+                                  onCancelarSolicitudPendiente:
+                                      r.status ==
+                                              TransactionRequestStatus
+                                                  .pendiente
+                                          ? () => _cancelarPendiente(
+                                                context,
+                                                r,
+                                              )
+                                          : null,
+                                  cancelarSolicitudPendienteBusy:
+                                      _cancelarBusyId == r.id,
                                   expandedFooter: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -307,6 +365,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                         transactionRequestId: r.id,
                                         allowReplyAsAliado: _esEnCurso(r.status),
                                         allowReplyAsAdmin: false,
+                                        onThreadChanged: _load,
+                                        orderPrecioTotalUsd: r.precioTotal,
                                       ),
                                     ],
                                   ),
@@ -320,7 +380,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   request: r,
                                   expanded: _expandedRequestId == r.id,
                                   onToggle: () => _toggleExpand(r.id),
-                                  statusLabel: _label(r.status),
+                                  statusLabel: _label(r),
                                   onConfirmarRecepcion:
                                       r.status ==
                                               TransactionRequestStatus.enTransito
@@ -328,6 +388,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                           : null,
                                   confirmarRecepcionBusy:
                                       _entregaBusyId == r.id,
+                                  onCancelarSolicitudPendiente:
+                                      r.status ==
+                                              TransactionRequestStatus
+                                                  .pendiente
+                                          ? () => _cancelarPendiente(
+                                                context,
+                                                r,
+                                              )
+                                          : null,
+                                  cancelarSolicitudPendienteBusy:
+                                      _cancelarBusyId == r.id,
                                   expandedFooter: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -345,6 +416,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                         transactionRequestId: r.id,
                                         allowReplyAsAliado: _esEnCurso(r.status),
                                         allowReplyAsAdmin: false,
+                                        onThreadChanged: _load,
+                                        orderPrecioTotalUsd: r.precioTotal,
                                       ),
                                     ],
                                   ),

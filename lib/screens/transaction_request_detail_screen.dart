@@ -108,6 +108,20 @@ class _TransactionRequestDetailScreenState
                 const SizedBox(height: 12),
                 _noteCard(r.notasAdmin!.trim()),
               ],
+              if (r.canceladoPorAliado &&
+                  (r.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                const SizedBox(height: 12),
+                _noteCard(
+                  'Motivo de cancelación (aliado): ${r.aliadoCancelacionMotivo!.trim()}',
+                ),
+              ],
+              if (r.anuladoPorMotolink &&
+                  (r.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                const SizedBox(height: 12),
+                _noteCard(
+                  'Anulación MotoLink: ${r.motolinkAnulacionMotivo!.trim()}',
+                ),
+              ],
             ],
           );
         },
@@ -284,7 +298,9 @@ class _TransactionRequestDetailScreenState
               spacing: 8,
               runSpacing: 6,
               children: [
-                _chip('Estado: ${TransactionRequestStatus.labelEs(r.status)}'),
+                _chip(
+                  'Estado: ${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)}',
+                ),
                 _chip('Cantidad: ${r.cantidad}'),
                 _chip('Total: \$${r.precioTotal.toStringAsFixed(2)}'),
               ],

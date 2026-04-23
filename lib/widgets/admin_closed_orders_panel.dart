@@ -91,7 +91,7 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
     );
   }
 
-  String _statusLabel(String s) => TransactionRequestStatus.labelEs(s);
+  String _statusLabel(TransactionRequestModel r) => r.statusLabelEs();
 
   void _toggleExpand(String id) {
     setState(() {
@@ -186,7 +186,7 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
                               request: r,
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
-                              statusLabel: _statusLabel(r.status),
+                              statusLabel: _statusLabel(r),
                               expandedFooter: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -212,6 +212,10 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
                                     transactionRequestId: r.id,
                                     allowReplyAsAliado: false,
                                     allowReplyAsAdmin: true,
+                                    onThreadChanged: _load,
+                                    orderPrecioTotalUsd: r.precioTotal,
+                                    creditPlanRescheduleLocked:
+                                        r.creditPlanLockedForAdminReschedule,
                                   ),
                                 ],
                               ),

@@ -17,6 +17,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     required this.statusLabel,
     this.onConfirmarRecepcion,
     this.confirmarRecepcionBusy = false,
+    this.onCancelarSolicitudPendiente,
+    this.cancelarSolicitudPendienteBusy = false,
     this.expandedFooter,
   });
 
@@ -27,12 +29,19 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   /// Cuando el pedido está en tránsito: el aliado cierra el ciclo confirmando recepción.
   final VoidCallback? onConfirmarRecepcion;
   final bool confirmarRecepcionBusy;
+  /// Solo aplica mientras [TransactionRequestModel.status] es pendiente.
+  final VoidCallback? onCancelarSolicitudPendiente;
+  final bool cancelarSolicitudPendienteBusy;
   final Widget? expandedFooter;
 
   @override
   Widget build(BuildContext context) {
     final r = request;
-    final tracking = TransactionRequestStatus.aliadoTrackingHeadline(r.status);
+    final tracking = TransactionRequestStatus.aliadoTrackingHeadline(
+      r.status,
+      canceladoPorAliado: r.canceladoPorAliado,
+      anuladoPorMotolink: r.anuladoPorMotolink,
+    );
     final showHeadline = tracking.isNotEmpty && tracking != '—';
 
     return Card(
@@ -235,7 +244,44 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-          ),
+            ),
+          if (r.status == TransactionRequestStatus.pendiente &&
+              onCancelarSolicitudPendiente != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+              child: OutlinedButton.icon(
+                onPressed: cancelarSolicitudPendienteBusy
+                    ? null
+                    : onCancelarSolicitudPendiente,
+                icon: cancelarSolicitudPendienteBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline, size: 20),
+                label: Text(
+                  cancelarSolicitudPendienteBusy
+                      ? 'Cancelando…'
+                      : 'Cancelar solicitud (antes de aprobarse)',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade800,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Text(
+                'Solo mientras MotoLink aún no ha aprobado. Debe indicar un motivo; se notifica a MotoLink.',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  height: 1.35,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ],
           if (onConfirmarRecepcion != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),

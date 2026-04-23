@@ -54,6 +54,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   bool _saving = false;
   bool _logoBusy = false;
   double? _openExposure;
+  /// Corte con el servidor (mismo request que [saldo activo]); ver [_loadOpenExposure].
+  double? _imputadoServidor;
   bool _loadingExposure = false;
 
   /// Recrea [AuthorizationStatusSection] al actualizar documentos KYC.
@@ -131,7 +133,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     if (!_persistedAsAliado) return;
     if (oldWidget.initial?.id != widget.initial?.id ||
         oldWidget.initial?.creditoConsumidoAcumulado !=
-            widget.initial?.creditoConsumidoAcumulado) {
+            widget.initial?.creditoConsumidoAcumulado ||
+        oldWidget.initial?.creditLimit != widget.initial?.creditLimit ||
+        oldWidget.initial?.creditoPreactivadoPorAdmin !=
+            widget.initial?.creditoPreactivadoPorAdmin) {
       _loadOpenExposure();
     }
   }
@@ -179,15 +184,27 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   Future<void> _loadOpenExposure() async {
     setState(() => _loadingExposure = true);
     try {
+      final s = await SupabaseService.fetchAliadoMotoLinkCupoSnapshot();
+      if (s != null) {
+        if (!mounted) return;
+        setState(() {
+          _openExposure = s.saldoActivoExposicion;
+          _imputadoServidor = s.imputadoAcumulado;
+          _loadingExposure = false;
+        });
+        return;
+      }
       final v = await SupabaseService.fetchOpenCreditExposureForCurrentAliado();
       if (!mounted) return;
       setState(() {
+        _imputadoServidor = null;
         _openExposure = v;
         _loadingExposure = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
+        _imputadoServidor = null;
         _openExposure = null;
         _loadingExposure = false;
       });
@@ -292,7 +309,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     final limMostrado = widget.initial?.limiteCreditoMostradoAliado;
     final limRaw = widget.initial?.creditLimit;
     final exp = _openExposure ?? 0.0;
-    final cons = widget.initial?.creditoConsumidoAcumulado ?? 0.0;
+    final cons = _imputadoServidor ?? widget.initial?.creditoConsumidoAcumulado ?? 0.0;
     final disponible =
         ((limMostrado ?? 0) - exp - cons).clamp(0.0, double.infinity);
     final pce = widget.initial?.primerosPedidosContadoEntregados ?? 0;
@@ -356,7 +373,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 const LinearProgressIndicator(minHeight: 3)
               else ...[
                 Text(
-                  'Compromiso en pedidos abiertos: \$${exp.toStringAsFixed(2)}',
+                  'Compromiso (saldo activo vía cupo / plan): \$${exp.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -364,10 +381,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Crédito imputado (entregas con línea MotoLink): \$${cons.toStringAsFixed(2)}',
+                  'Imputado acumulado (lo ya “cerrado” y descontado en disponible): '
+                  '\$${cons.toStringAsFixed(2)} (entregas a crédito sin plan, o al aprobar la última cuota de un plan).',
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: AppColors.textSecondary,
+                    height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -377,6 +396,16 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.brandBlue,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Fórmula: límite mostrado − saldo activo (compromiso) − imputado acumulado. '
+                  'El saldo activo baja con cada cuota; el imputado sube una sola vez al completar el plan.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                    height: 1.3,
                   ),
                 ),
               ],

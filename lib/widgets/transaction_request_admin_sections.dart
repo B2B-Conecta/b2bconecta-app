@@ -373,6 +373,32 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
       );
     }
 
+    // Comprobantes por cuota (crédito / plan MotoLink), mismo bucket que pago con comprobante.
+    if (r.hasAgreedCreditPlan) {
+      for (final c in r.paymentSchedule) {
+        if (!c.hasPagoComprobante) continue;
+        final path = c.pagoComprobanteStoragePath!.trim();
+        final name = c.pagoComprobanteFileName?.trim();
+        final label = (name != null && name.isNotEmpty)
+            ? 'Cuota ${c.installmentIndex} · comprobante · $name'
+            : 'Comprobante cuota ${c.installmentIndex} (línea crédito)';
+        chips.add(
+          OutlinedButton.icon(
+            onPressed: () => _launchSignedOrderDoc(
+              context,
+              () => SupabaseService.createSignedUrlForComprobantePago(path),
+            ),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      }
+    }
+
     if (chips.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -390,7 +416,10 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
+          r.hasAgreedCreditPlan
+              ? 'Archivos del pedido, incluidos comprobantes por cuota (crédito) que haya subido el aliado. '
+                  'Misma referencia que en «Factura y pago — revisión de cuota». Enlace temporal al abrir.'
+              : 'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
         ),
         const SizedBox(height: 10),
@@ -457,11 +486,38 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                   ),
                   Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
-                    label: 'Rechazado (MotoLink)',
+                    label: r.anuladoPorMotolink
+                        ? 'Anulado por MotoLink (post-aprobación)'
+                        : (r.canceladoPorAliado
+                            ? 'Cancelado por el aliado'
+                            : 'Rechazado (MotoLink)'),
                     value: formatEsShortDateTime(r.atRechazado),
                     isDone: r.atRechazado != null,
                     highlight: true,
                   ),
+                  if (r.anuladoPorMotolink &&
+                      (r.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Motivo (MotoLink): ${r.motolinkAnulacionMotivo!.trim()}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: Colors.blueGrey.shade900,
+                      ),
+                    ),
+                  ] else if (r.canceladoPorAliado &&
+                      (r.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Motivo: ${r.aliadoCancelacionMotivo!.trim()}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: Colors.blueGrey.shade900,
+                      ),
+                    ),
+                  ],
                 ] else ...[
                   _TimelineRow(
                     label: 'Solicitud registrada',

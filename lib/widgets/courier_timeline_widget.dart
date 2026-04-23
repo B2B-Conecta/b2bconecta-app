@@ -156,6 +156,10 @@ class CourierTimelineWidget extends StatelessWidget {
   }
 
   Widget _rejectedCard(TransactionRequestModel r) {
+    final cancel = r.canceladoPorAliado;
+    final m = r.aliadoCancelacionMotivo;
+    final mAnula = r.motolinkAnulacionMotivo;
+    final anulM = r.anuladoPorMotolink;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,20 +177,54 @@ class CourierTimelineWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.cancel_outlined, color: Colors.red.shade800),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Pedido rechazado · ${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}',
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.cancel_outlined, color: Colors.red.shade800),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        anulM
+                            ? 'Pedido anulado por MotoLink · '
+                                '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
+                            : (cancel
+                                ? 'Solicitud cancelada · '
+                                    '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
+                                : 'Pedido rechazado · '
+                                    '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: Colors.red.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (anulM && mAnula != null && mAnula.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Motivo (MotoLink): $mAnula',
                     style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                      fontSize: 11,
+                      height: 1.3,
                       color: Colors.red.shade900,
                     ),
                   ),
-                ),
+                ] else if (cancel && m != null && m.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Motivo registrado: $m',
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      color: Colors.red.shade900,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

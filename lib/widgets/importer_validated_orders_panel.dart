@@ -215,7 +215,7 @@ class _ImporterValidatedOrdersPanelState
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
                               statusLabel:
-                                  TransactionRequestStatus.labelEs(r.status),
+                                  r.statusLabelEs(),
                               operationalHeadline: headline,
                               nextStatus: next,
                               nextActionLabel: next != null

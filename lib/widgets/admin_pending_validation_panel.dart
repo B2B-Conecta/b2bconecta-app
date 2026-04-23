@@ -101,7 +101,7 @@ class _AdminPendingValidationPanelState
     );
   }
 
-  String _statusLabel(String s) => TransactionRequestStatus.labelEs(s);
+  String _statusLabel(TransactionRequestModel r) => r.statusLabelEs();
 
   void _toggleExpand(String id) {
     setState(() {
@@ -277,7 +277,7 @@ class _AdminPendingValidationPanelState
                               request: r,
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
-                              statusLabel: _statusLabel(r.status),
+                              statusLabel: _statusLabel(r),
                               expandedFooter: _buildExpandedFooter(context, r),
                             );
                           },

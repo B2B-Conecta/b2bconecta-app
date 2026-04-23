@@ -434,6 +434,191 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     }
   }
 
+  double _currentCupoFromField() {
+    final raw = _limitCtrl.text.trim().replaceAll(',', '.');
+    final p = double.tryParse(raw);
+    if (p != null) return p;
+    return widget.profile.creditLimit ?? 0;
+  }
+
+  /// Motivo obligatorio; devuelve null si cancela.
+  Future<String?> _promptCupoChangeReason({String? extraLine}) async {
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Motivo del ajuste (auditoría)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Quien modifica el límite debe dejar un motivo. Queda registrado en el historial interno.',
+              style: TextStyle(fontSize: 13, height: 1.3),
+            ),
+            if (extraLine != null && extraLine.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                extraLine,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.brandBlue.withOpacity(0.95),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Motivo',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (reasonCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Confirmar y registrar'),
+          ),
+        ],
+      ),
+    );
+    final t = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+    if (ok != true) return null;
+    if (t.isEmpty) return null;
+    return t;
+  }
+
+  Future<void> _persistCupoLimit(double v, String reason) async {
+    setState(() => _saving = true);
+    try {
+      await SupabaseService.adminSetAliadoCreditLimit(
+        aliadoId: widget.profile.id,
+        creditLimit: v,
+        creditoPreactivadoPorAdmin: _creditoPreactivadoDraft && v > 0,
+        reason: reason,
+      );
+      if (!mounted) return;
+      _limitCtrl.text = v.toStringAsFixed(2);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Límite de crédito actualizado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Sube o baja el cupo respecto al valor mostrado en el campo, con motivo de auditoría.
+  Future<void> _ajustarCupoMontoDesdeLineaBase(bool subir) async {
+    if (_saving) return;
+    final base = _currentCupoFromField();
+    final t = TextEditingController();
+    final ok1 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(subir ? 'Aumentar cupo (USD)' : 'Reducir cupo (USD)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Línea de base (campo o último cupo): \$'
+                '${base.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 13, height: 1.3),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: t,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                ],
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: subir ? 'Monto a sumar (USD)' : 'Monto a descontar (USD)',
+                  hintText: subir ? 'Ej. 2000' : 'Ej. 1000',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (t.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Continuar al motivo'),
+            ),
+          ],
+        );
+      },
+    );
+    final rawDelta = t.text.trim().replaceAll(',', '.');
+    t.dispose();
+    if (ok1 != true) return;
+    final delta = double.tryParse(rawDelta);
+    if (delta == null || delta <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Indique un monto positivo (mayor que 0).'),
+        ),
+      );
+      return;
+    }
+    if (!subir && delta > base) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'El descuento supera el cupo de referencia (\$${base.toStringAsFixed(2)}). '
+              'Se aplicará un nuevo límite de \$0,00.',
+            ),
+          ),
+        );
+      }
+    }
+    final nextRaw = subir
+        ? base + delta
+        : (base - delta).clamp(0.0, 1.0e16);
+    final nextD = double.parse(nextRaw.toStringAsFixed(2));
+    final razon = await _promptCupoChangeReason(
+      extraLine: 'Nuevo cupo previsto: \$${nextD.toStringAsFixed(2)} (antes \$${base.toStringAsFixed(2)}).',
+    );
+    if (razon == null) return;
+    await _persistCupoLimit(nextD, razon);
+  }
+
   Future<void> _confirmReactivarPedidos() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -485,6 +670,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     final raw = _limitCtrl.text.trim().replaceAll(',', '.');
     final v = double.tryParse(raw);
     if (v == null || v < 0) {
@@ -495,30 +681,10 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
       );
       return;
     }
-    setState(() => _saving = true);
-    try {
-      await SupabaseService.adminSetAliadoCreditLimit(
-        aliadoId: widget.profile.id,
-        creditLimit: v,
-        creditoPreactivadoPorAdmin:
-            _creditoPreactivadoDraft && v > 0,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Límite de crédito actualizado.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      await widget.onSaved();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    final vRounded = double.parse(v.toStringAsFixed(2));
+    final reason = await _promptCupoChangeReason();
+    if (reason == null) return;
+    await _persistCupoLimit(vRounded, reason);
   }
 
   Future<void> _openDocReviewSheet() async {
@@ -824,7 +990,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     final cons = widget.profile.creditoConsumidoAcumulado ?? 0;
     final exp = _openExposure ?? 0;
     final disp = lim != null
-        ? (lim - cons - exp).clamp(0.0, double.infinity)
+        ? (lim - exp - cons).clamp(0.0, double.infinity)
         : null;
     final cupoResumen = lim == null
         ? 'Sin cupo asignado'
@@ -1100,7 +1266,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Compromiso en pedidos abiertos: \$${exp.toStringAsFixed(2)}',
+                          'Compromiso (saldo activo vía cupo / plan): \$${exp.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade800,
@@ -1108,7 +1274,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Imputado en entregas (crédito MotoLink): \$${cons.toStringAsFixed(2)}',
+                          'Imputado acum. (entregas crédito + cuotas aprobadas): '
+                          '\$${cons.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade800,
@@ -1123,6 +1290,15 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: AppColors.brandBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Límite − saldo activo − imputado. El imputado sube al cerrar el plan (última cuota) o entrega a crédito sin plan.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                            height: 1.2,
                           ),
                         ),
                       ],
@@ -1273,6 +1449,36 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Ajuste por variación: indique un monto a sumar o a descontar; se pedirá el motivo (auditoría) antes de guardar.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.35,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _saving
+                        ? null
+                        : () => unawaited(_ajustarCupoMontoDesdeLineaBase(true)),
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: const Text('Subir cupo'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _saving
+                        ? null
+                        : () => unawaited(_ajustarCupoMontoDesdeLineaBase(false)),
+                    icon: const Icon(Icons.remove_circle_outline, size: 18),
+                    label: const Text('Bajar cupo'),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: _saving ? null : _save,
@@ -1285,7 +1491,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Guardar límite'),
+                    : const Text('Guardar límite (valor del campo)'),
               ),
             ],
           ),

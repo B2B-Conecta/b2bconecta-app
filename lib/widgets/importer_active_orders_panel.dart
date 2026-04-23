@@ -253,7 +253,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                               expanded: _expandedRequestId == r.id,
                               onToggle: () => _toggleExpand(r.id),
                               statusLabel:
-                                  TransactionRequestStatus.labelEs(r.status),
+                                  r.statusLabelEs(),
                               operationalHeadline: headline,
                               nextStatus: next,
                               nextActionLabel: next != null

@@ -1,4 +1,5 @@
 import 'pago_metodo.dart';
+import 'payment_schedule_model.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
 import '../utils/business_calendar.dart';
@@ -18,6 +19,10 @@ class TransactionRequestModel {
     required this.precioBaseAliadoTotal,
     this.stockDescontadoEn,
     this.notasAdmin,
+    this.canceladoPorAliado = false,
+    this.aliadoCancelacionMotivo,
+    this.anuladoPorMotolink = false,
+    this.motolinkAnulacionMotivo,
     this.createdAt,
     this.updatedAt,
     this.atAprobadoAdmin,
@@ -66,6 +71,10 @@ class TransactionRequestModel {
     this.destinoEntregaTexto,
     this.destinoEntregaMapsUrl,
     this.adminRutaMapsUrl,
+    this.creditPlanType,
+    this.creditPlanConfirmedAt,
+    this.creditMontoBloqueado,
+    this.paymentSchedule = const <PaymentScheduleModel>[],
   });
 
   final String id;
@@ -85,6 +94,10 @@ class TransactionRequestModel {
   final DateTime? stockDescontadoEn;
 
   final String? notasAdmin;
+  final bool canceladoPorAliado;
+  final String? aliadoCancelacionMotivo;
+  final bool anuladoPorMotolink;
+  final String? motolinkAnulacionMotivo;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? atAprobadoAdmin;
@@ -151,6 +164,48 @@ class TransactionRequestModel {
 
   /// URL de Google Maps de la ruta publicada por MotoLink (visible en tránsito).
   final String? adminRutaMapsUrl;
+
+  /// 1 = contado (1 cuota), 2 o 3 cuotas (cada 15 días), fijado por admin en el chat.
+  final int? creditPlanType;
+  final DateTime? creditPlanConfirmedAt;
+  final double? creditMontoBloqueado;
+  final List<PaymentScheduleModel> paymentSchedule;
+
+  bool get hasAgreedCreditPlan =>
+      creditPlanType != null &&
+      creditPlanType! >= 1 &&
+      creditPlanType! <= 3 &&
+      paymentSchedule.isNotEmpty;
+
+  /// True si la cuota 1 ya tiene comprobante, envío a revisión o no está pendiente: el plan no se puede cambiar.
+  bool get creditPlanLockedForAdminReschedule {
+    if (!hasAgreedCreditPlan) return false;
+    for (final c in paymentSchedule) {
+      if (c.installmentIndex != 1) continue;
+      if (c.pagoSubmittedAt != null) return true;
+      if (c.hasPagoComprobante) return true;
+      if (c.pagoEstadoEfectivo != PagoRevisionEstado.pendiente) {
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+
+  /// Suma de cuotas ya aprobadas por MotoLink.
+  double get montoAprobadoEnPlanCuotas {
+    var s = 0.0;
+    for (final c in paymentSchedule) {
+      if (c.pagoAprobado) s += c.amountUsd;
+    }
+    return s;
+  }
+
+  /// Monto de pedido aún sujeto a pago bajo el plan (total − cuotas aprobadas).
+  double? get saldoPendienteRealConPlan {
+    if (!hasAgreedCreditPlan) return null;
+    return (precioTotal - montoAprobadoEnPlanCuotas).clamp(0.0, 1.0e15);
+  }
 
   int get _etaDaysCoalesced => transitEtaDays ?? 0;
   int get _etaHoursCoalesced => transitEtaHours ?? 0;
@@ -232,6 +287,24 @@ class TransactionRequestModel {
 
   /// Muestra línea MotoLink en ficha de pedido (`credit_limit` > 0).
   bool get muestraCreditoMotoLinkAsignadoEnPedido => (aliadoCreditLimit ?? 0) > 0;
+
+  /// Distingue rechazo inicial, anulación MotoLink (post-aprobación) y cancelación por aliado.
+  String statusLabelEs({bool aliadoViewer = false}) {
+    if (status == TransactionRequestStatus.rechazado && canceladoPorAliado) {
+      return aliadoViewer
+          ? 'Cancelada por usted'
+          : 'Cancelada por el aliado';
+    }
+    if (status == TransactionRequestStatus.rechazado && anuladoPorMotolink) {
+      return 'Anulada por MotoLink';
+    }
+    return TransactionRequestStatus.labelEs(status);
+  }
+
+  /// Admin puede anular con motivo: aprobado o en curso, no entregado ni pendiente.
+  bool get motolinkPuedeAnularComoAdmin {
+    return TransactionRequestStatus.adminOperationalActive.contains(status);
+  }
 
   /// Ubicación fiscal del importador (recolección), desde el perfil del owner.
   String? get ownerUbicacionFiscalMultilineaEs {
@@ -432,6 +505,10 @@ class TransactionRequestModel {
       }(),
       stockDescontadoEn: _parseDate(json['stock_descontado_en']),
       notasAdmin: _nullableText(json['notas_admin']),
+      canceladoPorAliado: json['cancelado_por_aliado'] == true,
+      aliadoCancelacionMotivo: _nullableText(json['aliado_cancelacion_motivo']),
+      anuladoPorMotolink: json['anulado_por_motolink'] == true,
+      motolinkAnulacionMotivo: _nullableText(json['motolink_anulacion_motivo']),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -492,13 +569,38 @@ class TransactionRequestModel {
       destinoEntregaTexto: _nullableText(json['destino_entrega_texto']),
       destinoEntregaMapsUrl: _nullableText(json['destino_entrega_maps_url']),
       adminRutaMapsUrl: _nullableText(json['admin_ruta_maps_url']),
+      creditPlanType: _asNullableInt(json['credit_plan_type']),
+      creditPlanConfirmedAt: _parseDate(json['credit_plan_confirmed_at']),
+      creditMontoBloqueado: _asNullableDouble(json['credit_monto_bloqueado']),
+      paymentSchedule: _parsePaymentSchedule(json['payment_schedule']),
     );
+  }
+
+  static List<PaymentScheduleModel> _parsePaymentSchedule(dynamic v) {
+    if (v is! List) return const <PaymentScheduleModel>[];
+    final out = v
+        .map((e) {
+          if (e is! Map) return null;
+          return PaymentScheduleModel.fromJson(
+            Map<String, dynamic>.from(e),
+          );
+        })
+        .whereType<PaymentScheduleModel>()
+        .toList();
+    out.sort((a, b) => a.installmentIndex.compareTo(b.installmentIndex));
+    return out;
   }
 
   static int? _asNullableInt(dynamic v) {
     if (v == null) return null;
     if (v is int) return v;
     return int.tryParse(v.toString());
+  }
+
+  static double? _asNullableDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
   }
 
   static int _asInt(dynamic v) {

@@ -48,9 +48,9 @@ String _distanceChipLabel(PartModel part) {
   if (km == null) return 'Distancia no disponible';
   if (km < 1) {
     final m = (km * 1000).round();
-    return 'A $m m de tu ubicación';
+    return 'A $m m';
   }
-  return 'A ${km.toStringAsFixed(km < 10 ? 1 : 0)} km de tu ubicación';
+  return 'A ${km.toStringAsFixed(km < 10 ? 1 : 0)} km';
 }
 
 String _ownerLocationLine(PartModel part) {
@@ -858,13 +858,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: GridView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: _kCrossAxisCount,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          // Altura extra para importador + estado/ciudad + precio/stock sin overflow.
-                          childAspectRatio: 0.58,
+                          // Altura más compacta; en cercanía conservamos un poco más de espacio.
+                          childAspectRatio:
+                              _activeFilters.sortByDistanceFromReference
+                                  ? 0.60
+                                  : 0.62,
                         ),
                         itemCount: parts.length,
                         itemBuilder: (context, index) {
@@ -936,6 +938,7 @@ class _ProductGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compactDistanceMode = showDistanceChips;
     final importer = (part.ownerBusinessName ?? '').trim();
     final importerLine =
         importer.isNotEmpty ? importer.toUpperCase() : 'SIN IMPORTADOR';
@@ -951,12 +954,12 @@ class _ProductGridCard extends StatelessWidget {
           boxShadow: AppDecorations.cardShadow,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(compactDistanceMode ? 6 : 8),
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AspectRatio(
-                  aspectRatio: 1,
+                  aspectRatio: compactDistanceMode ? 1.25 : 1,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Hero(
@@ -979,69 +982,59 @@ class _ProductGridCard extends StatelessWidget {
                   importerLine,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: TextStyle(
+                    fontSize: compactDistanceMode ? 11 : 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
                 ),
                 if (locLine.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  SizedBox(height: compactDistanceMode ? 1 : 2),
                   Text(
                     locLine,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: compactDistanceMode ? 9.5 : 10,
                       fontWeight: FontWeight.w500,
                       color: Colors.grey.shade600,
                     ),
                   ),
                 ],
                 if (showDistanceChips) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      Chip(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        label: Text(
-                          _distanceChipLabel(part),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        backgroundColor: AppColors.brandBlue.withOpacity(0.1),
-                        side: BorderSide(color: AppColors.brandBlue.withOpacity(0.35)),
-                      ),
-                      if (_longDistancePart(part, profile))
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    height: 28,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
                         Chip(
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          label: const Text(
-                            'Envío de larga distancia',
-                            style: TextStyle(
+                          label: Text(
+                            _distanceChipLabel(part),
+                            style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          backgroundColor: Colors.deepOrange.shade50,
-                          side: BorderSide(color: Colors.deepOrange.shade200),
+                          backgroundColor: AppColors.brandBlue.withOpacity(0.1),
+                          side:
+                              BorderSide(color: AppColors.brandBlue.withOpacity(0.35)),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
-                const SizedBox(height: 2),
-                Expanded(
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 18,
                   child: Text(
                     part.nombre,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                       height: 1.15,
@@ -1050,8 +1043,8 @@ class _ProductGridCard extends StatelessWidget {
                 ),
                 Text(
                   '\$${part.precioUnitarioParaAliado(faseContado: faseContadoAliado).toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 17,
+                  style: TextStyle(
+                    fontSize: compactDistanceMode ? 15.5 : 17,
                     fontWeight: FontWeight.w900,
                     color: AppColors.brand,
                   ),
@@ -1074,7 +1067,7 @@ class _ProductGridCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: compactDistanceMode ? 11 : 12,
                           fontWeight: FontWeight.w600,
                           color: Colors.green.shade700,
                         ),

@@ -11,6 +11,8 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'aliado_document_type_preference_section.dart';
+import 'aliado_order_experience_section.dart';
 
 /// Factura MotoLink, método de pago y comprobante.
 /// En preparación: edición según estado de revisión. Tras confirmación o con pedido cerrado: solo consulta.
@@ -128,6 +130,17 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     BuildContext context,
     PaymentScheduleModel c,
   ) async {
+    if (widget.request.aliadoDebeElegirDocumentTypeAntesDePago) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Elija nota de entrega simple o factura fiscal (arriba) antes de subir comprobantes.',
+          ),
+        ),
+      );
+      return;
+    }
     if (c.id.isEmpty) return;
     final metodo = _metodoParaCuota(c.id);
     if (!_metodosComprobanteCuota.contains(metodo)) {
@@ -207,6 +220,17 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
 
   Future<void> _subirComprobante(BuildContext context) async {
     final r = widget.request;
+    if (r.aliadoDebeElegirDocumentTypeAntesDePago) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Elija nota de entrega simple o factura fiscal (arriba) antes de subir comprobante.',
+          ),
+        ),
+      );
+      return;
+    }
     final metodo = _metodoSeleccionado;
     if (metodo == null || !_metodosPermitidos.contains(metodo)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -261,6 +285,17 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
 
   Future<void> _declararCreditoSistema(BuildContext context) async {
     final r = widget.request;
+    if (r.aliadoDebeElegirDocumentTypeAntesDePago) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Elija nota de entrega simple o factura fiscal (arriba) antes de solicitar pago con crédito.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _busy = true);
     try {
       final profileFresh = await SupabaseService.fetchMyProfile();
@@ -366,6 +401,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         (_estadoPermiteDeclaracionPago(r) || r.tieneDocumentacionFacturaPago);
     if (!mostrar) return const SizedBox.shrink();
 
+    final docBloqueaPago = r.aliadoDebeElegirDocumentTypeAntesDePago;
     final pe = r.pagoEstadoRevisionEfectivo;
     final puedeModificarComprobante = _puedeModificarComprobante(r);
     final referenciaHistorica =
@@ -391,6 +427,31 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        AliadoDocumentTypePreferenceSection(
+          request: r,
+          onChanged: widget.onChanged,
+        ),
+        if (docBloqueaPago) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Text(
+              'Indique nota de entrega simple o factura fiscal (arriba) antes de registrar pago o subir comprobantes.',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange.shade900,
+                height: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         Text(
           referenciaHistorica
               ? 'Factura y pago (referencia)'
@@ -663,7 +724,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed: _busy
+                              onPressed: (_busy || docBloqueaPago)
                                   ? null
                                   : () => _subirComprobanteCuota(context, c),
                               child: const Text('Subir comprobante (esta cuota)'),
@@ -846,7 +907,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: (_busy || bloquearCreditoBtn)
+                  onPressed: (_busy || bloquearCreditoBtn || docBloqueaPago)
                       ? null
                       : () => _declararCreditoSistema(context),
                   child: _busy
@@ -880,7 +941,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _busy ? null : () => _subirComprobante(context),
+                  onPressed: (_busy || docBloqueaPago)
+                      ? null
+                      : () => _subirComprobante(context),
                   child: _busy
                       ? const SizedBox(
                           width: 20,
@@ -897,7 +960,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               ),
             ],
           ],
-          if (!referenciaHistorica && pe == PagoRevisionEstado.enRevision)
+        if (!referenciaHistorica && pe == PagoRevisionEstado.enRevision)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
@@ -940,6 +1003,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               ),
             ),
         ],
+        AliadoOrderExperienceSection(
+          request: r,
+          onChanged: widget.onChanged,
+        ),
         const SizedBox(height: 8),
       ],
     );

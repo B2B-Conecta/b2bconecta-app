@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/admin_active_orders_panel.dart';
 import '../widgets/admin_aliados_credit_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
+import '../widgets/admin_encomiendas_report_panel.dart';
 import '../widgets/admin_pending_validation_panel.dart';
 import '../widgets/aliado_my_requests_panel.dart';
 import '../widgets/aliado_pedidos_panel.dart';
@@ -139,6 +140,10 @@ class _MainShellState extends State<MainShell> {
             title: 'Límites de crédito',
             child: const AdminAliadosCreditPanel(),
           ),
+          _adminOrdersScaffold(
+            title: 'Reportes de encomiendas',
+            child: const AdminEncomiendasReportPanel(),
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.administrador,
@@ -183,6 +188,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.account_balance_outlined),
               activeIcon: Icon(Icons.account_balance),
               label: 'Crédito',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics_outlined),
+              activeIcon: Icon(Icons.analytics),
+              label: 'Reportes',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

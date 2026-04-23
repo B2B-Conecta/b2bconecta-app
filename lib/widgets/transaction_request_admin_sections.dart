@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/app_home_role.dart';
+import '../models/document_type_preference.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
@@ -140,6 +141,184 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
           businessName: request.ownerBusinessName,
           rif: request.ownerRif,
           phone: request.ownerPhone,
+        ),
+      ],
+    );
+  }
+}
+
+/// A6: valoración del aliado tras entrega (reportes gerenciales).
+class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
+  const TransactionRequestAliadoExperienceAdminSection({
+    super.key,
+    required this.request,
+  });
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final at = r.aliadoExperienceSubmittedAt;
+    final stars = r.aliadoExperienceStars;
+    final comment = r.aliadoExperienceComment?.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Valoración del aliado (post-entrega)',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: at != null ? Colors.purple.shade50 : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: at != null
+                  ? Colors.purple.shade200
+                  : Colors.grey.shade300,
+            ),
+          ),
+          child: at == null
+              ? Text(
+                  'Sin valoración: el aliado aún no envió calificación ni comentario para este pedido.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: Colors.grey.shade800,
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ...List.generate(5, (i) {
+                          final filled = (stars ?? 0) > i;
+                          return Icon(
+                            filled ? Icons.star : Icons.star_border,
+                            size: 20,
+                            color: Colors.amber.shade800,
+                          );
+                        }),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${stars ?? 0}/5',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: Colors.purple.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (comment != null && comment.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        comment,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.35,
+                          color: Colors.purple.shade900,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'Registrado: ${formatEsShortDateTime(at)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.purple.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A6: preferencia de documento del aliado (instrucción para administración / IVA).
+class TransactionRequestDocumentPreferenceAdminSection extends StatelessWidget {
+  const TransactionRequestDocumentPreferenceAdminSection({
+    super.key,
+    required this.request,
+  });
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = request.documentTypePreference?.trim();
+    final String label = p != null && p.isNotEmpty
+        ? (DocumentTypePreference.labelEs(p) ?? p)
+        : 'Pendiente: el aliado aún no indicó nota de entrega o factura fiscal.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Preferencia de documento (A6)',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: p != null && p.isNotEmpty
+                ? Colors.indigo.shade50
+                : Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: p != null && p.isNotEmpty
+                  ? Colors.indigo.shade200
+                  : Colors.amber.shade300,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                p != null && p.isNotEmpty
+                    ? Icons.description_outlined
+                    : Icons.pending_actions_outlined,
+                size: 20,
+                color: p != null && p.isNotEmpty
+                    ? Colors.indigo.shade900
+                    : Colors.amber.shade900,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: p != null && p.isNotEmpty
+                        ? Colors.indigo.shade900
+                        : Colors.amber.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

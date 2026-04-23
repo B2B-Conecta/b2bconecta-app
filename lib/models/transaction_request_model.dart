@@ -75,6 +75,10 @@ class TransactionRequestModel {
     this.creditPlanConfirmedAt,
     this.creditMontoBloqueado,
     this.paymentSchedule = const <PaymentScheduleModel>[],
+    this.documentTypePreference,
+    this.aliadoExperienceStars,
+    this.aliadoExperienceComment,
+    this.aliadoExperienceSubmittedAt,
   });
 
   final String id;
@@ -171,6 +175,12 @@ class TransactionRequestModel {
   final double? creditMontoBloqueado;
   final List<PaymentScheduleModel> paymentSchedule;
 
+  /// A6: nota de entrega vs factura fiscal; `null` hasta que el aliado elija.
+  final String? documentTypePreference;
+  final int? aliadoExperienceStars;
+  final String? aliadoExperienceComment;
+  final DateTime? aliadoExperienceSubmittedAt;
+
   bool get hasAgreedCreditPlan =>
       creditPlanType != null &&
       creditPlanType! >= 1 &&
@@ -239,6 +249,11 @@ class TransactionRequestModel {
   bool get hasFacturaAliado =>
       facturaAliadoStoragePath != null &&
       facturaAliadoStoragePath!.trim().isNotEmpty;
+
+  /// Con factura MotoLink hace falta elegir nota vs factura fiscal antes de pagar.
+  bool get aliadoDebeElegirDocumentTypeAntesDePago =>
+      hasFacturaAliado &&
+      (documentTypePreference == null || documentTypePreference!.trim().isEmpty);
 
   bool get hasComprobantePago =>
       comprobantePagoStoragePath != null &&
@@ -573,6 +588,11 @@ class TransactionRequestModel {
       creditPlanConfirmedAt: _parseDate(json['credit_plan_confirmed_at']),
       creditMontoBloqueado: _asNullableDouble(json['credit_monto_bloqueado']),
       paymentSchedule: _parsePaymentSchedule(json['payment_schedule']),
+      documentTypePreference: _nullableText(json['document_type_preference']),
+      aliadoExperienceStars: _asNullableInt(json['aliado_experience_stars']),
+      aliadoExperienceComment: _nullableText(json['aliado_experience_comment']),
+      aliadoExperienceSubmittedAt:
+          _parseDate(json['aliado_experience_submitted_at']),
     );
   }
 

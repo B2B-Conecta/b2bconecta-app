@@ -76,6 +76,17 @@ abstract final class TransactionRequestStatus {
     rechazado,
   ];
 
+  /// Chips de filtro en reportes admin (servidor).
+  static const List<String> valuesForReportFilter = [
+    pendiente,
+    aprobadoAdmin,
+    enPreparacion,
+    pedidoListo,
+    enTransito,
+    entregado,
+    rechazado,
+  ];
+
   /// Declaración / comprobante de pago multietapa (excluye solo `rechazado`).
   static const List<String> aliadoDeclaracionPagoMultietapa = [
     pendiente,

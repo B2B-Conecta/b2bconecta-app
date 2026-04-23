@@ -770,6 +770,10 @@ class SupabaseService {
     credit_plan_type,
     credit_plan_confirmed_at,
     credit_monto_bloqueado,
+    document_type_preference,
+    aliado_experience_stars,
+    aliado_experience_comment,
+    aliado_experience_submitted_at,
     payment_schedule (
       id, transaction_request_id, installment_index, amount_usd, due_on,
       pago_metodo, pago_comprobante_storage_path, pago_comprobante_file_name,
@@ -953,6 +957,53 @@ class SupabaseService {
         .inFilter('status', TransactionRequestStatus.adminClosedOrders)
         .order('updated_at', ascending: false);
 
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Reportes admin: encomiendas en un rango de fechas (`created_at`), con filtros opcionales en servidor.
+  static Future<List<TransactionRequestModel>>
+      fetchTransactionRequestsForAdminReport({
+    required DateTime createdFromLocal,
+    required DateTime createdToLocal,
+    List<String>? statuses,
+    String? ownerId,
+    int limit = 2500,
+  }) async {
+    final fromUtc = DateTime(
+      createdFromLocal.year,
+      createdFromLocal.month,
+      createdFromLocal.day,
+    ).toUtc();
+    final toUtc = DateTime(
+      createdToLocal.year,
+      createdToLocal.month,
+      createdToLocal.day,
+      23,
+      59,
+      59,
+      999,
+    ).toUtc();
+
+    dynamic query = _client
+        .from('transaction_requests')
+        .select(_trSelect)
+        .gte('created_at', fromUtc.toIso8601String())
+        .lte('created_at', toUtc.toIso8601String());
+
+    if (statuses != null && statuses.isNotEmpty) {
+      query = query.inFilter('status', statuses);
+    }
+    final owner = ownerId?.trim();
+    if (owner != null && owner.isNotEmpty) {
+      query = query.eq('owner_id', owner);
+    }
+
+    final response =
+        await query.order('created_at', ascending: false).limit(limit);
     final list = response as List<dynamic>;
     return list
         .map((row) =>
@@ -2067,6 +2118,36 @@ class SupabaseService {
     await _client.rpc(
       'aliado_marca_pedido_entregado',
       params: {'p_request_id': transactionRequestId},
+    );
+  }
+
+  /// A6: nota de entrega vs factura fiscal (una sola vez; vía RPC).
+  static Future<void> aliadoSetDocumentTypePreference({
+    required String transactionRequestId,
+    required String documentType,
+  }) async {
+    await _client.rpc(
+      'aliado_set_document_type_preference',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_type': documentType,
+      },
+    );
+  }
+
+  /// A6: calificación y comentario breve tras entrega (una sola vez).
+  static Future<void> aliadoSubmitOrderExperience({
+    required String transactionRequestId,
+    required int stars,
+    String? comment,
+  }) async {
+    await _client.rpc(
+      'aliado_submit_order_experience',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_stars': stars,
+        'p_comment': comment?.trim() ?? '',
+      },
     );
   }
 

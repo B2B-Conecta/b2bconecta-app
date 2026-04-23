@@ -272,6 +272,14 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           request: r,
                           viewingAsRole: cardViewerRole,
                         ),
+                        const SizedBox(height: 12),
+                        TransactionRequestDocumentPreferenceAdminSection(
+                          request: r,
+                        ),
+                        const SizedBox(height: 12),
+                        TransactionRequestAliadoExperienceAdminSection(
+                          request: r,
+                        ),
                         if ((r.status == TransactionRequestStatus.pedidoListo ||
                                 r.status ==
                                     TransactionRequestStatus.enTransito) &&

@@ -73,6 +73,7 @@ class _ImporterOrderInvoiceSectionState
         transactionRequestId: r.id,
         bytes: bytes,
         fileName: name,
+        subOrderId: r.importerSubOrderId,
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

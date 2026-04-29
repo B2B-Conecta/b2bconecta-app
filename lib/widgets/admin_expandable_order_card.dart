@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
+import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
@@ -56,7 +57,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  r.productName ?? 'Producto',
+                                  r.tituloFichaPrincipalPedido,
                                   maxLines: expanded ? 3 : 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -78,7 +79,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          if (r.productSku != null) ...[
+                          if (!r.isMasterOrder && r.productSku != null) ...[
                             const SizedBox(height: 2),
                             Text(
                               'SKU: ${r.productSku}',
@@ -88,9 +89,30 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
+                          if (r.isMasterOrder && r.subOrders.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final so in r.subOrders)
+                                  Chip(
+                                    label: Text(
+                                      '${so.importadorBusinessName ?? 'Importador'} · '
+                                      '${SubOrderStatus.labelEs(so.status)}',
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
-                            '${r.cantidad} uds · Total (aliado) '
+                            '${r.totalUnidadesAliado} uds · Total (aliado) '
                             '\$${r.precioTotal.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 12,
@@ -98,6 +120,20 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (r.isMasterOrder) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              r.lineasProductoCount > 0
+                                  ? '${r.subOrders.length} almacén(es) · '
+                                      '${r.lineasProductoCount} partida(s) de producto'
+                                  : 'Pedido contenedor (ver desglose al expandir)',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Colors.grey.shade700,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
                             r.destinoEntregaLineaCompactaEs,
@@ -314,8 +350,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
                             ],
                           ),
                         ],
-                        const SizedBox(height: 10),
-                        TransactionRequestEvidenceDocumentsSection(request: r),
                         const SizedBox(height: 12),
                         CourierTimelineWidget(request: r, compact: true),
                         if (expandedFooter != null) ...[

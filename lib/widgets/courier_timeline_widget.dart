@@ -1,10 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+
+String _enPreparacionSubtitle(
+  TransactionRequestModel r, {
+  AppHomeRole? viewerRole,
+}) {
+  if (viewerRole == AppHomeRole.importador) {
+    final p = r.resumenProveedoresLineaTimeline;
+    if (p != null && p.isNotEmpty) {
+      return 'Preparación en su almacén · $p';
+    }
+    return 'Preparación en su almacén (pedido del aliado vía MotoLink)';
+  }
+  if (r.isMasterOrder && r.totalSubOrdersCount > 0) {
+    final done = r.subOrdersEnPreparacionOrMoreCount;
+    final total = r.totalSubOrdersCount;
+    final names = r.resumenImportadoresEnPreparacionOrMore;
+    if (done >= total) {
+      if (names != null && names.isNotEmpty) {
+        return 'Importadores: $done/$total marcaron En preparación · $names';
+      }
+      return 'Importadores: $done/$total marcaron En preparación';
+    }
+    if (names != null && names.isNotEmpty) {
+      return 'Importadores: $done/$total marcaron En preparación · $names · faltan ${total - done}';
+    }
+    return 'Importadores: $done/$total marcaron En preparación · faltan ${total - done}';
+  }
+  final p = r.resumenProveedoresLineaTimeline;
+  if (p != null && p.isNotEmpty) {
+    return 'Importador: $p';
+  }
+  return 'Proveedor alistando mercancía';
+}
+
+String _listoParaDespachoSubtitle(TransactionRequestModel r) {
+  if (r.isMasterOrder && r.totalSubOrdersCount > 0) {
+    final done = r.subOrdersListoOrMoreCount;
+    final total = r.totalSubOrdersCount;
+    final names = r.resumenImportadoresListoOrMore;
+    if (done >= total) {
+      if (names != null && names.isNotEmpty) {
+        return 'Importadores: $done/$total listos para recolección · $names';
+      }
+      return 'Importadores: $done/$total listos para recolección';
+    }
+    if (names != null && names.isNotEmpty) {
+      return 'Importadores: $done/$total listos para recolección · $names · faltan ${total - done}';
+    }
+    return 'Importadores: $done/$total listos para recolección · faltan ${total - done}';
+  }
+  return 'Listo para recolección (importador)';
+}
 
 /// Línea de tiempo visual estilo courier (FedEx/DHL) para el ciclo logístico del pedido.
 class CourierTimelineWidget extends StatelessWidget {
@@ -12,10 +65,14 @@ class CourierTimelineWidget extends StatelessWidget {
     super.key,
     required this.request,
     this.compact = false,
+    this.viewerRole,
   });
 
   final TransactionRequestModel request;
   final bool compact;
+
+  /// Ajusta copy del paso «En preparación» (p. ej. importador prepara en su almacén).
+  final AppHomeRole? viewerRole;
 
   Future<void> _openMaps(BuildContext context, String url) async {
     final uri = Uri.tryParse(url.trim());
@@ -58,7 +115,7 @@ class CourierTimelineWidget extends StatelessWidget {
       _CourierStep(
         icon: Icons.precision_manufacturing_outlined,
         title: 'En preparación',
-        subtitle: 'Proveedor alistando mercancía',
+        subtitle: _enPreparacionSubtitle(r, viewerRole: viewerRole),
         at: r.atEnPreparacion,
         done: r.atEnPreparacion != null,
         current: r.status == TransactionRequestStatus.enPreparacion,
@@ -66,7 +123,7 @@ class CourierTimelineWidget extends StatelessWidget {
       _CourierStep(
         icon: Icons.fact_check_outlined,
         title: 'Listo para despacho',
-        subtitle: 'Listo para recolección (importador)',
+        subtitle: _listoParaDespachoSubtitle(r),
         at: r.atPedidoListo,
         done: r.atPedidoListo != null,
         current: r.status == TransactionRequestStatus.pedidoListo,

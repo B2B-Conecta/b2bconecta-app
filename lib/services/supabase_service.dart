@@ -19,6 +19,7 @@ import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_message_model.dart';
+import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../utils/app_date_format.dart';
@@ -170,7 +171,7 @@ class SupabaseService {
     if (id.isEmpty) return null;
     final row = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .eq('id', id)
         .maybeSingle();
     if (row == null) return null;
@@ -462,9 +463,10 @@ class SupabaseService {
   /// Número total de filas que cumplen [filters] (respeta RLS).
   static Future<int> fetchProductsCount({CatalogFilters? filters}) async {
     final f = filters ?? CatalogFilters.empty;
+    final locIds = await _importerProfileIdsForSearchLocation(f);
     final embed = _catalogProfileSelect(f);
     dynamic q = _client.from('products').select('id, $embed');
-    q = _applyCatalogFilters(q, f);
+    q = _applyCatalogFilters(q, f, searchLocationImporterIds: locIds);
     final res = await q.count(CountOption.exact);
     return (res as PostgrestResponse<dynamic>).count;
   }
@@ -719,7 +721,7 @@ class SupabaseService {
     }).eq('id', productId);
   }
 
-  static const _trSelect = '''
+  static const _trSelectFlat = '''
     id,
     aliado_id,
     product_id,
@@ -774,6 +776,8 @@ class SupabaseService {
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
+    is_master_order,
+    tasa_bcv_snapshot,
     payment_schedule (
       id, transaction_request_id, installment_index, amount_usd, due_on,
       pago_metodo, pago_comprobante_storage_path, pago_comprobante_file_name,
@@ -784,6 +788,50 @@ class SupabaseService {
     owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url )
   ''';
 
+  static String get _trSelectWithSubs => '''
+$_trSelectFlat,
+sub_orders (
+  id,
+  parent_order_id,
+  importador_id,
+  status,
+  monto_subtotal,
+  items_count,
+  proveedor_factura_storage_path,
+  proveedor_factura_file_name,
+  proveedor_factura_submitted_at,
+  transit_eta_days,
+  transit_eta_hours,
+  transit_eta_set_at,
+  importador:profiles!sub_orders_importador_id_fkey ( business_name, rif, phone, estado, ciudad ),
+  order_items (
+    id,
+    product_id,
+    importador_id,
+    cantidad,
+    precio_unitario_proveedor,
+    precio_unitario_aliado,
+    precio_line_total,
+    precio_base_aliado_line,
+    products ( name, sku )
+  )
+)
+''';
+
+  /// Líneas de `order_items` al listar un sub-pedido (vista importador).
+  static const _orderItemsSelectImporterSubOrderSlice = '''
+    id,
+    sub_order_id,
+    product_id,
+    importador_id,
+    cantidad,
+    precio_unitario_proveedor,
+    precio_unitario_aliado,
+    precio_line_total,
+    precio_base_aliado_line,
+    products ( name, sku, price_usd )
+  ''';
+
   /// Solicitudes del aliado autenticado (todas).
   static Future<List<TransactionRequestModel>> fetchMyTransactionRequests() async {
     final uid = _currentUserId;
@@ -791,7 +839,7 @@ class SupabaseService {
 
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .eq('aliado_id', uid)
         .order('created_at', ascending: false);
 
@@ -810,7 +858,7 @@ class SupabaseService {
 
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .eq('aliado_id', uid)
         .eq('status', TransactionRequestStatus.pendiente)
         .order('created_at', ascending: false);
@@ -830,7 +878,7 @@ class SupabaseService {
 
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .eq('aliado_id', uid)
         .inFilter('status', TransactionRequestStatus.aliadoPedidosActivosYCerrados)
         .order('updated_at', ascending: false);
@@ -848,18 +896,31 @@ class SupabaseService {
     final uid = _currentUserId;
     if (uid == null) return [];
 
+    final subSlices = await fetchValidatedSubOrderSlicesForImporter();
+
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectFlat)
         .eq('owner_id', uid)
         .inFilter('status', TransactionRequestStatus.importerSoloValidadosAdmin)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
-    return list
+    final legacy = list
         .map((row) =>
             TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
         .toList();
+
+    final merged = <TransactionRequestModel>[...subSlices, ...legacy];
+    merged.sort((a, b) {
+      final ta = a.updatedAt ?? a.createdAt;
+      final tb = b.updatedAt ?? b.createdAt;
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return tb.compareTo(ta);
+    });
+    return merged;
   }
 
   /// Ciclo completo post-validación: aprobado → … → entregado (pestaña Pedidos).
@@ -868,18 +929,31 @@ class SupabaseService {
     final uid = _currentUserId;
     if (uid == null) return [];
 
+    final subSlices = await fetchActiveSubOrderSlicesForImporter();
+
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectFlat)
         .eq('owner_id', uid)
         .inFilter('status', TransactionRequestStatus.importerPipeline)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
-    return list
+    final legacy = list
         .map((row) =>
             TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
         .toList();
+
+    final merged = <TransactionRequestModel>[...subSlices, ...legacy];
+    merged.sort((a, b) {
+      final ta = a.updatedAt ?? a.createdAt;
+      final tb = b.updatedAt ?? b.createdAt;
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return tb.compareTo(ta);
+    });
+    return merged;
   }
 
   /// Solo aprobados por MotoLink para un producto (importador dueño vía RLS).
@@ -889,7 +963,7 @@ class SupabaseService {
 
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectFlat)
         .eq('product_id', productId)
         .inFilter('status', TransactionRequestStatus.importerSoloValidadosAdmin)
         .order('created_at', ascending: false);
@@ -906,7 +980,7 @@ class SupabaseService {
       fetchTransactionRequestsForAdmin() async {
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectFlat)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -921,7 +995,7 @@ class SupabaseService {
       fetchActiveTransactionRequestsForAdmin() async {
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .inFilter('status', TransactionRequestStatus.adminOperationalActive)
         .order('updated_at', ascending: false);
 
@@ -937,7 +1011,7 @@ class SupabaseService {
       fetchPendingValidationForAdmin() async {
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .inFilter('status', TransactionRequestStatus.adminPendingValidation)
         .order('created_at', ascending: false);
 
@@ -953,7 +1027,7 @@ class SupabaseService {
       fetchClosedTransactionRequestsForAdmin() async {
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectWithSubs)
         .inFilter('status', TransactionRequestStatus.adminClosedOrders)
         .order('updated_at', ascending: false);
 
@@ -990,7 +1064,7 @@ class SupabaseService {
 
     dynamic query = _client
         .from('transaction_requests')
-        .select(_trSelect)
+        .select(_trSelectFlat)
         .gte('created_at', fromUtc.toIso8601String())
         .lte('created_at', toUtc.toIso8601String());
 
@@ -1431,6 +1505,245 @@ class SupabaseService {
     }
   }
 
+  /// Confirma carrito multi-importador (crea maestro + sub_orders + order_items + snapshot BCV).
+  static Future<String> checkoutMultiImportadorCart({
+    required List<Map<String, dynamic>> lines,
+    bool destinoEntregaUsaPerfil = true,
+    String? destinoEntregaTexto,
+    String? destinoEntregaMapsUrl,
+  }) async {
+    final res = await _client.rpc(
+      'aliado_checkout_multi_importador',
+      params: <String, dynamic>{
+        'p_lines': lines,
+        'p_destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
+        'p_destino_entrega_texto': destinoEntregaTexto,
+        'p_destino_entrega_maps_url': destinoEntregaMapsUrl,
+      },
+    );
+    return res?.toString() ?? '';
+  }
+
+  /// Tasa BCV configurada (solo lectura; usar [TransactionRequestModel.tasaBcvSnapshot] por pedido).
+  static Future<double?> fetchGlobalTasaBcv() async {
+    final row = await _client
+        .from('app_global_config')
+        .select('value_numeric')
+        .eq('key', 'tasa_bcv')
+        .maybeSingle();
+    if (row == null) return null;
+    final m = Map<String, dynamic>.from(row);
+    final v = m['value_numeric'];
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '');
+  }
+
+  static Future<void> adminSetTasaBcv(double tasa) async {
+    await _client.rpc('admin_set_tasa_bcv', params: {'p_tasa': tasa});
+  }
+
+  static Future<void> importerAdvanceSubOrder({
+    required String subOrderId,
+    required String newSubStatus,
+  }) async {
+    await _client.rpc(
+      'importer_advance_sub_order',
+      params: <String, dynamic>{
+        'p_sub_order_id': subOrderId,
+        'p_new_status': newSubStatus,
+      },
+    );
+  }
+
+  static Future<void> adminMarcaSubOrderEnTransito({
+    required String subOrderId,
+    required int transitEtaDays,
+    required int transitEtaHours,
+  }) async {
+    await _client.rpc(
+      'admin_marca_sub_order_en_transito',
+      params: <String, dynamic>{
+        'p_sub_order_id': subOrderId,
+        'p_transit_eta_days': transitEtaDays,
+        'p_transit_eta_hours': transitEtaHours,
+      },
+    );
+  }
+
+  static Future<void> aliadoMarcaSubOrderEntregado(String subOrderId) async {
+    await _client.rpc(
+      'aliado_marca_sub_order_entregado',
+      params: {'p_sub_order_id': subOrderId},
+    );
+  }
+
+  /// Importador: sub-pedidos activos (vista por tramo).
+  static Future<List<TransactionRequestModel>>
+      fetchActiveSubOrderSlicesForImporter() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final rows = await _client
+        .from('sub_orders')
+        .select('''
+          id,
+          status,
+          monto_subtotal,
+          items_count,
+          proveedor_factura_storage_path,
+          proveedor_factura_file_name,
+          proveedor_factura_submitted_at,
+          transit_eta_days,
+          transit_eta_hours,
+          transit_eta_set_at,
+          parent_order_id,
+          importador_id,
+          order_items ( $_orderItemsSelectImporterSubOrderSlice ),
+          transaction_requests!inner (
+            $_trSelectFlat
+          )
+        ''')
+        .eq('importador_id', uid)
+        .inFilter('status', const [
+          SubOrderStatus.preparando,
+          SubOrderStatus.listo,
+          SubOrderStatus.enRuta,
+          SubOrderStatus.entregado,
+        ])
+        .order('updated_at', ascending: false);
+
+    final list = rows as List<dynamic>;
+    return list
+        .map((row) => _transactionRequestFromImporterSubOrderRow(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
+  static String _mapSubStatusToTransactionRequestStatus(String subStatus) {
+    switch (subStatus) {
+      case SubOrderStatus.pendiente:
+        return TransactionRequestStatus.aprobadoAdmin;
+      case SubOrderStatus.preparando:
+        return TransactionRequestStatus.enPreparacion;
+      case SubOrderStatus.listo:
+        return TransactionRequestStatus.pedidoListo;
+      case SubOrderStatus.enRuta:
+        return TransactionRequestStatus.enTransito;
+      case SubOrderStatus.entregado:
+        return TransactionRequestStatus.entregado;
+      default:
+        return TransactionRequestStatus.aprobadoAdmin;
+    }
+  }
+
+  static String? _subStatusFromImporterAdvance(String trNextStatus) {
+    switch (trNextStatus) {
+      case TransactionRequestStatus.enPreparacion:
+        return SubOrderStatus.preparando;
+      case TransactionRequestStatus.pedidoListo:
+        return SubOrderStatus.listo;
+      default:
+        return null;
+    }
+  }
+
+  static TransactionRequestModel _transactionRequestFromImporterSubOrderRow(
+    Map<String, dynamic> row,
+  ) {
+    final parentRaw = row['transaction_requests'];
+    if (parentRaw is! Map) {
+      throw StateError('Respuesta inválida: falta transaction_requests');
+    }
+    final parent = Map<String, dynamic>.from(parentRaw);
+    final subId = row['id']?.toString() ?? '';
+
+    final names = <String>[];
+    final oi = row['order_items'];
+    final itemsJson = <Map<String, dynamic>>[];
+    if (oi is List) {
+      for (final e in oi) {
+        if (e is Map) {
+          final m = Map<String, dynamic>.from(e);
+          m.putIfAbsent('sub_order_id', () => subId);
+          itemsJson.add(m);
+          final p = m['products'];
+          if (p is Map) {
+            final n = p['name']?.toString().trim();
+            if (n != null && n.isNotEmpty) names.add(n);
+          }
+        }
+      }
+    }
+    final title = names.isEmpty
+        ? 'Varios repuestos'
+        : (names.length <= 3
+            ? names.join(', ')
+            : '${names.take(2).join(', ')} +${names.length - 2}');
+
+    parent['_importer_sub_order_id'] = subId;
+    parent['_importer_view_order_items'] = itemsJson;
+    parent['status'] =
+        _mapSubStatusToTransactionRequestStatus(row['status']?.toString() ?? '');
+    parent['proveedor_factura_storage_path'] =
+        row['proveedor_factura_storage_path'];
+    parent['proveedor_factura_file_name'] = row['proveedor_factura_file_name'];
+    parent['proveedor_factura_submitted_at'] =
+        row['proveedor_factura_submitted_at'];
+    parent['transit_eta_days'] = row['transit_eta_days'];
+    parent['transit_eta_hours'] = row['transit_eta_hours'];
+    parent['transit_eta_set_at'] = row['transit_eta_set_at'];
+    parent['precio_total'] = row['monto_subtotal'];
+    parent['precio_base_aliado_total'] = row['monto_subtotal'];
+    parent['cantidad'] = row['items_count'];
+    parent['products'] = {'name': title, 'sku': null, 'price_usd': null};
+
+    return TransactionRequestModel.fromJson(parent);
+  }
+
+  /// Sub-pedidos en «Validados»: maestro aprobado y sub aún pendiente de primera acción.
+  static Future<List<TransactionRequestModel>>
+      fetchValidatedSubOrderSlicesForImporter() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final rows = await _client
+        .from('sub_orders')
+        .select('''
+          id,
+          status,
+          monto_subtotal,
+          items_count,
+          proveedor_factura_storage_path,
+          proveedor_factura_file_name,
+          proveedor_factura_submitted_at,
+          transit_eta_days,
+          transit_eta_hours,
+          transit_eta_set_at,
+          parent_order_id,
+          importador_id,
+          order_items ( $_orderItemsSelectImporterSubOrderSlice ),
+          transaction_requests!inner ( $_trSelectFlat )
+        ''')
+        .eq('importador_id', uid)
+        .eq('status', SubOrderStatus.pendiente)
+        // Si otro importador ya avanzó, el maestro puede pasar a `en_preparacion`
+        // aunque este tramo siga `pendiente`; debe seguir visible para su primera acción.
+        .inFilter('transaction_requests.status', const [
+          TransactionRequestStatus.aprobadoAdmin,
+          TransactionRequestStatus.enPreparacion,
+          TransactionRequestStatus.pedidoListo,
+        ])
+        .order('updated_at', ascending: false);
+
+    final list = rows as List<dynamic>;
+    return list
+        .map((row) => _transactionRequestFromImporterSubOrderRow(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
   static Future<void> adminUpdateTransactionRequest({
     required String id,
     required String status,
@@ -1492,7 +1805,7 @@ class SupabaseService {
     final row = await _client
         .from('transaction_requests')
         .select(
-          'status, proveedor_factura_storage_path, pago_estado_revision',
+          'status, is_master_order, proveedor_factura_storage_path, pago_estado_revision',
         )
         .eq('id', transactionRequestId)
         .maybeSingle();
@@ -1500,15 +1813,43 @@ class SupabaseService {
     if (row == null) throw StateError('Pedido no encontrado.');
     final m = Map<String, dynamic>.from(row);
     final st = m['status']?.toString();
-    if (st != TransactionRequestStatus.enPreparacion &&
-        st != TransactionRequestStatus.pedidoListo) {
-      throw StateError('Solo aplica con el pedido en preparación o listo para recolección.');
-    }
-    final prov = m['proveedor_factura_storage_path']?.toString().trim();
-    if (prov == null || prov.isEmpty) {
+    final isMaster = m['is_master_order'] == true;
+    final stAllowed = st == TransactionRequestStatus.enPreparacion ||
+        st == TransactionRequestStatus.pedidoListo ||
+        (isMaster && st == TransactionRequestStatus.aprobadoAdmin);
+    if (!stAllowed) {
       throw StateError(
-        'El importador debe haber adjuntado antes la factura del proveedor.',
+        'Solo aplica con el pedido en preparación o listo para recolección.',
       );
+    }
+    if (isMaster) {
+      final rows = await _client
+          .from('sub_orders')
+          .select('id, proveedor_factura_storage_path')
+          .eq('parent_order_id', transactionRequestId);
+      final list = rows as List<dynamic>;
+      if (list.isEmpty) {
+        throw StateError(
+          'Pedido maestro sin sub-pedidos: no se puede emitir factura al aliado.',
+        );
+      }
+      final missing = list.where((e) {
+        if (e is! Map) return true;
+        final p = e['proveedor_factura_storage_path']?.toString().trim();
+        return p == null || p.isEmpty;
+      }).length;
+      if (missing > 0) {
+        throw StateError(
+          'Falta factura del proveedor en $missing sub-pedido(s).',
+        );
+      }
+    } else {
+      final prov = m['proveedor_factura_storage_path']?.toString().trim();
+      if (prov == null || prov.isEmpty) {
+        throw StateError(
+          'El importador debe haber adjuntado antes la factura del proveedor.',
+        );
+      }
     }
     final pe = m['pago_estado_revision']?.toString().trim();
     if (pe == PagoRevisionEstado.enRevision) {
@@ -1723,13 +2064,102 @@ class SupabaseService {
 
   /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación
   /// y antes de que MotoLink confirme la factura oficial al aliado.
+  /// Con [subOrderId], actualiza el sub-pedido (pedido maestro).
   static Future<void> importerSubmitOrderInvoice({
     required String transactionRequestId,
     required Uint8List bytes,
     required String fileName,
+    String? subOrderId,
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
+
+    var sid = subOrderId?.trim();
+    if (sid == null || sid.isEmpty) {
+      // Fallback útil en detalle por ID maestro (sin _importer_sub_order_id en memoria).
+      final srow = await _client
+          .from('sub_orders')
+          .select('id')
+          .eq('parent_order_id', transactionRequestId)
+          .eq('importador_id', uid)
+          .eq('status', SubOrderStatus.preparando)
+          .maybeSingle();
+      if (srow != null) {
+        sid = srow['id']?.toString().trim();
+      }
+    }
+    if (sid != null && sid.isNotEmpty) {
+      final srow = await _client
+          .from('sub_orders')
+          .select(
+            'id, importador_id, status, proveedor_factura_storage_path, parent_order_id, transaction_requests!inner ( factura_aliado_storage_path )',
+          )
+          .eq('id', sid)
+          .maybeSingle();
+
+      if (srow == null) {
+        throw StateError('Sub-pedido no encontrado.');
+      }
+      final sm = Map<String, dynamic>.from(srow);
+      if (sm['importador_id']?.toString() != uid) {
+        throw StateError('No autorizado a adjuntar factura en este sub-pedido.');
+      }
+      if (sm['status']?.toString() != SubOrderStatus.preparando) {
+        throw StateError(
+          'Solo puede adjuntar la factura mientras el sub-pedido está en preparación.',
+        );
+      }
+      final tr = sm['transaction_requests'];
+      String? fa;
+      if (tr is Map) {
+        fa = tr['factura_aliado_storage_path']?.toString().trim();
+      }
+      if (fa != null && fa.isNotEmpty) {
+        throw StateError(
+          'MotoLink ya confirmó la factura al aliado; no puede reemplazar la factura del proveedor.',
+        );
+      }
+
+      final ext = _profileDocExtension(fileName);
+      if (!_isAllowedProfileDocExtension(ext)) {
+        throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
+      }
+
+      var safeBase =
+          fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+      if (safeBase.isEmpty) {
+        safeBase = 'factura.$ext';
+      }
+
+      final stamp = DateTime.now().microsecondsSinceEpoch;
+      final path = '$transactionRequestId/sub_$sid/${stamp}_$safeBase';
+
+      final oldPath = sm['proveedor_factura_storage_path']?.toString().trim();
+      if (oldPath != null && oldPath.isNotEmpty) {
+        try {
+          await _client.storage.from(_orderInvoicesBucket).remove([oldPath]);
+        } catch (_) {}
+      }
+
+      final contentType = _mimeForProfileDocExtension(ext);
+      await _client.storage.from(_orderInvoicesBucket).uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: contentType,
+              upsert: true,
+            ),
+          );
+
+      await _client.from('sub_orders').update({
+        'proveedor_factura_storage_path': path,
+        'proveedor_factura_file_name': fileName.trim(),
+        'proveedor_factura_submitted_at':
+            DateTime.now().toUtc().toIso8601String(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', sid);
+      return;
+    }
 
     final row = await _client
         .from('transaction_requests')
@@ -2151,12 +2581,56 @@ class SupabaseService {
     );
   }
 
+  /// Si falta en la vista (p. ej. ficha cargada solo por ID maestro), resuelve el
+  /// sub-pedido del importador actual para aplicar la misma transición.
+  static Future<String?> _resolveImporterSubOrderIdForAdvance({
+    required String parentOrderId,
+    required String newTransactionStatus,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) return null;
+    final expectedSubStatus = switch (newTransactionStatus) {
+      TransactionRequestStatus.enPreparacion => SubOrderStatus.pendiente,
+      TransactionRequestStatus.pedidoListo => SubOrderStatus.preparando,
+      _ => null,
+    };
+    var q = _client
+        .from('sub_orders')
+        .select('id')
+        .eq('parent_order_id', parentOrderId)
+        .eq('importador_id', uid);
+    if (expectedSubStatus != null) {
+      q = q.eq('status', expectedSubStatus);
+    }
+    final row = await q.maybeSingle();
+    if (row == null) return null;
+    return Map<String, dynamic>.from(row)['id']?.toString();
+  }
+
   /// Avanza el estado del pedido (importador): `aprobado_admin` → `en_preparacion`,
   /// `en_preparacion` → `pedido_listo`. El tránsito lo marca MotoLink (RPC).
+  /// Con [importerSubOrderId] (pedido maestro), actualiza el sub-pedido vía RPC.
   static Future<void> importerAdvanceTransactionRequest({
     required String id,
     required String newStatus,
+    String? importerSubOrderId,
   }) async {
+    var sid = importerSubOrderId?.trim();
+    if (sid == null || sid.isEmpty) {
+      sid = await _resolveImporterSubOrderIdForAdvance(
+        parentOrderId: id,
+        newTransactionStatus: newStatus,
+      );
+    }
+    if (sid != null && sid.isNotEmpty) {
+      final subSt = _subStatusFromImporterAdvance(newStatus);
+      if (subSt == null) {
+        throw StateError('Transición no aplicable al sub-pedido.');
+      }
+      await importerAdvanceSubOrder(subOrderId: sid, newSubStatus: subSt);
+      return;
+    }
+
     final rows = await _client.from('transaction_requests').update({
       'status': newStatus,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -2179,9 +2653,10 @@ class SupabaseService {
     CatalogFilters? filters,
   }) async {
     final f = filters ?? CatalogFilters.empty;
+    final locIds = await _importerProfileIdsForSearchLocation(f);
     final embed = _catalogProfileSelect(f);
     dynamic query = _client.from('products').select('*, $embed');
-    query = _applyCatalogFilters(query, f);
+    query = _applyCatalogFilters(query, f, searchLocationImporterIds: locIds);
 
     if (f.sortByDistanceFromReference) {
       const cap = 800;
@@ -2232,19 +2707,59 @@ class SupabaseService {
         .trim();
   }
 
+  /// PostgREST no puede parsear `profiles.estado` / `profiles.ciudad` dentro de
+  /// un `or` en `products` (PGRST100). Buscamos importadores cuyo estado o
+  /// ciudad coincidan y unimos con `owner_id.in.(…)`.
+  static const _maxSearchLocationImporterIds = 120;
+
+  static Future<List<String>> _importerProfileIdsForSearchLocation(
+    CatalogFilters filters,
+  ) async {
+    final search = filters.searchQuery?.trim();
+    if (search == null || search.isEmpty) return const [];
+    final safe = _sanitizeIlike(search);
+    if (safe.isEmpty) return const [];
+    final pat = '*$safe*';
+    try {
+      final res = await _client
+          .from('profiles')
+          .select('id')
+          .eq('role', 'importador')
+          .or('estado.ilike.$pat,ciudad.ilike.$pat');
+      final list = res as List<dynamic>;
+      final ids = list
+          .map((e) => (e as Map)['id']?.toString().trim() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList();
+      if (ids.length > _maxSearchLocationImporterIds) {
+        return ids.sublist(0, _maxSearchLocationImporterIds);
+      }
+      return ids;
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static dynamic _applyCatalogFilters(
     dynamic query,
-    CatalogFilters filters,
-  ) {
+    CatalogFilters filters, {
+    List<String> searchLocationImporterIds = const [],
+  }) {
     var q = query;
     final search = filters.searchQuery?.trim();
     if (search != null && search.isNotEmpty) {
       final safe = _sanitizeIlike(search);
       if (safe.isNotEmpty) {
         final pat = '*$safe*';
-        q = q.or(
-          'name.ilike.$pat,profiles.estado.ilike.$pat,profiles.ciudad.ilike.$pat',
-        );
+        if (searchLocationImporterIds.isNotEmpty) {
+          final inList = searchLocationImporterIds.join(',');
+          q = q.or(
+            'name.ilike.$pat,owner_id.in.($inList)',
+          );
+        } else {
+          q = q.ilike('name', '%$safe%');
+        }
       }
     }
     final est = filters.ownerEstado?.trim();

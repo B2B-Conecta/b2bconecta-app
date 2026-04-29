@@ -5,6 +5,9 @@ import '../models/app_home_role.dart';
 import '../models/document_type_preference.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
+import '../models/order_item_model.dart';
+import '../models/sub_order_model.dart';
+import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -45,6 +48,10 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = request;
+    if (r.isMasterOrder) {
+      return _MasterOrSplitOrderContactSection(request: r);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -60,18 +67,130 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
         _PartyCard(
           icon: Icons.storefront_outlined,
           title: 'Aliado',
-          businessName: request.aliadoBusinessName,
-          rif: request.aliadoRif,
-          phone: request.aliadoPhone,
+          businessName: r.aliadoBusinessName,
+          rif: r.aliadoRif,
+          phone: r.aliadoPhone,
         ),
         const SizedBox(height: 10),
         _PartyCard(
           icon: Icons.local_shipping_outlined,
           title: 'Importador',
-          businessName: request.ownerBusinessName,
-          rif: request.ownerRif,
-          phone: request.ownerPhone,
+          businessName: r.ownerBusinessName,
+          rif: r.ownerRif,
+          phone: r.ownerPhone,
         ),
+      ],
+    );
+  }
+}
+
+/// Ficha B2B broker: estructura del maestro, importador(es) y partidas (producto × cantidad en REF).
+class _MasterOrSplitOrderContactSection extends StatelessWidget {
+  const _MasterOrSplitOrderContactSection({required this.request});
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final sub = r.subOrders;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Contacto y carga',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _PartyCard(
+          icon: Icons.storefront_outlined,
+          title: 'Aliado (comprador)',
+          businessName: r.aliadoBusinessName,
+          rif: r.aliadoRif,
+          phone: r.aliadoPhone,
+        ),
+        const SizedBox(height: 10),
+        Material(
+          color: AppColors.brandBlueContainer.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  r.subOrders.length > 1
+                      ? Icons.hub_outlined
+                      : Icons.inventory_2_outlined,
+                  size: 20,
+                  color: AppColors.brandBlue,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r.subOrders.length > 1
+                            ? 'Múltiples importadores (un pedido, varios almacenes)'
+                            : (r.lineasProductoCount > 1
+                                ? 'Un importador con varias partidas'
+                                : 'Una partida, un almacén'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        r.estructuraPedidoAdminBreve,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.3,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (sub.isEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            'No hay sub-pedidos en los datos. '
+            'Actualice la lista o abra de nuevo: el pedido debería incluir importadores y líneas.',
+            style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+          ),
+        ] else ...[
+          const SizedBox(height: 12),
+          Text(
+            sub.length > 1
+                ? 'Importadores (sub-pedido por almacén)'
+                : 'Importador',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 12.5,
+              color: AppColors.brandBlue,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < sub.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            SubOrderImporterLineasCard(
+              subOrder: sub[i],
+              index1: i + 1,
+            ),
+          ],
+        ],
       ],
     );
   }
@@ -112,17 +231,27 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
   }
 }
 
-/// Solo importador (vista aliado en pedidos).
+/// Importador(es) y productos — vista aliado. Pedido maestro: un bloque por `sub_order`.
 class TransactionRequestImporterContactSection extends StatelessWidget {
   const TransactionRequestImporterContactSection({
     super.key,
     required this.request,
+    /// Pedido maestro (aliado): confirma recepción por almacén cuando el sub-pedido está en ruta.
+    this.onAliadoMarcaSubOrderEntregado,
   });
 
   final TransactionRequestModel request;
+  final Future<void> Function(String subOrderId)? onAliadoMarcaSubOrderEntregado;
 
   @override
   Widget build(BuildContext context) {
+    final r = request;
+    if (r.isMasterOrder) {
+      return _AliadoImportadoresMaestroSection(
+        request: r,
+        onAliadoMarcaSubOrderEntregado: onAliadoMarcaSubOrderEntregado,
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -138,10 +267,86 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
         _PartyCard(
           icon: Icons.local_shipping_outlined,
           title: 'Importador',
-          businessName: request.ownerBusinessName,
-          rif: request.ownerRif,
-          phone: request.ownerPhone,
+          businessName: r.ownerBusinessName,
+          rif: r.ownerRif,
+          phone: r.ownerPhone,
         ),
+      ],
+    );
+  }
+}
+
+class _AliadoImportadoresMaestroSection extends StatelessWidget {
+  const _AliadoImportadoresMaestroSection({
+    required this.request,
+    this.onAliadoMarcaSubOrderEntregado,
+  });
+
+  final TransactionRequestModel request;
+  final Future<void> Function(String subOrderId)? onAliadoMarcaSubOrderEntregado;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final sub = r.subOrders;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Importador y productos',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Material(
+          color: AppColors.brandBlueContainer.withOpacity(0.45),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Row(
+              children: [
+                Icon(
+                  sub.length > 1 ? Icons.hub_outlined : Icons.warehouse_outlined,
+                  size: 18,
+                  color: AppColors.brandBlue,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    r.estructuraPedidoAdminBreve,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (sub.isEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'No se pudieron cargar las partidas. '
+            'Baje la lista (deslizar) o abra de nuevo el detalle del pedido.',
+            style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+          ),
+        ] else ...[
+          const SizedBox(height: 10),
+          for (var i = 0; i < sub.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            SubOrderImporterLineasCard(
+              subOrder: sub[i],
+              index1: i + 1,
+              onAliadoMarcaSubOrderEntregado: onAliadoMarcaSubOrderEntregado,
+            ),
+          ],
+        ],
       ],
     );
   }
@@ -398,6 +603,184 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   }
 }
 
+/// Sub-pedido: importador + líneas (reutilizable admin y aliado).
+class SubOrderImporterLineasCard extends StatelessWidget {
+  const SubOrderImporterLineasCard({
+    super.key,
+    required this.subOrder,
+    required this.index1,
+    this.onAliadoMarcaSubOrderEntregado,
+  });
+
+  final SubOrderModel subOrder;
+  final int index1;
+  final Future<void> Function(String subOrderId)? onAliadoMarcaSubOrderEntregado;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = subOrder;
+    final name = s.importadorBusinessName?.trim();
+    final items = s.orderItems;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.local_shipping_outlined, size: 18, color: AppColors.brand),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    name != null && name.isNotEmpty ? name : 'Importador $index1',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Chip(
+                  label: Text(
+                    SubOrderStatus.labelEs(s.status),
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
+            if (s.importadorRif != null && s.importadorRif!.trim().isNotEmpty)
+              Text(
+                'RIF: ${s.importadorRif}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              ),
+            if (s.importadorPhone != null && s.importadorPhone!.trim().isNotEmpty)
+              Text(
+                'Tel: ${s.importadorPhone}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              ),
+            if (s.importadorEstado != null && s.importadorEstado!.trim().isNotEmpty)
+              Text(
+                [
+                  s.importadorEstado,
+                  if (s.importadorCiudad != null && s.importadorCiudad!.trim().isNotEmpty)
+                    s.importadorCiudad,
+                ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' · '),
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.2),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            if (s.montoSubtotal > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Sub-total (REF, este almacén): '
+                '\$${s.montoSubtotal.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.brandBlue,
+                ),
+              ),
+            ],
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Partidas (producto · cant. · monto lineal REF)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (var k = 0; k < items.length; k++) ...[
+                if (k > 0) const SizedBox(height: 4),
+                _orderItemRow(items[k]),
+              ],
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Sin desglose de partidas (sin order_items en la carga).',
+                  style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                ),
+              ),
+            if (onAliadoMarcaSubOrderEntregado != null &&
+                s.status == SubOrderStatus.enRuta) ...[
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: () async {
+                  await onAliadoMarcaSubOrderEntregado!(s.id);
+                },
+                child: const Text('Confirmar recepción (este importador)'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _orderItemRow(OrderItemModel p) {
+    final nm = p.productName?.trim() ?? 'Producto';
+    final cant = p.cantidad;
+    final ref = p.precioLineTotal;
+    final sku = p.productSku?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceTinted,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            nm,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 12.5,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (sku != null && sku.isNotEmpty)
+            Text(
+              'SKU: $sku',
+              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade700),
+            ),
+          const SizedBox(height: 2),
+          Text(
+            '$cant uds · \$${ref.toStringAsFixed(2)} REF (línea)',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PartyCard extends StatelessWidget {
   const _PartyCard({
     required this.icon,
@@ -474,6 +857,35 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = request;
     final chips = <Widget>[];
+
+    if (r.isMasterOrder && r.subOrders.isNotEmpty) {
+      for (var i = 0; i < r.subOrders.length; i++) {
+        final s = r.subOrders[i];
+        final path = s.proveedorFacturaStoragePath?.trim();
+        if (path == null || path.isEmpty) continue;
+        final imp = s.importadorBusinessName?.trim();
+        final impLabel = (imp != null && imp.isNotEmpty)
+            ? imp
+            : 'Importador ${i + 1}';
+        final fn = s.proveedorFacturaFileName?.trim();
+        chips.add(
+          OutlinedButton.icon(
+            onPressed: () => _launchSignedOrderDoc(
+              context,
+              () => SupabaseService.createSignedUrlForOrderInvoice(path),
+            ),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: Text(
+              fn != null && fn.isNotEmpty
+                  ? 'Factura proveedor · $impLabel · $fn'
+                  : 'Factura proveedor · $impLabel',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      }
+    }
 
     if (r.hasProveedorFactura && r.proveedorFacturaStoragePath != null) {
       final path = r.proveedorFacturaStoragePath!.trim();

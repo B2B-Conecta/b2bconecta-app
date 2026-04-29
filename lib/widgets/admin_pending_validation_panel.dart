@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
+import 'admin_tasa_bcv_card.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
@@ -238,6 +239,7 @@ class _AdminPendingValidationPanelState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const AdminTasaBcvCard(),
               OrderListFilterBar(
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),

@@ -5,8 +5,10 @@ import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
+import '../services/cart_service.dart';
 import '../services/geolocator_service.dart';
 import '../services/supabase_service.dart';
+import 'cart_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
@@ -544,6 +546,61 @@ class _HomeScreenState extends State<HomeScreen> {
           : MotolinkAppBarLogoSizes.importador,
       onNotificationTap: widget.onNotificationTap,
       unreadNotifications: widget.unreadNotifications,
+      extraActions: widget.homeRole == AppHomeRole.aliado
+          ? [
+              ListenableBuilder(
+                listenable: CartService.instance,
+                builder: (context, _) {
+                  final n = CartService.instance.itemCount;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.shopping_cart_outlined),
+                        color: AppColors.textSecondary,
+                        onPressed: () async {
+                          final tasa =
+                              await SupabaseService.fetchGlobalTasaBcv();
+                          if (!context.mounted) return;
+                          await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => CartScreen(
+                                profile: widget.profile,
+                                liveTasaBcv: tasa,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      if (n > 0)
+                        Positioned(
+                          right: 4,
+                          top: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.brandOrange,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              n > 99 ? '99+' : '$n',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ]
+          : null,
     );
 
     if (widget.homeRole == AppHomeRole.administrador) {

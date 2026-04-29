@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'courier_timeline_widget.dart';
+import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para importador: resumen, acción rápida, detalle con aliado y fechas.
@@ -35,6 +37,10 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = request;
+    final lineas = r.orderItemsParaVistaImportador(SupabaseService.currentUserId);
+    final titulo = lineas.isNotEmpty
+        ? r.tituloPedidoImportador(lineas)
+        : (r.productName ?? 'Producto');
     final showHeadline =
         operationalHeadline != null &&
         operationalHeadline!.isNotEmpty &&
@@ -76,8 +82,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  r.productName ?? 'Producto',
-                                  maxLines: expanded ? 3 : 1,
+                                  titulo,
+                                  maxLines: expanded ? 4 : 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
@@ -98,7 +104,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          if (r.productSku != null) ...[
+                          if (lineas.isEmpty && r.productSku != null) ...[
                             const SizedBox(height: 2),
                             Text(
                               'SKU: ${r.productSku}',
@@ -108,15 +114,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 4),
-                          Text(
-                            '${r.cantidad} uds · Total (aliado) '
-                            '\$${r.precioTotal.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade800,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          ImporterAliadoSolicitudSection(
+                            request: r,
+                            compact: true,
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -252,7 +252,11 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           viewingAsRole: AppHomeRole.importador,
                         ),
                         const SizedBox(height: 12),
-                        CourierTimelineWidget(request: r, compact: true),
+                        CourierTimelineWidget(
+                          request: r,
+                          compact: true,
+                          viewerRole: AppHomeRole.importador,
+                        ),
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),
                           expandedFooter!,

@@ -10,6 +10,7 @@ import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
+import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
@@ -69,6 +70,142 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final id = part.id;
     if (id.length <= 14) return id;
     return id.substring(0, 12);
+  }
+
+  Future<void> _addToCart() async {
+    final ownerId = part.ownerId?.trim();
+    if (ownerId == null || ownerId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo identificar al importador.')),
+      );
+      return;
+    }
+    if (_pedidosSuspendidosMorosidad) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'MotoLink suspendió nuevos pedidos en su cuenta por morosidad.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (part.stock < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sin stock disponible.')),
+      );
+      return;
+    }
+
+    final maxQty = part.stock;
+    final qtyCtrl = TextEditingController(text: '1');
+    bool? ok;
+    var qtyRaw = '1';
+    try {
+      ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text('Agregar al carrito'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Indique cuántas unidades desea añadir (disponibles: $maxQty).',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Cantidad',
+                      hintText: '1',
+                      filled: true,
+                      fillColor: AppColors.fieldFill,
+                      border: OutlineInputBorder(
+                        borderRadius: AppDecorations.radius12,
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Agregar'),
+              ),
+            ],
+          );
+        },
+      );
+      qtyRaw = qtyCtrl.text.trim();
+    } finally {
+      qtyCtrl.dispose();
+    }
+
+    if (ok != true || !mounted) return;
+
+    var requested = int.tryParse(qtyRaw) ?? 1;
+    if (requested < 1) requested = 1;
+
+    var q = requested;
+    if (requested > maxQty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Stock limitado'),
+          content: Text(
+            'Actualmente hay $maxQty unidad(es) disponible(s). '
+            'Indicó $requested. ¿Desea agregar $maxQty al carrito?',
+            style: const TextStyle(height: 1.35),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Volver'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Agregar $maxQty'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      q = maxQty;
+    }
+
+    CartService.instance.addOrIncrement(
+      part,
+      precioUnitarioAliadoRef: _precioVentaUnit,
+      delta: q,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          q == 1
+              ? '1 unidad añadida al carrito.'
+              : '$q unidades añadidas al carrito.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _openRequestDialog() async {
@@ -733,6 +870,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                OutlinedButton(
+                  onPressed: (_submitting ||
+                          part.stock < 1 ||
+                          _pedidosSuspendidosMorosidad)
+                      ? null
+                      : _addToCart,
+                  child: const Text('Agregar al carrito'),
+                ),
+                const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: (_submitting ||
                           part.stock < 1 ||
@@ -748,7 +894,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Solicitar pedido'),
+                      : const Text('Solicitar solo este ítem'),
                 ),
               ],
             ),

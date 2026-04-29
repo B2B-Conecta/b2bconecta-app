@@ -1,6 +1,9 @@
+import 'order_item_model.dart';
 import 'pago_metodo.dart';
 import 'payment_schedule_model.dart';
 import 'pago_revision_estado.dart';
+import 'sub_order_model.dart';
+import 'sub_order_status.dart';
 import 'transaction_request_status.dart';
 import '../utils/business_calendar.dart';
 
@@ -79,6 +82,11 @@ class TransactionRequestModel {
     this.aliadoExperienceStars,
     this.aliadoExperienceComment,
     this.aliadoExperienceSubmittedAt,
+    this.isMasterOrder = false,
+    this.tasaBcvSnapshot,
+    this.subOrders = const <SubOrderModel>[],
+    this.importerSubOrderId,
+    this.importerViewOrderItems = const <OrderItemModel>[],
   });
 
   final String id;
@@ -180,6 +188,20 @@ class TransactionRequestModel {
   final int? aliadoExperienceStars;
   final String? aliadoExperienceComment;
   final DateTime? aliadoExperienceSubmittedAt;
+
+  /// Pedido maestro multi-importador (`sub_orders` + `order_items`).
+  final bool isMasterOrder;
+
+  /// Tasa BCV fijada al confirmar el pedido (VES por unidad REF). Cálculos de negocio en REF.
+  final double? tasaBcvSnapshot;
+
+  final List<SubOrderModel> subOrders;
+
+  /// Si no es null, esta fila representa la vista importador de un sub-pedido concreto.
+  final String? importerSubOrderId;
+
+  /// Líneas del sub-pedido del importador (solo en listados por `sub_orders`; ver [orderItemsParaVistaImportador]).
+  final List<OrderItemModel> importerViewOrderItems;
 
   bool get hasAgreedCreditPlan =>
       creditPlanType != null &&
@@ -303,6 +325,23 @@ class TransactionRequestModel {
   /// Muestra línea MotoLink en ficha de pedido (`credit_limit` > 0).
   bool get muestraCreditoMotoLinkAsignadoEnPedido => (aliadoCreditLimit ?? 0) > 0;
 
+  /// Total pedido en bolívares (solo presentación UI). Fuente de verdad: [precioTotal] en REF.
+  double? get precioTotalBsUi =>
+      tasaBcvSnapshot != null ? precioTotal * tasaBcvSnapshot! : null;
+
+  /// Aliado: puede cancelar antes de que ningún importador pase de pendiente (y maestro pendiente o aprobado).
+  bool get aliadoPuedeCancelarAntesDeGestionImportadores {
+    if (!isMasterOrder) {
+      return status == TransactionRequestStatus.pendiente;
+    }
+    if (status != TransactionRequestStatus.pendiente &&
+        status != TransactionRequestStatus.aprobadoAdmin) {
+      return false;
+    }
+    if (subOrders.isEmpty) return true;
+    return subOrders.every((s) => s.status == SubOrderStatus.pendiente);
+  }
+
   /// Distingue rechazo inicial, anulación MotoLink (post-aprobación) y cancelación por aliado.
   String statusLabelEs({bool aliadoViewer = false}) {
     if (status == TransactionRequestStatus.rechazado && canceladoPorAliado) {
@@ -343,6 +382,195 @@ class TransactionRequestModel {
     final bn = ownerBusinessName?.trim();
     if (bn != null && bn.isNotEmpty) return bn;
     return 'Almacén importador';
+  }
+
+  /// Texto breve de proveedor(es) importador para la línea de tiempo (p. ej. admin).
+  String? get resumenProveedoresLineaTimeline {
+    if (isMasterOrder) {
+      final names = <String>[];
+      final seen = <String>{};
+      for (final s in subOrders) {
+        final n = s.importadorBusinessName?.trim();
+        if (n != null && n.isNotEmpty && !seen.contains(n)) {
+          seen.add(n);
+          names.add(n);
+        }
+      }
+      if (names.isEmpty) return null;
+      if (names.length == 1) return names.first;
+      if (names.length == 2) return '${names[0]} · ${names[1]}';
+      return '${names[0]} · ${names[1]} +${names.length - 2}';
+    }
+    final o = ownerBusinessName?.trim();
+    if (o != null && o.isNotEmpty) return o;
+    return null;
+  }
+
+  static int _subOrderStatusRank(String st) {
+    switch (st) {
+      case SubOrderStatus.pendiente:
+        return 0;
+      case SubOrderStatus.preparando:
+        return 1;
+      case SubOrderStatus.listo:
+        return 2;
+      case SubOrderStatus.enRuta:
+        return 3;
+      case SubOrderStatus.entregado:
+        return 4;
+      default:
+        return -1;
+    }
+  }
+
+  int get totalSubOrdersCount => isMasterOrder ? subOrders.length : 0;
+
+  /// Tramos que ya superaron o alcanzaron `preparando`.
+  int get subOrdersEnPreparacionOrMoreCount {
+    if (!isMasterOrder) return 0;
+    return subOrders
+        .where((s) => _subOrderStatusRank(s.status) >= _subOrderStatusRank(SubOrderStatus.preparando))
+        .length;
+  }
+
+  /// Tramos que ya superaron o alcanzaron `listo`.
+  int get subOrdersListoOrMoreCount {
+    if (!isMasterOrder) return 0;
+    return subOrders
+        .where((s) => _subOrderStatusRank(s.status) >= _subOrderStatusRank(SubOrderStatus.listo))
+        .length;
+  }
+
+  String? _resumenImportadoresAtLeast(String minStatus) {
+    if (!isMasterOrder || subOrders.isEmpty) return null;
+    final minRank = _subOrderStatusRank(minStatus);
+    final names = <String>[];
+    final seen = <String>{};
+    for (final s in subOrders) {
+      if (_subOrderStatusRank(s.status) < minRank) continue;
+      final n = s.importadorBusinessName?.trim();
+      if (n == null || n.isEmpty) continue;
+      if (seen.add(n)) names.add(n);
+    }
+    if (names.isEmpty) return null;
+    if (names.length == 1) return names.first;
+    if (names.length == 2) return '${names[0]} · ${names[1]}';
+    return '${names[0]} · ${names[1]} +${names.length - 2}';
+  }
+
+  /// Importadores que ya marcaron `preparando` (o más).
+  String? get resumenImportadoresEnPreparacionOrMore =>
+      _resumenImportadoresAtLeast(SubOrderStatus.preparando);
+
+  /// Importadores que ya marcaron `listo` (o más).
+  String? get resumenImportadoresListoOrMore =>
+      _resumenImportadoresAtLeast(SubOrderStatus.listo);
+
+  /// Suma de unidades en pedido maestro (order_items); en 1:1, [cantidad] de la fila.
+  int get totalUnidadesAliado {
+    if (!isMasterOrder) return cantidad;
+    var t = 0;
+    for (final s in subOrders) {
+      for (final oi in s.orderItems) {
+        t += oi.cantidad;
+      }
+    }
+    return t;
+  }
+
+  /// Número de partidas (líneas de producto) en el maestro; 1 en pedido 1:1.
+  int get lineasProductoCount {
+    if (!isMasterOrder) return 1;
+    return subOrders.fold(0, (a, s) => a + s.orderItems.length);
+  }
+
+  /// Partidas que debe preparar este importador (API por sub_order o sub_orders del maestro).
+  List<OrderItemModel> orderItemsParaVistaImportador(String? importadorUserId) {
+    if (importerViewOrderItems.isNotEmpty) return importerViewOrderItems;
+    final sid = importerSubOrderId?.trim();
+    if (sid != null && sid.isNotEmpty) {
+      for (final s in subOrders) {
+        if (s.id == sid) return s.orderItems;
+      }
+    }
+    final u = importadorUserId?.trim();
+    if (u != null && u.isNotEmpty) {
+      for (final s in subOrders) {
+        if (s.importadorId == u) return s.orderItems;
+      }
+    }
+    return const <OrderItemModel>[];
+  }
+
+  /// Cabecera corta para fichas importador con desglose por líneas.
+  String tituloPedidoImportador(List<OrderItemModel> lines) {
+    if (lines.isEmpty) {
+      final p = productName?.trim();
+      if (p != null && p.isNotEmpty) return p;
+      return 'Producto';
+    }
+    if (lines.length == 1) {
+      final n = lines.first.productName?.trim();
+      if (n != null && n.isNotEmpty) return n;
+      return '1 partida';
+    }
+    final names = lines
+        .map((e) => e.productName?.trim())
+        .whereType<String>()
+        .where((n) => n.isNotEmpty)
+        .take(2)
+        .toList();
+    if (names.length >= 2) {
+      return '${names[0]} · ${names[1]}'
+          '${lines.length > 2 ? ' +${lines.length - 2}' : ''}';
+    }
+    if (names.length == 1) return '${names[0]} +${lines.length - 1} más';
+    return '${lines.length} partidas';
+  }
+
+  int totalUnidadesImportador(List<OrderItemModel> lines) {
+    if (lines.isEmpty) return cantidad;
+    return lines.fold<int>(0, (a, e) => a + e.cantidad);
+  }
+
+  /// Cabecera en listas y resumen: evita «multi-importador» cuando solo hay un almacén (`sub_orders`).
+  String get tituloFichaPrincipalPedido {
+    if (!isMasterOrder) {
+      final p = productName?.trim();
+      if (p != null && p.isNotEmpty) return p;
+      return 'Producto';
+    }
+    if (subOrders.isEmpty) {
+      return 'Pedido (contenedor)';
+    }
+    if (subOrders.length > 1) {
+      return 'Pedido multi-importador';
+    }
+    final n = subOrders.first.importadorBusinessName?.trim();
+    if (n != null && n.isNotEmpty) {
+      return n;
+    }
+    return 'Un importador';
+  }
+
+  /// Título de estructura para la ficha admin: distingue N importadores vs 1 importador y M productos.
+  String get estructuraPedidoAdminBreve {
+    if (!isMasterOrder) {
+      return 'Un importador · 1 partida (producto único en catálogo)';
+    }
+    if (subOrders.isEmpty) {
+      return 'Contenedor de pedido sin líneas (actualice o revise datos)';
+    }
+    final nImp = subOrders.length;
+    final nLines = lineasProductoCount;
+    if (nImp > 1) {
+      return 'Varios importadores en un solo pedido: $nImp almacén(es) distintos, '
+          '$nLines partida(s) con cantidades.';
+    }
+    if (nLines > 1) {
+      return 'Un importador, varias partidas: 1 almacén, $nLines producto(s) distintos con cantidades.';
+    }
+    return 'Un importador, una partida: 1 producto y cantidad.';
   }
 
   /// Dirección fiscal del aliado cuando el pedido usa perfil (texto multilínea).
@@ -593,7 +821,35 @@ class TransactionRequestModel {
       aliadoExperienceComment: _nullableText(json['aliado_experience_comment']),
       aliadoExperienceSubmittedAt:
           _parseDate(json['aliado_experience_submitted_at']),
+      isMasterOrder: json['is_master_order'] == true,
+      tasaBcvSnapshot: _asNullableDouble(json['tasa_bcv_snapshot']),
+      subOrders: _parseSubOrders(json['sub_orders']),
+      importerSubOrderId: _nullableText(json['_importer_sub_order_id']),
+      importerViewOrderItems:
+          _parseImporterViewOrderItems(json['_importer_view_order_items']),
     );
+  }
+
+  static List<OrderItemModel> _parseImporterViewOrderItems(dynamic v) {
+    if (v is! List) return const <OrderItemModel>[];
+    return v
+        .map((e) {
+          if (e is! Map) return null;
+          return OrderItemModel.fromJson(Map<String, dynamic>.from(e));
+        })
+        .whereType<OrderItemModel>()
+        .toList();
+  }
+
+  static List<SubOrderModel> _parseSubOrders(dynamic v) {
+    if (v is! List) return const <SubOrderModel>[];
+    return v
+        .map((e) {
+          if (e is! Map) return null;
+          return SubOrderModel.fromJson(Map<String, dynamic>.from(e));
+        })
+        .whereType<SubOrderModel>()
+        .toList();
   }
 
   static List<PaymentScheduleModel> _parsePaymentSchedule(dynamic v) {

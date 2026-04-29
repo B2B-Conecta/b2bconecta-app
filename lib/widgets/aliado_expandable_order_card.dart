@@ -82,7 +82,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  r.productName ?? 'Producto',
+                                  r.tituloFichaPrincipalPedido,
                                   maxLines: expanded ? 3 : 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -104,7 +104,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          if (r.productSku != null) ...[
+                          if (!r.isMasterOrder && r.productSku != null) ...[
                             const SizedBox(height: 2),
                             Text(
                               'SKU: ${r.productSku}',
@@ -116,14 +116,32 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           ],
                           const SizedBox(height: 4),
                           Text(
-                            '${r.cantidad} uds · Total estimado '
-                            '\$${r.precioTotal.toStringAsFixed(2)}',
+                            r.isMasterOrder
+                                ? '${r.subOrders.isEmpty ? 0 : r.subOrders.length} '
+                                    '${r.subOrders.length == 1 ? "importador" : "importadores"} · '
+                                    '${r.totalUnidadesAliado} uds · Total REF '
+                                    '\$${r.precioTotal.toStringAsFixed(2)}'
+                                    '${r.precioTotalBsUi != null ? " · ~${r.precioTotalBsUi!.toStringAsFixed(2)} BS" : ""}'
+                                : '${r.cantidad} uds · Total estimado '
+                                    '\$${r.precioTotal.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (r.isMasterOrder && r.subOrders.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '${r.subOrders.length} almacén(es) · '
+                              '${r.lineasProductoCount} partida(s) de producto',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Colors.grey.shade700,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
                             r.destinoEntregaLineaCompactaEs,

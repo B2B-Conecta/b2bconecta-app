@@ -112,9 +112,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     );
   }
 
-  void _toggleExpand(String id) {
+  String _rowKey(TransactionRequestModel r) =>
+      r.importerSubOrderId != null ? '${r.id}::${r.importerSubOrderId}' : r.id;
+
+  void _toggleExpand(TransactionRequestModel r) {
+    final k = _rowKey(r);
     setState(() {
-      _expandedRequestId = _expandedRequestId == id ? null : id;
+      _expandedRequestId = _expandedRequestId == k ? null : k;
     });
   }
 
@@ -137,6 +141,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       await SupabaseService.importerAdvanceTransactionRequest(
         id: r.id,
         newStatus: next,
+        importerSubOrderId: r.importerSubOrderId,
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -248,10 +253,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                             );
                             final headline = TransactionRequestStatus
                                 .importerOperationalHeadline(r.status);
+                            final rk = _rowKey(r);
                             return ImporterExpandableOrderCard(
                               request: r,
-                              expanded: _expandedRequestId == r.id,
-                              onToggle: () => _toggleExpand(r.id),
+                              expanded: _expandedRequestId == rk,
+                              onToggle: () => _toggleExpand(r),
                               statusLabel:
                                   r.statusLabelEs(),
                               operationalHeadline: headline,

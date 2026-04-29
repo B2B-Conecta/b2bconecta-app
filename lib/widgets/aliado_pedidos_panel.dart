@@ -332,20 +332,19 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   statusLabel: _label(r),
                                   onConfirmarRecepcion:
                                       r.status ==
-                                              TransactionRequestStatus.enTransito
+                                              TransactionRequestStatus
+                                                  .enTransito
                                           ? () => _confirmarEntrega(context, r)
                                           : null,
                                   confirmarRecepcionBusy:
                                       _entregaBusyId == r.id,
-                                  onCancelarSolicitudPendiente:
-                                      r.status ==
-                                              TransactionRequestStatus
-                                                  .pendiente
-                                          ? () => _cancelarPendiente(
-                                                context,
-                                                r,
-                                              )
-                                          : null,
+                                  onCancelarSolicitudPendiente: r
+                                          .aliadoPuedeCancelarAntesDeGestionImportadores
+                                      ? () => _cancelarPendiente(
+                                            context,
+                                            r,
+                                          )
+                                      : null,
                                   cancelarSolicitudPendienteBusy:
                                       _cancelarBusyId == r.id,
                                   expandedFooter: Column(
@@ -383,20 +382,19 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   statusLabel: _label(r),
                                   onConfirmarRecepcion:
                                       r.status ==
-                                              TransactionRequestStatus.enTransito
+                                              TransactionRequestStatus
+                                                  .enTransito
                                           ? () => _confirmarEntrega(context, r)
                                           : null,
                                   confirmarRecepcionBusy:
                                       _entregaBusyId == r.id,
-                                  onCancelarSolicitudPendiente:
-                                      r.status ==
-                                              TransactionRequestStatus
-                                                  .pendiente
-                                          ? () => _cancelarPendiente(
-                                                context,
-                                                r,
-                                              )
-                                          : null,
+                                  onCancelarSolicitudPendiente: r
+                                          .aliadoPuedeCancelarAntesDeGestionImportadores
+                                      ? () => _cancelarPendiente(
+                                            context,
+                                            r,
+                                          )
+                                      : null,
                                   cancelarSolicitudPendienteBusy:
                                       _cancelarBusyId == r.id,
                                   expandedFooter: Column(

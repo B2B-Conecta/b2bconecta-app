@@ -142,7 +142,7 @@ class ProfileModel {
         rif!.trim().isNotEmpty &&
         hasRole;
     if (!base) return false;
-    if (r == 'administrador' || r == 'transportista') return true;
+    if (r == 'administrador') return true;
     return hasRegisteredLocation;
   }
 

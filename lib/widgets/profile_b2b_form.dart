@@ -87,9 +87,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'transportista';
   }
 
-  bool get _ubicacionObligatoria {
+  /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
+  bool get _requiereUbicacionFiscalCompleta {
     final r = _role.trim().toLowerCase();
-    return r == 'importador' || r == 'aliado';
+    return r == 'importador' || r == 'aliado' || r == 'transportista';
   }
 
   void _bumpAuthorizationSection() {
@@ -422,6 +423,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         return 'ENLACE GOOGLE MAPS · ALMACÉN / DOMICILIO FISCAL';
       case 'aliado':
         return 'ENLACE GOOGLE MAPS · TALLER / DOMICILIO FISCAL';
+      case 'transportista':
+        return 'ENLACE GOOGLE MAPS · BASE OPERATIVA / DOMICILIO FISCAL';
       default:
         return 'ENLACE GOOGLE MAPS (OPCIONAL)';
     }
@@ -437,9 +440,29 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         return 'Pegue el enlace «Compartir» de Google Maps apuntando a su taller o domicilio fiscal. '
             'MotoLink lo usa como destino al armar la ruta en vivo desde el importador cuando el pedido '
             'está en tránsito (junto con el enlace del importador en su perfil).';
+      case 'transportista':
+        return 'Pegue el enlace «Compartir» de Google Maps apuntando a su base operativa o domicilio fiscal. '
+            'Debe coincidir con la dirección indicada arriba: MotoLink usa esas coordenadas para asignación '
+            'por proximidad y las rutas en tránsito.';
       default:
         return 'Pegue un enlace público (compartir ubicación) para que MotoLink y los participantes '
             'abran su domicilio fiscal en el mapa.';
+    }
+  }
+
+  String _ubicacionFiscalIntroText() {
+    switch (_role.trim().toLowerCase()) {
+      case 'transportista':
+        return 'Indique la ubicación de su base operativa o casa matriz. Estado, ciudad y domicilio '
+            'son obligatorios; al guardar, MotoLink geocodifica la dirección para registrar coordenadas '
+            'en su perfil y en su expediente de transportista (proximidad a almacenes).';
+      case 'importador':
+      case 'aliado':
+        return 'Visible en el catálogo para ubicar proveedores y talleres. '
+            'Complete también la dirección fiscal más abajo: estado, ciudad y domicilio '
+            'son obligatorios para solicitar pedidos.';
+      default:
+        return '';
     }
   }
 
@@ -494,10 +517,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     await AuthService.signOut();
   }
 
-  /// Geocodifica el domicilio fiscal para ordenar el catálogo por proximidad (importador/aliado).
+  /// Geocodifica el domicilio fiscal (importador/aliado: catálogo; transportista: perfil + transportista_info).
   Future<void> _tryGeocodeAndSaveCoordinates() async {
     final role = _role.trim().toLowerCase();
-    if (role != 'importador' && role != 'aliado') return;
+    if (role != 'importador' &&
+        role != 'aliado' &&
+        role != 'transportista') {
+      return;
+    }
     final dir = _fiscalAddressController.text.trim();
     final ci = _ciudadController.text.trim();
     final es = _estadoController.text.trim();
@@ -510,6 +537,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         latitude: first.latitude,
         longitude: first.longitude,
       );
+      if (role == 'transportista') {
+        await SupabaseService.syncTransportistaInfoBaseFromProfileCoordinates(
+          latitude: first.latitude,
+          longitude: first.longitude,
+          rifAlignedWithProfile: _rifController.text,
+        );
+      }
     } catch (_) {}
   }
 
@@ -711,13 +745,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             keyboardType: TextInputType.phone,
             decoration: _fieldDecoration('+58 412 1234567'),
           ),
-          if (_ubicacionObligatoria) ...[
+          if (_requiereUbicacionFiscalCompleta) ...[
             const SizedBox(height: 16),
             _sectionLabel('UBICACIÓN (ESTADO / CIUDAD)'),
             Text(
-              'Visible en el catálogo para ubicar proveedores y talleres. '
-              'Complete también la dirección fiscal más abajo: estado, ciudad y domicilio '
-              'son obligatorios para solicitar pedidos.',
+              _ubicacionFiscalIntroText(),
               style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 10),
@@ -726,7 +758,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               textCapitalization: TextCapitalization.words,
               decoration: _fieldDecoration('Estado (ej: Miranda)'),
               validator: (v) {
-                if (!_ubicacionObligatoria) return null;
+                if (!_requiereUbicacionFiscalCompleta) return null;
                 if (v == null || v.trim().isEmpty) return 'Indique el estado';
                 return null;
               },
@@ -737,7 +769,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               textCapitalization: TextCapitalization.words,
               decoration: _fieldDecoration('Ciudad (ej: Los Teques)'),
               validator: (v) {
-                if (!_ubicacionObligatoria) return null;
+                if (!_requiereUbicacionFiscalCompleta) return null;
                 if (v == null || v.trim().isEmpty) return 'Indique la ciudad';
                 return null;
               },
@@ -752,7 +784,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 'Av. Principal, Local 12, Zona Industrial...',
               ),
               validator: (v) {
-                if (!_ubicacionObligatoria) return null;
+                if (!_requiereUbicacionFiscalCompleta) return null;
                 if (v == null || v.trim().isEmpty) {
                   return 'Indique la dirección fiscal (domicilio de la empresa)';
                 }
@@ -783,7 +815,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               },
             ),
           ],
-          if (!_ubicacionObligatoria) ...[
+          if (!_requiereUbicacionFiscalCompleta) ...[
             const SizedBox(height: 16),
             _sectionLabel('DIRECCIÓN FISCAL'),
             TextFormField(

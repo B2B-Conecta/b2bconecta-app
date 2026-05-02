@@ -164,9 +164,9 @@ insert into public.profiles (
 )
 values
   ('a1000001-0000-4000-8000-000000000001', 'Importaciones Delta C.A.', 'J-401234567', 'importador', '+58 424-1000001', 100, 100000, null, 0, 'Distrito Capital', 'Caracas', 'Domicilio fiscal: Torre Empresarial Delta, Av. Francisco de Miranda, piso 4 ofic. 4-B, Urb. Los Palos Grandes, Caracas 1060 (mismo RIF J-401234567).', now()),
-  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, null, 0, 'Miranda', 'Los Teques', 'Casa matriz fiscal: Calle Bolívar esq. Guaicaipuro, galpón 7, Zona Industrial La Mariposa, Los Teques 1201, Edo. Miranda.', now()),
-  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, null, 0, 'Carabobo', 'Valencia', 'Domicilio fiscal: Av. Bolívar Norte, sector San Blas, nave 12 (galpón logístico), Valencia 2001, Edo. Carabobo.', now()),
-  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, null, 0, 'Lara', 'Barquisimeto', 'Domicilio fiscal: Carrera 19 entre calles 7 y 8, edificio LuzMoto, piso PB local 2, Parroquia Concepción, Barquisimeto 3001.', now()),
+  ('a1000002-0000-4000-8000-000000000002', 'Repuestos El Ávila', 'J-402345678', 'importador', '+58 424-1000002', 100, 100000, null, 0, 'Distrito Capital', 'Caracas', 'Domicilio fiscal / almacén: Av. Francisco de Miranda, Torre Parque Cristal, piso 12 ofic. 12-B, Urb. Los Palos Grandes, Caracas 1060 (zona Chacao).', now()),
+  ('a1000003-0000-4000-8000-000000000003', 'MotoParts Venezuela', 'J-403456789', 'importador', '+58 424-1000003', 100, 100000, null, 0, 'Distrito Capital', 'Caracas', 'Domicilio fiscal: Av. Universidad esq. Traposos, edificio MotoParts, galpón anexo, Parroquia San José, Caracas 1010.', now()),
+  ('a1000004-0000-4000-8000-000000000004', 'LuzMoto Import C.A.', 'J-404567890', 'importador', '+58 424-1000004', 100, 100000, null, 0, 'Distrito Capital', 'Caracas', 'Domicilio fiscal: Av. Principal de La Castellana, Qta. LuzMoto, galpón 2, Caracas 1061.', now()),
   ('a1000005-0000-4000-8000-000000000005', 'ImportMotos Centro', 'J-405678901', 'importador', '+58 424-1000005', 100, 100000, null, 0, 'Aragua', 'Maracay', 'Casa matriz: Zona industrial San Jacinto, callejón B, nave 5 (acceso fiscal), Maracay 2103, Edo. Aragua.', now()),
   ('a1000006-0000-4000-8000-000000000006', 'Frenos y Transmisión VE', 'J-406789012', 'importador', '+58 424-1000006', 100, 100000, null, 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Av. 5 de Julio, Edif. Industrial La Limpia, módulo 3, locales 301-302, Maracaibo 4005, Edo. Zulia.', now()),
   ('a1000007-0000-4000-8000-000000000007', 'MotorZone Distribuidora', 'J-407890123', 'importador', '+58 424-1000007', 100, 100000, null, 0, 'Táchira', 'San Cristóbal', 'Domicilio fiscal: Av. Principal de Capacho, galpón MotoZone (área de despacho y facturación), San Cristóbal 5001, Edo. Táchira.', now()),
@@ -174,7 +174,7 @@ values
   ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 0, 'pendiente', 0, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
   ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 0, 'pendiente', 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
   ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, null, null, null, now()),
-  ('a4000001-0000-4000-8000-000000000001', 'MotoLink Despacho', 'J-300000002', 'transportista', '+58 414-4000001', 100, null, null, 0, null, null, null, now())
+  ('a4000001-0000-4000-8000-000000000001', 'MotoLink Despacho', 'J-300000002', 'transportista', '+58 414-4000001', 100, null, null, 0, 'Distrito Capital', 'Caracas', 'Base operativa fiscal: Av. Intercomunal de La Vega, galpón logístico MotoLink Despacho, sector industrial La Yaguara, Caracas.', now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,
@@ -188,22 +188,115 @@ on conflict (id) do update set
   ciudad = excluded.ciudad,
   direccion = excluded.direccion;
 
--- Demo A5: primer importador + primer aliado con coordenadas (pruebas de catálogo por
--- proximidad sin depender del GPS del dispositivo ni de geocoding en runtime).
--- Aliado1 (Los Ruices, Caracas) · Importador1 (Los Palos Grandes, Caracas).
-update public.profiles
-set
+-- Coordenadas + enlaces Google Maps (origen fiscal / almacén). Primeros 4 importadores en Caracas
+-- para probar proximidad con transportista en el área metropolitana.
+--
+-- App Flutter (perfil B2B): al guardar, si completan Estado+Ciudad+Dirección fiscal, se geocodifica
+-- y se persisten latitude/longitude (RPC update_my_geolocation). El campo «Enlace Google Maps»
+-- guarda solo fiscal_maps_url; no rellena lat/long automáticamente. Ambos conviven: coords para
+-- catálogo/RPC proximidad; enlace para abrir ubicación y armar rutas en tránsito.
+
+-- Importadores 1–4 · Caracas (puntos ligeramente distintos para ranking de distancias)
+update public.profiles set
+  latitude = 10.4969,
+  longitude = -66.8488,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.4969,-66.8488',
+  location_updated_at = now()
+where id = 'a1000001-0000-4000-8000-000000000001'::uuid;
+
+update public.profiles set
+  latitude = 10.4892,
+  longitude = -66.8541,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.4892,-66.8541',
+  location_updated_at = now()
+where id = 'a1000002-0000-4000-8000-000000000002'::uuid;
+
+update public.profiles set
+  latitude = 10.5065,
+  longitude = -66.9140,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.5065,-66.9140',
+  location_updated_at = now()
+where id = 'a1000003-0000-4000-8000-000000000003'::uuid;
+
+update public.profiles set
+  latitude = 10.4889,
+  longitude = -66.8622,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.4889,-66.8622',
+  location_updated_at = now()
+where id = 'a1000004-0000-4000-8000-000000000004'::uuid;
+
+-- Importadores 5–7 · ciudades de origen (Maracay, Maracaibo, San Cristóbal)
+update public.profiles set
+  latitude = 10.2442,
+  longitude = -67.6059,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.2442,-67.6059',
+  location_updated_at = now()
+where id = 'a1000005-0000-4000-8000-000000000005'::uuid;
+
+update public.profiles set
+  latitude = 10.6666,
+  longitude = -71.6124,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.6666,-71.6124',
+  location_updated_at = now()
+where id = 'a1000006-0000-4000-8000-000000000006'::uuid;
+
+update public.profiles set
+  latitude = 7.7711,
+  longitude = -72.2249,
+  fiscal_maps_url = 'https://www.google.com/maps?q=7.7711,-72.2249',
+  location_updated_at = now()
+where id = 'a1000007-0000-4000-8000-000000000007'::uuid;
+
+-- Aliados · Caracas, Valencia, Maracaibo
+update public.profiles set
   latitude = 10.4289,
   longitude = -66.8092,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.4289,-66.8092',
   location_updated_at = now()
 where id = 'a2000001-0000-4000-8000-000000000001'::uuid;
 
-update public.profiles
-set
-  latitude = 10.4969,
-  longitude = -66.8488,
+update public.profiles set
+  latitude = 10.1621,
+  longitude = -68.0077,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.1621,-68.0077',
   location_updated_at = now()
-where id = 'a1000001-0000-4000-8000-000000000001'::uuid;
+where id = 'a2000002-0000-4000-8000-000000000002'::uuid;
+
+update public.profiles set
+  latitude = 10.6936,
+  longitude = -71.6143,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.6936,-71.6143',
+  location_updated_at = now()
+where id = 'a2000003-0000-4000-8000-000000000003'::uuid;
+
+-- Transportista (perfil + enlace; coords de base jurídica siguen en transportista_info)
+update public.profiles set
+  latitude = 10.4810,
+  longitude = -66.9380,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.4810,-66.9380',
+  location_updated_at = now()
+where id = 'a4000001-0000-4000-8000-000000000001'::uuid;
+
+-- Transportista jurídico: base operativa Caracas (requiere migración transportista_info).
+insert into public.transportista_info (
+  id,
+  rif,
+  base_operativa_latitude,
+  base_operativa_longitude,
+  location_updated_at
+)
+values (
+  'a4000001-0000-4000-8000-000000000001'::uuid,
+  'J-300000002',
+  10.4810,
+  -66.9380,
+  now()
+)
+on conflict (id) do update set
+  rif = excluded.rif,
+  base_operativa_latitude = excluded.base_operativa_latitude,
+  base_operativa_longitude = excluded.base_operativa_longitude,
+  location_updated_at = excluded.location_updated_at;
 
 -- =============================================================================
 -- Esquema inventario B2B (idempotente). Debe existir antes de insertar productos.

@@ -87,6 +87,7 @@ class TransactionRequestModel {
     this.subOrders = const <SubOrderModel>[],
     this.importerSubOrderId,
     this.importerViewOrderItems = const <OrderItemModel>[],
+    this.assignedTransportistaId,
   });
 
   final String id;
@@ -202,6 +203,9 @@ class TransactionRequestModel {
 
   /// Líneas del sub-pedido del importador (solo en listados por `sub_orders`; ver [orderItemsParaVistaImportador]).
   final List<OrderItemModel> importerViewOrderItems;
+
+  /// Transportista asignado al pedido (`transaction_requests.assigned_transportista_id`).
+  final String? assignedTransportistaId;
 
   bool get hasAgreedCreditPlan =>
       creditPlanType != null &&
@@ -827,6 +831,8 @@ class TransactionRequestModel {
       importerSubOrderId: _nullableText(json['_importer_sub_order_id']),
       importerViewOrderItems:
           _parseImporterViewOrderItems(json['_importer_view_order_items']),
+      assignedTransportistaId:
+          _nullableText(json['assigned_transportista_id']),
     );
   }
 

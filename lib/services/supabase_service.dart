@@ -22,6 +22,7 @@ import '../models/transaction_request_message_model.dart';
 import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import '../models/transportista_info_model.dart';
 import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
@@ -776,6 +777,7 @@ class SupabaseService {
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
+    assigned_transportista_id,
     is_master_order,
     tasa_bcv_snapshot,
     payment_schedule (
@@ -2040,6 +2042,125 @@ sub_orders (
       } catch (_) {}
       rethrow;
     }
+  }
+
+  /// Transportista: lectura de su expediente (`transportista_info`).
+  static Future<TransportistaInfoModel?> fetchMyTransportistaInfo() async {
+    final uid = currentUserId;
+    if (uid == null) return null;
+    final row = await _client
+        .from('transportista_info')
+        .select()
+        .eq('id', uid)
+        .maybeSingle();
+    if (row == null) return null;
+    return TransportistaInfoModel.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  /// Tras geocodificar el domicilio en perfil: mantiene alineadas las coords de [transportista_info]
+  /// (usadas por el RPC de proximidad). Inserta fila mínima si aún no existe.
+  static Future<void> syncTransportistaInfoBaseFromProfileCoordinates({
+    required double latitude,
+    required double longitude,
+    String? rifAlignedWithProfile,
+  }) async {
+    final uid = currentUserId;
+    if (uid == null) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    final rif = rifAlignedWithProfile?.trim();
+    final existing = await _client
+        .from('transportista_info')
+        .select('id')
+        .eq('id', uid)
+        .maybeSingle();
+    if (existing != null) {
+      final patch = <String, dynamic>{
+        'base_operativa_latitude': latitude,
+        'base_operativa_longitude': longitude,
+        'location_updated_at': now,
+        'updated_at': now,
+      };
+      if (rif != null && rif.isNotEmpty) {
+        patch['rif'] = rif;
+      }
+      await _client.from('transportista_info').update(patch).eq('id', uid);
+      return;
+    }
+    await _client.from('transportista_info').insert({
+      'id': uid,
+      if (rif != null && rif.isNotEmpty) 'rif': rif,
+      'base_operativa_latitude': latitude,
+      'base_operativa_longitude': longitude,
+      'location_updated_at': now,
+      'updated_at': now,
+    });
+  }
+
+  /// Transportista: crea o actualiza expediente y base operativa.
+  static Future<void> upsertMyTransportistaInfo({
+    required double baseOperativaLatitude,
+    required double baseOperativaLongitude,
+    String? rif,
+    String? documentoConstitutivoStoragePath,
+    String? rifDocumentoStoragePath,
+    String? otrosDocumentosStoragePath,
+  }) async {
+    final uid = currentUserId;
+    if (uid == null) {
+      throw StateError('Se requiere sesión para guardar transportista_info.');
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client.from('transportista_info').upsert({
+      'id': uid,
+      'rif': rif,
+      'documento_constitutivo_storage_path': documentoConstitutivoStoragePath,
+      'rif_documento_storage_path': rifDocumentoStoragePath,
+      'otros_documentos_storage_path': otrosDocumentosStoragePath,
+      'base_operativa_latitude': baseOperativaLatitude,
+      'base_operativa_longitude': baseOperativaLongitude,
+      'location_updated_at': now,
+      'updated_at': now,
+    });
+  }
+
+  /// MotoLink: ranking de transportistas por distancia media a los almacenes (perfil importador).
+  static Future<List<TransportistaProximityCandidate>>
+      adminRankTransportistasByImporterProximity({
+    required List<String> importerProfileIds,
+    int limit = 20,
+  }) async {
+    final res = await _client.rpc(
+      'rpc_rank_transportistas_by_importer_proximity',
+      params: <String, dynamic>{
+        'p_importer_profile_ids': importerProfileIds,
+        'p_limit': limit,
+      },
+    );
+    if (res == null) return const <TransportistaProximityCandidate>[];
+    if (res is! List) return const <TransportistaProximityCandidate>[];
+    return res
+        .map((e) {
+          if (e is! Map) return null;
+          return TransportistaProximityCandidate.fromJson(
+            Map<String, dynamic>.from(e),
+          );
+        })
+        .whereType<TransportistaProximityCandidate>()
+        .toList();
+  }
+
+  /// MotoLink: asigna o desasigna transportista en un pedido maestro o simple.
+  static Future<void> adminAssignTransportistaPedido({
+    required String requestId,
+    String? transportistaId,
+  }) async {
+    await _client.rpc(
+      'admin_assign_transportista_pedido',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_transportista_id': transportistaId,
+      },
+    );
   }
 
   static Future<void> adminAprobarPagoAliado(String requestId) async {

@@ -58,7 +58,8 @@ class _SheetBody extends StatelessWidget {
     return r != null && r.isNotEmpty;
   }
 
-  bool get _ubicOk => profile.hasRegisteredLocation;
+  bool get _ubicOk =>
+      profile.hasRegisteredLocation && profile.hasFiscalMapsShareLink;
 
   int get _pce => profile.primerosPedidosContadoEntregados ?? 0;
 

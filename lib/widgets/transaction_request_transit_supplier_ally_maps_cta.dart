@@ -54,7 +54,7 @@ class TransactionRequestTransitSupplierToAliadoMapsCta extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'MotoLink aún no ha publicado el enlace de la ruta en vivo. '
+                  'MotoLink aún no ha publicado el enlace de ruta en Google Maps. '
                   'Vuelva a consultar la ficha cuando esté disponible.',
                   style: TextStyle(
                     fontSize: 12,
@@ -89,7 +89,7 @@ class TransactionRequestTransitSupplierToAliadoMapsCta extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Ruta en vivo (MotoLink)',
+                        'Ruta en Google Maps (MotoLink)',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 13,

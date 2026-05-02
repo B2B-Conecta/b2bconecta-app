@@ -2,16 +2,18 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/profile_model.dart';
+import '../models/sub_order_model.dart';
 import '../models/transaction_request_model.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/maps_route_utils.dart';
 
-/// Ruta origen (importador) → destino (Bloque A2): mapa + OSRM + Google Maps externo.
-/// La pantalla de detalle solo monta este widget cuando el pedido está `en_transito`.
+/// Ruta en tránsito estática: base del transportista → almacenes pendientes → destino.
+/// OSRM multi-parada; botón para abrir la misma secuencia en Google Maps.
 class TransactionRequestRouteMapSection extends StatefulWidget {
   const TransactionRequestRouteMapSection({
     super.key,
@@ -28,8 +30,7 @@ class TransactionRequestRouteMapSection extends StatefulWidget {
 class _TransactionRequestRouteMapSectionState
     extends State<TransactionRequestRouteMapSection> {
   List<LatLng> _routePoints = const [];
-  LatLng? _origin;
-  LatLng? _dest;
+  List<LatLng> _waypoints = const [];
   bool _busy = true;
   bool _usedRoadGeometry = false;
 
@@ -42,8 +43,13 @@ class _TransactionRequestRouteMapSectionState
   @override
   void didUpdateWidget(TransactionRequestRouteMapSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.request.id != widget.request.id ||
-        oldWidget.request.status != widget.request.status) {
+    final a = oldWidget.request;
+    final b = widget.request;
+    if (a.id != b.id ||
+        a.status != b.status ||
+        a.subOrdersRecogidasAlmacenCount != b.subOrdersRecogidasAlmacenCount ||
+        a.transportistaRecogioAlmacenSimple != b.transportistaRecogioAlmacenSimple ||
+        a.adminRutaMapsUrl != b.adminRutaMapsUrl) {
       _load();
     }
   }
@@ -52,68 +58,43 @@ class _TransactionRequestRouteMapSectionState
     setState(() {
       _busy = true;
       _routePoints = const [];
-      _origin = null;
-      _dest = null;
+      _waypoints = const [];
       _usedRoadGeometry = false;
     });
     final r = widget.request;
 
-    final origin = await _resolveOriginLatLng(r);
-    final dest = await _resolveDestLatLng(r);
+    ProfileModel? tp;
+    if (r.hasAssignedTransportista) {
+      tp = await SupabaseService.fetchProfileById(
+        r.assignedTransportistaId!.trim(),
+      );
+    }
+
+    final waypoints = buildRemainingShipmentWaypoints(
+      request: r,
+      transportista: tp,
+      livePosition: null,
+    );
 
     List<LatLng> line = const [];
     var usedRoad = false;
-    if (origin != null && dest != null) {
-      final road = await fetchDrivingRouteOsrm(origin, dest);
+    if (waypoints.length >= 2) {
+      final road = await fetchDrivingRouteOsrmWaypoints(waypoints);
       if (road != null && road.length >= 2) {
         line = road;
         usedRoad = true;
       } else {
-        line = [origin, dest];
+        line = waypoints;
       }
     }
 
     if (!mounted) return;
     setState(() {
-      _origin = origin;
-      _dest = dest;
+      _waypoints = waypoints;
       _routePoints = line;
       _usedRoadGeometry = usedRoad;
       _busy = false;
     });
-  }
-
-  static Future<LatLng?> _tryGeocode(String raw) async {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return null;
-    final query = trimmed.toLowerCase().contains('venezuela')
-        ? trimmed
-        : '$trimmed, Venezuela';
-    try {
-      final locs = await locationFromAddress(query);
-      if (locs.isEmpty) return null;
-      final l = locs.first;
-      return LatLng(l.latitude, l.longitude);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<LatLng?> _resolveOriginLatLng(TransactionRequestModel r) async {
-    final fromUrl = parseLatLngFromGoogleMapsUrl(r.ownerFiscalMapsUrl);
-    if (fromUrl != null) return fromUrl;
-    return _tryGeocode(r.ownerUbicacionUnaLineaParaMapa);
-  }
-
-  Future<LatLng?> _resolveDestLatLng(TransactionRequestModel r) async {
-    if (!r.destinoEntregaUsaPerfil) {
-      final fromAlt = parseLatLngFromGoogleMapsUrl(r.destinoEntregaMapsUrl);
-      if (fromAlt != null) return fromAlt;
-    } else {
-      final fromFiscal = parseLatLngFromGoogleMapsUrl(r.aliadoFiscalMapsUrl);
-      if (fromFiscal != null) return fromFiscal;
-    }
-    return _tryGeocode(r.destinoEntregaTextoParaMapa);
   }
 
   static LatLng _mid(List<LatLng> pts) {
@@ -164,12 +145,92 @@ class _TransactionRequestRouteMapSectionState
     return LatLngBounds(LatLng(minLat, minLng), LatLng(maxLat, maxLng));
   }
 
+  List<Marker> _buildMarkers(TransactionRequestModel r) {
+    if (_waypoints.isEmpty) return const [];
+    final out = <Marker>[];
+    for (var i = 0; i < _waypoints.length; i++) {
+      final p = _waypoints[i];
+      final isLast = i == _waypoints.length - 1;
+      final isFirst = i == 0;
+      if (isLast) {
+        out.add(
+          Marker(
+            width: 40,
+            height: 40,
+            point: p,
+            alignment: Alignment.topCenter,
+            child: Icon(
+              Icons.place,
+              color: Colors.green.shade800,
+              size: 32,
+            ),
+          ),
+        );
+      } else if (isFirst) {
+        out.add(
+          Marker(
+            width: 40,
+            height: 40,
+            point: p,
+            alignment: Alignment.topCenter,
+            child: Icon(
+              Icons.home_work_outlined,
+              color: Colors.deepPurple.shade800,
+              size: 30,
+            ),
+          ),
+        );
+      } else {
+        out.add(
+          Marker(
+            width: 40,
+            height: 40,
+            point: p,
+            alignment: Alignment.topCenter,
+            child: Icon(
+              Icons.warehouse_outlined,
+              color: Colors.blue.shade800,
+              size: 30,
+            ),
+          ),
+        );
+      }
+    }
+    return out;
+  }
+
   Future<void> _openExterno(TransactionRequestModel r) async {
-    final uri = googleMapsDrivingDirectionsSupplierToAliado(
-      r,
-      originOverride: _origin,
-      destOverride: _dest,
+    if (r.hasAdminRutaMapsUrl) {
+      final pub = Uri.tryParse(r.adminRutaMapsUrl!.trim());
+      if (pub != null &&
+          pub.hasScheme &&
+          (pub.scheme == 'http' || pub.scheme == 'https')) {
+        final ok = await launchUrl(pub, mode: LaunchMode.externalApplication);
+        if (!ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo abrir Google Maps.')),
+          );
+        }
+        return;
+      }
+    }
+    ProfileModel? tp;
+    if (r.hasAssignedTransportista) {
+      tp = await SupabaseService.fetchProfileById(
+        r.assignedTransportistaId!.trim(),
+      );
+    }
+    final fallback = googleMapsRemainingRouteUrl(
+      request: r,
+      transportista: tp,
+      livePosition: null,
     );
+    final uri = fallback ??
+        googleMapsDrivingDirectionsSupplierToAliado(
+          r,
+          originOverride: _waypoints.isNotEmpty ? _waypoints.first : null,
+          destOverride: _waypoints.isNotEmpty ? _waypoints.last : null,
+        );
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,7 +249,7 @@ class _TransactionRequestRouteMapSectionState
     }
     uri ??=
         Uri.parse(
-          'https://www.google.com/maps/search/?api=1'
+          'https://www.google.maps/search/?api=1'
           '&query=${Uri.encodeComponent(r.destinoEntregaTextoParaMapa)}',
         );
     if (!uri.hasScheme ||
@@ -202,22 +263,111 @@ class _TransactionRequestRouteMapSectionState
   }
 
   Future<void> _openOrigen(TransactionRequestModel r) async {
+    if (r.isMasterOrder && r.subOrders.isNotEmpty) {
+      final sorted = List<SubOrderModel>.from(r.subOrders)
+        ..sort((a, b) => a.id.compareTo(b.id));
+      final pending =
+          sorted.where((s) => !s.transportistaRecogioEnAlmacen).toList();
+      final targets = pending.isNotEmpty ? pending : sorted;
+      final s = targets.first;
+
+      Uri? uri;
+      final fu = s.importadorFiscalMapsUrl?.trim();
+      if (fu != null && fu.isNotEmpty) {
+        uri = Uri.tryParse(fu);
+      }
+      if (uri != null &&
+          uri.hasScheme &&
+          (uri.scheme == 'http' || uri.scheme == 'https')) {
+        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo abrir el almacén.')),
+          );
+        }
+        return;
+      }
+
+      final la = s.importadorLatitude;
+      final lo = s.importadorLongitude;
+      if (la != null && lo != null) {
+        uri = Uri.parse(
+          'https://www.google.com/maps/search/?api=1&query=$la,$lo',
+        );
+        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo abrir el almacén.')),
+          );
+        }
+        return;
+      }
+
+      final q = [
+        s.importadorBusinessName,
+        s.importadorDireccion,
+        s.importadorCiudad,
+        s.importadorEstado,
+      ]
+          .whereType<String>()
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .join(', ');
+      if (q.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Este almacén no tiene dirección ni enlace en perfil. Use «Abrir ruta en Google Maps».',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1'
+        '&query=${Uri.encodeComponent(q)}',
+      );
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir el almacén.')),
+        );
+      }
+      return;
+    }
+
     Uri? uri;
     if (r.ownerFiscalMapsUrl != null &&
         r.ownerFiscalMapsUrl!.trim().isNotEmpty) {
       uri = Uri.tryParse(r.ownerFiscalMapsUrl!.trim());
     }
-    uri ??=
-        Uri.parse(
-          'https://www.google.com/maps/search/?api=1'
-          '&query=${Uri.encodeComponent(r.ownerUbicacionUnaLineaParaMapa)}',
-        );
+    uri ??= Uri.parse(
+      'https://www.google.com/maps/search/?api=1'
+      '&query=${Uri.encodeComponent(r.ownerUbicacionUnaLineaParaMapa)}',
+    );
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo abrir el origen.')),
       );
     }
+  }
+
+  String _progresoRecogidaLine(TransactionRequestModel r) {
+    if (!r.isMasterOrder || r.subOrders.isEmpty) {
+      if (r.transportistaRecogioAlmacenSimple) {
+        return 'Recogida en almacén confirmada · tramo hacia el aliado.';
+      }
+      return 'Pendiente confirmar recogida en almacén del importador.';
+    }
+    final done = r.subOrdersRecogidasAlmacenCount;
+    final total = r.subOrders.length;
+    if (done >= total) {
+      return 'Retiros en almacén: $total/$total · ruta hacia el aliado.';
+    }
+    return 'Retiros en almacén: $done/$total · el mapa omite almacenes ya marcados como recogidos.';
   }
 
   @override
@@ -237,19 +387,22 @@ class _TransactionRequestRouteMapSectionState
         ),
         const SizedBox(height: 6),
         Text(
-          'Origen: almacén del importador · Destino: entrega según Bloque A2. '
-          'La línea violeta sigue carretera cuando es posible (OSRM); use Google Maps para navegación GPS en vivo.',
+          '${_progresoRecogidaLine(r)} '
+          'La línea sigue carretera cuando OSRM lo permite; el enlace inferior abre la ruta con las mismas paradas.',
           style: TextStyle(fontSize: 11, height: 1.35, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 10),
         _bloqueUbicacion(
           icon: Icons.home_work_outlined,
-          titulo: 'Origen · recolección (importador)',
-          texto: r.ownerUbicacionFiscalMultilineaEs ??
-              (r.ownerBusinessName ?? 'Sin dirección en perfil'),
-          subtitulo: 'Punto A del envío.',
-          mapsUrlAvailable: r.ownerFiscalMapsUrl?.trim().isNotEmpty == true ||
-              r.ownerUbicacionFiscalMultilineaEs != null,
+          titulo: r.isMasterOrder && r.subOrders.isNotEmpty
+              ? 'Origen · recolección (almacenes)'
+              : 'Origen · recolección (importador)',
+          texto: r.transportistaOrigenRecoleccionTextoEs,
+          subtitulo: r.isMasterOrder && r.subOrders.isNotEmpty
+              ? '«Ubicación en mapa» abre el primer almacén pendiente (o el primero si ya recogió todos). '
+                  'Use «Abrir ruta en Google Maps» para la ruta completa con paradas.'
+              : 'Almacén del importador. Pendiente de recogida aparece en el mapa hasta confirmar.',
+          mapsUrlAvailable: r.transportistaOrigenPermiteAbrirMapa,
           onMaps: () => _openOrigen(r),
         ),
         const SizedBox(height: 10),
@@ -304,33 +457,8 @@ class _TransactionRequestRouteMapSectionState
                       ),
                     ],
                   ),
-                  if (_origin != null && _dest != null)
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          width: 40,
-                          height: 40,
-                          point: _origin!,
-                          alignment: Alignment.topCenter,
-                          child: Icon(
-                            Icons.warehouse_outlined,
-                            color: Colors.blue.shade800,
-                            size: 32,
-                          ),
-                        ),
-                        Marker(
-                          width: 40,
-                          height: 40,
-                          point: _dest!,
-                          alignment: Alignment.topCenter,
-                          child: Icon(
-                            Icons.place,
-                            color: Colors.green.shade800,
-                            size: 32,
-                          ),
-                        ),
-                      ],
-                    ),
+                  if (_buildMarkers(r).isNotEmpty)
+                    MarkerLayer(markers: _buildMarkers(r)),
                   RichAttributionWidget(
                     attributions: [
                       TextSourceAttribution(
@@ -362,8 +490,8 @@ class _TransactionRequestRouteMapSectionState
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'No se pudieron obtener ambos puntos (perfil sin dirección o enlace Maps sin coordenadas). '
-                      'Complete dirección fiscal del importador y del aliado, o use los botones de mapa y Google Maps.',
+                      'Faltan coordenadas para trazar la ruta restante (perfiles / enlaces Maps). '
+                      'Use los botones de ubicación o Google Maps abajo.',
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
@@ -379,8 +507,8 @@ class _TransactionRequestRouteMapSectionState
           const SizedBox(height: 6),
           Text(
             _usedRoadGeometry
-                ? 'Trazado por carretera (aprox.). Para ETA y navegación en vivo use el botón de «Destino de entrega» o el enlace de abajo.'
-                : 'Línea recta entre puntos. Para ETA y navegación use el botón de «Destino de entrega» o el enlace de abajo.',
+                ? 'Trazado por carretera (aprox.). La navegación turn-by-turn sigue siendo en Google Maps.'
+                : 'Línea simplificada entre paradas. Abra el enlace de Google Maps para guiado.',
             style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
           ),
         ],
@@ -390,7 +518,11 @@ class _TransactionRequestRouteMapSectionState
           child: TextButton.icon(
             onPressed: () => _openExterno(r),
             icon: const Icon(Icons.open_in_new, size: 18),
-            label: const Text('Abrir misma ruta importador → aliado (Google Maps)'),
+            label: Text(
+              r.hasAdminRutaMapsUrl
+                  ? 'Abrir ruta en Google Maps (paradas actualizadas)'
+                  : 'Abrir ruta en Google Maps',
+            ),
           ),
         ),
       ],

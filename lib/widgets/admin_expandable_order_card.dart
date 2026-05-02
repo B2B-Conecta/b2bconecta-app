@@ -5,9 +5,10 @@ import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
-import 'transaction_request_admin_pedido_listo_route_prep_section.dart';
 import 'courier_timeline_widget.dart';
 import 'transaction_request_admin_sections.dart';
+import 'transportista_assignment_ack_section.dart';
+import 'transportista_recogida_almacen_section.dart';
 
 /// Ficha compacta: un toque en la cabecera despliega contactos, crédito y ciclo del envío.
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -30,6 +31,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
   final Widget? expandedFooter;
   final AppHomeRole cardViewerRole;
   final VoidCallback? onRequestMutated;
+
+  bool get _isTransportista => cardViewerRole == AppHomeRole.transportista;
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +146,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               height: 1.25,
                             ),
                           ),
-                          if (r.status == TransactionRequestStatus.pedidoListo) ...[
+                          if (r.status == TransactionRequestStatus.pedidoListo &&
+                              !_isTransportista) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -178,7 +182,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (r.pedidoEntregadoYPagado) ...[
+                          if (!_isTransportista && r.pedidoEntregadoYPagado) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -210,7 +214,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                          ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
+                          ] else if (!_isTransportista &&
+                              r.pagoMotolinkPendienteTrasEntrega) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -302,56 +307,77 @@ class AdminExpandableOrderCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (_isTransportista) ...[
+                          TransportistaAssignmentAckSection(
+                            request: r,
+                            onAcknowledged: () => onRequestMutated?.call(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         TransactionRequestPartiesContactSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestDestinoEntregaSection(
                           request: r,
                           viewingAsRole: cardViewerRole,
                         ),
-                        const SizedBox(height: 12),
-                        TransactionRequestDocumentPreferenceAdminSection(
-                          request: r,
-                        ),
-                        const SizedBox(height: 12),
-                        TransactionRequestAliadoExperienceAdminSection(
-                          request: r,
-                        ),
-                        if ((r.status == TransactionRequestStatus.pedidoListo ||
-                                r.status ==
-                                    TransactionRequestStatus.enTransito) &&
-                            cardViewerRole == AppHomeRole.administrador) ...[
+                        if (!_isTransportista) ...[
                           const SizedBox(height: 12),
-                          TransactionRequestAdminPedidoListoRoutePrepSection(
+                          TransactionRequestDocumentPreferenceAdminSection(
                             request: r,
-                            onSaved: onRequestMutated,
                           ),
-                        ],
-                        if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.account_balance_wallet_outlined,
-                                size: 18,
-                                color: Colors.grey.shade700,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Crédito MotoLink asignado (aliado): '
-                                  '\$${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} USD',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.brandBlue,
+                          const SizedBox(height: 12),
+                          TransactionRequestAliadoExperienceAdminSection(
+                            request: r,
+                          ),
+                          if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                  size: 18,
+                                  color: Colors.grey.shade700,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Crédito MotoLink asignado (aliado): '
+                                    '\$${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} USD',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandBlue,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                         ],
                         const SizedBox(height: 12),
-                        CourierTimelineWidget(request: r, compact: true),
+                        CourierTimelineWidget(
+                          request: r,
+                          compact: true,
+                          viewerRole: cardViewerRole,
+                        ),
+                        if (r.status == TransactionRequestStatus.enTransito) ...[
+                          const SizedBox(height: 12),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade50.withOpacity(0.45),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.teal.shade100),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: TransportistaRecogidaAlmacenSection(
+                                request: r,
+                                viewerRole: cardViewerRole,
+                                onUpdated: onRequestMutated,
+                              ),
+                            ),
+                          ),
+                        ],
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 8),
                           expandedFooter!,

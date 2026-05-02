@@ -136,7 +136,7 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
               ok: complete,
               label: complete
                   ? 'Perfil B2B completo: puede gestionar inventario y pedidos validados.'
-                  : 'Complete nombre del negocio, RIF y teléfono para operar con normalidad.',
+                  : 'Complete nombre, RIF, domicilio fiscal y enlace Google Maps para operar con normalidad.',
             ),
           ],
         ),
@@ -176,7 +176,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD imputados acumulados (entregas a crédito sin plan, o al completar un plan a cuotas). '
             'El cupo restante se ve en su perfil.'
         : faseContado
-            ? 'Primeros pedidos (contado): con RIF y domicilio fiscal puede pedir hasta '
+            ? 'Primeros pedidos (contado): con RIF, domicilio fiscal y enlace Google Maps puede pedir hasta '
                 '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad. '
                 'El cupo revolvente y la documentación completa se revisan al solicitar línea de crédito MotoLink.'
             : tieneCupo
@@ -188,7 +188,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
 
     final kycLabelEs = faseContado && !kycOk
         ? 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
-            'No bloquea pedidos en contado mientras tenga RIF y domicilio fiscal; '
+            'No bloquea pedidos en contado mientras tenga RIF, domicilio fiscal y enlace Maps; '
             'la revisión completa de documentos aplica al solicitar crédito MotoLink.'
         : (kycOk
             ? 'Verificación documental aprobada (todos los documentos requeridos).'

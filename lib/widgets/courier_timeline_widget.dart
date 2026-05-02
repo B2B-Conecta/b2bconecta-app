@@ -40,6 +40,27 @@ String _enPreparacionSubtitle(
   return 'Proveedor alistando mercancía';
 }
 
+String _enCaminoRecogidaSubtitle(TransactionRequestModel r) {
+  if (r.status != TransactionRequestStatus.enTransito) {
+    return 'En tránsito hacia el aliado';
+  }
+  if (r.isMasterOrder && r.subOrders.isNotEmpty) {
+    final done = r.subOrdersRecogidasAlmacenCount;
+    final total = r.subOrders.length;
+    if (done >= total) {
+      return 'Carga retirada en $total almacén(es) · ruta hacia el aliado';
+    }
+    if (done > 0) {
+      return 'Retiro en almacén: $done/$total · pendiente confirmar en otros almacenes si aplica';
+    }
+    return 'Confirme en la app al retirar la carga en cada almacén importador';
+  }
+  if (r.transportistaRecogioAlmacenSimple) {
+    return 'Mercancía retirada del importador · en ruta hacia el aliado';
+  }
+  return 'Confirme en la app al retirar la carga en el almacén del importador';
+}
+
 String _listoParaDespachoSubtitle(TransactionRequestModel r) {
   if (r.isMasterOrder && r.totalSubOrdersCount > 0) {
     final done = r.subOrdersListoOrMoreCount;
@@ -131,12 +152,13 @@ class CourierTimelineWidget extends StatelessWidget {
       _CourierStep(
         icon: Icons.local_shipping_outlined,
         title: 'En camino',
-        subtitle: 'En tránsito hacia el aliado',
+        subtitle: _enCaminoRecogidaSubtitle(r),
         at: r.atEnTransito,
         done: r.atEnTransito != null,
         current: r.status == TransactionRequestStatus.enTransito,
         trailing: r.status == TransactionRequestStatus.enTransito &&
-                r.hasAdminRutaMapsUrl
+                r.hasAdminRutaMapsUrl &&
+                viewerRole != AppHomeRole.transportista
             ? TextButton.icon(
                 onPressed: () => _openMaps(context, r.adminRutaMapsUrl!),
                 icon: const Icon(Icons.map_outlined, size: 16),

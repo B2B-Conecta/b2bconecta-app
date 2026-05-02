@@ -90,7 +90,11 @@ class _MainShellState extends State<MainShell> {
   }
 
   /// Pestañas admin: Activos, Cerrados, Por validar, Crédito, Perfil (sin catálogo).
-  Widget _adminOrdersScaffold({required String title, required Widget child}) {
+  Widget _adminOrdersScaffold({
+    required String title,
+    required Widget child,
+    String? subtitle,
+  }) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
@@ -104,13 +108,29 @@ class _MainShellState extends State<MainShell> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      height: 1.35,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           Expanded(child: child),
@@ -313,6 +333,9 @@ class _MainShellState extends State<MainShell> {
         children: [
           _adminOrdersScaffold(
             title: 'Despacho',
+            subtitle:
+                'Pedidos asignados a usted. Confirme la orden, retire en cada '
+                'almacén y siga la ruta hasta el taller del aliado.',
             child: const AdminActiveOrdersPanel(
               isTransportistaView: true,
             ),

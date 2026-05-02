@@ -18,6 +18,8 @@ class TransactionRequestMessageModel {
 
   bool get isFromAdmin => authorRole.trim() == 'administrador';
 
+  bool get isFromTransportista => authorRole.trim() == 'transportista';
+
   factory TransactionRequestMessageModel.fromJson(Map<String, dynamic> json) {
     return TransactionRequestMessageModel(
       id: json['id']?.toString() ?? '',

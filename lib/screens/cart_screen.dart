@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/profile_location_exception.dart';
 import '../models/profile_model.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
@@ -52,7 +53,7 @@ class _CartScreenState extends State<CartScreen> {
 
     final result = await showDialog<_DestinoEntregaResult?>(
       context: context,
-      builder: (ctx) => const _DestinoEntregaDialog(),
+      builder: (ctx) => _DestinoEntregaDialog(profile: widget.profile),
     );
 
     if (result == null || !mounted) return;
@@ -87,6 +88,11 @@ class _CartScreenState extends State<CartScreen> {
         ),
       );
       nav.pop(true);
+    } on ProfileLocationException catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
+      );
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
@@ -233,7 +239,9 @@ class _DestinoEntregaResult {
 
 /// Destino: dirección fiscal del perfil, o formulario de ubicación alterna.
 class _DestinoEntregaDialog extends StatefulWidget {
-  const _DestinoEntregaDialog();
+  const _DestinoEntregaDialog({required this.profile});
+
+  final ProfileModel profile;
 
   @override
   State<_DestinoEntregaDialog> createState() => _DestinoEntregaDialogState();
@@ -280,7 +288,18 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
   }
 
   void _confirmar() {
-    if (!_usaPerfil) {
+    if (_usaPerfil) {
+      if (!widget.profile.hasFiscalMapsShareLink) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Registre el enlace de Google Maps de su domicilio fiscal en Mi perfil.',
+            ),
+          ),
+        );
+        return;
+      }
+    } else {
       final e = _estado.text.trim();
       final c = _ciudad.text.trim();
       final d = _domicilio.text.trim();
@@ -294,14 +313,26 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
         );
         return;
       }
+      final m = _maps.text.trim();
+      final u = Uri.tryParse(m);
+      if (m.isEmpty ||
+          u == null ||
+          !u.hasScheme ||
+          (u.scheme != 'http' && u.scheme != 'https')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Indique un enlace válido de Google Maps (http o https) para la entrega alterna.',
+            ),
+          ),
+        );
+        return;
+      }
     }
     final text = _usaPerfil ? null : _armarTextoEntrega();
     final maps = _usaPerfil
         ? null
-        : (() {
-            final m = _maps.text.trim();
-            return m.isEmpty ? null : m;
-          })();
+        : _maps.text.trim();
     Navigator.of(context).pop(
       _DestinoEntregaResult(
         useProfile: _usaPerfil,
@@ -325,8 +356,10 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
               title: const Text('Usar dirección fiscal del perfil'),
               subtitle: Text(
                 _usaPerfil
-                    ? 'El reparto usará su domicilio fiscal de Mi perfil.'
-                    : 'Indique otra dirección de recepción a continuación.',
+                    ? (widget.profile.hasFiscalMapsShareLink
+                        ? 'El reparto usará su domicilio y el enlace Maps guardados en Mi perfil.'
+                        : 'Debe completar el enlace de Google Maps en Mi perfil para usar esta opción.')
+                    : 'Indique otra dirección y enlace Maps a continuación.',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
               ),
               value: _usaPerfil,
@@ -345,7 +378,7 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
               const SizedBox(height: 4),
               const Text(
                 'Esta dirección sustituye a la fiscal para este pedido. '
-                'Puede añadir un enlace a Maps para ubicar el sitio en el mapa.',
+                'El enlace de Google Maps es obligatorio para ubicar el sitio con precisión.',
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.35,
@@ -381,7 +414,7 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
                 keyboardType: TextInputType.url,
                 decoration: _field(
                   'URL de Google Maps',
-                  hint: 'Opcional',
+                  hint: 'https://…',
                 ),
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _confirmar(),

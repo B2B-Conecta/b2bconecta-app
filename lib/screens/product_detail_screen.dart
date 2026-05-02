@@ -348,16 +348,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   height: 1.25,
                                 ),
                               ),
-                            if (_profile?.fiscalMapsUrl == null ||
-                                _profile!.fiscalMapsUrl!.trim().isEmpty)
+                            if (_profile != null &&
+                                !_profile!.hasFiscalMapsShareLink)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  'Opcional: puede añadir un enlace de Maps en Mi perfil para compartir la ubicación.',
+                                  'Debe guardar el enlace «Compartir» de Google Maps en Mi perfil para solicitar el pedido.',
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: Colors.blueGrey.shade700,
+                                    color: Colors.orange.shade900,
                                     height: 1.2,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -397,7 +398,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         TextField(
                           controller: mapsCtrl,
                           decoration: InputDecoration(
-                            labelText: 'Enlace Google Maps (opcional)',
+                            labelText: 'Enlace Google Maps (obligatorio)',
                             hintText: 'https://maps.google.com/...',
                             filled: true,
                             fillColor: AppColors.fieldFill,
@@ -462,16 +463,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   FilledButton(
                     onPressed: () {
-                      if (!usaDestinoPerfil &&
-                          destinoCtrl.text.trim().isEmpty) {
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Indique la dirección cuando el destino no es el del perfil.',
+                      if (usaDestinoPerfil) {
+                        if (_profile == null ||
+                            !_profile!.hasFiscalMapsShareLink) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Complete el enlace de Google Maps de su domicilio fiscal en Mi perfil.',
+                              ),
                             ),
-                          ),
-                        );
-                        return;
+                          );
+                          return;
+                        }
+                      } else {
+                        if (destinoCtrl.text.trim().isEmpty) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Indique la dirección cuando el destino no es el del perfil.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        final m = mapsCtrl.text.trim();
+                        final u = Uri.tryParse(m);
+                        if (m.isEmpty ||
+                            u == null ||
+                            !u.hasScheme ||
+                            (u.scheme != 'http' && u.scheme != 'https')) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Indique un enlace válido de Google Maps (http o https) para la entrega alterna.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
                       }
                       Navigator.pop(ctx, true);
                     },
@@ -546,20 +575,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-      if (usaDestinoPerfil) {
-        final m = _profile?.fiscalMapsUrl?.trim();
-        if (m == null || m.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Sugerencia: agregue en Mi perfil un enlace de Google Maps a su domicilio fiscal '
-                'para que el equipo y socios abran la ubicación en mapa.',
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
     } on CreditLimitException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

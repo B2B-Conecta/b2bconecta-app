@@ -21,6 +21,11 @@ class SubOrderModel {
     this.importadorPhone,
     this.importadorEstado,
     this.importadorCiudad,
+    this.importadorDireccion,
+    this.importadorFiscalMapsUrl,
+    this.importadorLatitude,
+    this.importadorLongitude,
+    this.transportistaRecogidaAlmacenAt,
     this.orderItems = const [],
   });
 
@@ -41,7 +46,15 @@ class SubOrderModel {
   final String? importadorPhone;
   final String? importadorEstado;
   final String? importadorCiudad;
+  final String? importadorDireccion;
+  final String? importadorFiscalMapsUrl;
+  final double? importadorLatitude;
+  final double? importadorLongitude;
+  final DateTime? transportistaRecogidaAlmacenAt;
   final List<OrderItemModel> orderItems;
+
+  bool get transportistaRecogioEnAlmacen =>
+      transportistaRecogidaAlmacenAt != null;
 
   bool get hasProveedorFactura =>
       proveedorFacturaStoragePath != null &&
@@ -89,8 +102,20 @@ class SubOrderModel {
       importadorPhone: _nullableText(imp?['phone']),
       importadorEstado: _nullableText(imp?['estado']),
       importadorCiudad: _nullableText(imp?['ciudad']),
+      importadorDireccion: _nullableText(imp?['direccion']),
+      importadorFiscalMapsUrl: _nullableText(imp?['fiscal_maps_url']),
+      importadorLatitude: _asDoubleNullable(imp?['latitude']),
+      importadorLongitude: _asDoubleNullable(imp?['longitude']),
+      transportistaRecogidaAlmacenAt:
+          _parseDate(json['transportista_recogida_almacen_at']),
       orderItems: items,
     );
+  }
+
+  static double? _asDoubleNullable(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
   }
 
   static int _asInt(dynamic v) {

@@ -5,14 +5,15 @@
 --   supabase db query --linked -f supabase/seed.sql
 -- O pegar este archivo en Supabase → SQL Editor (rol con permisos sobre auth y public).
 --
--- Contraseña común (11 usuarios): SeedPass123!
+-- Contraseña común (todos los seed): SeedPass123!
 -- Importadores: importador1@motolink.seed … importador7@motolink.seed
 -- Aliados:      aliado1@motolink.seed … aliado3@motolink.seed
--- Transportista: transportista1@motolink.seed
+-- Transportistas: transportista1@motolink.seed (zona Caracas / aliado 1),
+--                  transportista2@motolink.seed (zona Valencia / aliado 2)
 -- Admin broker: admin@motolink.seed
 --
 -- Requiere migración `20260407120000_broker_transaction_requests.sql` (tabla transaction_requests).
--- Contenido: 12 usuarios auth + perfiles (estado, ciudad, direccion) + esquema
+-- Contenido: 13 usuarios auth + perfiles (estado, ciudad, direccion, fiscal_maps_url) + esquema
 -- inventario (sku, is_active, category) + 140 productos. Sin pedidos predefinidos; KYC aliados en pendiente.
 -- Re-ejecutar: aplica DDL idempotente, borra productos de importadores seed,
 -- inserta productos; usuarios/perfiles solo si no existen.
@@ -40,7 +41,8 @@ seed_users (id, email) as (
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
     ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
     ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed'),
-    ('a4000001-0000-4000-8000-000000000001'::uuid, 'transportista1@motolink.seed')
+    ('a4000001-0000-4000-8000-000000000001'::uuid, 'transportista1@motolink.seed'),
+    ('a4000002-0000-4000-8000-000000000002'::uuid, 'transportista2@motolink.seed')
 )
 insert into auth.users (
   instance_id,
@@ -119,7 +121,8 @@ from (
     ('a2000002-0000-4000-8000-000000000002'::uuid, 'aliado2@motolink.seed'),
     ('a2000003-0000-4000-8000-000000000003'::uuid, 'aliado3@motolink.seed'),
     ('a3000001-0000-4000-8000-000000000001'::uuid, 'admin@motolink.seed'),
-    ('a4000001-0000-4000-8000-000000000001'::uuid, 'transportista1@motolink.seed')
+    ('a4000001-0000-4000-8000-000000000001'::uuid, 'transportista1@motolink.seed'),
+    ('a4000002-0000-4000-8000-000000000002'::uuid, 'transportista2@motolink.seed')
 ) as s(id, email)
 where exists (select 1 from auth.users u where u.id = s.id)
   and not exists (
@@ -174,7 +177,8 @@ values
   ('a2000002-0000-4000-8000-000000000002', 'Servicio Rápido 2000', 'J-502222222', 'aliado', '+58 414-2000002', 72, 0, 'pendiente', 0, 'Carabobo', 'Valencia', 'Casa matriz: Urb. El Trigal, calle 102 galpón 2, inscripción fiscal Valencia 2005, Edo. Carabobo.', now()),
   ('a2000003-0000-4000-8000-000000000003', 'Motos y Más', 'J-503333333', 'aliado', '+58 414-2000003', 90, 0, 'pendiente', 0, 'Zulia', 'Maracaibo', 'Domicilio fiscal: Calle 72, sector Sabaneta, local Motos y Más (referencia mercado), Maracaibo 4002.', now()),
   ('a3000001-0000-4000-8000-000000000001', 'MotoLink (Broker)', 'J-300000001', 'administrador', '+58 212-3000001', 100, null, null, 0, null, null, null, now()),
-  ('a4000001-0000-4000-8000-000000000001', 'MotoLink Despacho', 'J-300000002', 'transportista', '+58 414-4000001', 100, null, null, 0, 'Distrito Capital', 'Caracas', 'Base operativa fiscal: Av. Intercomunal de La Vega, galpón logístico MotoLink Despacho, sector industrial La Yaguara, Caracas.', now())
+  ('a4000001-0000-4000-8000-000000000001', 'MotoLink Despacho Capital', 'J-300000002', 'transportista', '+58 414-4000001', 100, null, null, 0, 'Miranda', 'Caracas', 'Base operativa: Av. Francisco de Miranda, sector Los Ruices, galpón 8 (referencia cercana a aliado seed Taller Los Ruices), Caracas.', now()),
+  ('a4000002-0000-4000-8000-000000000002', 'Logística Valencia Express', 'J-300000003', 'transportista', '+58 414-4000002', 100, null, null, 0, 'Carabobo', 'Valencia', 'Base operativa: Av. Cuatricentenario, galpón 4, Zona Industrial El Recreo, Valencia (referencia cercana a aliado seed Servicio Rápido 2000).', now())
 on conflict (id) do update set
   business_name = excluded.business_name,
   rif = excluded.rif,
@@ -269,15 +273,23 @@ update public.profiles set
   location_updated_at = now()
 where id = 'a2000003-0000-4000-8000-000000000003'::uuid;
 
--- Transportista (perfil + enlace; coords de base jurídica siguen en transportista_info)
+-- Transportista 1 · cerca de aliado 1 (Los Ruices) e importadores Caracas
 update public.profiles set
-  latitude = 10.4810,
-  longitude = -66.9380,
-  fiscal_maps_url = 'https://www.google.com/maps?q=10.4810,-66.9380',
+  latitude = 10.4305,
+  longitude = -66.8065,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.4305,-66.8065',
   location_updated_at = now()
 where id = 'a4000001-0000-4000-8000-000000000001'::uuid;
 
--- Transportista jurídico: base operativa Caracas (requiere migración transportista_info).
+-- Transportista 2 · cerca de aliado 2 (Valencia)
+update public.profiles set
+  latitude = 10.1750,
+  longitude = -68.0020,
+  fiscal_maps_url = 'https://www.google.com/maps?q=10.1750,-68.0020',
+  location_updated_at = now()
+where id = 'a4000002-0000-4000-8000-000000000002'::uuid;
+
+-- Expediente jurídico transportistas (requiere migración transportista_info).
 insert into public.transportista_info (
   id,
   rif,
@@ -288,8 +300,28 @@ insert into public.transportista_info (
 values (
   'a4000001-0000-4000-8000-000000000001'::uuid,
   'J-300000002',
-  10.4810,
-  -66.9380,
+  10.4305,
+  -66.8065,
+  now()
+)
+on conflict (id) do update set
+  rif = excluded.rif,
+  base_operativa_latitude = excluded.base_operativa_latitude,
+  base_operativa_longitude = excluded.base_operativa_longitude,
+  location_updated_at = excluded.location_updated_at;
+
+insert into public.transportista_info (
+  id,
+  rif,
+  base_operativa_latitude,
+  base_operativa_longitude,
+  location_updated_at
+)
+values (
+  'a4000002-0000-4000-8000-000000000002'::uuid,
+  'J-300000003',
+  10.1750,
+  -68.0020,
   now()
 )
 on conflict (id) do update set

@@ -6,10 +6,14 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/transaction_request_admin_pedido_listo_route_prep_section.dart';
 import '../widgets/courier_timeline_widget.dart';
 import '../widgets/importer_aliado_solicitud_section.dart';
 import '../widgets/transaction_request_admin_sections.dart';
+import '../widgets/admin_transportista_assignment_section.dart';
+import '../widgets/transaction_request_route_map_section.dart';
+import '../widgets/transportista_assignment_ack_section.dart';
+import '../widgets/transportista_recogida_almacen_section.dart';
+import '../widgets/transportista_factura_aliado_section.dart';
 
 class TransactionRequestDetailScreen extends StatefulWidget {
   const TransactionRequestDetailScreen({
@@ -105,13 +109,45 @@ class _TransactionRequestDetailScreenState
                 request: r,
                 viewingAsRole: widget.homeRole,
               ),
-              if ((r.status == TransactionRequestStatus.pedidoListo ||
-                      r.status == TransactionRequestStatus.enTransito) &&
-                  widget.homeRole == AppHomeRole.administrador) ...[
+              if (widget.homeRole == AppHomeRole.transportista) ...[
                 const SizedBox(height: 12),
-                TransactionRequestAdminPedidoListoRoutePrepSection(
+                TransportistaAssignmentAckSection(
                   request: r,
-                  onSaved: _reloadRequest,
+                  onAcknowledged: _reloadRequest,
+                ),
+                if (r.hasFacturaAliado) ...[
+                  const SizedBox(height: 12),
+                  TransportistaFacturaAliadoSection(request: r),
+                ],
+              ],
+              if (r.status == TransactionRequestStatus.enTransito) ...[
+                const SizedBox(height: 12),
+                TransactionRequestRouteMapSection(request: r),
+                const SizedBox(height: 12),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.teal.shade100),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: TransportistaRecogidaAlmacenSection(
+                      request: r,
+                      viewerRole: widget.homeRole,
+                      onUpdated: _reloadRequest,
+                    ),
+                  ),
+                ),
+              ],
+              if (widget.homeRole == AppHomeRole.administrador) ...[
+                const SizedBox(height: 12),
+                AdminTransportistaAssignmentSection(
+                  key: ValueKey<String>(
+                    'detail-assign-${r.id}-${r.assignedTransportistaId ?? ''}',
+                  ),
+                  request: r,
+                  onMutated: _reloadRequest,
                 ),
               ],
               const SizedBox(height: 12),

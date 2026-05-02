@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:latlong2/latlong.dart' hide Haversine;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/aliado_motolink_cupo_snapshot.dart';
@@ -26,6 +27,7 @@ import '../models/transportista_info_model.dart';
 import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
+import '../utils/maps_route_utils.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -291,6 +293,31 @@ class SupabaseService {
 
     if (data == null) return null;
     return ProfileModel.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  /// Nombre de negocio para mostrar (p. ej. transportista asignado).
+  static Future<String?> fetchProfileBusinessName(String profileId) async {
+    final id = profileId.trim();
+    if (id.isEmpty) return null;
+    final row = await _client
+        .from('profiles')
+        .select('business_name')
+        .eq('id', id)
+        .maybeSingle();
+    if (row == null) return null;
+    final n = row['business_name']?.toString().trim();
+    if (n == null || n.isEmpty) return null;
+    return n;
+  }
+
+  /// Perfil B2B por id (rutas automáticas, etiquetas).
+  static Future<ProfileModel?> fetchProfileById(String profileId) async {
+    final id = profileId.trim();
+    if (id.isEmpty) return null;
+    final row =
+        await _client.from('profiles').select().eq('id', id).maybeSingle();
+    if (row == null) return null;
+    return ProfileModel.fromJson(Map<String, dynamic>.from(row));
   }
 
   /// Persiste GPS o geocodificación del domicilio fiscal (`profiles.latitude/longitude`).
@@ -770,6 +797,12 @@ class SupabaseService {
     destino_entrega_texto,
     destino_entrega_maps_url,
     admin_ruta_maps_url,
+    transportista_assignment_acknowledged_at,
+    transportista_recogida_almacen_at,
+    transportista_live_location_opt_in,
+    transportista_live_lat,
+    transportista_live_lng,
+    transportista_live_location_at,
     credit_plan_type,
     credit_plan_confirmed_at,
     credit_monto_bloqueado,
@@ -786,8 +819,8 @@ class SupabaseService {
       pago_submitted_at, pago_estado_revision, pago_comprobante_rechazo_nota, pago_aprobado_at
     ),
     products ( name, sku, price_usd ),
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url ),
-    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url )
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
+    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude )
   ''';
 
   static String get _trSelectWithSubs => '''
@@ -805,7 +838,8 @@ sub_orders (
   transit_eta_days,
   transit_eta_hours,
   transit_eta_set_at,
-  importador:profiles!sub_orders_importador_id_fkey ( business_name, rif, phone, estado, ciudad ),
+  transportista_recogida_almacen_at,
+  importador:profiles!sub_orders_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
   order_items (
     id,
     product_id,
@@ -1274,11 +1308,11 @@ sub_orders (
         );
 
     try {
-      await _client.from('profile_documents').insert({
-        'profile_id': uid,
-        'doc_type': docType,
-        'storage_path': path,
-        'file_name': fileName,
+    await _client.from('profile_documents').insert({
+      'profile_id': uid,
+      'doc_type': docType,
+      'storage_path': path,
+      'file_name': fileName,
         'review_status': DocumentReviewStatus.pendiente,
         'is_current': true,
       });
@@ -1381,6 +1415,20 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
 
+    if (!destinoEntregaUsaPerfil) {
+      final m = destinoEntregaMapsUrl?.trim() ?? '';
+      final u = Uri.tryParse(m);
+      if (m.isEmpty ||
+          u == null ||
+          !u.hasScheme ||
+          (u.scheme != 'http' && u.scheme != 'https')) {
+        throw ProfileLocationException(
+          'Cuando el destino no es el de su perfil, indique un enlace válido de Google Maps '
+          '(http o https) además de la dirección.',
+        );
+      }
+    }
+
     final profile = await fetchMyProfile();
     final role = profile?.role?.trim().toLowerCase();
     if (role != 'aliado') {
@@ -1401,6 +1449,12 @@ sub_orders (
         'Registre estado, ciudad y dirección fiscal en Mi perfil para poder solicitar pedidos.',
       );
     }
+    if (!profile.hasFiscalMapsShareLink) {
+      throw ProfileLocationException(
+        'Registre en Mi perfil el enlace «Compartir» de Google Maps de su domicilio fiscal '
+        '(URL http o https) para solicitar pedidos con precisión de ruta.',
+      );
+    }
 
     final pce = profile.primerosPedidosContadoEntregados ?? 0;
     final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
@@ -1410,13 +1464,13 @@ sub_orders (
     // requisito para generar pedidos (sí para cupo y métodos ampliados cuando aplique).
     final rif = profile.rif?.trim();
     if (rif == null || rif.isEmpty) {
-      throw KycVerificationException(
+        throw KycVerificationException(
         'Registre su RIF comercial en Mi perfil para solicitar pedidos.',
-      );
-    }
+        );
+      }
     final ks = profile.kycStatus?.trim();
-    if (ks == KycStatus.rechazado) {
-      throw KycVerificationException(
+      if (ks == KycStatus.rechazado) {
+        throw KycVerificationException(
         'Su documentación fue rechazada. Actualice los datos en su perfil antes de solicitar pedidos.',
       );
     }
@@ -1468,10 +1522,10 @@ sub_orders (
     } else {
       final limit = profile.creditLimit;
       if (limit != null && limit > 0) {
-        final exposure = await fetchOpenCreditExposureForCurrentAliado();
+    final exposure = await fetchOpenCreditExposureForCurrentAliado();
         final consumido = profile.creditoConsumidoAcumulado ?? 0;
         if (exposure + consumido + total > limit + _creditTol) {
-          throw CreditLimitException(
+      throw CreditLimitException(
             'Este pedido (\$${total.toStringAsFixed(2)}) más su uso de línea actual '
             '(\$${(exposure + consumido).toStringAsFixed(2)}: ver perfil) '
             'supera su límite autorizado (\$${limit.toStringAsFixed(2)}).',
@@ -1481,15 +1535,15 @@ sub_orders (
     }
 
     try {
-      await _client.from('transaction_requests').insert({
-        'aliado_id': uid,
-        'product_id': productId,
-        'owner_id': ownerId,
-        'status': 'pendiente',
-        'cantidad': cantidad,
-        'precio_unitario_proveedor': precioUnitarioProveedor,
-        'precio_unitario_aliado': unitAliado,
-        'precio_total': total,
+    await _client.from('transaction_requests').insert({
+      'aliado_id': uid,
+      'product_id': productId,
+      'owner_id': ownerId,
+      'status': 'pendiente',
+      'cantidad': cantidad,
+      'precio_unitario_proveedor': precioUnitarioProveedor,
+      'precio_unitario_aliado': unitAliado,
+      'precio_total': total,
         'precio_base_aliado_total': total,
         'destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
         'destino_entrega_texto':
@@ -1514,6 +1568,31 @@ sub_orders (
     String? destinoEntregaTexto,
     String? destinoEntregaMapsUrl,
   }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final profile = await fetchMyProfile();
+    if (profile == null || profile.role?.trim().toLowerCase() != 'aliado') {
+      throw StateError('Solo los aliados pueden confirmar el carrito.');
+    }
+    if (destinoEntregaUsaPerfil) {
+      if (!profile.hasFiscalMapsShareLink) {
+        throw ProfileLocationException(
+          'Registre en Mi perfil el enlace «Compartir» de Google Maps de su domicilio fiscal.',
+        );
+      }
+    } else {
+      final m = destinoEntregaMapsUrl?.trim() ?? '';
+      final u = Uri.tryParse(m);
+      if (m.isEmpty ||
+          u == null ||
+          !u.hasScheme ||
+          (u.scheme != 'http' && u.scheme != 'https')) {
+        throw ProfileLocationException(
+          'Indique un enlace válido de Google Maps (http o https) para la entrega alterna.',
+        );
+      }
+    }
+
     final res = await _client.rpc(
       'aliado_checkout_multi_importador',
       params: <String, dynamic>{
@@ -2153,14 +2232,149 @@ sub_orders (
   static Future<void> adminAssignTransportistaPedido({
     required String requestId,
     String? transportistaId,
+    String? cambioMotivoEnTransito,
   }) async {
+    final params = <String, dynamic>{
+      'p_request_id': requestId,
+      'p_transportista_id': transportistaId,
+    };
+    final m = cambioMotivoEnTransito?.trim();
+    if (m != null && m.isNotEmpty) {
+      params['p_cambio_motivo'] = m;
+    }
     await _client.rpc(
       'admin_assign_transportista_pedido',
+      params: params,
+    );
+  }
+
+  /// Transportista asignado: confirma en la app que recibió la orden.
+  static Future<void> transportistaAcknowledgeAssignment(
+    String requestId,
+  ) async {
+    await _client.rpc(
+      'transportista_acknowledge_assignment',
+      params: <String, dynamic>{'p_request_id': requestId},
+    );
+  }
+
+  /// Transportista: confirma retiro de carga en almacén del importador.
+  /// Pedido maestro: [subOrderId] obligatorio; pedido simple: [subOrderId] null.
+  static Future<void> transportistaMarcaRecogidaEnAlmacen({
+    required String requestId,
+    String? subOrderId,
+  }) async {
+    await _client.rpc(
+      'transportista_marca_recogida_en_almacen',
       params: <String, dynamic>{
         'p_request_id': requestId,
-        'p_transportista_id': transportistaId,
+        'p_sub_order_id': subOrderId,
       },
     );
+  }
+
+  /// Transportista: publica en servidor la URL de Maps con almacenes **pendientes** y destino.
+  /// Usa la posición en vivo reciente del pedido si aplica. Devuelve `false` si no hubo URL válida.
+  static Future<bool> transportistaTryRefreshRutaMapsRemaining(
+    String requestId,
+  ) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final r = await fetchTransactionRequestById(requestId);
+    if (r == null) return false;
+    if (r.assignedTransportistaId?.trim() != uid) return false;
+    if (r.status != TransactionRequestStatus.enTransito) return false;
+    final tid = r.assignedTransportistaId!.trim();
+    final transportista = await fetchProfileById(tid);
+    LatLng? live;
+    if (r.transportistaLiveLocationOptIn && r.hasRecentTransportistaLiveLocation) {
+      final la = r.transportistaLiveLat;
+      final lo = r.transportistaLiveLng;
+      if (la != null && lo != null) live = LatLng(la, lo);
+    }
+    final uri = googleMapsRemainingRouteUrl(
+          request: r,
+          transportista: transportista,
+          livePosition: live,
+        ) ??
+        googleMapsRemainingRouteAddressFallback(
+          request: r,
+          transportista: transportista,
+        ) ??
+        googleMapsDrivingDirectionsSupplierToAliado(
+          r,
+          originOverride: live,
+        );
+    await _client.rpc(
+      'transportista_publica_ruta_maps_actualizada',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_maps_url': uri.toString(),
+      },
+    );
+    return true;
+  }
+
+  static Future<void> transportistaSetLiveTrackingOptIn({
+    required String requestId,
+    required bool enabled,
+  }) async {
+    await _client.rpc(
+      'transportista_set_live_tracking_opt_in',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_enabled': enabled,
+      },
+    );
+  }
+
+  static Future<void> transportistaReportLiveLocation({
+    required String requestId,
+    required double lat,
+    required double lng,
+  }) async {
+    await _client.rpc(
+      'transportista_report_live_location',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_lat': lat,
+        'p_lng': lng,
+      },
+    );
+  }
+
+  /// MotoLink: tras asignar transportista, intenta publicar `admin_ruta_maps_url`
+  /// (base → almacén(es) → destino) si hay al menos dos puntos con coordenadas.
+  /// No lanza si faltan datos; devuelve `false` si no se guardó URL.
+  static Future<bool> adminTryAutoPublishRutaMapsUrl(String requestId) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final me = await fetchMyProfile();
+    if (me?.role?.trim().toLowerCase() != 'administrador') {
+      throw StateError('Solo MotoLink puede publicar la ruta.');
+    }
+    final r = await fetchTransactionRequestById(requestId);
+    if (r == null || !r.hasAssignedTransportista) return false;
+    if (!TransactionRequestStatus.adminOperationalActive.contains(r.status)) {
+      return false;
+    }
+    final tid = r.assignedTransportistaId!.trim();
+    final transportista = await fetchProfileById(tid);
+    final coordUri = googleMapsAutoRutaForAssignedPedido(
+      request: r,
+      transportista: transportista,
+    );
+    final uri = coordUri ??
+        googleMapsAutoRutaAddressFallback(
+          request: r,
+          transportista: transportista,
+        ) ??
+        googleMapsDrivingDirectionsSupplierToAliado(r);
+    await _client.from('transaction_requests').update({
+      'admin_ruta_maps_url': uri.toString(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', requestId);
+    return true;
   }
 
   static Future<void> adminAprobarPagoAliado(String requestId) async {
@@ -2386,10 +2600,9 @@ sub_orders (
         .maybeSingle();
     if (row == null) throw StateError('Pedido no encontrado.');
     final st = Map<String, dynamic>.from(row)['status']?.toString();
-    if (st != TransactionRequestStatus.pedidoListo &&
-        st != TransactionRequestStatus.enTransito) {
+    if (!TransactionRequestStatus.adminOperationalActive.contains(st)) {
       throw StateError(
-        'El enlace de ruta solo se puede editar con el pedido listo para recolección o en tránsito.',
+        'El enlace de ruta solo se puede editar mientras el pedido está activo en fulfillment.',
       );
     }
 
@@ -2464,6 +2677,23 @@ sub_orders (
       'transaction_request_id': transactionRequestId,
       'author_id': uid,
       'author_role': 'administrador',
+      'body': t,
+    });
+  }
+
+  static Future<void> insertTransactionRequestMessageAsTransportista({
+    required String transactionRequestId,
+    required String body,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final t = body.trim();
+    if (t.isEmpty) return;
+
+    await _client.from('transaction_request_messages').insert({
+      'transaction_request_id': transactionRequestId,
+      'author_id': uid,
+      'author_role': 'transportista',
       'body': t,
     });
   }
@@ -2879,7 +3109,7 @@ sub_orders (
             'name.ilike.$pat,owner_id.in.($inList)',
           );
         } else {
-          q = q.ilike('name', '%$safe%');
+      q = q.ilike('name', '%$safe%');
         }
       }
     }

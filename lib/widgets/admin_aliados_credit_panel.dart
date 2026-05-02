@@ -598,9 +598,9 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     }
     if (!subir && delta > base) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
               'El descuento supera el cupo de referencia (\$${base.toStringAsFixed(2)}). '
               'Se aplicará un nuevo límite de \$0,00.',
             ),
@@ -795,21 +795,21 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                   return SafeArea(
                     child: Material(
                       color: Theme.of(context).colorScheme.surface,
-                      child: Column(
-                        children: [
+          child: Column(
+            children: [
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
                             child: Row(
                               children: [
                                 const Expanded(
-                                  child: Text(
+                child: Text(
                                     'Revisión documental KYC',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
                                       fontSize: 17,
-                                    ),
-                                  ),
-                                ),
+                  ),
+                ),
+              ),
                                 IconButton(
                                   onPressed: () => Navigator.pop(ctx),
                                   icon: const Icon(Icons.close),
@@ -918,19 +918,19 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                                     onOpen: () async {
                                       final d = currentDocFor(type);
                                       if (d == null) return;
-                                      final url = await SupabaseService
-                                          .createSignedUrlForProfileDocument(
-                                        d.storagePath,
-                                      );
-                                      final uri = Uri.parse(url);
+                          final url = await SupabaseService
+                              .createSignedUrlForProfileDocument(
+                            d.storagePath,
+                          );
+                          final uri = Uri.parse(url);
                                       if (ctx.mounted &&
                                           await canLaunchUrl(uri)) {
-                                        await launchUrl(
-                                          uri,
-                                          mode: LaunchMode.externalApplication,
-                                        );
-                                      }
-                                    },
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          }
+                        },
                                     onOpenVersion: (d) async {
                                       final url = await SupabaseService
                                           .createSignedUrlForProfileDocument(
@@ -962,11 +962,11 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                                             ),
                                   ),
                               ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
                   );
                 },
               );
@@ -1001,8 +1001,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     return KeyedSubtree(
       key: widget.cardKey,
       child: Material(
-        color: Colors.white,
-        elevation: 0,
+      color: Colors.white,
+      elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: AppDecorations.radius12,
           side: BorderSide(color: Colors.grey.shade300),
@@ -1029,13 +1029,13 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'RIF: $rif',
-                    style: const TextStyle(
+            Text(
+              'RIF: $rif',
+              style: const TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                color: AppColors.textSecondary,
+              ),
+            ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
@@ -1141,8 +1141,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
+            const SizedBox(height: 4),
+            Text(
                     'Pulse la fila para cupo, KYC y acciones',
                     style: TextStyle(
                       fontSize: 11,
@@ -1157,7 +1157,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
               if (widget.profile.debeMostrarCreditoMotoLinkAsignado) ...[
                 Text(
                   'Crédito MotoLink asignado: \$${(widget.profile.creditLimit ?? 0).toStringAsFixed(2)} USD',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 6),
               ],
@@ -1174,9 +1174,9 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                   fontWeight: FontWeight.w700,
                   color: AppColors.brandBlue,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
+            ),
+            const SizedBox(height: 8),
+            Text(
                 'Puede corregir el estado global o el de cada archivo en cualquier momento. '
                 'Para marcar «Aprobado» global, el servidor exige los 6 documentos cargados y aprobados uno a uno.',
                 style: TextStyle(
@@ -1286,14 +1286,14 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                           lim != null
                               ? 'Disponible estimado: \$${disp!.toStringAsFixed(2)}'
                               : 'Disponible estimado: —',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.brandBlue,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.brandBlue,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
                           'Límite − saldo activo − imputado. El imputado sube al cerrar el plan (última cuota) o entrega a crédito sin plan.',
                           style: TextStyle(
                             fontSize: 10,
@@ -1367,11 +1367,11 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.red.shade800,
@@ -1380,7 +1380,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                             onPressed: _busySuspension ||
                                     !widget.tienePedidosMorosos ||
                                     widget.profile.pedidosSuspendidosMorosidad
-                                ? null
+                      ? null
                                 : _confirmSuspendPedidos,
                             icon: const Icon(Icons.block, size: 18),
                             label: const Text('Suspender nuevos pedidos'),
@@ -1389,7 +1389,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                             onPressed: _busySuspension ||
                                     !widget.profile.pedidosSuspendidosMorosidad ||
                                     widget.tienePedidosMorosos
-                                ? null
+                      ? null
                                 : _confirmReactivarPedidos,
                             icon: const Icon(Icons.undo_outlined, size: 18),
                             label: const Text('Reactivar nuevos pedidos'),
@@ -1404,8 +1404,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _creditoPreactivadoDraft,
@@ -1430,25 +1430,25 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: _limitCtrl,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Límite de crédito (USD)',
-                  hintText: 'Ej: 50000.00',
-                  filled: true,
-                  fillColor: AppColors.fieldFill,
-                  border: OutlineInputBorder(
-                    borderRadius: AppDecorations.radius12,
-                    borderSide: BorderSide.none,
-                  ),
+            TextField(
+              controller: _limitCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Límite de crédito (USD)',
+                hintText: 'Ej: 50000.00',
+                filled: true,
+                fillColor: AppColors.fieldFill,
+                border: OutlineInputBorder(
+                  borderRadius: AppDecorations.radius12,
+                  borderSide: BorderSide.none,
                 ),
               ),
+            ),
               const SizedBox(height: 8),
               Text(
                 'Ajuste por variación: indique un monto a sumar o a descontar; se pedirá el motivo (auditoría) antes de guardar.',
@@ -1479,18 +1479,18 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
                     : const Text('Guardar límite (valor del campo)'),
               ),
             ],

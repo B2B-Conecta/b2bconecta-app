@@ -535,8 +535,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   const TransactionRequestDestinoEntregaSection({
     super.key,
     required this.request,
-    /// Quién ve la ficha; la tarjeta «Ruta en vivo» solo la ve MotoLink (aliado/importador
-    /// usan el enlace en el paso «En camino» del seguimiento).
+    /// Quién ve la ficha; el CTA de ruta MotoLink en destino solo aplica al administrador.
     this.viewingAsRole,
   });
 

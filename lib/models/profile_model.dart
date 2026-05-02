@@ -93,6 +93,16 @@ class ProfileModel {
         d.isNotEmpty;
   }
 
+  /// Enlace «Compartir» de Google Maps u otra URL https al domicilio fiscal (rutas automáticas).
+  bool get hasFiscalMapsShareLink {
+    final u = fiscalMapsUrl?.trim();
+    if (u == null || u.isEmpty) return false;
+    final uri = Uri.tryParse(u);
+    return uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
+  }
+
   /// `true` mientras no haya completado las primeras [CashPhasePolicy.entregasRequeridas] entregas
   /// en modalidad contado (onboarding). Tras esa fase puede seguir pagando al contado (p. ej. efectivo o transferencia)
   /// según las opciones del pedido, además de crédito MotoLink si aplica.
@@ -143,7 +153,11 @@ class ProfileModel {
         hasRole;
     if (!base) return false;
     if (r == 'administrador') return true;
-    return hasRegisteredLocation;
+    if (!hasRegisteredLocation) return false;
+    if (r == 'importador' || r == 'aliado' || r == 'transportista') {
+      return hasFiscalMapsShareLink;
+    }
+    return true;
   }
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {

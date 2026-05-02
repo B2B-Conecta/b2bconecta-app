@@ -44,6 +44,8 @@ class TransactionRequestModel {
     this.aliadoCiudad,
     this.aliadoDireccion,
     this.aliadoFiscalMapsUrl,
+    this.aliadoLatitude,
+    this.aliadoLongitude,
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
@@ -51,6 +53,8 @@ class TransactionRequestModel {
     this.ownerCiudad,
     this.ownerDireccion,
     this.ownerFiscalMapsUrl,
+    this.ownerLatitude,
+    this.ownerLongitude,
     this.proveedorFacturaStoragePath,
     this.proveedorFacturaFileName,
     this.proveedorFacturaSubmittedAt,
@@ -88,6 +92,12 @@ class TransactionRequestModel {
     this.importerSubOrderId,
     this.importerViewOrderItems = const <OrderItemModel>[],
     this.assignedTransportistaId,
+    this.transportistaAssignmentAcknowledgedAt,
+    this.transportistaRecogidaAlmacenAt,
+    this.transportistaLiveLocationOptIn = false,
+    this.transportistaLiveLat,
+    this.transportistaLiveLng,
+    this.transportistaLiveLocationAt,
   });
 
   final String id;
@@ -132,6 +142,8 @@ class TransactionRequestModel {
   final String? aliadoCiudad;
   final String? aliadoDireccion;
   final String? aliadoFiscalMapsUrl;
+  final double? aliadoLatitude;
+  final double? aliadoLongitude;
 
   final String? ownerBusinessName;
   final String? ownerRif;
@@ -140,6 +152,8 @@ class TransactionRequestModel {
   final String? ownerCiudad;
   final String? ownerDireccion;
   final String? ownerFiscalMapsUrl;
+  final double? ownerLatitude;
+  final double? ownerLongitude;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -206,6 +220,74 @@ class TransactionRequestModel {
 
   /// Transportista asignado al pedido (`transaction_requests.assigned_transportista_id`).
   final String? assignedTransportistaId;
+
+  /// Cuándo el transportista confirmó en la app haber recibido la asignación.
+  final DateTime? transportistaAssignmentAcknowledgedAt;
+
+  /// Pedido simple: retiro confirmado en almacén del importador (`owner`).
+  final DateTime? transportistaRecogidaAlmacenAt;
+
+  /// El transportista autoriza enviar coordenadas del teléfono para este envío (`en_transito`).
+  final bool transportistaLiveLocationOptIn;
+  final double? transportistaLiveLat;
+  final double? transportistaLiveLng;
+  final DateTime? transportistaLiveLocationAt;
+
+  /// Perfiles importador (almacenes) para el RPC de proximidad: sub-pedidos o dueño en pedido simple.
+  List<String> get importerProfileIdsForTransportistaProximity {
+    if (isMasterOrder && subOrders.isNotEmpty) {
+      final ids = <String>{};
+      for (final s in subOrders) {
+        final id = s.importadorId.trim();
+        if (id.isNotEmpty) ids.add(id);
+      }
+      return ids.toList();
+    }
+    final o = ownerId.trim();
+    if (o.isEmpty) return const <String>[];
+    return <String>[o];
+  }
+
+  bool get canComputeTransportistaProximity =>
+      importerProfileIdsForTransportistaProximity.isNotEmpty;
+
+  bool get hasAssignedTransportista =>
+      assignedTransportistaId != null &&
+      assignedTransportistaId!.trim().isNotEmpty;
+
+  bool get transportistaReconocioAsignacion =>
+      transportistaAssignmentAcknowledgedAt != null;
+
+  /// Tramos maestro con retiro en almacén ya marcado.
+  int get subOrdersRecogidasAlmacenCount {
+    if (!isMasterOrder || subOrders.isEmpty) return 0;
+    return subOrders.where((s) => s.transportistaRecogioEnAlmacen).length;
+  }
+
+  /// Pedido simple: ya hubo confirmación de retiro en almacén.
+  bool get transportistaRecogioAlmacenSimple =>
+      transportistaRecogidaAlmacenAt != null;
+
+  /// Hay coordenadas recientes de tracking en vivo (p. ej. para el mapa).
+  bool get hasRecentTransportistaLiveLocation {
+    if (transportistaLiveLat == null || transportistaLiveLng == null) {
+      return false;
+    }
+    final t = transportistaLiveLocationAt;
+    if (t == null) return false;
+    return DateTime.now().difference(t) < const Duration(minutes: 12);
+  }
+
+  /// Todo lo necesario en almacén antes de seguir ruta al aliado (para copy UI).
+  bool get transportistaCompletoRecogidaAlmacen {
+    if (status != TransactionRequestStatus.enTransito) return false;
+    if (!hasAssignedTransportista) return false;
+    if (isMasterOrder && subOrders.isNotEmpty) {
+      return subOrders.isNotEmpty &&
+          subOrders.every((s) => s.transportistaRecogioEnAlmacen);
+    }
+    return transportistaRecogioAlmacenSimple;
+  }
 
   bool get hasAgreedCreditPlan =>
       creditPlanType != null &&
@@ -386,6 +468,73 @@ class TransactionRequestModel {
     final bn = ownerBusinessName?.trim();
     if (bn != null && bn.isNotEmpty) return bn;
     return 'Almacén importador';
+  }
+
+  /// Origen(s) de recogida para el transportista: un bloque por almacén en pedido maestro.
+  String get transportistaOrigenRecoleccionTextoEs {
+    if (isMasterOrder && subOrders.isNotEmpty) {
+      final sorted = List<SubOrderModel>.from(subOrders)
+        ..sort((a, b) => a.id.compareTo(b.id));
+      final buf = StringBuffer();
+      for (var i = 0; i < sorted.length; i++) {
+        final s = sorted[i];
+        if (i > 0) buf.writeln();
+        final idx = i + 1;
+        final name = s.importadorBusinessName?.trim();
+        final title =
+            (name != null && name.isNotEmpty) ? name : 'Almacén $idx';
+        final pick = s.transportistaRecogioEnAlmacen ? ' · recogido' : '';
+        buf.writeln('$idx. $title$pick');
+        final locParts = <String>[];
+        final est = s.importadorEstado?.trim();
+        final ciu = s.importadorCiudad?.trim();
+        if (est != null && est.isNotEmpty) locParts.add(est);
+        if (ciu != null && ciu.isNotEmpty) locParts.add(ciu);
+        if (locParts.isNotEmpty) buf.writeln(locParts.join(' · '));
+        final dir = s.importadorDireccion?.trim();
+        if (dir != null && dir.isNotEmpty) buf.writeln(dir);
+        final ph = s.importadorPhone?.trim();
+        if (ph != null && ph.isNotEmpty) buf.writeln('Tel: $ph');
+        final rif = s.importadorRif?.trim();
+        if (rif != null && rif.isNotEmpty) buf.writeln('RIF: $rif');
+      }
+      return buf.toString().trim();
+    }
+    final simple = ownerUbicacionFiscalMultilineaEs?.trim();
+    if (simple != null && simple.isNotEmpty) return simple;
+    final bn = ownerBusinessName?.trim();
+    if (bn != null && bn.isNotEmpty) return bn;
+    return 'Sin dirección en perfil';
+  }
+
+  /// Hay datos para abrir Maps desde el bloque de origen (enlace, coordenadas o texto).
+  bool get transportistaOrigenPermiteAbrirMapa {
+    if (isMasterOrder && subOrders.isNotEmpty) {
+      for (final s in subOrders) {
+        if (s.importadorFiscalMapsUrl?.trim().isNotEmpty == true) {
+          return true;
+        }
+        if (s.importadorLatitude != null && s.importadorLongitude != null) {
+          return true;
+        }
+        final loc = [
+          s.importadorDireccion,
+          s.importadorEstado,
+          s.importadorCiudad,
+          s.importadorBusinessName,
+        ]
+            .whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .join(', ');
+        if (loc.isNotEmpty) return true;
+      }
+      return false;
+    }
+    return ownerFiscalMapsUrl?.trim().isNotEmpty == true ||
+        (ownerUbicacionFiscalMultilineaEs != null &&
+            ownerUbicacionFiscalMultilineaEs!.trim().isNotEmpty) ||
+        (ownerBusinessName?.trim().isNotEmpty == true);
   }
 
   /// Texto breve de proveedor(es) importador para la línea de tiempo (p. ej. admin).
@@ -778,6 +927,8 @@ class TransactionRequestModel {
       aliadoCiudad: _nullableText(aliadoMap?['ciudad']),
       aliadoDireccion: _nullableText(aliadoMap?['direccion']),
       aliadoFiscalMapsUrl: _nullableText(aliadoMap?['fiscal_maps_url']),
+      aliadoLatitude: _asNullableDouble(aliadoMap?['latitude']),
+      aliadoLongitude: _asNullableDouble(aliadoMap?['longitude']),
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),
@@ -785,6 +936,8 @@ class TransactionRequestModel {
       ownerCiudad: _nullableText(ownerMap?['ciudad']),
       ownerDireccion: _nullableText(ownerMap?['direccion']),
       ownerFiscalMapsUrl: _nullableText(ownerMap?['fiscal_maps_url']),
+      ownerLatitude: _asNullableDouble(ownerMap?['latitude']),
+      ownerLongitude: _asNullableDouble(ownerMap?['longitude']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:
@@ -833,6 +986,16 @@ class TransactionRequestModel {
           _parseImporterViewOrderItems(json['_importer_view_order_items']),
       assignedTransportistaId:
           _nullableText(json['assigned_transportista_id']),
+      transportistaAssignmentAcknowledgedAt:
+          _parseDate(json['transportista_assignment_acknowledged_at']),
+      transportistaRecogidaAlmacenAt:
+          _parseDate(json['transportista_recogida_almacen_at']),
+      transportistaLiveLocationOptIn:
+          json['transportista_live_location_opt_in'] == true,
+      transportistaLiveLat: _asNullableDouble(json['transportista_live_lat']),
+      transportistaLiveLng: _asNullableDouble(json['transportista_live_lng']),
+      transportistaLiveLocationAt:
+          _parseDate(json['transportista_live_location_at']),
     );
   }
 

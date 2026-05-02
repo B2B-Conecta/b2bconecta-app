@@ -8,13 +8,14 @@ import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import 'main_shell_tab.dart';
 
-/// Hilo de mensajes aliado ↔ MotoLink sobre un pedido.
+/// Hilo de mensajes aliado ↔ MotoLink ↔ transportista (despacho) sobre un pedido.
 class OrderMotolinkThreadSection extends StatefulWidget {
   const OrderMotolinkThreadSection({
     super.key,
     required this.transactionRequestId,
     required this.allowReplyAsAliado,
     required this.allowReplyAsAdmin,
+    this.allowReplyAsTransportista = false,
     this.onThreadChanged,
     this.orderPrecioTotalUsd,
     this.creditPlanRescheduleLocked = false,
@@ -23,6 +24,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   final String transactionRequestId;
   final bool allowReplyAsAliado;
   final bool allowReplyAsAdmin;
+
+  /// Despacho asignado al pedido: puede leer y escribir en el mismo hilo que aliado y admin.
+  final bool allowReplyAsTransportista;
 
   /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido (cuotas, cupo).
   final VoidCallback? onThreadChanged;
@@ -357,6 +361,11 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           transactionRequestId: widget.transactionRequestId,
           body: text,
         );
+      } else if (widget.allowReplyAsTransportista) {
+        await SupabaseService.insertTransactionRequestMessageAsTransportista(
+          transactionRequestId: widget.transactionRequestId,
+          body: text,
+        );
       }
       _ctrl.clear();
       await _load();
@@ -373,17 +382,24 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   @override
   Widget build(BuildContext context) {
     final uid = SupabaseService.currentUserId;
-    final canReply = widget.allowReplyAsAliado || widget.allowReplyAsAdmin;
+    final canReply = widget.allowReplyAsAliado ||
+        widget.allowReplyAsAdmin ||
+        widget.allowReplyAsTransportista;
+    final transportistaOnlyTitle = widget.allowReplyAsTransportista &&
+        !widget.allowReplyAsAliado &&
+        !widget.allowReplyAsAdmin;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Consultas a MotoLink',
-                style: TextStyle(
+                transportistaOnlyTitle
+                    ? 'Mensajes del pedido'
+                    : 'Consultas a MotoLink',
+                style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
                   color: AppColors.textPrimary,
@@ -442,16 +458,22 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             itemBuilder: (context, i) {
               final m = _items[i];
               final mine = uid != null && m.authorId == uid;
-              final fromMotoLink = m.isFromAdmin;
-              final label =
-                  fromMotoLink ? 'MotoLink' : (mine ? 'Tú' : 'Aliado');
+              final label = mine
+                  ? 'Tú'
+                  : (m.isFromAdmin
+                      ? 'MotoLink'
+                      : (m.isFromTransportista
+                          ? 'Transportista'
+                          : 'Aliado'));
               final align =
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-              final bg = fromMotoLink
+              final bg = m.isFromAdmin
                   ? AppColors.surfaceTinted.withOpacity(0.55)
-                  : (mine
-                      ? AppColors.brandBlue.withOpacity(0.12)
-                      : Colors.grey.shade200);
+                  : (m.isFromTransportista
+                      ? Colors.teal.shade50
+                      : (mine
+                          ? AppColors.brandBlue.withOpacity(0.12)
+                          : Colors.grey.shade200));
 
               return Column(
                 crossAxisAlignment: align,
@@ -493,7 +515,9 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             decoration: InputDecoration(
               hintText: widget.allowReplyAsAdmin
                   ? 'Respuesta al aliado…'
-                  : 'Escriba a MotoLink…',
+                  : widget.allowReplyAsTransportista
+                      ? 'Mensaje a MotoLink y aliado…'
+                      : 'Escriba a MotoLink…',
               isDense: true,
               border: const OutlineInputBorder(),
             ),

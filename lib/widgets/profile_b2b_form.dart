@@ -157,11 +157,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     final p = widget.initial;
     if (p == null) return;
     final rifOk = p.rif?.trim().isNotEmpty ?? false;
-    if (!rifOk || !p.hasRegisteredLocation) {
+    if (!rifOk || !p.hasRegisteredLocation || !p.hasFiscalMapsShareLink) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Indique RIF y domicilio fiscal (estado, ciudad y dirección) '
+            'Indique RIF, domicilio fiscal (estado, ciudad y dirección) y enlace de Google Maps '
             'en este formulario antes de cargar la documentación.',
           ),
           behavior: SnackBarBehavior.floating,
@@ -803,13 +803,16 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               keyboardType: TextInputType.url,
               decoration: _fieldDecoration('https://maps.app.goo.gl/... o maps.google.com/...'),
               validator: (v) {
+                if (!_requiereUbicacionFiscalCompleta) return null;
                 final t = v?.trim() ?? '';
-                if (t.isEmpty) return null;
+                if (t.isEmpty) {
+                  return 'Indique el enlace «Compartir» de Google Maps de su domicilio fiscal';
+                }
                 final u = Uri.tryParse(t);
                 if (u == null ||
                     !u.hasScheme ||
                     (u.scheme != 'http' && u.scheme != 'https')) {
-                  return 'Use una URL que empiece por https://';
+                  return 'Use una URL que empiece por http(s)://';
                 }
                 return null;
               },

@@ -366,6 +366,37 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           onRegistered: widget.onRefresh,
         ),
         const SizedBox(height: 14),
+        if (puedeTransito &&
+            (r.assignedTransportistaId == null ||
+                r.assignedTransportistaId!.trim().isEmpty)) ...[
+          Material(
+            color: Colors.deepOrange.shade50,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.deepOrange.shade900),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Sin transportista asignado: el perfil Despacho no verá este pedido hasta que MotoLink lo asigne '
+                      '(sección «Transportista (despacho)» arriba en la ficha).',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.deepOrange.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         Text(
           'Envío en tránsito',
           style: TextStyle(

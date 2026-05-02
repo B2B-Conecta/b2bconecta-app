@@ -325,6 +325,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         bg = AppColors.brandBlue;
         break;
       case 'envio':
+      case 'logistica':
         icon = Icons.local_shipping_outlined;
         bg = Colors.green.shade600;
         break;

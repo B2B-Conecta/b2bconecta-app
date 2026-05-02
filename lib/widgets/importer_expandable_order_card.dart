@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'courier_timeline_widget.dart';
+import 'transportista_recogida_almacen_section.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 
@@ -257,6 +258,23 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           compact: true,
                           viewerRole: AppHomeRole.importador,
                         ),
+                        if (r.status == TransactionRequestStatus.enTransito) ...[
+                          const SizedBox(height: 12),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade50.withOpacity(0.45),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.teal.shade100),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: TransportistaRecogidaAlmacenSection(
+                                request: r,
+                                viewerRole: AppHomeRole.importador,
+                              ),
+                            ),
+                          ),
+                        ],
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),
                           expandedFooter!,

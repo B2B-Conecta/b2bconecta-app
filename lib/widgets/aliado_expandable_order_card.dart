@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import 'courier_timeline_widget.dart';
 import 'transaction_request_admin_sections.dart';
+import 'transportista_recogida_almacen_section.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
 class AliadoExpandableOrderCard extends StatelessWidget {
@@ -37,6 +38,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = request;
+    final puedeConfirmarRecepcion = r.transportistaCompletoRecogidaAlmacen;
     final tracking = TransactionRequestStatus.aliadoTrackingHeadline(
       r.status,
       canceladoPorAliado: r.canceladoPorAliado,
@@ -307,7 +309,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   FilledButton.icon(
-                    onPressed: confirmarRecepcionBusy ? null : onConfirmarRecepcion,
+                    onPressed: confirmarRecepcionBusy || !puedeConfirmarRecepcion
+                        ? null
+                        : onConfirmarRecepcion,
                     icon: confirmarRecepcionBusy
                         ? const SizedBox(
                             width: 18,
@@ -324,6 +328,39 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           : 'Confirmar recepción en tu taller',
                     ),
                   ),
+                  if (r.status == TransactionRequestStatus.enTransito &&
+                      !puedeConfirmarRecepcion) ...[
+                    const SizedBox(height: 8),
+                    Material(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 20, color: Colors.amber.shade900),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                r.isMasterOrder && r.subOrders.isNotEmpty
+                                    ? 'Podrá confirmar cuando el transportista haya marcado la recogida '
+                                        'en todos los almacenes de este pedido (${r.subOrdersRecogidasAlmacenCount}/${r.subOrders.length} listos).'
+                                    : 'Podrá confirmar cuando el transportista haya marcado la recogida en el almacén del importador.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.35,
+                                  color: Colors.amber.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     request.pagoMotolinkPendienteEnTransito
@@ -371,6 +408,23 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         CourierTimelineWidget(request: r, compact: true),
+                        if (r.status == TransactionRequestStatus.enTransito) ...[
+                          const SizedBox(height: 12),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade50.withOpacity(0.45),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.teal.shade100),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: TransportistaRecogidaAlmacenSection(
+                                request: r,
+                                viewerRole: AppHomeRole.aliado,
+                              ),
+                            ),
+                          ),
+                        ],
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),
                           expandedFooter!,

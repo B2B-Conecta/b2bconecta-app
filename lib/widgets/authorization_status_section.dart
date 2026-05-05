@@ -171,17 +171,17 @@ class _AliadoAuthorizationCard extends StatelessWidget {
     final cupoLabelEs = faseContado &&
             profile.puedeUsarLineaCreditoMotoLinkPreactivada
         ? 'MotoLink le habilitó el cupo desde el inicio (confianza): '
-            '${profile.creditLimit!.toStringAsFixed(2)} USD. '
+            '${profile.creditLimit!.toStringAsFixed(2)} REF. '
             'Puede usar la línea de crédito aun en fase contado. '
-            '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD imputados acumulados (entregas a crédito sin plan, o al completar un plan a cuotas). '
+            '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} REF imputados acumulados (entregas a crédito sin plan, o al completar un plan a cuotas). '
             'El cupo restante se ve en su perfil.'
         : faseContado
             ? 'Primeros pedidos (contado): con RIF, domicilio fiscal y enlace Google Maps puede pedir hasta '
                 '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad. '
                 'El cupo revolvente y la documentación completa se revisan al solicitar línea de crédito MotoLink.'
             : tieneCupo
-                ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} USD · '
-                    '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} USD imputados acumulados. '
+                ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} REF · '
+                    '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} REF imputados acumulados. '
                     'Compromiso, imputado y disponible se muestran en este perfil.'
                 : 'Sin línea de crédito asignada: puede seguir solicitando repuestos pagando al contado '
                     '(transferencia o efectivo). MotoLink puede habilitar cupo y más medios de pago cuando lo solicite.';

@@ -277,8 +277,8 @@ class _AdminEncomiendasReportPanelState
               icon: Icons.inventory_2_outlined,
             ),
             _StatCard(
-              title: 'Total USD (aliado)',
-              value: '\$${totalUsd.toStringAsFixed(2)}',
+              title: 'Total REF (aliado)',
+              value: totalUsd.toStringAsFixed(2),
               icon: Icons.payments_outlined,
             ),
             _StatCard(
@@ -717,7 +717,7 @@ class _AdminEncomiendasReportPanelState
             Text(
               '${TransactionRequestStatus.labelEs(r.status)} · '
               '${formatEsShortDateTime(r.createdAt)} · '
-              '\$${r.precioTotal.toStringAsFixed(2)}',
+              '${r.precioTotal.toStringAsFixed(2)} REF',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
             ),
             const SizedBox(height: 2),

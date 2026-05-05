@@ -688,7 +688,7 @@ class SubOrderImporterLineasCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Sub-total (REF, este almacén): '
-                '\$${s.montoSubtotal.toStringAsFixed(2)}',
+                '${s.montoSubtotal.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
@@ -767,7 +767,7 @@ class SubOrderImporterLineasCard extends StatelessWidget {
             ),
           const SizedBox(height: 2),
           Text(
-            '$cant uds · \$${ref.toStringAsFixed(2)} REF (línea)',
+            '$cant uds · ${ref.toStringAsFixed(2)} REF (línea)',
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,

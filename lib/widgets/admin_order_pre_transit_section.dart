@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/document_type_preference.dart';
 import '../models/pago_revision_estado.dart';
 import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
@@ -31,6 +32,7 @@ class AdminOrderPreTransitSection extends StatefulWidget {
 
 class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSection> {
   bool _busyFacturaAliado = false;
+  bool _busyGeneratePdf = false;
 
   Future<void> _openUrl(BuildContext context, Future<String> Function() signed) async {
     try {
@@ -90,6 +92,99 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
       );
     } finally {
       if (mounted) setState(() => _busyFacturaAliado = false);
+    }
+  }
+
+  Future<String?> _pedirMotivoReemision(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Motivo de reemision'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Indique el motivo (obligatorio).',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+    final m = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || !context.mounted) return null;
+    if (m.isEmpty) return null;
+    return m;
+  }
+
+  Future<void> _generateMotoLinkPdf(BuildContext context) async {
+    final r = widget.request;
+    final hasProv = r.isMasterOrder
+        ? (r.subOrders.isNotEmpty &&
+            r.subOrders.every(
+              (s) =>
+                  s.proveedorFacturaStoragePath != null &&
+                  s.proveedorFacturaStoragePath!.trim().isNotEmpty,
+            ))
+        : r.hasProveedorFactura;
+    if (!hasProv) return;
+    final pref = r.documentTypePreference?.trim();
+    if (pref == null || !DocumentTypePreference.values.contains(pref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'El aliado debe haber elegido nota de entrega o factura fiscal al aceptar el pedido.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    String? motivo;
+    if (r.hasFacturaAliado) {
+      motivo = await _pedirMotivoReemision(context);
+      if (motivo == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('La reemision requiere un motivo.')),
+          );
+        }
+        return;
+      }
+    }
+
+    setState(() => _busyGeneratePdf = true);
+    try {
+      await SupabaseService.adminGenerateMotolinkAllyDocumentPdf(
+        transactionRequestId: r.id,
+        reissueMotivo: motivo,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+                motivo != null
+                ? 'Documento re-emitido y registrado.'
+                : 'Documento PDF generado y registrado.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      widget.onRefresh();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyGeneratePdf = false);
     }
   }
 
@@ -277,6 +372,50 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 6),
+        if (hasProveedorFacturaOperativa &&
+            r.documentTypePreference != null &&
+            DocumentTypePreference.values
+                .contains(r.documentTypePreference!.trim())) ...[
+          Text(
+            'Tipo elegido por el aliado: '
+            '${DocumentTypePreference.labelEs(r.documentTypePreference) ?? r.documentTypePreference}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.brandBlue,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: (pe == PagoRevisionEstado.enRevision ||
+                      pe == PagoRevisionEstado.aprobado ||
+                      _busyGeneratePdf ||
+                      _busyFacturaAliado)
+                  ? null
+                  : () => _generateMotoLinkPdf(context),
+              icon: _busyGeneratePdf
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined, size: 20),
+              label: Text(
+                r.hasFacturaAliado
+                    ? 'Re-emitir PDF MotoLink (con motivo)'
+                    : 'Generar PDF MotoLink (plantilla)',
+              ),
+            ),
+          ),
+          Text(
+            'Usa la tasa BCV del día y los porcentajes IVA/IGTF configurados en administración. '
+            'Sustituye adjuntar archivo manual si lo desea.',
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade600, height: 1.2),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (r.hasFacturaAliado) ...[
           Text(
             r.facturaAliadoFileName ?? 'Archivo',

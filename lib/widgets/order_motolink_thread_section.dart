@@ -167,12 +167,12 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                   children: [
                     Text(
                       'Vencimientos: cada 15 días a partir de hoy (zona Caracas). '
-                      'Suma de cuotas debe ser \$${tPedido.toStringAsFixed(2)}.',
+                      'Suma de cuotas debe ser ${tPedido.toStringAsFixed(2)} REF.',
                       style: const TextStyle(fontSize: 13, height: 1.3),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Total pedido: \$${tPedido.toStringAsFixed(2)}',
+                      'Total pedido: ${tPedido.toStringAsFixed(2)} REF',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
@@ -228,7 +228,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                           decimal: true,
                         ),
                         decoration: InputDecoration(
-                          labelText: 'Cuota ${i + 1} (USD)',
+                          labelText: 'Cuota ${i + 1} (REF)',
                           isDense: true,
                           border: const OutlineInputBorder(),
                         ),
@@ -263,7 +263,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'La suma (\$${suma.toStringAsFixed(2)}) debe coincidir con el total (\$${tPedido.toStringAsFixed(2)}).',
+                            'La suma (${suma.toStringAsFixed(2)} REF) debe coincidir con el total (${tPedido.toStringAsFixed(2)} REF).',
                           ),
                         ),
                       );

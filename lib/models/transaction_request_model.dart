@@ -83,6 +83,7 @@ class TransactionRequestModel {
     this.creditMontoBloqueado,
     this.paymentSchedule = const <PaymentScheduleModel>[],
     this.documentTypePreference,
+    this.motolinkPendingAutoInvoice = false,
     this.aliadoExperienceStars,
     this.aliadoExperienceComment,
     this.aliadoExperienceSubmittedAt,
@@ -200,6 +201,9 @@ class TransactionRequestModel {
 
   /// A6: nota de entrega vs factura fiscal; `null` hasta que el aliado elija.
   final String? documentTypePreference;
+
+  /// Cola server-side: generar factura MotoLink al aliado al abrir Pedidos activos (admin).
+  final bool motolinkPendingAutoInvoice;
   final int? aliadoExperienceStars;
   final String? aliadoExperienceComment;
   final DateTime? aliadoExperienceSubmittedAt;
@@ -974,6 +978,8 @@ class TransactionRequestModel {
       creditMontoBloqueado: _asNullableDouble(json['credit_monto_bloqueado']),
       paymentSchedule: _parsePaymentSchedule(json['payment_schedule']),
       documentTypePreference: _nullableText(json['document_type_preference']),
+      motolinkPendingAutoInvoice:
+          json['motolink_pending_auto_invoice'] == true,
       aliadoExperienceStars: _asNullableInt(json['aliado_experience_stars']),
       aliadoExperienceComment: _nullableText(json['aliado_experience_comment']),
       aliadoExperienceSubmittedAt:

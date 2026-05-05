@@ -539,14 +539,14 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(subir ? 'Aumentar cupo (USD)' : 'Reducir cupo (USD)'),
+          title: Text(subir ? 'Aumentar cupo (REF)' : 'Reducir cupo (REF)'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Línea de base (campo o último cupo): \$'
-                '${base.toStringAsFixed(2)}',
+                'Línea de base (campo o último cupo): '
+                '${base.toStringAsFixed(2)} REF',
                 style: const TextStyle(fontSize: 13, height: 1.3),
               ),
               const SizedBox(height: 12),
@@ -560,7 +560,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 ],
                 autofocus: true,
                 decoration: InputDecoration(
-                  labelText: subir ? 'Monto a sumar (USD)' : 'Monto a descontar (USD)',
+                  labelText: subir ? 'Monto a sumar (REF)' : 'Monto a descontar (REF)',
                   hintText: subir ? 'Ej. 2000' : 'Ej. 1000',
                   border: const OutlineInputBorder(),
                 ),
@@ -601,8 +601,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'El descuento supera el cupo de referencia (\$${base.toStringAsFixed(2)}). '
-              'Se aplicará un nuevo límite de \$0,00.',
+              'El descuento supera el cupo de referencia (${base.toStringAsFixed(2)} REF). '
+              'Se aplicará un nuevo límite de 0,00 REF.',
             ),
           ),
         );
@@ -613,7 +613,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
         : (base - delta).clamp(0.0, 1.0e16);
     final nextD = double.parse(nextRaw.toStringAsFixed(2));
     final razon = await _promptCupoChangeReason(
-      extraLine: 'Nuevo cupo previsto: \$${nextD.toStringAsFixed(2)} (antes \$${base.toStringAsFixed(2)}).',
+      extraLine: 'Nuevo cupo previsto: ${nextD.toStringAsFixed(2)} REF (antes ${base.toStringAsFixed(2)} REF).',
     );
     if (razon == null) return;
     await _persistCupoLimit(nextD, razon);
@@ -995,8 +995,8 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
     final cupoResumen = lim == null
         ? 'Sin cupo asignado'
         : _loadingExposure
-            ? '\$${lim.toStringAsFixed(2)} USD asignado'
-            : '\$${lim.toStringAsFixed(2)} asignado · \$${disp!.toStringAsFixed(2)} disp.';
+            ? '${lim.toStringAsFixed(2)} REF asignado'
+            : '${lim.toStringAsFixed(2)} REF asignado · ${disp!.toStringAsFixed(2)} REF disp.';
 
     return KeyedSubtree(
       key: widget.cardKey,
@@ -1156,7 +1156,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
             children: [
               if (widget.profile.debeMostrarCreditoMotoLinkAsignado) ...[
                 Text(
-                  'Crédito MotoLink asignado: \$${(widget.profile.creditLimit ?? 0).toStringAsFixed(2)} USD',
+                  'Crédito MotoLink asignado: ${(widget.profile.creditLimit ?? 0).toStringAsFixed(2)} REF',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 6),
@@ -1258,7 +1258,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         const LinearProgressIndicator(minHeight: 3)
                       else ...[
                         Text(
-                          'Límite definido: ${lim != null ? '\$${lim.toStringAsFixed(2)}' : '—'}',
+                          'Límite definido: ${lim != null ? '${lim.toStringAsFixed(2)} REF' : '—'}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade800,
@@ -1266,7 +1266,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Compromiso (saldo activo vía cupo / plan): \$${exp.toStringAsFixed(2)}',
+                          'Compromiso (saldo activo vía cupo / plan): ${exp.toStringAsFixed(2)} REF',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade800,
@@ -1275,7 +1275,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         const SizedBox(height: 4),
                         Text(
                           'Imputado acum. (entregas crédito + cuotas aprobadas): '
-                          '\$${cons.toStringAsFixed(2)}',
+                          '${cons.toStringAsFixed(2)} REF',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade800,
@@ -1284,7 +1284,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         const SizedBox(height: 6),
                         Text(
                           lim != null
-                              ? 'Disponible estimado: \$${disp!.toStringAsFixed(2)}'
+                              ? 'Disponible estimado: ${disp!.toStringAsFixed(2)} REF'
                               : 'Disponible estimado: —',
               style: const TextStyle(
                 fontSize: 13,
@@ -1439,7 +1439,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                 FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
               ],
               decoration: InputDecoration(
-                labelText: 'Límite de crédito (USD)',
+                labelText: 'Límite de crédito (REF)',
                 hintText: 'Ej: 50000.00',
                 filled: true,
                 fillColor: AppColors.fieldFill,

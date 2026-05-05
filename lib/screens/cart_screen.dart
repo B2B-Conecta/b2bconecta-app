@@ -157,7 +157,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                               subtitle: Text(
                                 '${line.quantity} uds · '
-                                '\$${(line.precioUnitarioAliadoRef * line.quantity).toStringAsFixed(2)} REF',
+                                '${(line.precioUnitarioAliadoRef * line.quantity).toStringAsFixed(2)} REF',
                               ),
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete_outline),
@@ -182,7 +182,7 @@ class _CartScreenState extends State<CartScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Total REF: \$${totalRef.toStringAsFixed(2)}',
+                            'Total REF: ${totalRef.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 16,

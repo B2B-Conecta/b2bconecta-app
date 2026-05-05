@@ -393,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Precio mín. (USD)',
+                        labelText: 'Precio mín. (REF)',
                         filled: true,
                         fillColor: AppColors.fieldFill,
                         border: OutlineInputBorder(
@@ -411,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Precio máx. (USD)',
+                        labelText: 'Precio máx. (REF)',
                         filled: true,
                         fillColor: AppColors.fieldFill,
                         border: OutlineInputBorder(
@@ -1099,7 +1099,7 @@ class _ProductGridCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '\$${part.precioUnitarioParaAliado(faseContado: faseContadoAliado).toStringAsFixed(2)}',
+                  '${part.precioUnitarioParaAliado(faseContado: faseContadoAliado).toStringAsFixed(2)} REF',
                   style: TextStyle(
                     fontSize: compactDistanceMode ? 15.5 : 17,
                     fontWeight: FontWeight.w900,

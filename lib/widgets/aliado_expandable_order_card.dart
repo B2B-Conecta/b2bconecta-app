@@ -122,10 +122,10 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ? '${r.subOrders.isEmpty ? 0 : r.subOrders.length} '
                                     '${r.subOrders.length == 1 ? "importador" : "importadores"} · '
                                     '${r.totalUnidadesAliado} uds · Total REF '
-                                    '\$${r.precioTotal.toStringAsFixed(2)}'
+                                    '${r.precioTotal.toStringAsFixed(2)}'
                                     '${r.precioTotalBsUi != null ? " · ~${r.precioTotalBsUi!.toStringAsFixed(2)} BS" : ""}'
                                 : '${r.cantidad} uds · Total estimado '
-                                    '\$${r.precioTotal.toStringAsFixed(2)}',
+                                    '${r.precioTotal.toStringAsFixed(2)} REF',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,
@@ -245,7 +245,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               'Crédito MotoLink asignado: '
-                              '\$${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} USD',
+                              '${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} REF',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,

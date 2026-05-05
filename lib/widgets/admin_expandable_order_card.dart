@@ -116,7 +116,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             '${r.totalUnidadesAliado} uds · Total (aliado) '
-                            '\$${r.precioTotal.toStringAsFixed(2)}',
+                            '${r.precioTotal.toStringAsFixed(2)} REF',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,
@@ -342,7 +342,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     'Crédito MotoLink asignado (aliado): '
-                                    '\$${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} USD',
+                                    '${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} REF',
                                     style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,

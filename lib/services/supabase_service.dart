@@ -9,6 +9,7 @@ import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
 import '../models/credit_limit_exception.dart';
 import '../models/document_review_status.dart';
+import '../models/document_type_preference.dart';
 import '../models/in_app_notification_model.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
@@ -28,6 +29,7 @@ import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
 import '../utils/maps_route_utils.dart';
+import 'motolink_ally_invoice_pdf_service.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -807,6 +809,7 @@ class SupabaseService {
     credit_plan_confirmed_at,
     credit_monto_bloqueado,
     document_type_preference,
+    motolink_pending_auto_invoice,
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
@@ -1526,9 +1529,9 @@ sub_orders (
         final consumido = profile.creditoConsumidoAcumulado ?? 0;
         if (exposure + consumido + total > limit + _creditTol) {
       throw CreditLimitException(
-            'Este pedido (\$${total.toStringAsFixed(2)}) más su uso de línea actual '
-            '(\$${(exposure + consumido).toStringAsFixed(2)}: ver perfil) '
-            'supera su límite autorizado (\$${limit.toStringAsFixed(2)}).',
+            'Este pedido (${total.toStringAsFixed(2)} REF) más su uso de línea actual '
+            '(${(exposure + consumido).toStringAsFixed(2)} REF: ver perfil) '
+            'supera su límite autorizado (${limit.toStringAsFixed(2)} REF).',
           );
         }
       }
@@ -1995,6 +1998,128 @@ sub_orders (
     }).eq('id', transactionRequestId);
   }
 
+  /// MotoLink: reserva correlativo y valida gate; luego genere PDF en cliente y llame a [adminFinalizeMotolinkAllyDocumentEmission].
+  static Future<Map<String, dynamic>> adminPrepareMotolinkAllyDocumentEmission({
+    required String transactionRequestId,
+    required String documentType,
+    String? reissueMotivo,
+  }) async {
+    final raw = await _client.rpc(
+      'admin_prepare_motolink_ally_document_emission',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_document_type': documentType,
+        'p_reissue_motivo': reissueMotivo?.trim(),
+      },
+    );
+    if (raw is! Map) {
+      throw StateError('Respuesta inválida al preparar emisión.');
+    }
+    return Map<String, dynamic>.from(raw);
+  }
+
+  static Future<void> adminFinalizeMotolinkAllyDocumentEmission({
+    required String emissionId,
+    required String storagePath,
+    required String fileName,
+  }) async {
+    await _client.rpc(
+      'admin_finalize_motolink_ally_document_emission',
+      params: <String, dynamic>{
+        'p_emission_id': emissionId,
+        'p_storage_path': storagePath,
+        'p_file_name': fileName,
+      },
+    );
+  }
+
+  /// Genera PDF oficial (nota o factura según preferencia del aliado), sube a Storage y registra emisión.
+  static Future<void> adminGenerateMotolinkAllyDocumentPdf({
+    required String transactionRequestId,
+    String? reissueMotivo,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final profile = await fetchMyProfile();
+    if (profile?.role?.trim().toLowerCase() != 'administrador') {
+      throw StateError('Solo MotoLink puede generar este documento.');
+    }
+
+    final r0 = await fetchTransactionRequestById(transactionRequestId);
+    if (r0 == null) throw StateError('Pedido no encontrado.');
+    final pref = r0.documentTypePreference?.trim();
+    if (pref == null ||
+        !DocumentTypePreference.values.contains(pref)) {
+      throw StateError(
+        'El aliado no indicó tipo de documento (nota o factura) en el pedido.',
+      );
+    }
+
+    final prep = await adminPrepareMotolinkAllyDocumentEmission(
+      transactionRequestId: transactionRequestId,
+      documentType: pref,
+      reissueMotivo: reissueMotivo,
+    );
+
+    final emissionId = prep['emission_id']?.toString() ?? '';
+    if (emissionId.isEmpty) {
+      throw StateError('Emisión sin id.');
+    }
+    final correlativo = (prep['correlativo'] as num?)?.toInt() ?? 0;
+    final tasa = (prep['tasa_bcv_emision'] as num?)?.toDouble() ?? 0;
+    final iva = (prep['iva_pct_emision'] as num?)?.toDouble() ?? 16;
+    final igtf = (prep['igtf_pct_emision'] as num?)?.toDouble() ?? 3;
+
+    final r = await fetchTransactionRequestById(transactionRequestId);
+    if (r == null) throw StateError('Pedido no encontrado tras preparar.');
+
+    final bytes = await MotolinkAllyInvoicePdfService.build(
+      request: r,
+      documentType: pref,
+      correlativo: correlativo,
+      tasaBcvEmision: tasa,
+      ivaPct: iva,
+      igtfPct: igtf,
+      emissionId: emissionId,
+    );
+
+    final label = pref == DocumentTypePreference.notaEntrega ? 'NE' : 'FF';
+    final safeName =
+        'MotoLink_${label}_${correlativo.toString().padLeft(6, '0')}.pdf';
+    final path = '$transactionRequestId/motolink_$emissionId.pdf';
+
+    final existing = await _client
+        .from('transaction_requests')
+        .select('factura_aliado_storage_path')
+        .eq('id', transactionRequestId)
+        .maybeSingle();
+    if (existing != null) {
+      final oldPath = Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
+          ?.toString()
+          .trim();
+      if (oldPath != null && oldPath.isNotEmpty) {
+        try {
+          await _client.storage.from(_orderAllyInvoicesBucket).remove([oldPath]);
+        } catch (_) {}
+      }
+    }
+
+    await _client.storage.from(_orderAllyInvoicesBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(
+            contentType: 'application/pdf',
+            upsert: true,
+          ),
+        );
+
+    await adminFinalizeMotolinkAllyDocumentEmission(
+      emissionId: emissionId,
+      storagePath: path,
+      fileName: safeName,
+    );
+  }
+
   /// Aliado: sube foto del comprobante y envía a revisión MotoLink.
   static Future<void> aliadoSubmitComprobantePago({
     required String transactionRequestId,
@@ -2234,14 +2359,14 @@ sub_orders (
     String? transportistaId,
     String? cambioMotivoEnTransito,
   }) async {
+    final m = cambioMotivoEnTransito?.trim();
     final params = <String, dynamic>{
       'p_request_id': requestId,
       'p_transportista_id': transportistaId,
+      // Siempre enviar el tercer argumento para que PostgREST resuelva la única firma (uuid, uuid, text).
+      'p_cambio_motivo':
+          (m != null && m.isNotEmpty) ? m : null,
     };
-    final m = cambioMotivoEnTransito?.trim();
-    if (m != null && m.isNotEmpty) {
-      params['p_cambio_motivo'] = m;
-    }
     await _client.rpc(
       'admin_assign_transportista_pedido',
       params: params,
@@ -2772,12 +2897,12 @@ sub_orders (
     if (n == 1) {
       w.write(
         'MotoLink fijó 1 cuota (contado) por '
-        '\$${suma.toStringAsFixed(2)}. ',
+        '${suma.toStringAsFixed(2)} REF. ',
       );
     } else {
       w.write(
         'MotoLink fijó $n cuotas (cada 15 días) por un total de '
-        '\$${suma.toStringAsFixed(2)}. ',
+        '${suma.toStringAsFixed(2)} REF. ',
       );
     }
     if (montosPersonalizados) {

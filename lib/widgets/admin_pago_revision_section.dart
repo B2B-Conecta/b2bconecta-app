@@ -301,7 +301,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
                   children: [
                     Text(
                       'Cuota ${c.installmentIndex} · '
-                      '\$${c.amountUsd.toStringAsFixed(2)} · vence ${c.dueOn.toLocal().toString().split(' ').first}',
+                      '${c.amountUsd.toStringAsFixed(2)} REF · vence ${c.dueOn.toLocal().toString().split(' ').first}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 12,

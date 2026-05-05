@@ -114,7 +114,7 @@ class _SheetBody extends StatelessWidget {
             color: AppColors.successGreen,
             child: Text(
               'Tiene un límite de crédito de '
-              '${profile.creditLimit!.toStringAsFixed(2)} USD. '
+              '${profile.creditLimit!.toStringAsFixed(2)} REF. '
               'Los pedidos a crédito consumen cupo según entregas y pedidos abiertos.',
               style: TextStyle(
                 fontSize: 13,

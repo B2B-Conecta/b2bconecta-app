@@ -29,7 +29,7 @@ class EncomiendasReportExcelService {
       'Aliado',
       'Importador',
       'Cantidad',
-      'Total USD (aliado)',
+      'Total REF (aliado)',
       'Pref. documento',
       'Factura MotoLink aliado',
       'Pago estado',

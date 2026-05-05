@@ -813,7 +813,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                                           Row(
                                             children: [
                                               Text(
-                                                '\$${p.precio.toStringAsFixed(2)}',
+                                                '${p.precio.toStringAsFixed(2)} REF',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.w800,
                                                   color: AppColors.brandOrange,

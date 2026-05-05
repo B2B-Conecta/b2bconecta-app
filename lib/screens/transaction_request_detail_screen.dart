@@ -30,6 +30,8 @@ class TransactionRequestDetailScreen extends StatefulWidget {
       _TransactionRequestDetailScreenState();
 }
 
+enum _NoteCardTone { info, warning, danger }
+
 class _TransactionRequestDetailScreenState
     extends State<TransactionRequestDetailScreen> {
   late Future<TransactionRequestModel?> _future;
@@ -73,13 +75,13 @@ class _TransactionRequestDetailScreenState
               'No encontramos este pedido o no tienes permisos para verlo.',
             );
           }
-            return ListView(
+          return ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
             children: [
               if (r.pedidoEntregadoYPagado) ...[
                 _pagoCompletadoBanner(),
                 const SizedBox(height: 12),
-              ] else               if (r.pagoMotolinkPendienteTrasEntrega) ...[
+              ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
                 _pagoPendienteBanner(),
                 if (r.pagoPendienteRiesgoCuentaTresDiasHabiles) ...[
                   const SizedBox(height: 10),
@@ -91,7 +93,25 @@ class _TransactionRequestDetailScreenState
                 _pedidoListoPickupBanner(),
                 const SizedBox(height: 12),
               ],
-              _summaryCard(r),
+              if (r.canceladoPorAliado &&
+                  (r.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                _noteCard(
+                  r.aliadoCancelacionMotivo!.trim(),
+                  title: 'Pedido cancelado por el aliado',
+                  tone: _NoteCardTone.warning,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (r.anuladoPorMotolink &&
+                  (r.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                _noteCard(
+                  r.motolinkAnulacionMotivo!.trim(),
+                  title: 'Pedido anulado por MotoLink',
+                  tone: _NoteCardTone.danger,
+                ),
+                const SizedBox(height: 12),
+              ],
+              _summaryCardCompact(r),
               if (widget.homeRole == AppHomeRole.importador) ...[
                 const SizedBox(height: 12),
                 ImporterAliadoSolicitudSection(request: r, compact: false),
@@ -104,11 +124,6 @@ class _TransactionRequestDetailScreenState
               ],
               const SizedBox(height: 12),
               _contactByRole(r),
-              const SizedBox(height: 12),
-              TransactionRequestDestinoEntregaSection(
-                request: r,
-                viewingAsRole: widget.homeRole,
-              ),
               if (widget.homeRole == AppHomeRole.transportista) ...[
                 const SizedBox(height: 12),
                 TransportistaAssignmentAckSection(
@@ -151,28 +166,7 @@ class _TransactionRequestDetailScreenState
                 ),
               ],
               const SizedBox(height: 12),
-              CourierTimelineWidget(
-                request: r,
-                viewerRole: widget.homeRole,
-              ),
-              if (r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _noteCard(r.notasAdmin!.trim()),
-              ],
-              if (r.canceladoPorAliado &&
-                  (r.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false)) ...[
-                const SizedBox(height: 12),
-                _noteCard(
-                  'Motivo de cancelación (aliado): ${r.aliadoCancelacionMotivo!.trim()}',
-                ),
-              ],
-              if (r.anuladoPorMotolink &&
-                  (r.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false)) ...[
-                const SizedBox(height: 12),
-                _noteCard(
-                  'Anulación MotoLink: ${r.motolinkAnulacionMotivo!.trim()}',
-                ),
-              ],
+              _masInformacionSection(context, r),
             ],
           );
         },
@@ -314,7 +308,8 @@ class _TransactionRequestDetailScreenState
     );
   }
 
-  Widget _summaryCard(TransactionRequestModel r) {
+  /// Resumen breve: lo esencial para ubicar el pedido y el estado.
+  Widget _summaryCardCompact(TransactionRequestModel r) {
     final uid = SupabaseService.currentUserId;
     final partidas = r.orderItemsParaVistaImportador(uid);
     final title = widget.homeRole == AppHomeRole.importador && partidas.isNotEmpty
@@ -339,18 +334,6 @@ class _TransactionRequestDetailScreenState
                 color: AppColors.textPrimary,
               ),
             ),
-            if (!r.isMasterOrder &&
-                r.productSku != null &&
-                r.productSku!.isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Text(
-                'SKU: ${r.productSku}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ],
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -359,25 +342,131 @@ class _TransactionRequestDetailScreenState
                 _chip(
                   'Estado: ${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)}',
                 ),
-                if (!r.isMasterOrder) _chip('Cantidad: ${r.cantidad}'),
-                _chip('Total REF: \$${r.precioTotal.toStringAsFixed(2)}'),
-                if (r.precioTotalBsUi != null)
-                  _chip(
-                    'Referencia BS: ${r.precioTotalBsUi!.toStringAsFixed(2)}',
-                  ),
+                _chip('Total REF: ${r.precioTotal.toStringAsFixed(2)}'),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              'ID: ${r.id}',
+              'Ref. pedido: ${r.id.substring(0, 8)}…',
               style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey.shade600,
+                fontSize: 12,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _masInformacionSection(BuildContext context, TransactionRequestModel r) {
+    final hasNota =
+        r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          leading: Badge(
+            isLabelVisible: hasNota,
+            smallSize: 7,
+            backgroundColor: AppColors.brand,
+            child: Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.brandBlue,
+            ),
+          ),
+          title: const Text(
+            'Más información',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            'Referencias, entrega, historial y notas',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          children: [
+            _summaryReferenceBlock(r),
+            const SizedBox(height: 14),
+            TransactionRequestDestinoEntregaSection(
+              request: r,
+              viewingAsRole: widget.homeRole,
+            ),
+            const SizedBox(height: 14),
+            CourierTimelineWidget(
+              request: r,
+              viewerRole: widget.homeRole,
+            ),
+            if (hasNota) ...[
+              const SizedBox(height: 14),
+              _noteCard(
+                r.notasAdmin!.trim(),
+                title: 'Nota de MotoLink',
+                tone: _NoteCardTone.info,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryReferenceBlock(TransactionRequestModel r) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Referencias',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SelectableText(
+          r.id,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade800,
+            height: 1.35,
+          ),
+        ),
+        if (!r.isMasterOrder &&
+            r.productSku != null &&
+            r.productSku!.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            'SKU: ${r.productSku}',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            if (!r.isMasterOrder) _chip('Cantidad: ${r.cantidad}'),
+            if (r.precioTotalBsUi != null)
+              _chip(
+                'Referencia BS: ${r.precioTotalBsUi!.toStringAsFixed(2)}',
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -429,7 +518,7 @@ class _TransactionRequestDetailScreenState
                     ],
                   ),
                   Text(
-                    '${so.itemsCount} ítems · subtotal REF \$${so.montoSubtotal.toStringAsFixed(2)}'
+                    '${so.itemsCount} ítems · subtotal REF ${so.montoSubtotal.toStringAsFixed(2)}'
                     '${r.tasaBcvSnapshot != null ? ' · ~${(so.montoSubtotal * r.tasaBcvSnapshot!).toStringAsFixed(2)} BS' : ''}',
                     style: TextStyle(
                       fontSize: 12,
@@ -443,7 +532,7 @@ class _TransactionRequestDetailScreenState
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         '· ${it.productName ?? 'Producto'} × ${it.cantidad} '
-                        '(\$${it.precioLineTotal.toStringAsFixed(2)} REF)',
+                        '(${it.precioLineTotal.toStringAsFixed(2)} REF)',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade700,
@@ -544,12 +633,33 @@ class _TransactionRequestDetailScreenState
     }
   }
 
-  Widget _noteCard(String note) {
+  Widget _noteCard(
+    String note, {
+    required String title,
+    _NoteCardTone tone = _NoteCardTone.info,
+  }) {
+    late Color bg;
+    late Color border;
+    late Color titleColor;
+    switch (tone) {
+      case _NoteCardTone.info:
+        bg = Colors.orange.shade50;
+        border = Colors.orange.shade200;
+        titleColor = Colors.orange.shade900;
+      case _NoteCardTone.warning:
+        bg = Colors.amber.shade50;
+        border = Colors.amber.shade300;
+        titleColor = Colors.amber.shade900;
+      case _NoteCardTone.danger:
+        bg = Colors.red.shade50;
+        border = Colors.red.shade200;
+        titleColor = Colors.red.shade900;
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(color: border),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -557,10 +667,10 @@ class _TransactionRequestDetailScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Nota de MotoLink',
+              title,
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                color: Colors.orange.shade900,
+                color: titleColor,
               ),
             ),
             const SizedBox(height: 6),

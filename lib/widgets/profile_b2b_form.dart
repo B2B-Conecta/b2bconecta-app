@@ -360,8 +360,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   ? 'Sin cupo asignado: puede solicitar pedidos pagando al contado (transferencia o efectivo). '
                       'MotoLink puede asignar límite cuando lo solicite (pestaña Crédito).'
                   : enFaseContado && !preact
-                      ? 'Límite mostrado (fase contado): \$${(limMostrado ?? 0).toStringAsFixed(2)}'
-                      : 'Límite autorizado: \$${(limMostrado ?? 0).toStringAsFixed(2)}',
+                      ? 'Límite mostrado (fase contado): ${(limMostrado ?? 0).toStringAsFixed(2)} REF'
+                      : 'Límite autorizado: ${(limMostrado ?? 0).toStringAsFixed(2)} REF',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -374,7 +374,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 const LinearProgressIndicator(minHeight: 3)
               else ...[
                 Text(
-                  'Compromiso (saldo activo vía cupo / plan): \$${exp.toStringAsFixed(2)}',
+                  'Compromiso (saldo activo vía cupo / plan): ${exp.toStringAsFixed(2)} REF',
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -383,7 +383,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 const SizedBox(height: 6),
                 Text(
                   'Imputado acumulado (lo ya “cerrado” y descontado en disponible): '
-                  '\$${cons.toStringAsFixed(2)} (entregas a crédito sin plan, o al aprobar la última cuota de un plan).',
+                  '${cons.toStringAsFixed(2)} REF (entregas a crédito sin plan, o al aprobar la última cuota de un plan).',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -392,7 +392,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Disponible estimado: \$${disponible.toStringAsFixed(2)}',
+                  'Disponible estimado: ${disponible.toStringAsFixed(2)} REF',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,

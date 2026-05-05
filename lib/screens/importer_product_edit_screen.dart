@@ -294,7 +294,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           const SizedBox(height: 12),
           TextFormField(
             controller: _priceController,
-            decoration: _dec('Precio (USD)'),
+            decoration: _dec('Precio (REF)'),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),

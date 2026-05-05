@@ -275,7 +275,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '\$${_precioVentaUnit.toStringAsFixed(2)} / u.',
+                        '${_precioVentaUnit.toStringAsFixed(2)} REF / u.',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -305,7 +305,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           final safe = q.clamp(1, maxQty);
                           final total = _precioVentaUnit * safe;
                           return Text(
-                            'Total: \$${total.toStringAsFixed(2)}',
+                            'Total: ${total.toStringAsFixed(2)} REF',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
@@ -731,7 +731,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '\$${_precioVentaUnit.toStringAsFixed(2)}',
+                        '${_precioVentaUnit.toStringAsFixed(2)} REF',
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,

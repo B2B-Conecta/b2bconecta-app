@@ -53,7 +53,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           SizedBox(height: compact ? 2 : 4),
           Text(
             '$nPart partida(s) · $uds uds · subtotal (tu tramo) '
-            '\$${r.precioTotal.toStringAsFixed(2)} REF'
+            '${r.precioTotal.toStringAsFixed(2)} REF'
             '${r.precioTotalBsUi != null ? ' · ~${r.precioTotalBsUi!.toStringAsFixed(2)} BS' : ''}',
             style: TextStyle(
               fontSize: bodySize * 0.95,
@@ -127,7 +127,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           ],
           const SizedBox(height: 2),
           Text(
-            '${p.cantidad} uds · \$${p.precioLineTotal.toStringAsFixed(2)} REF (línea)',
+            '${p.cantidad} uds · ${p.precioLineTotal.toStringAsFixed(2)} REF (línea)',
             style: TextStyle(
               fontSize: compact ? 11 : 11.5,
               fontWeight: FontWeight.w600,
@@ -183,7 +183,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '${r.cantidad} uds · subtotal (precio al aliado, tu tramo) '
-                '\$${r.precioTotal.toStringAsFixed(2)} REF',
+                '${r.precioTotal.toStringAsFixed(2)} REF',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

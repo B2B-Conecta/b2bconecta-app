@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../models/document_type_preference.dart';
 import '../models/app_home_role.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
@@ -141,6 +144,9 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
         _expandedRequestId = null;
       });
       _tryExpandFromPendingNotification();
+      if (!widget.isTransportistaView) {
+        unawaited(_runPendingMotolinkAutoInvoices(rows));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -148,6 +154,33 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
         _loading = false;
       });
     }
+  }
+
+  /// Genera en segundo plano las facturas MotoLink marcadas por el servidor como pendientes.
+  Future<void> _runPendingMotolinkAutoInvoices(
+    List<TransactionRequestModel> rows,
+  ) async {
+    final targets = rows
+        .where(
+          (r) =>
+              r.motolinkPendingAutoInvoice &&
+              !r.hasFacturaAliado &&
+              r.documentTypePreference != null &&
+              DocumentTypePreference.values.contains(r.documentTypePreference),
+        )
+        .toList();
+    if (targets.isEmpty) return;
+    for (final r in targets) {
+      if (!mounted) return;
+      try {
+        await SupabaseService.adminGenerateMotolinkAllyDocumentPdf(
+          transactionRequestId: r.id,
+        );
+      } catch (_) {
+        // Mantiene motolink_pending_auto_invoice en servidor para reintentar al siguiente load.
+      }
+    }
+    if (mounted) await _load();
   }
 
   void _clearFilters() {

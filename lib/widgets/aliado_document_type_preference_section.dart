@@ -61,7 +61,9 @@ class _AliadoDocumentTypePreferenceSectionState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Preferencia guardada. MotoLink registrará el documento según su elección.'),
+          content: Text(
+            'Preferencia guardada. El equipo MotoLink fue notificado y podrá emitir su documento oficial.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

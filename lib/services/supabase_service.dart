@@ -29,6 +29,7 @@ import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
 import '../utils/maps_route_utils.dart';
+import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
 
 class SupabaseService {
@@ -823,7 +824,17 @@ class SupabaseService {
     ),
     products ( name, sku, price_usd ),
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
-    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude )
+    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
+    motolink_ally_document_emissions (
+      id,
+      correlativo,
+      document_type,
+      storage_path,
+      file_name,
+      finalized_at,
+      fragment_index,
+      fragment_total
+    )
   ''';
 
   static String get _trSelectWithSubs => '''
@@ -2003,6 +2014,8 @@ sub_orders (
     required String transactionRequestId,
     required String documentType,
     String? reissueMotivo,
+    int fragmentIndex = 1,
+    int fragmentTotal = 1,
   }) async {
     final raw = await _client.rpc(
       'admin_prepare_motolink_ally_document_emission',
@@ -2010,6 +2023,8 @@ sub_orders (
         'p_request_id': transactionRequestId,
         'p_document_type': documentType,
         'p_reissue_motivo': reissueMotivo?.trim(),
+        'p_fragment_index': fragmentIndex,
+        'p_fragment_total': fragmentTotal,
       },
     );
     if (raw is! Map) {
@@ -2022,6 +2037,7 @@ sub_orders (
     required String emissionId,
     required String storagePath,
     required String fileName,
+    bool isLastFragment = true,
   }) async {
     await _client.rpc(
       'admin_finalize_motolink_ally_document_emission',
@@ -2029,11 +2045,12 @@ sub_orders (
         'p_emission_id': emissionId,
         'p_storage_path': storagePath,
         'p_file_name': fileName,
+        'p_is_last_fragment': isLastFragment,
       },
     );
   }
 
-  /// Genera PDF oficial (nota o factura según preferencia del aliado), sube a Storage y registra emisión.
+  /// Genera uno o varios PDF oficiales (fragmentación por [MotolinkAllyInvoiceConstants.maxItemsPerDocument]).
   static Future<void> adminGenerateMotolinkAllyDocumentPdf({
     required String transactionRequestId,
     String? reissueMotivo,
@@ -2055,69 +2072,113 @@ sub_orders (
       );
     }
 
-    final prep = await adminPrepareMotolinkAllyDocumentEmission(
-      transactionRequestId: transactionRequestId,
-      documentType: pref,
-      reissueMotivo: reissueMotivo,
-    );
-
-    final emissionId = prep['emission_id']?.toString() ?? '';
-    if (emissionId.isEmpty) {
-      throw StateError('Emisión sin id.');
+    final lines = MotolinkAllyInvoicePdfService.linesFromRequest(r0);
+    final maxItems = MotolinkAllyInvoiceConstants.maxItemsPerDocument;
+    final chunks = <List<MotolinkAllyInvoicePdfLine>>[];
+    for (var i = 0; i < lines.length; i += maxItems) {
+      final end = (i + maxItems > lines.length) ? lines.length : i + maxItems;
+      chunks.add(lines.sublist(i, end));
     }
-    final correlativo = (prep['correlativo'] as num?)?.toInt() ?? 0;
-    final tasa = (prep['tasa_bcv_emision'] as num?)?.toDouble() ?? 0;
-    final iva = (prep['iva_pct_emision'] as num?)?.toDouble() ?? 16;
-    final igtf = (prep['igtf_pct_emision'] as num?)?.toDouble() ?? 3;
+    if (chunks.isEmpty) {
+      chunks.add(lines);
+    }
 
-    final r = await fetchTransactionRequestById(transactionRequestId);
-    if (r == null) throw StateError('Pedido no encontrado tras preparar.');
+    final trimmedReissue = reissueMotivo?.trim();
+    final isReissue = trimmedReissue != null && trimmedReissue.isNotEmpty;
+    if (isReissue && chunks.length > 1) {
+      throw StateError(
+        'La reemisión con varias hojas no está soportada. Contacte soporte.',
+      );
+    }
 
-    final bytes = await MotolinkAllyInvoicePdfService.build(
-      request: r,
-      documentType: pref,
-      correlativo: correlativo,
-      tasaBcvEmision: tasa,
-      ivaPct: iva,
-      igtfPct: igtf,
-      emissionId: emissionId,
-    );
+    final existingDone = r0.motolinkAllyDocumentEmissions
+        .where((e) => e.documentType == pref && e.isFinalized)
+        .length;
 
-    final label = pref == DocumentTypePreference.notaEntrega ? 'NE' : 'FF';
-    final safeName =
-        'MotoLink_${label}_${correlativo.toString().padLeft(6, '0')}.pdf';
-    final path = '$transactionRequestId/motolink_$emissionId.pdf';
+    if (!isReissue) {
+      if (existingDone >= chunks.length) return;
+    }
 
-    final existing = await _client
-        .from('transaction_requests')
-        .select('factura_aliado_storage_path')
-        .eq('id', transactionRequestId)
-        .maybeSingle();
-    if (existing != null) {
-      final oldPath = Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
-          ?.toString()
-          .trim();
-      if (oldPath != null && oldPath.isNotEmpty) {
-        try {
-          await _client.storage.from(_orderAllyInvoicesBucket).remove([oldPath]);
-        } catch (_) {}
+    var startIndex = isReissue ? 0 : existingDone;
+    if (startIndex > 0 && startIndex >= chunks.length) {
+      throw StateError(
+        'Estado de emisiones inconsistente con las líneas del pedido.',
+      );
+    }
+
+    if (startIndex == 0) {
+      final existing = await _client
+          .from('transaction_requests')
+          .select('factura_aliado_storage_path')
+          .eq('id', transactionRequestId)
+          .maybeSingle();
+      if (existing != null) {
+        final oldPath = Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
+            ?.toString()
+            .trim();
+        if (oldPath != null && oldPath.isNotEmpty) {
+          try {
+            await _client.storage.from(_orderAllyInvoicesBucket).remove([oldPath]);
+          } catch (_) {}
+        }
       }
     }
 
-    await _client.storage.from(_orderAllyInvoicesBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: const FileOptions(
-            contentType: 'application/pdf',
-            upsert: true,
-          ),
-        );
+    final label = pref == DocumentTypePreference.notaEntrega ? 'NE' : 'FF';
+    final totalFrags = chunks.length;
 
-    await adminFinalizeMotolinkAllyDocumentEmission(
-      emissionId: emissionId,
-      storagePath: path,
-      fileName: safeName,
-    );
+    for (var fi = startIndex; fi < chunks.length; fi++) {
+      final fragmentIndex = fi + 1;
+      final prep = await adminPrepareMotolinkAllyDocumentEmission(
+        transactionRequestId: transactionRequestId,
+        documentType: pref,
+        reissueMotivo: fragmentIndex == 1 ? trimmedReissue : null,
+        fragmentIndex: fragmentIndex,
+        fragmentTotal: totalFrags,
+      );
+
+      final emissionId = prep['emission_id']?.toString() ?? '';
+      if (emissionId.isEmpty) {
+        throw StateError('Emisión sin id.');
+      }
+      final correlativo = (prep['correlativo'] as num?)?.toInt() ?? 0;
+      final tasa = (prep['tasa_bcv_emision'] as num?)?.toDouble() ?? 0;
+      final iva = (prep['iva_pct_emision'] as num?)?.toDouble() ?? 16;
+      final igtf = (prep['igtf_pct_emision'] as num?)?.toDouble() ?? 3;
+
+      final bytes = await MotolinkAllyInvoicePdfService.build(
+        request: r0,
+        documentType: pref,
+        correlativo: correlativo,
+        tasaBcvEmision: tasa,
+        ivaPct: iva,
+        igtfPct: igtf,
+        emissionId: emissionId,
+        lines: chunks[fi],
+        fragmentIndex: fragmentIndex,
+        fragmentTotal: totalFrags,
+      );
+
+      final safeName =
+          'MotoLink_${label}_${correlativo.toString().padLeft(6, '0')}.pdf';
+      final path = '$transactionRequestId/motolink_$emissionId.pdf';
+
+      await _client.storage.from(_orderAllyInvoicesBucket).uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'application/pdf',
+              upsert: true,
+            ),
+          );
+
+      await adminFinalizeMotolinkAllyDocumentEmission(
+        emissionId: emissionId,
+        storagePath: path,
+        fileName: safeName,
+        isLastFragment: fi == chunks.length - 1,
+      );
+    }
   }
 
   /// Aliado: sube foto del comprobante y envía a revisión MotoLink.

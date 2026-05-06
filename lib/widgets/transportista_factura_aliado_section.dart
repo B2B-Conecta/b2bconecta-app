@@ -15,9 +15,9 @@ class TransportistaFacturaAliadoSection extends StatelessWidget {
 
   final TransactionRequestModel request;
 
-  Future<void> _open(BuildContext context) async {
-    final path = request.facturaAliadoStoragePath?.trim();
-    if (path == null || path.isEmpty) return;
+  Future<void> _openPath(BuildContext context, String rawPath) async {
+    final path = rawPath.trim();
+    if (path.isEmpty) return;
     try {
       final url = await SupabaseService.createSignedUrlForFacturaAliado(path);
       final uri = Uri.tryParse(url);
@@ -77,7 +77,8 @@ class TransportistaFacturaAliadoSection extends StatelessWidget {
                 color: Colors.grey.shade800,
               ),
             ),
-            if (r.facturaAliadoFileName != null &&
+            if (r.motolinkAllyInvoicesDescargables.length <= 1 &&
+                r.facturaAliadoFileName != null &&
                 r.facturaAliadoFileName!.trim().isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
@@ -97,14 +98,39 @@ class TransportistaFacturaAliadoSection extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _open(context),
-                icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text('Abrir factura'),
+            if (r.motolinkAllyInvoicesDescargables.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final e in r.motolinkAllyInvoicesDescargables)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: OutlinedButton.icon(
+                        onPressed: e.storagePath == null ||
+                                e.storagePath!.trim().isEmpty
+                            ? null
+                            : () => _openPath(context, e.storagePath!),
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: Text(
+                          e.downloadButtonLabel,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                ],
+              )
+            else if (r.facturaAliadoStoragePath != null &&
+                r.facturaAliadoStoragePath!.trim().isNotEmpty)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _openPath(context, r.facturaAliadoStoragePath!),
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('Abrir factura'),
+                ),
               ),
-            ),
           ],
         ),
       ),

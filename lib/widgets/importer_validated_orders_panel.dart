@@ -30,13 +30,44 @@ class _ImporterValidatedOrdersPanelState
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    MainShellTabController.registerImportadorValidadosNotificationDeepLink(
+      _onNotificationValidadosDeepLink,
+    );
     _load();
   }
 
   @override
   void dispose() {
+    MainShellTabController.registerImportadorValidadosNotificationDeepLink(null);
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onNotificationValidadosDeepLink() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    for (final r in _rows) {
+      if (r.id == pending) {
+        MainShellTabController.consumePendingNotificationRelatedId();
+        setState(() => _expandedRequestId = _rowKey(r));
+        return;
+      }
+    }
+    if (!_loading) {
+      _load();
+    }
+  }
+
+  void _tryExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return;
+    for (final r in _rows) {
+      if (r.id == pending) {
+        MainShellTabController.consumePendingNotificationRelatedId();
+        setState(() => _expandedRequestId = _rowKey(r));
+        return;
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -52,6 +83,7 @@ class _ImporterValidatedOrdersPanelState
         _rows = rows;
         _loading = false;
       });
+      _tryExpandFromPendingNotification();
     } catch (e) {
       if (!mounted) return;
       setState(() {

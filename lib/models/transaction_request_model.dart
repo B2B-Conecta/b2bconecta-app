@@ -1,3 +1,4 @@
+import 'motolink_ally_document_emission_model.dart';
 import 'order_item_model.dart';
 import 'pago_metodo.dart';
 import 'payment_schedule_model.dart';
@@ -99,6 +100,7 @@ class TransactionRequestModel {
     this.transportistaLiveLat,
     this.transportistaLiveLng,
     this.transportistaLiveLocationAt,
+    this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
   });
 
   final String id;
@@ -237,6 +239,17 @@ class TransactionRequestModel {
   final double? transportistaLiveLng;
   final DateTime? transportistaLiveLocationAt;
 
+  /// Emisiones de documento MotoLink al aliado (nota / factura; puede haber varias hojas).
+  final List<MotolinkAllyDocumentEmissionModel> motolinkAllyDocumentEmissions;
+
+  /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
+  List<MotolinkAllyDocumentEmissionModel> get motolinkAllyInvoicesDescargables =>
+      motolinkAllyDocumentEmissions.where((e) => e.isFinalized).toList();
+
+  /// Pedido con más de una hoja fiscal MotoLink (límite de ítems SENIAT).
+  bool get hasMultiFragmentMotolinkAllyDocs =>
+      motolinkAllyInvoicesDescargables.any((e) => e.fragmentTotal > 1);
+
   /// Perfiles importador (almacenes) para el RPC de proximidad: sub-pedidos o dueño en pedido simple.
   List<String> get importerProfileIdsForTransportistaProximity {
     if (isMasterOrder && subOrders.isNotEmpty) {
@@ -359,8 +372,9 @@ class TransactionRequestModel {
       proveedorFacturaStoragePath!.trim().isNotEmpty;
 
   bool get hasFacturaAliado =>
-      facturaAliadoStoragePath != null &&
-      facturaAliadoStoragePath!.trim().isNotEmpty;
+      (facturaAliadoStoragePath != null &&
+          facturaAliadoStoragePath!.trim().isNotEmpty) ||
+      motolinkAllyDocumentEmissions.any((e) => e.isFinalized);
 
   /// Con factura MotoLink hace falta elegir nota vs factura fiscal antes de pagar.
   bool get aliadoDebeElegirDocumentTypeAntesDePago =>
@@ -1002,6 +1016,10 @@ class TransactionRequestModel {
       transportistaLiveLng: _asNullableDouble(json['transportista_live_lng']),
       transportistaLiveLocationAt:
           _parseDate(json['transportista_live_location_at']),
+      motolinkAllyDocumentEmissions:
+          MotolinkAllyDocumentEmissionModel.listFromJson(
+        json['motolink_ally_document_emissions'],
+      ),
     );
   }
 

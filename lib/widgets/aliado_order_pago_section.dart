@@ -186,11 +186,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
-  Future<void> _abrirFactura(BuildContext context) async {
-    final path = widget.request.facturaAliadoStoragePath?.trim();
-    if (path == null || path.isEmpty) return;
+  Future<void> _abrirFacturaPath(BuildContext context, String path) async {
+    final p = path.trim();
+    if (p.isEmpty) return;
     try {
-      final url = await SupabaseService.createSignedUrlForFacturaAliado(path);
+      final url = await SupabaseService.createSignedUrlForFacturaAliado(p);
       final uri = Uri.parse(url);
       if (!context.mounted) return;
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -601,7 +601,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         ],
         if (r.hasFacturaAliado) ...[
           Text(
-            'Factura MotoLink: ${r.facturaAliadoFileName ?? 'documento'}',
+            r.motolinkAllyInvoicesDescargables.length > 1
+                ? 'Facturas MotoLink (${r.motolinkAllyInvoicesDescargables.length} documentos)'
+                : 'Factura MotoLink: ${r.facturaAliadoFileName ?? 'documento'}',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
           ),
           Text(
@@ -609,11 +611,34 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () => _abrirFactura(context),
-            icon: const Icon(Icons.download_outlined, size: 18),
-            label: const Text('Ver / descargar factura'),
-          ),
+          if (r.motolinkAllyInvoicesDescargables.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final e in r.motolinkAllyInvoicesDescargables)
+                  OutlinedButton.icon(
+                    onPressed: e.storagePath == null ||
+                            e.storagePath!.trim().isEmpty
+                        ? null
+                        : () => _abrirFacturaPath(context, e.storagePath!),
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    label: Text(
+                      e.downloadButtonLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            )
+          else if (r.facturaAliadoStoragePath != null &&
+              r.facturaAliadoStoragePath!.trim().isNotEmpty)
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _abrirFacturaPath(context, r.facturaAliadoStoragePath!),
+              icon: const Icon(Icons.download_outlined, size: 18),
+              label: const Text('Ver / descargar factura'),
+            ),
         ] else if (!referenciaHistorica)
           Text(
             'Cuando MotoLink emita la factura oficial al aliado, aquí podrá elegir método de pago '

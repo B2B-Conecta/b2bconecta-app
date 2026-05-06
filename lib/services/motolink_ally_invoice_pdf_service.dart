@@ -8,8 +8,9 @@ import '../config/motolink_fiscal_issuer_constants.dart';
 import '../models/document_type_preference.dart';
 import '../models/transaction_request_model.dart';
 
-class _PdfLine {
-  const _PdfLine({
+/// Línea de detalle para el PDF (ítem de pedido).
+class MotolinkAllyInvoicePdfLine {
+  const MotolinkAllyInvoicePdfLine({
     required this.codigo,
     required this.descripcion,
     required this.cantidad,
@@ -28,6 +29,63 @@ class _PdfLine {
 class MotolinkAllyInvoicePdfService {
   MotolinkAllyInvoicePdfService._();
 
+  /// Líneas de facturación en orden (order_items del maestro o línea única simple).
+  static List<MotolinkAllyInvoicePdfLine> linesFromRequest(TransactionRequestModel r) {
+    if (r.isMasterOrder && r.subOrders.isNotEmpty) {
+      final out = <MotolinkAllyInvoicePdfLine>[];
+      for (final so in r.subOrders) {
+        final imp = so.importadorBusinessName?.trim();
+        for (final oi in so.orderItems) {
+          final name = oi.productName?.trim().isNotEmpty == true
+              ? oi.productName!.trim()
+              : 'Producto';
+          final sku = oi.productSku?.trim() ?? '';
+          final desc = imp != null && imp.isNotEmpty ? '$name · $imp' : name;
+          out.add(
+            MotolinkAllyInvoicePdfLine(
+              codigo: sku.isNotEmpty ? sku : '—',
+              descripcion: desc,
+              cantidad: oi.cantidad,
+              precioUnitarioRef: oi.precioUnitarioAliado,
+              montoRef: oi.precioLineTotal,
+            ),
+          );
+        }
+      }
+      if (out.isEmpty) {
+        for (final so in r.subOrders) {
+          if (so.montoSubtotal <= 0) continue;
+          final imp = so.importadorBusinessName?.trim();
+          out.add(
+            MotolinkAllyInvoicePdfLine(
+              codigo: '—',
+              descripcion: imp != null && imp.isNotEmpty
+                  ? 'Resumen almacén · $imp'
+                  : 'Resumen sub-pedido',
+              cantidad: 1,
+              precioUnitarioRef: so.montoSubtotal,
+              montoRef: so.montoSubtotal,
+            ),
+          );
+        }
+      }
+      if (out.isNotEmpty) return out;
+    }
+    final pname = r.productName?.trim().isNotEmpty == true
+        ? r.productName!.trim()
+        : 'Producto';
+    final sku = r.productSku?.trim() ?? '';
+    return [
+      MotolinkAllyInvoicePdfLine(
+        codigo: sku.isNotEmpty ? sku : '—',
+        descripcion: pname,
+        cantidad: r.cantidad,
+        precioUnitarioRef: r.precioUnitarioAliado,
+        montoRef: r.precioTotal,
+      ),
+    ];
+  }
+
   static Future<Uint8List> build({
     required TransactionRequestModel request,
     required String documentType,
@@ -36,10 +94,13 @@ class MotolinkAllyInvoicePdfService {
     required double ivaPct,
     required double igtfPct,
     required String emissionId,
+    List<MotolinkAllyInvoicePdfLine>? lines,
+    int fragmentIndex = 1,
+    int fragmentTotal = 1,
   }) async {
-    final lines = _linesFromRequest(request);
+    final useLines = lines ?? linesFromRequest(request);
     final subtotalRef =
-        lines.fold<double>(0, (a, e) => a + e.montoRef);
+        useLines.fold<double>(0, (a, e) => a + e.montoRef);
 
     Uint8List? logoBytes;
     try {
@@ -54,6 +115,12 @@ class MotolinkAllyInvoicePdfService {
     final docLabel = isNota ? 'NE' : 'FF';
     final controlFmt =
         '00-${correlativo.toString().padLeft(6, '0')}';
+    final idShort = request.id.length >= 8
+        ? request.id.substring(0, 8)
+        : request.id;
+    final emissionShort = emissionId.length >= 8
+        ? emissionId.substring(0, 8)
+        : emissionId;
 
     final aliadoNombre = request.aliadoBusinessName?.trim().isNotEmpty == true
         ? request.aliadoBusinessName!.trim()
@@ -75,6 +142,29 @@ class MotolinkAllyInvoicePdfService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(28),
+        footer: (ctx) => pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 10),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Container(height: 0.5, color: PdfColors.grey500),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'Tasa BCV utilizada para conversión REF → Bs: ${tasaBcvEmision.toStringAsFixed(2)}',
+                style: pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                'Observaciones: Página $fragmentIndex de $fragmentTotal del pedido #$idShort',
+                style: pw.TextStyle(
+                  fontSize: 7,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey900,
+                ),
+              ),
+            ],
+          ),
+        ),
         build: (ctx) => [
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -149,7 +239,7 @@ class MotolinkAllyInvoicePdfService {
                     style: const pw.TextStyle(fontSize: 9),
                   ),
                   pw.Text(
-                    'Emisión UUID: ${emissionId.substring(0, 8)}…',
+                    'Emisión UUID: $emissionShort…',
                     style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
                   ),
                 ],
@@ -171,7 +261,11 @@ class MotolinkAllyInvoicePdfService {
           _fieldRow('Domicilio fiscal', aliadoDir),
           _fieldRow(
             'Pedido MotoLink',
-            request.id.substring(0, 8),
+            idShort,
+          ),
+          _fieldRow(
+            'Observaciones',
+            'Página $fragmentIndex de $fragmentTotal del pedido #$idShort',
           ),
           ..._importerBlockWidgets(request),
           pw.SizedBox(height: 10),
@@ -185,7 +279,7 @@ class MotolinkAllyInvoicePdfService {
                     'P.U. REF',
                     'Monto REF',
                   ],
-            data: lines.map((e) {
+            data: useLines.map((e) {
               if (isNota) {
                 return [
                   e.cantidad.toString(),
@@ -350,7 +444,6 @@ class MotolinkAllyInvoicePdfService {
 
   static String _fmtBs(double v) => 'Bs ${v.toStringAsFixed(2)}';
 
-  /// Nombres de importadores (maestro: un sub-pedido por importador; simple: dueño del producto).
   static List<String> _importerNamesOrdered(TransactionRequestModel r) {
     if (r.isMasterOrder && r.subOrders.isNotEmpty) {
       final names = <String>[];
@@ -385,64 +478,6 @@ class MotolinkAllyInvoicePdfService {
           padding: const pw.EdgeInsets.only(bottom: 2),
           child: pw.Text('• $n', style: const pw.TextStyle(fontSize: 8)),
         ),
-      ),
-    ];
-  }
-
-  static List<_PdfLine> _linesFromRequest(TransactionRequestModel r) {
-    if (r.isMasterOrder && r.subOrders.isNotEmpty) {
-      final out = <_PdfLine>[];
-      for (final so in r.subOrders) {
-        final imp = so.importadorBusinessName?.trim();
-        for (final oi in so.orderItems) {
-          final name = oi.productName?.trim().isNotEmpty == true
-              ? oi.productName!.trim()
-              : 'Producto';
-          final sku = oi.productSku?.trim() ?? '';
-          final desc = imp != null && imp.isNotEmpty
-              ? '$name · $imp'
-              : name;
-          out.add(
-            _PdfLine(
-              codigo: sku.isNotEmpty ? sku : '—',
-              descripcion: desc,
-              cantidad: oi.cantidad,
-              precioUnitarioRef: oi.precioUnitarioAliado,
-              montoRef: oi.precioLineTotal,
-            ),
-          );
-        }
-      }
-      if (out.isEmpty) {
-        for (final so in r.subOrders) {
-          if (so.montoSubtotal <= 0) continue;
-          final imp = so.importadorBusinessName?.trim();
-          out.add(
-            _PdfLine(
-              codigo: '—',
-              descripcion: imp != null && imp.isNotEmpty
-                  ? 'Resumen almacén · $imp'
-                  : 'Resumen sub-pedido',
-              cantidad: 1,
-              precioUnitarioRef: so.montoSubtotal,
-              montoRef: so.montoSubtotal,
-            ),
-          );
-        }
-      }
-      if (out.isNotEmpty) return out;
-    }
-    final pname = r.productName?.trim().isNotEmpty == true
-        ? r.productName!.trim()
-        : 'Producto';
-    final sku = r.productSku?.trim() ?? '';
-    return [
-      _PdfLine(
-        codigo: sku.isNotEmpty ? sku : '—',
-        descripcion: pname,
-        cantidad: r.cantidad,
-        precioUnitarioRef: r.precioUnitarioAliado,
-        montoRef: r.precioTotal,
       ),
     ];
   }

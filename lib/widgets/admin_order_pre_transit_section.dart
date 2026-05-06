@@ -2,12 +2,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/motolink_ally_invoice_constants.dart';
 import '../models/document_type_preference.dart';
 import '../models/pago_revision_estado.dart';
 import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import '../services/motolink_ally_invoice_pdf_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
@@ -147,13 +149,47 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
       return;
     }
 
+    final lines = MotolinkAllyInvoicePdfService.linesFromRequest(r);
+    final totalChunks = lines.isEmpty
+        ? 1
+        : (lines.length / MotolinkAllyInvoiceConstants.maxItemsPerDocument)
+            .ceil();
+    final existingDone = r.motolinkAllyDocumentEmissions
+        .where((e) => e.documentType == pref && e.isFinalized)
+        .length;
+    final needsResume = existingDone > 0 && existingDone < totalChunks;
+
     String? motivo;
-    if (r.hasFacturaAliado) {
+    if (r.hasFacturaAliado && !needsResume) {
+      if (r.hasMultiFragmentMotolinkAllyDocs) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No se puede reemitir el PDF en pedidos con varias hojas fiscales.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      if (r.motolinkAllyInvoicesDescargables.isEmpty && totalChunks > 1) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Este pedido legacy tiene demasiados ítems para reemisión automática; contacte soporte.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
       motivo = await _pedirMotivoReemision(context);
       if (motivo == null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('La reemision requiere un motivo.')),
+            const SnackBar(content: Text('La reemisión requiere un motivo.')),
           );
         }
         return;
@@ -199,6 +235,25 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
     }
 
     final pe = r.pagoEstadoRevisionEfectivo;
+    final prefDoc = r.documentTypePreference?.trim();
+    final linesMoto = MotolinkAllyInvoicePdfService.linesFromRequest(r);
+    final motoTotalChunks = linesMoto.isEmpty
+        ? 1
+        : (linesMoto.length / MotolinkAllyInvoiceConstants.maxItemsPerDocument)
+            .ceil();
+    final motoExistingDone = prefDoc != null &&
+            DocumentTypePreference.values.contains(prefDoc)
+        ? r.motolinkAllyDocumentEmissions
+            .where((e) => e.documentType == prefDoc && e.isFinalized)
+            .length
+        : 0;
+    final motoNeedsResume =
+        motoExistingDone > 0 && motoExistingDone < motoTotalChunks;
+    final blockMotoPdfReissue = r.hasFacturaAliado &&
+        !motoNeedsResume &&
+        (r.hasMultiFragmentMotolinkAllyDocs ||
+            (r.motolinkAllyInvoicesDescargables.isEmpty &&
+                motoTotalChunks > 1));
     final allSubOrdersListo = r.isMasterOrder &&
         r.subOrders.isNotEmpty &&
         r.subOrders.every((s) => s.status == 'listo');
@@ -392,7 +447,8 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
               onPressed: (pe == PagoRevisionEstado.enRevision ||
                       pe == PagoRevisionEstado.aprobado ||
                       _busyGeneratePdf ||
-                      _busyFacturaAliado)
+                      _busyFacturaAliado ||
+                      blockMotoPdfReissue)
                   ? null
                   : () => _generateMotoLinkPdf(context),
               icon: _busyGeneratePdf
@@ -403,12 +459,23 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
                     )
                   : const Icon(Icons.picture_as_pdf_outlined, size: 20),
               label: Text(
-                r.hasFacturaAliado
-                    ? 'Re-emitir PDF MotoLink (con motivo)'
-                    : 'Generar PDF MotoLink (plantilla)',
+                motoNeedsResume
+                    ? 'Completar PDF MotoLink ($motoExistingDone/$motoTotalChunks)'
+                    : r.hasFacturaAliado
+                        ? 'Re-emitir PDF MotoLink (con motivo)'
+                        : 'Generar PDF MotoLink (plantilla)',
               ),
             ),
           ),
+          if (blockMotoPdfReissue) ...[
+            const SizedBox(height: 4),
+            Text(
+              r.hasMultiFragmentMotolinkAllyDocs
+                  ? 'La reemisión no aplica a pedidos ya fragmentados en varias hojas.'
+                  : 'Reemisión no disponible: pedido con muchos ítems sin emisiones registradas.',
+              style: TextStyle(fontSize: 10, color: Colors.orange.shade800),
+            ),
+          ],
           Text(
             'Usa la tasa BCV del día y los porcentajes IVA/IGTF configurados en administración. '
             'Sustituye adjuntar archivo manual si lo desea.',
@@ -417,43 +484,103 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           const SizedBox(height: 8),
         ],
         if (r.hasFacturaAliado) ...[
-          Text(
-            r.facturaAliadoFileName ?? 'Archivo',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-          ),
-          Text(
-            'Subida: ${formatEsShortDateTime(r.facturaAliadoSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _openUrl(
-                  context,
-                  () => SupabaseService.createSignedUrlForFacturaAliado(
-                    r.facturaAliadoStoragePath!.trim(),
-                  ),
-                ),
-                icon: const Icon(Icons.download_outlined, size: 18),
-                label: const Text('Abrir / descargar'),
+          if (r.motolinkAllyInvoicesDescargables.isNotEmpty) ...[
+            Text(
+              r.motolinkAllyInvoicesDescargables.length > 1
+                  ? '${r.motolinkAllyInvoicesDescargables.length} documentos fiscales MotoLink'
+                  : (r.facturaAliadoFileName?.trim().isNotEmpty == true
+                      ? r.facturaAliadoFileName!.trim()
+                      : r.motolinkAllyInvoicesDescargables.single
+                          .downloadButtonLabel),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            ),
+            if (r.facturaAliadoSubmittedAt != null)
+              Text(
+                'Última emisión: ${formatEsShortDateTime(r.facturaAliadoSubmittedAt)}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
-              if (pe != PagoRevisionEstado.aprobado &&
-                  pe != PagoRevisionEstado.enRevision)
-                OutlinedButton(
-                  onPressed: _busyFacturaAliado ? null : () => _pickFacturaAliado(context),
-                  child: _busyFacturaAliado
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Reemplazar factura'),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final e in r.motolinkAllyInvoicesDescargables)
+                  OutlinedButton.icon(
+                    onPressed: e.storagePath == null ||
+                            e.storagePath!.trim().isEmpty
+                        ? null
+                        : () => _openUrl(
+                              context,
+                              () => SupabaseService.createSignedUrlForFacturaAliado(
+                                    e.storagePath!.trim(),
+                                  ),
+                            ),
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    label: Text(
+                      e.downloadButtonLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (!r.hasMultiFragmentMotolinkAllyDocs &&
+                    pe != PagoRevisionEstado.aprobado &&
+                    pe != PagoRevisionEstado.enRevision)
+                  OutlinedButton(
+                    onPressed: _busyFacturaAliado
+                        ? null
+                        : () => _pickFacturaAliado(context),
+                    child: _busyFacturaAliado
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Reemplazar factura'),
+                  ),
+              ],
+            ),
+          ] else if (r.facturaAliadoStoragePath != null &&
+              r.facturaAliadoStoragePath!.trim().isNotEmpty) ...[
+            Text(
+              r.facturaAliadoFileName ?? 'Archivo',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            ),
+            Text(
+              'Subida: ${formatEsShortDateTime(r.facturaAliadoSubmittedAt)}',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _openUrl(
+                    context,
+                    () => SupabaseService.createSignedUrlForFacturaAliado(
+                      r.facturaAliadoStoragePath!.trim(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: const Text('Abrir / descargar'),
                 ),
-            ],
-          ),
+                if (pe != PagoRevisionEstado.aprobado &&
+                    pe != PagoRevisionEstado.enRevision)
+                  OutlinedButton(
+                    onPressed: _busyFacturaAliado
+                        ? null
+                        : () => _pickFacturaAliado(context),
+                    child: _busyFacturaAliado
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Reemplazar factura'),
+                  ),
+              ],
+            ),
+          ],
         ] else
           OutlinedButton(
             onPressed: !hasProveedorFacturaOperativa || _busyFacturaAliado

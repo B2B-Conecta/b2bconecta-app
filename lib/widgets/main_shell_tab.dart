@@ -11,6 +11,7 @@ class MainShellTabController {
   static VoidCallback? _refreshImporterPedidos;
   static String? _pendingNotificationRelatedId;
   static VoidCallback? _pedidosNotificationDeepLink;
+  static VoidCallback? _importadorValidadosNotificationDeepLink;
   static VoidCallback? _adminActivosNotificationDeepLink;
   static VoidCallback? _adminPorValidarNotificationDeepLink;
   static VoidCallback? _adminCreditoKycNotificationDeepLink;
@@ -25,6 +26,7 @@ class MainShellTabController {
     _refreshImporterPedidos = null;
     _pendingNotificationRelatedId = null;
     _pedidosNotificationDeepLink = null;
+    _importadorValidadosNotificationDeepLink = null;
     _adminActivosNotificationDeepLink = null;
     _adminPorValidarNotificationDeepLink = null;
     _adminCreditoKycNotificationDeepLink = null;
@@ -53,6 +55,20 @@ class MainShellTabController {
   /// [AliadoPedidosPanel] / [ImporterActiveOrdersPanel] registran el expand tras deep link.
   static void registerPedidosNotificationDeepLink(VoidCallback? onNavigate) {
     _pedidosNotificationDeepLink = onNavigate;
+  }
+
+  /// [ImporterValidatedOrdersPanel]: pestaña Validados (índice 2) + expande el pedido.
+  static void registerImportadorValidadosNotificationDeepLink(
+      VoidCallback? onNavigate) {
+    _importadorValidadosNotificationDeepLink = onNavigate;
+  }
+
+  /// Pestaña Validados importador + expande fila vinculada a la notificación.
+  static void navigateToImportadorValidadosForNotification() {
+    _goTo?.call(2);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _importadorValidadosNotificationDeepLink?.call();
+    });
   }
 
   /// [AdminActiveOrdersPanel] expande el pedido del chat tras deep link.

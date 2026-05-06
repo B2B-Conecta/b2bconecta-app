@@ -905,24 +905,46 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         ),
       );
     }
-    if (r.hasFacturaAliado && r.facturaAliadoStoragePath != null) {
-      final path = r.facturaAliadoStoragePath!.trim();
-      chips.add(
-        OutlinedButton.icon(
-          onPressed: () => _launchSignedOrderDoc(
-            context,
-            () => SupabaseService.createSignedUrlForFacturaAliado(path),
+    if (r.hasFacturaAliado) {
+      final moto = r.motolinkAllyInvoicesDescargables;
+      if (moto.isNotEmpty) {
+        for (final e in moto) {
+          final path = e.storagePath?.trim();
+          if (path == null || path.isEmpty) continue;
+          chips.add(
+            OutlinedButton.icon(
+              onPressed: () => _launchSignedOrderDoc(
+                context,
+                () => SupabaseService.createSignedUrlForFacturaAliado(path),
+              ),
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+              label: Text(
+                'Factura MotoLink · ${e.downloadButtonLabel}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          );
+        }
+      } else if (r.facturaAliadoStoragePath != null) {
+        final path = r.facturaAliadoStoragePath!.trim();
+        chips.add(
+          OutlinedButton.icon(
+            onPressed: () => _launchSignedOrderDoc(
+              context,
+              () => SupabaseService.createSignedUrlForFacturaAliado(path),
+            ),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: Text(
+              r.facturaAliadoFileName?.trim().isNotEmpty == true
+                  ? 'Factura MotoLink · ${r.facturaAliadoFileName}'
+                  : 'Factura MotoLink al aliado',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-          label: Text(
-            r.facturaAliadoFileName?.trim().isNotEmpty == true
-                ? 'Factura MotoLink · ${r.facturaAliadoFileName}'
-                : 'Factura MotoLink al aliado',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      );
+        );
+      }
     }
     if (r.hasComprobantePago && r.comprobantePagoStoragePath != null) {
       final path = r.comprobantePagoStoragePath!.trim();

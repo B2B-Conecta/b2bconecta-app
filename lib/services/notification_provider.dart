@@ -158,10 +158,22 @@ class NotificationProvider extends ChangeNotifier {
         MainShellTabController.navigateToAdminActivosForNotification();
         return;
       case AppHomeRole.aliado:
-      case AppHomeRole.importador:
         MainShellTabController.navigateToPedidosForNotification();
         return;
+      case AppHomeRole.importador:
+        if (_importadorNotificationOpensValidadosTab(n)) {
+          MainShellTabController.navigateToImportadorValidadosForNotification();
+        } else {
+          MainShellTabController.navigateToPedidosForNotification();
+        }
+        return;
     }
+  }
+
+  /// Pedidos recién aprobados por MotoLink viven en «Validados» hasta la primera acción del importador.
+  static bool _importadorNotificationOpensValidadosTab(InAppNotificationModel n) {
+    final title = n.title.trim();
+    return title == 'Pedido aprobado para su inventario';
   }
 
   void _onRealtimeInsert(InAppNotificationModel n) {

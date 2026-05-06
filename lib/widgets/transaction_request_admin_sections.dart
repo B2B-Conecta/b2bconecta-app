@@ -13,6 +13,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/ves_amount_format.dart';
 import 'transaction_request_transit_supplier_ally_maps_cta.dart';
 
 Future<void> _launchSignedOrderDoc(
@@ -688,7 +689,7 @@ class SubOrderImporterLineasCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Sub-total (REF, este almacén): '
-                '${s.montoSubtotal.toStringAsFixed(2)}',
+                '${formatRefAmount(s.montoSubtotal)}',
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
@@ -767,7 +768,7 @@ class SubOrderImporterLineasCard extends StatelessWidget {
             ),
           const SizedBox(height: 2),
           Text(
-            '$cant uds · ${ref.toStringAsFixed(2)} REF (línea)',
+            '$cant uds · ${formatRefAmount(ref)} REF (línea)',
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,

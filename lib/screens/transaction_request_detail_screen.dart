@@ -6,6 +6,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/ves_amount_format.dart';
 import '../widgets/courier_timeline_widget.dart';
 import '../widgets/importer_aliado_solicitud_section.dart';
 import '../widgets/transaction_request_admin_sections.dart';
@@ -462,7 +463,7 @@ class _TransactionRequestDetailScreenState
             if (!r.isMasterOrder) _chip('Cantidad: ${r.cantidad}'),
             if (r.precioTotalBsUi != null)
               _chip(
-                'Referencia BS: ${r.precioTotalBsUi!.toStringAsFixed(2)}',
+                'Referencia en Bs: ${formatVesAmount(r.precioTotalBsUi!)}',
               ),
           ],
         ),
@@ -518,8 +519,8 @@ class _TransactionRequestDetailScreenState
                     ],
                   ),
                   Text(
-                    '${so.itemsCount} ítems · subtotal REF ${so.montoSubtotal.toStringAsFixed(2)}'
-                    '${r.tasaBcvSnapshot != null ? ' · ~${(so.montoSubtotal * r.tasaBcvSnapshot!).toStringAsFixed(2)} BS' : ''}',
+                    '${so.itemsCount} ítems · subtotal REF ${formatRefAmount(so.montoSubtotal)}'
+                    '${r.tasaBcvSnapshot != null ? ' · ~${formatVesAmount(so.montoSubtotal * r.tasaBcvSnapshot!)} Bs' : ''}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade800,
@@ -532,7 +533,7 @@ class _TransactionRequestDetailScreenState
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         '· ${it.productName ?? 'Producto'} × ${it.cantidad} '
-                        '(${it.precioLineTotal.toStringAsFixed(2)} REF)',
+                        '(${formatRefAmount(it.precioLineTotal)} REF)',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade700,

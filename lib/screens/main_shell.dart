@@ -20,6 +20,7 @@ import '../widgets/main_shell_tab.dart';
 import '../widgets/motolink_app_bar.dart';
 import '../widgets/notification_center_sheet.dart';
 import '../widgets/profile_b2b_form.dart';
+import '../widgets/transportista_closed_orders_panel.dart';
 import 'account_settings_screen.dart';
 import 'home_screen.dart';
 
@@ -340,6 +341,13 @@ class _MainShellState extends State<MainShell> {
               isTransportistaView: true,
             ),
           ),
+          _adminOrdersScaffold(
+            title: 'Pedidos cerrados',
+            subtitle:
+                'Envíos finalizados (entregados o cerrados por MotoLink) en los que '
+                'sigue figurando como transportista asignado.',
+            child: const TransportistaClosedOrdersPanel(),
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.transportista,
@@ -368,7 +376,12 @@ class _MainShellState extends State<MainShell> {
             BottomNavigationBarItem(
               icon: Icon(Icons.local_shipping_outlined),
               activeIcon: Icon(Icons.local_shipping),
-              label: 'Pedidos',
+              label: 'Despacho',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: 'Cerrados',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

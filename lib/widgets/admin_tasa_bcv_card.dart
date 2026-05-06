@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/ves_amount_format.dart';
 
 /// Admin: actualizar tasa BCV global (`app_global_config`).
 class AdminTasaBcvCard extends StatefulWidget {
@@ -38,7 +39,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
     try {
       final v = await SupabaseService.fetchGlobalTasaBcv();
       if (!mounted) return;
-      _ctrl.text = v?.toStringAsFixed(4) ?? '';
+      _ctrl.text = v != null ? formatVesAmount(v, fractionDigits: 4) : '';
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
@@ -50,7 +51,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
   }
 
   Future<void> _save() async {
-    final parsed = double.tryParse(_ctrl.text.replaceAll(',', '.'));
+    final parsed = parseVesOrEnDecimal(_ctrl.text);
     if (parsed == null || parsed <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Indique una tasa numérica válida.')),

@@ -4,6 +4,7 @@ import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
+import '../utils/ves_amount_format.dart';
 import 'courier_timeline_widget.dart';
 import 'transaction_request_admin_sections.dart';
 import 'transportista_recogida_almacen_section.dart';
@@ -122,10 +123,10 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ? '${r.subOrders.isEmpty ? 0 : r.subOrders.length} '
                                     '${r.subOrders.length == 1 ? "importador" : "importadores"} · '
                                     '${r.totalUnidadesAliado} uds · Total REF '
-                                    '${r.precioTotal.toStringAsFixed(2)}'
-                                    '${r.precioTotalBsUi != null ? " · ~${r.precioTotalBsUi!.toStringAsFixed(2)} BS" : ""}'
+                                    '${formatRefAmount(r.precioTotal)}'
+                                    '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}'
                                 : '${r.cantidad} uds · Total estimado '
-                                    '${r.precioTotal.toStringAsFixed(2)} REF',
+                                    '${formatRefAmount(r.precioTotal)} REF',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,

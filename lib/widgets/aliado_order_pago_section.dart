@@ -10,6 +10,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/ves_amount_format.dart';
 import '../utils/app_date_format.dart';
 import 'aliado_document_type_preference_section.dart';
 import 'aliado_order_experience_section.dart';
@@ -46,7 +47,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   static double _totalConRecargoEfectivo(double base) =>
       (base * (1 + PagoMetodo.recargoEfectivoTasa) * 100).round() / 100;
 
-  static String _fmtRef(double v) => '${v.toStringAsFixed(2)} REF';
+  static String _fmtRef(double v) => '${formatRefAmount(v)} REF';
 
   /// Primeros pedidos: solo transferencia/efectivo. Tras las 3 entregas iniciales: igual hasta que
   /// MotoLink asigne cupo (>0); entonces Pago Móvil, Zelle y crédito sistema según perfil.
@@ -502,7 +503,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 if (r.saldoPendienteRealConPlan != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Saldo pendiente real: ${r.saldoPendienteRealConPlan!.toStringAsFixed(2)} REF (total menos cuotas aprobadas por MotoLink).',
+                    'Saldo pendiente real: ${formatRefAmount(r.saldoPendienteRealConPlan!)} REF (total menos cuotas aprobadas por MotoLink).',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -514,7 +515,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 if (r.creditMontoBloqueado != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Monto vinculado a su cupo: ${r.creditMontoBloqueado!.toStringAsFixed(2)} REF al formalizar el plan.',
+                    'Monto vinculado a su cupo: ${formatRefAmount(r.creditMontoBloqueado!)} REF al formalizar el plan.',
                     style: TextStyle(
                       fontSize: 10.5,
                       color: Colors.blueGrey.shade800,
@@ -1053,7 +1054,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     return 'Adjuntar comprobante de pago';
   }
 
-  static String _fmtMoney(double v) => '${v.toStringAsFixed(2)} REF';
+  static String _fmtMoney(double v) => '${formatRefAmount(v)} REF';
 
   static String _formatDueEs(DateTime d) {
     final l = d.isUtc ? d.toLocal() : d;

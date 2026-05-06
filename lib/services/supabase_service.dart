@@ -806,6 +806,11 @@ class SupabaseService {
     transportista_live_lat,
     transportista_live_lng,
     transportista_live_location_at,
+    transportista_decline_motivo,
+    transportista_declined_at,
+    transportista_gestion_eta_days,
+    transportista_gestion_eta_hours,
+    transportista_gestion_eta_set_at,
     credit_plan_type,
     credit_plan_confirmed_at,
     credit_monto_bloqueado,
@@ -1078,6 +1083,26 @@ sub_orders (
     final response = await _client
         .from('transaction_requests')
         .select(_trSelectWithSubs)
+        .inFilter('status', TransactionRequestStatus.adminClosedOrders)
+        .order('updated_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Pedidos cerrados asignados al transportista actual (entregados o rechazados).
+  static Future<List<TransactionRequestModel>>
+      fetchClosedTransactionRequestsForTransportista() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelectWithSubs)
+        .eq('assigned_transportista_id', uid)
         .inFilter('status', TransactionRequestStatus.adminClosedOrders)
         .order('updated_at', ascending: false);
 
@@ -2434,13 +2459,33 @@ sub_orders (
     );
   }
 
-  /// Transportista asignado: confirma en la app que recibió la orden.
-  static Future<void> transportistaAcknowledgeAssignment(
-    String requestId,
-  ) async {
+  /// Transportista asignado: confirma la orden e indica tiempo estimado de gestión (días 0–365, horas 0–23).
+  static Future<void> transportistaAcknowledgeAssignment({
+    required String requestId,
+    required int gestionEtaDays,
+    required int gestionEtaHours,
+  }) async {
     await _client.rpc(
       'transportista_acknowledge_assignment',
-      params: <String, dynamic>{'p_request_id': requestId},
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_gestion_eta_days': gestionEtaDays,
+        'p_gestion_eta_hours': gestionEtaHours,
+      },
+    );
+  }
+
+  /// Transportista asignado: rechaza la asignación (quita asignación) con motivo obligatorio.
+  static Future<void> transportistaDeclineAssignment({
+    required String requestId,
+    required String motivo,
+  }) async {
+    await _client.rpc(
+      'transportista_decline_assignment',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_motivo': motivo,
+      },
     );
   }
 

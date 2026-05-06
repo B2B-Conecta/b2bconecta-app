@@ -5,6 +5,7 @@ import '../models/transaction_request_status.dart';
 import '../models/transportista_info_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_date_format.dart';
 
 /// MotoLink: sugerencia por distancia a almacenes importador y asignación al pedido.
 class AdminTransportistaAssignmentSection extends StatefulWidget {
@@ -317,6 +318,50 @@ class _AdminTransportistaAssignmentSectionState
                             )
                           : const Text('Quitar'),
                     ),
+                ],
+              ),
+            ),
+          ),
+          if (r.transportistaReconocioAsignacion &&
+              r.transportistaGestionEtaLabelEs != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Tiempo estimado declarado por el transportista: '
+              '${r.transportistaGestionEtaLabelEs}'
+              '${r.transportistaGestionEtaSetAt != null ? ' · ${formatEsShortDateTime(r.transportistaGestionEtaSetAt)}' : ''}',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: Colors.teal.shade900,
+                height: 1.25,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+        ],
+        if (!r.hasAssignedTransportista &&
+            r.transportistaDeclinedAt != null &&
+            (r.transportistaDeclineMotivo?.trim().isNotEmpty ?? false)) ...[
+          Material(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange.shade900, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Último rechazo por transportista (${formatEsShortDateTime(r.transportistaDeclinedAt)}): '
+                      '${r.transportistaDeclineMotivo!.trim()}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        color: Colors.grey.shade900,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

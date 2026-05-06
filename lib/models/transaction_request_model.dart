@@ -100,6 +100,11 @@ class TransactionRequestModel {
     this.transportistaLiveLat,
     this.transportistaLiveLng,
     this.transportistaLiveLocationAt,
+    this.transportistaDeclineMotivo,
+    this.transportistaDeclinedAt,
+    this.transportistaGestionEtaDays,
+    this.transportistaGestionEtaHours,
+    this.transportistaGestionEtaSetAt,
     this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
   });
 
@@ -239,6 +244,15 @@ class TransactionRequestModel {
   final double? transportistaLiveLng;
   final DateTime? transportistaLiveLocationAt;
 
+  /// Motivo si el transportista rechazó la asignación antes de confirmar.
+  final String? transportistaDeclineMotivo;
+  final DateTime? transportistaDeclinedAt;
+
+  /// Tiempo de gestión estimado declarado al confirmar la asignación (independiente del ETA de tránsito MotoLink).
+  final int? transportistaGestionEtaDays;
+  final int? transportistaGestionEtaHours;
+  final DateTime? transportistaGestionEtaSetAt;
+
   /// Emisiones de documento MotoLink al aliado (nota / factura; puede haber varias hojas).
   final List<MotolinkAllyDocumentEmissionModel> motolinkAllyDocumentEmissions;
 
@@ -274,6 +288,16 @@ class TransactionRequestModel {
 
   bool get transportistaReconocioAsignacion =>
       transportistaAssignmentAcknowledgedAt != null;
+
+  /// Texto legible del ETA de gestión declarado por el transportista (null si no aplica).
+  String? get transportistaGestionEtaLabelEs {
+    final d = transportistaGestionEtaDays ?? 0;
+    final h = transportistaGestionEtaHours ?? 0;
+    if (d <= 0 && h <= 0) return null;
+    if (d > 0 && h > 0) return '$d día(s) y $h hora(s)';
+    if (d > 0) return '$d día(s)';
+    return '$h hora(s)';
+  }
 
   /// Tramos maestro con retiro en almacén ya marcado.
   int get subOrdersRecogidasAlmacenCount {
@@ -1016,6 +1040,16 @@ class TransactionRequestModel {
       transportistaLiveLng: _asNullableDouble(json['transportista_live_lng']),
       transportistaLiveLocationAt:
           _parseDate(json['transportista_live_location_at']),
+      transportistaDeclineMotivo:
+          _nullableText(json['transportista_decline_motivo']),
+      transportistaDeclinedAt:
+          _parseDate(json['transportista_declined_at']),
+      transportistaGestionEtaDays:
+          _asNullableInt(json['transportista_gestion_eta_days']),
+      transportistaGestionEtaHours:
+          _asNullableInt(json['transportista_gestion_eta_hours']),
+      transportistaGestionEtaSetAt:
+          _parseDate(json['transportista_gestion_eta_set_at']),
       motolinkAllyDocumentEmissions:
           MotolinkAllyDocumentEmissionModel.listFromJson(
         json['motolink_ally_document_emissions'],

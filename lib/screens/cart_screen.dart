@@ -5,6 +5,7 @@ import '../models/profile_model.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/ves_amount_format.dart';
 
 /// Carrito multi-importador: agrupa por importador y confirma un solo pedido maestro.
 class CartScreen extends StatefulWidget {
@@ -182,7 +183,7 @@ class _CartScreenState extends State<CartScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Total REF: ${totalRef.toStringAsFixed(2)}',
+                            'Total REF: ${formatRefAmount(totalRef)}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
@@ -190,8 +191,8 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                           if (totalBs != null && tasa != null)
                             Text(
-                              'Referencia BS (tasa ${tasa.toStringAsFixed(2)}): '
-                              '${totalBs.toStringAsFixed(2)}',
+                              'Referencia en Bs (tasa ${formatTasaBcvDisplay(tasa, fractionDigits: 4)}): '
+                              '${formatVesAmount(totalBs)}',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey.shade800,

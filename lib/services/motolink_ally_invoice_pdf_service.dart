@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../config/motolink_fiscal_issuer_constants.dart';
 import '../models/document_type_preference.dart';
 import '../models/transaction_request_model.dart';
+import '../utils/ves_amount_format.dart';
 
 /// Línea de detalle para el PDF (ítem de pedido).
 class MotolinkAllyInvoicePdfLine {
@@ -150,7 +151,8 @@ class MotolinkAllyInvoicePdfService {
               pw.Container(height: 0.5, color: PdfColors.grey500),
               pw.SizedBox(height: 6),
               pw.Text(
-                'Tasa BCV utilizada para conversión REF → Bs: ${tasaBcvEmision.toStringAsFixed(2)}',
+                'Tasa BCV utilizada para conversión REF → Bs: '
+                '${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}',
                 style: pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
               ),
               pw.SizedBox(height: 2),
@@ -324,11 +326,11 @@ class MotolinkAllyInvoicePdfService {
                       isNota
                           ? 'Documento exento (nota de entrega). Montos en REF; '
                               'referencia en bolívares según tasa BCV del día de emisión '
-                              '(${tasaBcvEmision.toStringAsFixed(2)}).'
-                          : 'Factura fiscal: IVA ${ivaPct.toStringAsFixed(2)} % e IGTF '
-                              '${igtfPct.toStringAsFixed(2)} % aplicados según parámetros MotoLink '
+                              '(${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}).'
+                          : 'Factura fiscal: IVA ${formatVesAmount(ivaPct, fractionDigits: 2)} % e IGTF '
+                              '${formatVesAmount(igtfPct, fractionDigits: 2)} % aplicados según parámetros MotoLink '
                               '(ajustables por contador). Tasa BCV emisión: '
-                              '${tasaBcvEmision.toStringAsFixed(2)}.',
+                              '${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}.',
                       style: const pw.TextStyle(fontSize: 7, lineSpacing: 1.2),
                     ),
                   ],
@@ -347,7 +349,7 @@ class MotolinkAllyInvoicePdfService {
                   children: [
                     _totRow('Subtotal REF', _fmtRef(subtotalRef)),
                     _totRow(
-                      'Subtotal Bs (× ${tasaBcvEmision.toStringAsFixed(2)})',
+                      'Subtotal Bs (× ${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)})',
                       _fmtBs(subtotalBs),
                     ),
                     if (isNota) ...[
@@ -359,10 +361,12 @@ class MotolinkAllyInvoicePdfService {
                     ] else ...[
                       _totRow('Base imponible Bs', _fmtBs(baseBs)),
                       _totRow(
-                          'I.V.A. (${ivaPct.toStringAsFixed(2)}%)', _fmtBs(ivaBs)),
+                          'I.V.A. (${formatVesAmount(ivaPct, fractionDigits: 2)}%)',
+                          _fmtBs(ivaBs)),
                       _totRow('Total operación Bs', _fmtBs(totalOperacionBs)),
                       _totRow(
-                          'I.G.T.F. (${igtfPct.toStringAsFixed(2)}%)', _fmtBs(igtfBs)),
+                          'I.G.T.F. (${formatVesAmount(igtfPct, fractionDigits: 2)}%)',
+                          _fmtBs(igtfBs)),
                       _totRow('Total a pagar Bs', _fmtBs(totalPagarBs),
                           bold: true),
                     ],
@@ -440,9 +444,9 @@ class MotolinkAllyInvoicePdfService {
     );
   }
 
-  static String _fmtRef(double v) => 'REF ${v.toStringAsFixed(2)}';
+  static String _fmtRef(double v) => 'REF ${formatRefAmount(v)}';
 
-  static String _fmtBs(double v) => 'Bs ${v.toStringAsFixed(2)}';
+  static String _fmtBs(double v) => formatBsLabel(v);
 
   static List<String> _importerNamesOrdered(TransactionRequestModel r) {
     if (r.isMasterOrder && r.subOrders.isNotEmpty) {

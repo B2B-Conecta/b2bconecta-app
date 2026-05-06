@@ -4,6 +4,7 @@ import '../models/order_item_model.dart';
 import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/ves_amount_format.dart';
 
 /// Qué pidió el aliado a **este** importador: partidas, cantidades y monto al aliado (REF).
 class ImporterAliadoSolicitudSection extends StatelessWidget {
@@ -53,8 +54,8 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           SizedBox(height: compact ? 2 : 4),
           Text(
             '$nPart partida(s) · $uds uds · subtotal (tu tramo) '
-            '${r.precioTotal.toStringAsFixed(2)} REF'
-            '${r.precioTotalBsUi != null ? ' · ~${r.precioTotalBsUi!.toStringAsFixed(2)} BS' : ''}',
+            '${formatRefAmount(r.precioTotal)} REF'
+            '${r.precioTotalBsUi != null ? ' · ~${formatVesAmount(r.precioTotalBsUi!)} Bs' : ''}',
             style: TextStyle(
               fontSize: bodySize * 0.95,
               color: Colors.grey.shade800,
@@ -127,7 +128,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           ],
           const SizedBox(height: 2),
           Text(
-            '${p.cantidad} uds · ${p.precioLineTotal.toStringAsFixed(2)} REF (línea)',
+            '${p.cantidad} uds · ${formatRefAmount(p.precioLineTotal)} REF (línea)',
             style: TextStyle(
               fontSize: compact ? 11 : 11.5,
               fontWeight: FontWeight.w600,
@@ -183,7 +184,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '${r.cantidad} uds · subtotal (precio al aliado, tu tramo) '
-                '${r.precioTotal.toStringAsFixed(2)} REF',
+                '${formatRefAmount(r.precioTotal)} REF',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

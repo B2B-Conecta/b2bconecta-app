@@ -405,7 +405,6 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         const SizedBox(height: 12),
                         TransactionRequestDestinoEntregaSection(
                           request: r,
-                          viewingAsRole: AppHomeRole.aliado,
                         ),
                         const SizedBox(height: 12),
                         CourierTimelineWidget(request: r, compact: true),

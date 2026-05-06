@@ -18,7 +18,17 @@ abstract final class TransactionRequestStatus {
     entregado,
   ];
 
-  /// Solo aprobados por MotoLink pendientes de la primera acción del importador (pestaña Validados).
+  /// Listado unificado importador: operación + cerrados (`rechazado`).
+  static const List<String> importerOrdersUnifiedStatuses = [
+    aprobadoAdmin,
+    enPreparacion,
+    pedidoListo,
+    enTransito,
+    entregado,
+    rechazado,
+  ];
+
+  /// Solo aprobados por MotoLink pendientes de la primera acción del importador (legacy / filtros).
   static const List<String> importerSoloValidadosAdmin = [
     aprobadoAdmin,
   ];
@@ -141,6 +151,16 @@ abstract final class TransactionRequestStatus {
     return null;
   }
 
+  /// Etiquetas en vista importador (ingreso directo: `aprobado_admin` = pedido nuevo).
+  static String importerFilterStatusLabelEs(String status) {
+    switch (status) {
+      case aprobadoAdmin:
+        return 'Pedido nuevo · confirme stock';
+      default:
+        return labelEs(status);
+    }
+  }
+
   static String actionLabelForNext(String nextStatus) {
     switch (nextStatus) {
       case enPreparacion:
@@ -192,7 +212,7 @@ abstract final class TransactionRequestStatus {
             ? 'Solicitud cancelada (antes de aprobación)'
             : 'Solicitud no aprobada';
       case aprobadoAdmin:
-        return 'Aprobado · preparación pendiente';
+        return 'Enviado al importador · confirma stock y preparación';
       case enPreparacion:
         return 'Tu pedido se está preparando';
       case pedidoListo:

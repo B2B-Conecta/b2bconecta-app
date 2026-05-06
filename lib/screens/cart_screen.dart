@@ -84,7 +84,9 @@ class _CartScreenState extends State<CartScreen> {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Pedido enviado. MotoLink lo revisará.'),
+          content: Text(
+            'Pedido registrado. Los importadores recibirán un aviso para confirmar stock.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

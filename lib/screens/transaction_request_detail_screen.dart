@@ -404,7 +404,6 @@ class _TransactionRequestDetailScreenState
             const SizedBox(height: 14),
             TransactionRequestDestinoEntregaSection(
               request: r,
-              viewingAsRole: widget.homeRole,
             ),
             const SizedBox(height: 14),
             CourierTimelineWidget(

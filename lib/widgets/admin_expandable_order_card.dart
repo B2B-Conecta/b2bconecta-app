@@ -19,7 +19,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
     required this.onToggle,
     required this.statusLabel,
     this.expandedFooter,
-    /// Broker MotoLink vs transportista (afecta CTA de ruta y bloque «pedido listo»).
+    /// Broker MotoLink vs transportista (afecta bloque «pedido listo» y secciones de despacho).
     this.cardViewerRole = AppHomeRole.administrador,
     this.onRequestMutated,
   });
@@ -318,7 +318,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         const SizedBox(height: 12),
                         TransactionRequestDestinoEntregaSection(
                           request: r,
-                          viewingAsRole: cardViewerRole,
                         ),
                         if (!_isTransportista) ...[
                           const SizedBox(height: 12),

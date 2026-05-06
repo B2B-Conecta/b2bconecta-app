@@ -1140,7 +1140,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                         ),
                       ),
                     ],
-                  ),
+            ),
             const SizedBox(height: 4),
             Text(
                     'Pulse la fila para cupo, KYC y acciones',
@@ -1478,7 +1478,7 @@ class _AliadoCreditCardState extends State<_AliadoCreditCard> {
                     label: const Text('Bajar cupo'),
                   ),
                 ],
-              ),
+            ),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: _saving ? null : _save,

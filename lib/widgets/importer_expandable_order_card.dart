@@ -250,7 +250,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         const SizedBox(height: 12),
                         TransactionRequestDestinoEntregaSection(
                           request: r,
-                          viewingAsRole: AppHomeRole.importador,
                         ),
                         const SizedBox(height: 12),
                         CourierTimelineWidget(

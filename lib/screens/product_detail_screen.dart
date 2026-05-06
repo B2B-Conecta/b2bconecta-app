@@ -571,7 +571,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Solicitud enviada. MotoLink la revisará.'),
+          content: Text(
+            'Pedido registrado. El importador confirmará stock y preparación.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

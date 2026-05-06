@@ -905,26 +905,6 @@ sub_orders (
         .toList();
   }
 
-  /// Aliado: pendientes de validación MotoLink (pestaña Solicitudes).
-  static Future<List<TransactionRequestModel>>
-      fetchMyPendingValidationForAliado() async {
-    final uid = _currentUserId;
-    if (uid == null) return [];
-
-    final response = await _client
-        .from('transaction_requests')
-        .select(_trSelectWithSubs)
-        .eq('aliado_id', uid)
-        .eq('status', TransactionRequestStatus.pendiente)
-        .order('created_at', ascending: false);
-
-    final list = response as List<dynamic>;
-    return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
-        .toList();
-  }
-
   /// Aliado: pedidos en curso y cerrados (pestaña Pedidos).
   static Future<List<TransactionRequestModel>>
       fetchMyPedidosActivosYCerradosForAliado() async {
@@ -1011,6 +991,90 @@ sub_orders (
     return merged;
   }
 
+  /// Importador: sub-pedidos en cualquier fase operativa o cerrada (vista unificada).
+  static Future<List<TransactionRequestModel>>
+      fetchSubOrderSlicesForImporterUnified() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final rows = await _client
+        .from('sub_orders')
+        .select('''
+          id,
+          status,
+          monto_subtotal,
+          items_count,
+          proveedor_factura_storage_path,
+          proveedor_factura_file_name,
+          proveedor_factura_submitted_at,
+          transit_eta_days,
+          transit_eta_hours,
+          transit_eta_set_at,
+          parent_order_id,
+          importador_id,
+          order_items ( $_orderItemsSelectImporterSubOrderSlice ),
+          transaction_requests!inner ( $_trSelectFlat )
+        ''')
+        .eq('importador_id', uid)
+        .inFilter('status', const [
+          SubOrderStatus.pendiente,
+          SubOrderStatus.preparando,
+          SubOrderStatus.listo,
+          SubOrderStatus.enRuta,
+          SubOrderStatus.entregado,
+        ])
+        .inFilter('transaction_requests.status', TransactionRequestStatus.importerOrdersUnifiedStatuses)
+        .order('updated_at', ascending: false);
+
+    final list = rows as List<dynamic>;
+    return list
+        .map((row) => _transactionRequestFromImporterSubOrderRow(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
+  /// Importador: pedidos simples + tramos maestro (un solo listado con histórico cerrado).
+  static Future<List<TransactionRequestModel>>
+      fetchUnifiedTransactionRequestsForImporter() async {
+    final uid = _currentUserId;
+    if (uid == null) return [];
+
+    final subSlices = await fetchSubOrderSlicesForImporterUnified();
+
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelectFlat)
+        .eq('owner_id', uid)
+        .inFilter('status', TransactionRequestStatus.importerOrdersUnifiedStatuses)
+        .order('created_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    final legacy = list
+        .map((row) =>
+            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+
+    final seen = <String>{};
+    final merged = <TransactionRequestModel>[];
+    for (final r in subSlices) {
+      final k = r.importerSubOrderId != null ? '${r.id}::${r.importerSubOrderId}' : r.id;
+      if (seen.add(k)) merged.add(r);
+    }
+    for (final r in legacy) {
+      if (seen.add(r.id)) merged.add(r);
+    }
+    merged.sort((a, b) {
+      final ta = a.updatedAt ?? a.createdAt;
+      final tb = b.updatedAt ?? b.createdAt;
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return tb.compareTo(ta);
+    });
+    return merged;
+  }
+
   /// Solo aprobados por MotoLink para un producto (importador dueño vía RLS).
   static Future<List<TransactionRequestModel>>
       fetchValidatedTransactionRequestsForProduct(String productId) async {
@@ -1053,22 +1117,6 @@ sub_orders (
         .select(_trSelectWithSubs)
         .inFilter('status', TransactionRequestStatus.adminOperationalActive)
         .order('updated_at', ascending: false);
-
-    final list = response as List<dynamic>;
-    return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
-        .toList();
-  }
-
-  /// Solicitudes pendientes de aprobación/rechazo (pestaña Por validar — admin).
-  static Future<List<TransactionRequestModel>>
-      fetchPendingValidationForAdmin() async {
-    final response = await _client
-        .from('transaction_requests')
-        .select(_trSelectWithSubs)
-        .inFilter('status', TransactionRequestStatus.adminPendingValidation)
-        .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
     return list
@@ -1578,7 +1626,7 @@ sub_orders (
       'aliado_id': uid,
       'product_id': productId,
       'owner_id': ownerId,
-      'status': 'pendiente',
+      'status': 'aprobado_admin',
       'cantidad': cantidad,
       'precio_unitario_proveedor': precioUnitarioProveedor,
       'precio_unitario_aliado': unitAliado,

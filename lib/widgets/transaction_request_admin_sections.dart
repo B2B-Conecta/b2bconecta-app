@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../models/app_home_role.dart';
 import '../models/document_type_preference.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
@@ -14,8 +13,6 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/ves_amount_format.dart';
-import 'transaction_request_transit_supplier_ally_maps_cta.dart';
-
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
   Future<String> Function() signed,
@@ -536,12 +533,9 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   const TransactionRequestDestinoEntregaSection({
     super.key,
     required this.request,
-    /// Quién ve la ficha; el CTA de ruta MotoLink en destino solo aplica al administrador.
-    this.viewingAsRole,
   });
 
   final TransactionRequestModel request;
-  final AppHomeRole? viewingAsRole;
 
   @override
   Widget build(BuildContext context) {
@@ -592,11 +586,6 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
               height: 1.35,
             ),
           ),
-        ],
-        if (r.status == TransactionRequestStatus.enTransito &&
-            viewingAsRole == AppHomeRole.administrador) ...[
-          const SizedBox(height: 14),
-          TransactionRequestTransitSupplierToAliadoMapsCta(request: r),
         ],
       ],
     );

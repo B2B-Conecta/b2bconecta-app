@@ -144,12 +144,12 @@ class NotificationProvider extends ChangeNotifier {
       return;
     }
     final type = n.type.trim();
-    final legacyPorValidar = homeRole == AppHomeRole.administrador &&
+    final legacyOrderAsActive = homeRole == AppHomeRole.administrador &&
         type == 'envio' &&
         n.title.trim() == 'Nueva solicitud por validar';
     if (homeRole == AppHomeRole.administrador &&
-        (type == 'validacion' || legacyPorValidar)) {
-      MainShellTabController.navigateToAdminPorValidarForNotification();
+        (type == 'validacion' || legacyOrderAsActive)) {
+      MainShellTabController.navigateToAdminActivosForNotification();
       return;
     }
     switch (homeRole) {
@@ -161,19 +161,10 @@ class NotificationProvider extends ChangeNotifier {
         MainShellTabController.navigateToPedidosForNotification();
         return;
       case AppHomeRole.importador:
-        if (_importadorNotificationOpensValidadosTab(n)) {
-          MainShellTabController.navigateToImportadorValidadosForNotification();
-        } else {
-          MainShellTabController.navigateToPedidosForNotification();
-        }
+        MainShellTabController.setImporterPedidosPreferNuevosFilter(true);
+        MainShellTabController.navigateToPedidosForNotification();
         return;
     }
-  }
-
-  /// Pedidos recién aprobados por MotoLink viven en «Validados» hasta la primera acción del importador.
-  static bool _importadorNotificationOpensValidadosTab(InAppNotificationModel n) {
-    final title = n.title.trim();
-    return title == 'Pedido aprobado para su inventario';
   }
 
   void _onRealtimeInsert(InAppNotificationModel n) {

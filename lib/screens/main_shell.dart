@@ -11,11 +11,8 @@ import '../widgets/admin_active_orders_panel.dart';
 import '../widgets/admin_aliados_credit_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
-import '../widgets/admin_pending_validation_panel.dart';
-import '../widgets/aliado_my_requests_panel.dart';
 import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
-import '../widgets/importer_validated_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
 import '../widgets/motolink_app_bar.dart';
 import '../widgets/notification_center_sheet.dart';
@@ -24,7 +21,7 @@ import '../widgets/transportista_closed_orders_panel.dart';
 import 'account_settings_screen.dart';
 import 'home_screen.dart';
 
-/// Shell principal: navegación por rol (admin: pedidos; resto: catálogo / pedidos / bandeja / perfil).
+/// Shell principal: navegación por rol (admin: pedidos; aliado: catálogo / pedidos / perfil).
 class MainShell extends StatefulWidget {
   const MainShell({
     super.key,
@@ -58,6 +55,10 @@ class _MainShellState extends State<MainShell> {
       if (!mounted) return;
       _notifications.reload();
     });
+    if (widget.homeRole == AppHomeRole.importador ||
+        widget.homeRole == AppHomeRole.aliado) {
+      MainShellTabController.registerB2BProfileTabIndex(2);
+    }
   }
 
   @override
@@ -90,7 +91,7 @@ class _MainShellState extends State<MainShell> {
     setState(() => _profile = p);
   }
 
-  /// Pestañas admin: Activos, Cerrados, Por validar, Crédito, Perfil (sin catálogo).
+  /// Pestañas admin: Activos, Cerrados, Crédito, Reportes, Perfil (sin catálogo).
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,
@@ -154,10 +155,6 @@ class _MainShellState extends State<MainShell> {
             child: const AdminClosedOrdersPanel(),
           ),
           _adminOrdersScaffold(
-            title: 'Por validar',
-            child: const AdminPendingValidationPanel(),
-          ),
-          _adminOrdersScaffold(
             title: 'Límites de crédito',
             child: const AdminAliadosCreditPanel(),
           ),
@@ -201,11 +198,6 @@ class _MainShellState extends State<MainShell> {
               label: 'Cerrados',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.fact_check_outlined),
-              activeIcon: Icon(Icons.fact_check),
-              label: 'Validar',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.account_balance_outlined),
               activeIcon: Icon(Icons.account_balance),
               label: 'Crédito',
@@ -243,12 +235,6 @@ class _MainShellState extends State<MainShell> {
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
           ),
-          _MessagesTab(
-            profile: _profile,
-            homeRole: widget.homeRole,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
           _ProfileTab(
             profile: _profile,
             homeRole: widget.homeRole,
@@ -273,50 +259,22 @@ class _MainShellState extends State<MainShell> {
           currentIndex: _tabIndex,
           onTap: (i) {
             setState(() => _tabIndex = i);
-            if (widget.homeRole == AppHomeRole.importador && i == 1) {
-              MainShellTabController.notifyImporterPedidosReload();
-            }
-            if (widget.homeRole == AppHomeRole.aliado && i == 3) {
+            if (widget.homeRole == AppHomeRole.aliado && i == 2) {
               unawaited(_refreshProfile());
             }
           },
-          items: [
+          items: const [
             BottomNavigationBarItem(
-              icon: Icon(
-                widget.homeRole == AppHomeRole.importador
-                    ? Icons.inventory_2_outlined
-                    : Icons.grid_view_outlined,
-              ),
-              activeIcon: Icon(
-                widget.homeRole == AppHomeRole.importador
-                    ? Icons.inventory_2
-                    : Icons.grid_view,
-              ),
-              label: widget.homeRole == AppHomeRole.importador
-                  ? 'Inventario'
-                  : 'Catálogo',
+              icon: Icon(Icons.grid_view_outlined),
+              activeIcon: Icon(Icons.grid_view),
+              label: 'Catálogo',
             ),
-            const BottomNavigationBarItem(
+            BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart_outlined),
               activeIcon: Icon(Icons.shopping_cart),
               label: 'Pedidos',
             ),
             BottomNavigationBarItem(
-              icon: Icon(
-                widget.homeRole == AppHomeRole.importador
-                    ? Icons.check_circle_outline
-                    : Icons.list_alt_outlined,
-              ),
-              activeIcon: Icon(
-                widget.homeRole == AppHomeRole.importador
-                    ? Icons.check_circle
-                    : Icons.list_alt,
-              ),
-              label: widget.homeRole == AppHomeRole.importador
-                  ? 'Validados'
-                  : 'Solicitudes',
-            ),
-            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'Perfil',
@@ -402,7 +360,79 @@ class _MainShellState extends State<MainShell> {
     if (widget.homeRole == AppHomeRole.transportista) {
       return _buildTransportistaShell();
     }
+    if (widget.homeRole == AppHomeRole.importador) {
+      return _buildImportadorShell();
+    }
     return _buildDefaultShell();
+  }
+
+  /// Importador: Inventario, Pedidos (unificado), Perfil.
+  Widget _buildImportadorShell() {
+    return Scaffold(
+      body: IndexedStack(
+        index: _tabIndex,
+        children: [
+          HomeScreen(
+            profile: _profile,
+            homeRole: AppHomeRole.importador,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+          ),
+          _OrdersTab(
+            profile: _profile,
+            homeRole: AppHomeRole.importador,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+          ),
+          _ProfileTab(
+            profile: _profile,
+            homeRole: AppHomeRole.importador,
+            onProfileSaved: _refreshProfile,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+          ),
+        ],
+      ),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceTinted,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _tabIndex,
+          type: BottomNavigationBarType.fixed,
+          onTap: (i) {
+            setState(() => _tabIndex = i);
+            if (i == 1) {
+              MainShellTabController.notifyImporterPedidosReload();
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              activeIcon: Icon(Icons.inventory_2),
+              label: 'Inventario',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_cart_outlined),
+              activeIcon: Icon(Icons.shopping_cart),
+              label: 'Pedidos',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -435,41 +465,6 @@ class _OrdersTab extends StatelessWidget {
         AppHomeRole.importador => const ImporterActiveOrdersPanel(),
         AppHomeRole.administrador => const SizedBox.shrink(),
         AppHomeRole.aliado => const AliadoPedidosPanel(),
-        AppHomeRole.transportista => const SizedBox.shrink(),
-      },
-    );
-  }
-}
-
-class _MessagesTab extends StatelessWidget {
-  const _MessagesTab({
-    required this.profile,
-    required this.homeRole,
-    required this.onNotificationTap,
-    required this.unreadNotifications,
-  });
-
-  final ProfileModel profile;
-  final AppHomeRole homeRole;
-  final VoidCallback onNotificationTap;
-  final int unreadNotifications;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(
-        currentUserProfile: profile,
-        logoHeight: homeRole == AppHomeRole.aliado
-            ? MotolinkAppBarLogoSizes.aliado
-            : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: onNotificationTap,
-        unreadNotifications: unreadNotifications,
-      ),
-      body: switch (homeRole) {
-        AppHomeRole.administrador => const SizedBox.shrink(),
-        AppHomeRole.importador => const ImporterValidatedOrdersPanel(),
-        AppHomeRole.aliado => const AliadoMyRequestsPanel(),
         AppHomeRole.transportista => const SizedBox.shrink(),
       },
     );

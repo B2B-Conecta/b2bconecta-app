@@ -13,7 +13,8 @@ class MainShellTabController {
   static VoidCallback? _pedidosNotificationDeepLink;
   static VoidCallback? _importadorValidadosNotificationDeepLink;
   static VoidCallback? _adminActivosNotificationDeepLink;
-  static VoidCallback? _adminPorValidarNotificationDeepLink;
+  static int? _b2bProfileTabIndex;
+  static bool _importerPedidosPreferNuevosFilter = false;
   static VoidCallback? _adminCreditoKycNotificationDeepLink;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
@@ -28,7 +29,8 @@ class MainShellTabController {
     _pedidosNotificationDeepLink = null;
     _importadorValidadosNotificationDeepLink = null;
     _adminActivosNotificationDeepLink = null;
-    _adminPorValidarNotificationDeepLink = null;
+    _b2bProfileTabIndex = null;
+    _importerPedidosPreferNuevosFilter = false;
     _adminCreditoKycNotificationDeepLink = null;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
@@ -49,7 +51,22 @@ class MainShellTabController {
 
   static void notifyImporterPedidosReload() => _refreshImporterPedidos?.call();
 
-  /// Índices: 0 Inventario/Catálogo, 1 Pedidos, 2 Bandeja/validados, 3 Perfil.
+  /// Importador y aliado (3 pestañas): Perfil = 2.
+  static void registerB2BProfileTabIndex(int index) => _b2bProfileTabIndex = index;
+
+  static int get _resolvedB2BProfileTabIndex => _b2bProfileTabIndex ?? 2;
+
+  /// Abrir listado importador en filtro «Nuevos» (p. ej. tras tocar notificación).
+  static void setImporterPedidosPreferNuevosFilter(bool value) =>
+      _importerPedidosPreferNuevosFilter = value;
+
+  static bool consumeImporterPedidosPreferNuevosFilter() {
+    final v = _importerPedidosPreferNuevosFilter;
+    _importerPedidosPreferNuevosFilter = false;
+    return v;
+  }
+
+  /// Índices: 0 Inventario/Catálogo, 1 Pedidos, 2 Perfil (importador/aliado).
   static void goTo(int index) => _goTo?.call(index);
 
   /// [AliadoPedidosPanel] / [ImporterActiveOrdersPanel] registran el expand tras deep link.
@@ -57,15 +74,16 @@ class MainShellTabController {
     _pedidosNotificationDeepLink = onNavigate;
   }
 
-  /// [ImporterValidatedOrdersPanel]: pestaña Validados (índice 2) + expande el pedido.
+  /// Importador: deep link en pestaña Pedidos (filtro Nuevos) + expande fila.
   static void registerImportadorValidadosNotificationDeepLink(
       VoidCallback? onNavigate) {
     _importadorValidadosNotificationDeepLink = onNavigate;
   }
 
-  /// Pestaña Validados importador + expande fila vinculada a la notificación.
+  /// Importador: pestaña Pedidos (índice 1), filtro Nuevos + expande fila.
   static void navigateToImportadorValidadosForNotification() {
-    _goTo?.call(2);
+    _importerPedidosPreferNuevosFilter = true;
+    _goTo?.call(1);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _importadorValidadosNotificationDeepLink?.call();
     });
@@ -75,12 +93,6 @@ class MainShellTabController {
   static void registerAdminActivosNotificationDeepLink(
       VoidCallback? onNavigate) {
     _adminActivosNotificationDeepLink = onNavigate;
-  }
-
-  /// [AdminPendingValidationPanel] expande la solicitud en la pestaña Por validar.
-  static void registerAdminPorValidarNotificationDeepLink(
-      VoidCallback? onNavigate) {
-    _adminPorValidarNotificationDeepLink = onNavigate;
   }
 
   /// [AdminAliadosCreditPanel] expande la fila del aliado en Límites de crédito (KYC).
@@ -105,22 +117,14 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Por validar (índice 2) + expande la solicitud vinculada.
-  static void navigateToAdminPorValidarForNotification() {
-    _goTo?.call(2);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _adminPorValidarNotificationDeepLink?.call();
-    });
-  }
-
   /// [ProfileB2BForm] (aliado) ancla la sección de documentación para deep links.
   static void registerKycDocumentationSectionKey(GlobalKey? key) {
     _kycDocumentationSectionKey = key;
   }
 
-  /// Pestaña Perfil (índice 3): scroll a documentación KYC del aliado/importador.
+  /// Pestaña Perfil: scroll a documentación KYC del aliado/importador.
   static void navigateToProfileKycDocumentation() {
-    _goTo?.call(3);
+    _goTo?.call(_resolvedB2BProfileTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         final ctx = _kycDocumentationSectionKey?.currentContext;
@@ -136,9 +140,9 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Crédito (índice 3) donde se revisa KYC / cupos de aliados.
+  /// Admin: pestaña Crédito (índice 2) donde se revisa KYC / cupos de aliados.
   static void navigateToAdminCreditoForKycNotification() {
-    _goTo?.call(3);
+    _goTo?.call(2);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminCreditoKycNotificationDeepLink?.call();
     });

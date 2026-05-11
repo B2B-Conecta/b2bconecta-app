@@ -22,6 +22,10 @@ create table public.profiles (
     check (role = any (array['importador'::text, 'aliado'::text, 'administrador'::text])),
   phone text,
   logo_storage_path text,
+  estado text,
+  ciudad text,
+  direccion text,
+  fiscal_maps_url text,
   created_at timestamptz not null default now()
 );
 

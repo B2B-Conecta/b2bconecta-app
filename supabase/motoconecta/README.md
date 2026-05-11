@@ -10,17 +10,15 @@ Marketplace B2B simplificado: solo roles **aliado**, **importador** y **administ
 ## Orden recomendado (SQL Editor o `psql`)
 
 1. `schema.sql` — crea tablas, índices, comisión generada al 5 % y políticas RLS básicas.
-2. Desde la raíz del repo, `supabase/seed.sql` — usuarios de prueba, perfiles, catálogo y un pedido `pendiente` (valida `comision_motoconecta`).
+2. Desde la raíz del repo, `supabase/seed.sql` — un importador, un aliado, un admin; perfiles con dirección fiscal de referencia; **15 productos** del importador; un pedido `pendiente` (valida `comision_motoconecta`).
 
 Contraseña de todos los usuarios seed: **`SeedPass123!`**
 
 | Rol | Email |
 |-----|--------|
+| Importador | `importador1@motoconecta.seed` |
+| Aliado | `aliado1@motoconecta.seed` |
 | Admin | `admin@motoconecta.seed` |
-| Importador 1 | `importador1@motoconecta.seed` |
-| Importador 2 | `importador2@motoconecta.seed` |
-| Aliado 1 | `aliado1@motoconecta.seed` |
-| Aliado 2 | `aliado2@motoconecta.seed` |
 
 ## Credenciales de API
 

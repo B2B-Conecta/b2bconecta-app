@@ -111,7 +111,7 @@ class _TransportistaRecogidaAlmacenSectionState
             children: [
               Row(
                 children: [
-                  Icon(Icons.storefront_outlined, size: 20, color: AppColors.brandBlue),
+                  const Icon(Icons.storefront_outlined, size: 20, color: AppColors.brandBlue),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -135,7 +135,7 @@ class _TransportistaRecogidaAlmacenSectionState
                   child: OutlinedButton.icon(
                     onPressed: busy ? null : () => _marcar(subOrderId: s.id),
                     icon: busy
-                        ? SizedBox(
+                        ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
@@ -230,7 +230,7 @@ class _TransportistaRecogidaAlmacenSectionState
                       child: OutlinedButton.icon(
                         onPressed: _busySimple ? null : () => _marcar(subOrderId: null),
                         icon: _busySimple
-                            ? SizedBox(
+                            ? const SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(

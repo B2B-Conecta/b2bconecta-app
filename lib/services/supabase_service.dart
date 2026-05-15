@@ -29,6 +29,7 @@ import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
 import '../utils/maps_route_utils.dart';
+import '../config/app_backend.dart';
 import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
 
@@ -177,7 +178,7 @@ class SupabaseService {
     if (id.isEmpty) return null;
     final row = await _client
         .from('transaction_requests')
-        .select(_trSelectWithSubs)
+        .select(_trSelectForListWithSubs)
         .eq('id', id)
         .maybeSingle();
     if (row == null) return null;
@@ -196,9 +197,12 @@ class SupabaseService {
         .toList();
     if (ids.isEmpty) return const {};
 
+    final selectCols = kAppUsesMotoConectaBackend
+        ? 'id, aliado:profiles!transaction_requests_aliado_id_fkey(business_name), importador:profiles!transaction_requests_importador_id_fkey(business_name)'
+        : 'id, products(name), aliado:profiles!transaction_requests_aliado_id_fkey(business_name)';
     final rows = await _client
         .from('transaction_requests')
-        .select('id, products(name), aliado:profiles!transaction_requests_aliado_id_fkey(business_name)')
+        .select(selectCols)
         .inFilter('id', ids);
     final list = rows as List<dynamic>;
     final out = <String, NotificationOrderSummary>{};
@@ -212,6 +216,15 @@ class SupabaseService {
       String? aliadoBusinessName;
       if (prod is Map) {
         productName = prod['name']?.toString().trim();
+      }
+      if (kAppUsesMotoConectaBackend &&
+          (productName == null || productName.isEmpty)) {
+        final imp = m['importador'];
+        if (imp is Map) {
+          final ibn = imp['business_name']?.toString().trim();
+          productName =
+              (ibn != null && ibn.isNotEmpty) ? 'Pedido · $ibn' : 'Pedido';
+        }
       }
       if (ali is Map) {
         aliadoBusinessName = ali['business_name']?.toString().trim();
@@ -873,6 +886,33 @@ sub_orders (
 )
 ''';
 
+  /// MotoConecta: pedido directo (sin `sub_orders`, `payment_schedule`, ni FK a `products`).
+  static const _trSelectMotoconecta = '''
+    id,
+    aliado_id,
+    importador_id,
+    product_id,
+    status,
+    cantidad,
+    precio_total_usd,
+    comision_motoconecta,
+    factura_url,
+    proveedor_factura_storage_path,
+    proveedor_factura_file_name,
+    proveedor_factura_submitted_at,
+    tiempo_estimado_envio,
+    created_at,
+    updated_at,
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
+    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude )
+  ''';
+
+  static String get _trSelectForListWithSubs =>
+      kAppUsesMotoConectaBackend ? _trSelectMotoconecta : _trSelectWithSubs;
+
+  static String get _trSelectForListFlat =>
+      kAppUsesMotoConectaBackend ? _trSelectMotoconecta : _trSelectFlat;
+
   /// Líneas de `order_items` al listar un sub-pedido (vista importador).
   static const _orderItemsSelectImporterSubOrderSlice = '''
     id,
@@ -894,7 +934,7 @@ sub_orders (
 
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectWithSubs)
+        .select(_trSelectForListWithSubs)
         .eq('aliado_id', uid)
         .order('created_at', ascending: false);
 
@@ -911,11 +951,15 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) return [];
 
+    final statusFilter = kAppUsesMotoConectaBackend
+        ? TransactionRequestStatus.motoconectaAliadoPedidosActivosYCerrados
+        : TransactionRequestStatus.aliadoPedidosActivosYCerrados;
+
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectWithSubs)
+        .select(_trSelectForListWithSubs)
         .eq('aliado_id', uid)
-        .inFilter('status', TransactionRequestStatus.aliadoPedidosActivosYCerrados)
+        .inFilter('status', statusFilter)
         .order('updated_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -930,6 +974,7 @@ sub_orders (
       fetchValidatedTransactionRequestsForImporter() async {
     final uid = _currentUserId;
     if (uid == null) return [];
+    if (kAppUsesMotoConectaBackend) return [];
 
     final subSlices = await fetchValidatedSubOrderSlicesForImporter();
 
@@ -964,6 +1009,20 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) return [];
 
+    if (kAppUsesMotoConectaBackend) {
+      final response = await _client
+          .from('transaction_requests')
+          .select(_trSelectMotoconecta)
+          .eq('importador_id', uid)
+          .inFilter('status', TransactionRequestStatus.motoconectaAdminOperationalActive)
+          .order('updated_at', ascending: false);
+      final list = response as List<dynamic>;
+      return list
+          .map((row) => TransactionRequestModel.fromJson(
+              Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+
     final subSlices = await fetchActiveSubOrderSlicesForImporter();
 
     final response = await _client
@@ -996,6 +1055,7 @@ sub_orders (
       fetchSubOrderSlicesForImporterUnified() async {
     final uid = _currentUserId;
     if (uid == null) return [];
+    if (kAppUsesMotoConectaBackend) return [];
 
     final rows = await _client
         .from('sub_orders')
@@ -1040,6 +1100,21 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) return [];
 
+    if (kAppUsesMotoConectaBackend) {
+      final response = await _client
+          .from('transaction_requests')
+          .select(_trSelectMotoconecta)
+          .eq('importador_id', uid)
+          .inFilter(
+              'status', TransactionRequestStatus.motoconectaImporterOrdersUnifiedStatuses)
+          .order('updated_at', ascending: false);
+      final list = response as List<dynamic>;
+      return list
+          .map((row) => TransactionRequestModel.fromJson(
+              Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+
     final subSlices = await fetchSubOrderSlicesForImporterUnified();
 
     final response = await _client
@@ -1079,6 +1154,7 @@ sub_orders (
   static Future<List<TransactionRequestModel>>
       fetchValidatedTransactionRequestsForProduct(String productId) async {
     if (productId.isEmpty) return [];
+    if (kAppUsesMotoConectaBackend) return [];
 
     final response = await _client
         .from('transaction_requests')
@@ -1099,7 +1175,7 @@ sub_orders (
       fetchTransactionRequestsForAdmin() async {
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectFlat)
+        .select(_trSelectForListFlat)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -1112,10 +1188,14 @@ sub_orders (
   /// Pedidos en curso tras validación MotoLink (pestaña Pedidos activos — admin).
   static Future<List<TransactionRequestModel>>
       fetchActiveTransactionRequestsForAdmin() async {
+    final activeStatuses = kAppUsesMotoConectaBackend
+        ? TransactionRequestStatus.motoconectaAdminOperationalActive
+        : TransactionRequestStatus.adminOperationalActive;
+
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectWithSubs)
-        .inFilter('status', TransactionRequestStatus.adminOperationalActive)
+        .select(_trSelectForListWithSubs)
+        .inFilter('status', activeStatuses)
         .order('updated_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -1130,7 +1210,7 @@ sub_orders (
       fetchClosedTransactionRequestsForAdmin() async {
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectWithSubs)
+        .select(_trSelectForListWithSubs)
         .inFilter('status', TransactionRequestStatus.adminClosedOrders)
         .order('updated_at', ascending: false);
 
@@ -1146,10 +1226,11 @@ sub_orders (
       fetchClosedTransactionRequestsForTransportista() async {
     final uid = _currentUserId;
     if (uid == null) return [];
+    if (kAppUsesMotoConectaBackend) return [];
 
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectWithSubs)
+        .select(_trSelectForListWithSubs)
         .eq('assigned_transportista_id', uid)
         .inFilter('status', TransactionRequestStatus.adminClosedOrders)
         .order('updated_at', ascending: false);
@@ -1187,7 +1268,7 @@ sub_orders (
 
     dynamic query = _client
         .from('transaction_requests')
-        .select(_trSelectFlat)
+        .select(_trSelectForListFlat)
         .gte('created_at', fromUtc.toIso8601String())
         .lte('created_at', toUtc.toIso8601String());
 
@@ -1196,7 +1277,11 @@ sub_orders (
     }
     final owner = ownerId?.trim();
     if (owner != null && owner.isNotEmpty) {
-      query = query.eq('owner_id', owner);
+      if (kAppUsesMotoConectaBackend) {
+        query = query.eq('importador_id', owner);
+      } else {
+        query = query.eq('owner_id', owner);
+      }
     }
 
     final response =
@@ -1479,11 +1564,15 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) return 0;
 
+    final exposure = kAppUsesMotoConectaBackend
+        ? TransactionRequestStatus.motoconectaAliadoCreditExposureStatuses
+        : TransactionRequestStatus.aliadoCreditExposureStatuses;
+
     final response = await _client
         .from('transaction_requests')
         .select('id')
         .eq('aliado_id', uid)
-        .inFilter('status', TransactionRequestStatus.aliadoCreditExposureStatuses);
+        .inFilter('status', exposure);
 
     return (response as List<dynamic>).length;
   }
@@ -1622,15 +1711,30 @@ sub_orders (
     }
 
     try {
-    await _client.from('transaction_requests').insert({
-      'aliado_id': uid,
-      'product_id': productId,
-      'owner_id': ownerId,
-      'status': 'aprobado_admin',
-      'cantidad': cantidad,
-      'precio_unitario_proveedor': precioUnitarioProveedor,
-      'precio_unitario_aliado': unitAliado,
-      'precio_total': total,
+      if (kAppUsesMotoConectaBackend) {
+        await _client.from('transaction_requests').insert({
+          'aliado_id': uid,
+          'importador_id': ownerId,
+          'product_id': productId,
+          'status': TransactionRequestStatus.pendiente,
+          'cantidad': cantidad,
+          'precio_total_usd': total,
+        });
+        await _client.from('products').update({
+          'stock': stock - cantidad,
+        }).eq('id', productId).eq('owner_id', ownerId);
+        return;
+      }
+
+      await _client.from('transaction_requests').insert({
+        'aliado_id': uid,
+        'product_id': productId,
+        'owner_id': ownerId,
+        'status': 'aprobado_admin',
+        'cantidad': cantidad,
+        'precio_unitario_proveedor': precioUnitarioProveedor,
+        'precio_unitario_aliado': unitAliado,
+        'precio_total': total,
         'precio_base_aliado_total': total,
         'destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
         'destino_entrega_texto':
@@ -1750,6 +1854,7 @@ sub_orders (
       fetchActiveSubOrderSlicesForImporter() async {
     final uid = _currentUserId;
     if (uid == null) return [];
+    if (kAppUsesMotoConectaBackend) return [];
 
     final rows = await _client
         .from('sub_orders')
@@ -1874,6 +1979,7 @@ sub_orders (
       fetchValidatedSubOrderSlicesForImporter() async {
     final uid = _currentUserId;
     if (uid == null) return [];
+    if (kAppUsesMotoConectaBackend) return [];
 
     final rows = await _client
         .from('sub_orders')
@@ -2146,7 +2252,7 @@ sub_orders (
     }
 
     final lines = MotolinkAllyInvoicePdfService.linesFromRequest(r0);
-    final maxItems = MotolinkAllyInvoiceConstants.maxItemsPerDocument;
+    const maxItems = MotolinkAllyInvoiceConstants.maxItemsPerDocument;
     final chunks = <List<MotolinkAllyInvoicePdfLine>>[];
     for (var i = 0; i < lines.length; i += maxItems) {
       final end = (i + maxItems > lines.length) ? lines.length : i + maxItems;
@@ -2674,6 +2780,76 @@ sub_orders (
         'p_nota': nota.trim(),
       },
     );
+  }
+
+  /// MotoConecta: importador sube factura del proveedor (Storage `order-invoices`).
+  static Future<void> importerSubmitMotoconectaProveedorFactura({
+    required String transactionRequestId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final row = await _client
+        .from('transaction_requests')
+        .select('importador_id, status, proveedor_factura_storage_path')
+        .eq('id', transactionRequestId)
+        .maybeSingle();
+
+    if (row == null) {
+      throw StateError('Pedido no encontrado.');
+    }
+    final m = Map<String, dynamic>.from(row);
+    if (m['importador_id']?.toString() != uid) {
+      throw StateError('No autorizado a adjuntar factura en este pedido.');
+    }
+    final st = m['status']?.toString();
+    if (st != TransactionRequestStatus.pendiente &&
+        st != TransactionRequestStatus.enPreparacion) {
+      throw StateError(
+        'Solo puede adjuntar la factura mientras el pedido está pendiente o en preparación.',
+      );
+    }
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) {
+      safeBase = 'factura.$ext';
+    }
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path = '$transactionRequestId/${stamp}_$safeBase';
+
+    final oldPath = m['proveedor_factura_storage_path']?.toString().trim();
+    if (oldPath != null && oldPath.isNotEmpty) {
+      try {
+        await _client.storage.from(_orderInvoicesBucket).remove([oldPath]);
+      } catch (_) {}
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderInvoicesBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    await _client.from('transaction_requests').update({
+      'proveedor_factura_storage_path': path,
+      'proveedor_factura_file_name': fileName.trim(),
+      'proveedor_factura_submitted_at':
+          DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', transactionRequestId);
   }
 
   /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación
@@ -3217,6 +3393,7 @@ sub_orders (
     required String parentOrderId,
     required String newTransactionStatus,
   }) async {
+    if (kAppUsesMotoConectaBackend) return null;
     final uid = _currentUserId;
     if (uid == null) return null;
     final expectedSubStatus = switch (newTransactionStatus) {

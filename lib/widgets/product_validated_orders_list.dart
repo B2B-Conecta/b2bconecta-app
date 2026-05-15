@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/app_backend.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -95,11 +96,25 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     TransactionRequestModel r,
     String next,
   ) async {
-    if (next == TransactionRequestStatus.pedidoListo && !r.hasProveedorFactura) {
+    if (!kAppUsesMotoConectaBackend &&
+        next == TransactionRequestStatus.pedidoListo &&
+        !r.hasProveedorFactura) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'Adjunte primero la factura digital del proveedor.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (kAppUsesMotoConectaBackend &&
+        next == TransactionRequestStatus.enviado &&
+        !r.hasProveedorFactura) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Adjunte la factura del proveedor antes de marcar «Enviado».',
           ),
         ),
       );

@@ -122,11 +122,9 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   Future<void> _openPlanModal() async {
     if (_savingPlan) return;
     var orderTotal = widget.orderPrecioTotalUsd;
-    if (orderTotal == null) {
-      orderTotal = await SupabaseService.fetchTransactionRequestPrecioTotal(
+    orderTotal ??= await SupabaseService.fetchTransactionRequestPrecioTotal(
         widget.transactionRequestId,
       );
-    }
     if (orderTotal == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

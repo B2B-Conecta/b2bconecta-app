@@ -153,7 +153,7 @@ class MotolinkAllyInvoicePdfService {
               pw.Text(
                 'Tasa BCV utilizada para conversión REF → Bs: '
                 '${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}',
-                style: pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
               ),
               pw.SizedBox(height: 2),
               pw.Text(
@@ -242,7 +242,7 @@ class MotolinkAllyInvoicePdfService {
                   ),
                   pw.Text(
                     'Emisión UUID: $emissionShort…',
-                    style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                    style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
                   ),
                 ],
               ),
@@ -379,7 +379,7 @@ class MotolinkAllyInvoicePdfService {
           pw.Center(
             child: pw.Text(
               'MotoLink Marketplace B2B — documento generado electrónicamente.',
-              style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+              style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
             ),
           ),
         ],

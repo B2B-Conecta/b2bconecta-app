@@ -106,6 +106,7 @@ class TransactionRequestModel {
     this.transportistaGestionEtaHours,
     this.transportistaGestionEtaSetAt,
     this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
+    this.facturaUrl,
   });
 
   final String id;
@@ -255,6 +256,9 @@ class TransactionRequestModel {
 
   /// Emisiones de documento MotoLink al aliado (nota / factura; puede haber varias hojas).
   final List<MotolinkAllyDocumentEmissionModel> motolinkAllyDocumentEmissions;
+
+  /// MotoConecta: URL pública de factura / documento del importador (`transaction_requests.factura_url`).
+  final String? facturaUrl;
 
   /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
   List<MotolinkAllyDocumentEmissionModel> get motolinkAllyInvoicesDescargables =>
@@ -917,6 +921,35 @@ class TransactionRequestModel {
     if (ownerRaw is Map) {
       ownerMap = Map<String, dynamic>.from(ownerRaw);
     }
+    final importadorRaw = json['importador'];
+    if (ownerMap == null && importadorRaw is Map) {
+      ownerMap = Map<String, dynamic>.from(importadorRaw);
+    }
+
+    final cant = _asInt(json['cantidad']);
+    final precioTotalVal =
+        _asDouble(json['precio_total'] ?? json['precio_total_usd']);
+    final unitProv = json['precio_unitario_proveedor'];
+    final unitAli = json['precio_unitario_aliado'];
+    final unitFallback = cant > 0 ? precioTotalVal / cant : precioTotalVal;
+    var precioUnitarioProveedor = _asDouble(unitProv);
+    var precioUnitarioAliado = _asDouble(unitAli);
+    if (precioUnitarioProveedor == 0 && precioUnitarioAliado == 0) {
+      precioUnitarioProveedor = unitFallback;
+      precioUnitarioAliado = unitFallback;
+    } else if (precioUnitarioProveedor == 0) {
+      precioUnitarioProveedor = unitFallback;
+    } else if (precioUnitarioAliado == 0) {
+      precioUnitarioAliado = unitFallback;
+    }
+
+    if ((productName == null || productName.isEmpty) &&
+        importadorRaw is Map) {
+      final im = Map<String, dynamic>.from(importadorRaw);
+      final bn = im['business_name']?.toString().trim();
+      productName =
+          (bn != null && bn.isNotEmpty) ? 'Pedido · $bn' : 'Pedido MotoConecta';
+    }
 
     double? aliadoLim;
     final cl = aliadoMap?['credit_limit'];
@@ -930,15 +963,17 @@ class TransactionRequestModel {
       id: json['id']?.toString() ?? '',
       aliadoId: json['aliado_id']?.toString() ?? '',
       productId: json['product_id']?.toString() ?? '',
-      ownerId: json['owner_id']?.toString() ?? '',
+      ownerId: json['owner_id']?.toString() ??
+          json['importador_id']?.toString() ??
+          '',
       status: json['status']?.toString() ?? 'pendiente',
-      cantidad: _asInt(json['cantidad']),
-      precioUnitarioProveedor: _asDouble(json['precio_unitario_proveedor']),
-      precioUnitarioAliado: _asDouble(json['precio_unitario_aliado']),
-      precioTotal: _asDouble(json['precio_total']),
+      cantidad: cant,
+      precioUnitarioProveedor: precioUnitarioProveedor,
+      precioUnitarioAliado: precioUnitarioAliado,
+      precioTotal: precioTotalVal,
       precioBaseAliadoTotal: () {
         final v = json['precio_base_aliado_total'];
-        if (v == null) return _asDouble(json['precio_total']);
+        if (v == null) return precioTotalVal;
         return _asDouble(v);
       }(),
       stockDescontadoEn: _parseDate(json['stock_descontado_en']),
@@ -1054,6 +1089,7 @@ class TransactionRequestModel {
           MotolinkAllyDocumentEmissionModel.listFromJson(
         json['motolink_ally_document_emissions'],
       ),
+      facturaUrl: _nullableText(json['factura_url']),
     );
   }
 

@@ -1,11 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/app_backend.dart';
 import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+
+/// MotoConecta: «Recibido» se cierra al tomar el pedido en operación (en preparación o posterior).
+bool _recibidoDoneMotoconecta(TransactionRequestModel r) {
+  return r.atEnPreparacion != null ||
+      r.status == TransactionRequestStatus.enPreparacion ||
+      r.status == TransactionRequestStatus.enviado ||
+      r.status == TransactionRequestStatus.entregado;
+}
+
+String _recibidoSubtitle(TransactionRequestModel r) {
+  if (kAppUsesMotoConectaBackend) {
+    if (_recibidoDoneMotoconecta(r)) {
+      return 'Importador confirmó el pedido al iniciar la preparación';
+    }
+    return 'Pedido nuevo en su bandeja · marque «En preparación» cuando confirme stock';
+  }
+  if (r.atAprobadoAdmin != null) return 'Validado por MotoLink';
+  return 'Pendiente de validación MotoLink';
+}
+
+DateTime? _recibidoAt(TransactionRequestModel r) {
+  if (kAppUsesMotoConectaBackend) {
+    if (_recibidoDoneMotoconecta(r)) {
+      return r.atEnPreparacion ?? r.createdAt;
+    }
+    return r.createdAt;
+  }
+  return r.atAprobadoAdmin ?? r.createdAt;
+}
+
+bool _recibidoDone(TransactionRequestModel r) {
+  if (kAppUsesMotoConectaBackend) return _recibidoDoneMotoconecta(r);
+  return r.atAprobadoAdmin != null;
+}
 
 String _enPreparacionSubtitle(
   TransactionRequestModel r, {
@@ -15,6 +50,9 @@ String _enPreparacionSubtitle(
     final p = r.resumenProveedoresLineaTimeline;
     if (p != null && p.isNotEmpty) {
       return 'Preparación en su almacén · $p';
+    }
+    if (kAppUsesMotoConectaBackend) {
+      return 'Preparación en su almacén (pedido del aliado vía MotoConecta)';
     }
     return 'Preparación en su almacén (pedido del aliado vía MotoLink)';
   }
@@ -126,11 +164,9 @@ class CourierTimelineWidget extends StatelessWidget {
       _CourierStep(
         icon: Icons.inventory_2_outlined,
         title: 'Recibido',
-        subtitle: r.atAprobadoAdmin != null
-            ? 'Validado por MotoLink'
-            : 'Pendiente de validación MotoLink',
-        at: r.atAprobadoAdmin ?? r.createdAt,
-        done: r.atAprobadoAdmin != null,
+        subtitle: _recibidoSubtitle(r),
+        at: _recibidoAt(r),
+        done: _recibidoDone(r),
         current: r.status == TransactionRequestStatus.pendiente,
       ),
       _CourierStep(
@@ -401,13 +437,25 @@ class _StepRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                s.title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: compact ? 12 : 13,
-                  color: AppColors.textPrimary,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      s.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: compact ? 12 : 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (s.done)
+                    Icon(
+                      Icons.check_circle,
+                      size: compact ? 17 : 19,
+                      color: AppColors.brand,
+                    ),
+                ],
               ),
               Text(
                 s.subtitle,

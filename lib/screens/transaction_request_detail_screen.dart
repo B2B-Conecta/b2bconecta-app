@@ -379,7 +379,7 @@ class _TransactionRequestDetailScreenState
             isLabelVisible: hasNota,
             smallSize: 7,
             backgroundColor: AppColors.brand,
-            child: Icon(
+            child: const Icon(
               Icons.info_outline_rounded,
               color: AppColors.brandBlue,
             ),

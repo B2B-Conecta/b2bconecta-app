@@ -1,4 +1,7 @@
 -- =============================================================================
+-- MotoConecta — migración baseline única (reemplaza el historial MotoLink).
+-- Mantener sincronizado con `supabase/motoconecta/schema.sql` al editar el DDL.
+-- =============================================================================
 -- MotoConecta — esquema (greenfield, alineado a la app Flutter)
 -- =============================================================================
 -- Tablas: profiles, products, transaction_requests, transaction_request_messages,
@@ -397,10 +400,7 @@ grant all on public.transaction_requests to service_role;
 grant all on public.transaction_request_messages to service_role;
 grant all on public.notifications to service_role;
 
--- ---------------------------------------------------------------------------
--- Storage: facturas de pedido (MotoConecta — mismo bucket que usa Flutter)
--- ---------------------------------------------------------------------------
-
+-- Storage: facturas de pedido (bucket order-invoices + RLS)
 insert into storage.buckets (id, name, public)
 values ('order-invoices', 'order-invoices', false)
 on conflict (id) do nothing;

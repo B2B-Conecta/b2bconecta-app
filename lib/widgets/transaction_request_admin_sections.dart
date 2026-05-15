@@ -631,7 +631,7 @@ class SubOrderImporterLineasCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.local_shipping_outlined, size: 18, color: AppColors.brand),
+                const Icon(Icons.local_shipping_outlined, size: 18, color: AppColors.brand),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -679,7 +679,7 @@ class SubOrderImporterLineasCard extends StatelessWidget {
               Text(
                 'Sub-total (REF, este almacén): '
                 '${formatRefAmount(s.montoSubtotal)}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: AppColors.brandBlue,

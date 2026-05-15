@@ -10,13 +10,15 @@ void main() async {
   await dotenv.load(fileName: '.env');
 
   final url = dotenv.env['NEXT_PUBLIC_SUPABASE_URL']?.trim();
-  final anonKey =
-      dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY']?.trim();
+  final anonKey = (dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY'] ??
+          dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'])
+      ?.trim();
 
   if (url == null || url.isEmpty || anonKey == null || anonKey.isEmpty) {
     throw StateError(
       'Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and '
-      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY in .env',
+      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY (or '
+      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) in .env',
     );
   }
 

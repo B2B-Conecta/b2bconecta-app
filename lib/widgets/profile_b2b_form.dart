@@ -926,7 +926,7 @@ class _ProfileLogoBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = storagePath?.trim();
     if (p == null || p.isEmpty) {
-      return Center(
+      return const Center(
         child: MotoLinkProLogo(height: 48),
       );
     }
@@ -953,7 +953,7 @@ class _ProfileLogoBox extends StatelessWidget {
           width: 88,
           height: 88,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Center(
+          errorBuilder: (_, __, ___) => const Center(
             child: MotoLinkProLogo(height: 48),
           ),
         );

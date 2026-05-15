@@ -434,7 +434,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           Text(
             'Tipo elegido por el aliado: '
             '${DocumentTypePreference.labelEs(r.documentTypePreference) ?? r.documentTypePreference}',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: AppColors.brandBlue,

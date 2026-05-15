@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../config/app_backend.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -10,7 +9,7 @@ import 'importer_expandable_order_card.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
-/// Solo solicitudes aprobadas por MotoLink para este producto (pendientes de primera acción).
+/// Solicitudes para este producto (bandeja vacía sin flujo «validado broker»).
 class ProductValidatedOrdersList extends StatefulWidget {
   const ProductValidatedOrdersList({super.key, required this.productId});
 
@@ -96,20 +95,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     TransactionRequestModel r,
     String next,
   ) async {
-    if (!kAppUsesMotoConectaBackend &&
-        next == TransactionRequestStatus.pedidoListo &&
-        !r.hasProveedorFactura) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Adjunte primero la factura digital del proveedor.',
-          ),
-        ),
-      );
-      return;
-    }
-    if (kAppUsesMotoConectaBackend &&
-        next == TransactionRequestStatus.enviado &&
+    if (next == TransactionRequestStatus.enviado &&
         !r.hasProveedorFactura) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

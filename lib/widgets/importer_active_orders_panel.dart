@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../config/app_backend.dart';
+
+
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -114,18 +115,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final s = r.status;
     switch (_quickFilter) {
       case _ImporterQuickFilter.nuevos:
-        if (kAppUsesMotoConectaBackend) {
-          return s == TransactionRequestStatus.pendiente;
-        }
-        return s == TransactionRequestStatus.aprobadoAdmin;
+        return s == TransactionRequestStatus.pendiente;
       case _ImporterQuickFilter.enProceso:
-        if (kAppUsesMotoConectaBackend) {
-          return s == TransactionRequestStatus.enPreparacion ||
-              s == TransactionRequestStatus.enviado;
-        }
         return s == TransactionRequestStatus.enPreparacion ||
-            s == TransactionRequestStatus.pedidoListo ||
-            s == TransactionRequestStatus.enTransito;
+            s == TransactionRequestStatus.enviado;
       case _ImporterQuickFilter.cerrados:
         return s == TransactionRequestStatus.entregado ||
             s == TransactionRequestStatus.rechazado;
@@ -165,9 +158,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         runSpacing: 6,
         children: [
           chip(
-            kAppUsesMotoConectaBackend
-                ? 'Pendientes · nuevos'
-                : 'Nuevos · por validar',
+            'Pendientes · nuevos',
             _ImporterQuickFilter.nuevos,
           ),
           chip('En proceso', _ImporterQuickFilter.enProceso),
@@ -192,20 +183,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     TransactionRequestModel r,
     String next,
   ) async {
-    if (!kAppUsesMotoConectaBackend &&
-        next == TransactionRequestStatus.pedidoListo &&
-        !r.hasProveedorFactura) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Adjunte primero la factura digital del proveedor.',
-          ),
-        ),
-      );
-      return;
-    }
-    if (kAppUsesMotoConectaBackend &&
-        next == TransactionRequestStatus.enviado &&
+    if (next == TransactionRequestStatus.enviado &&
         !r.hasProveedorFactura) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

@@ -257,7 +257,7 @@ class TransactionRequestModel {
   /// Emisiones de documento MotoLink al aliado (nota / factura; puede haber varias hojas).
   final List<MotolinkAllyDocumentEmissionModel> motolinkAllyDocumentEmissions;
 
-  /// MotoConecta: URL pública de factura / documento del importador (`transaction_requests.factura_url`).
+  /// URL pública de factura / documento del importador (`transaction_requests.factura_url`).
   final String? facturaUrl;
 
   /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
@@ -948,7 +948,7 @@ class TransactionRequestModel {
       final im = Map<String, dynamic>.from(importadorRaw);
       final bn = im['business_name']?.toString().trim();
       productName =
-          (bn != null && bn.isNotEmpty) ? 'Pedido · $bn' : 'Pedido MotoConecta';
+          (bn != null && bn.isNotEmpty) ? 'Pedido · $bn' : 'Pedido';
     }
 
     double? aliadoLim;

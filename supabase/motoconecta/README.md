@@ -4,8 +4,7 @@ Marketplace B2B simplificado: solo roles **aliado**, **importador** y **administ
 
 ## Cuándo usar esto
 
-- **Proyecto Supabase nuevo** (p. ej. el entorno MotoConecta enlazado desde Flutter con `.env`).
-- No ejecutes `schema.sql` sobre la base **MotoLink** legacy: chocaría con tablas antiguas.
+- **Proyecto Supabase** enlazado desde Flutter con `.env` (esta rama asume solo esquema MotoConecta).
 
 ## Local (Supabase CLI + Docker)
 
@@ -14,9 +13,9 @@ Marketplace B2B simplificado: solo roles **aliado**, **importador** y **administ
 
 Si ves `supabase start is not running`, ejecuta primero el paso 1.
 
-## Migraciones en esta rama
+## Migraciones
 
-Las migraciones históricas MotoLink **no** están en `supabase/migrations/`. Solo existe la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`**, que debe coincidir con este `schema.sql`.
+Solo la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`**, alineada con `schema.sql`.
 
 ## Orden recomendado (SQL Editor o `psql`)
 

@@ -29,7 +29,6 @@ import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
 import '../utils/maps_route_utils.dart';
-import '../config/app_backend.dart';
 import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
 
@@ -197,9 +196,8 @@ class SupabaseService {
         .toList();
     if (ids.isEmpty) return const {};
 
-    final selectCols = kAppUsesMotoConectaBackend
-        ? 'id, aliado:profiles!transaction_requests_aliado_id_fkey(business_name), importador:profiles!transaction_requests_importador_id_fkey(business_name)'
-        : 'id, products(name), aliado:profiles!transaction_requests_aliado_id_fkey(business_name)';
+    const selectCols =
+        'id, aliado:profiles!transaction_requests_aliado_id_fkey(business_name), importador:profiles!transaction_requests_importador_id_fkey(business_name)';
     final rows = await _client
         .from('transaction_requests')
         .select(selectCols)
@@ -217,8 +215,7 @@ class SupabaseService {
       if (prod is Map) {
         productName = prod['name']?.toString().trim();
       }
-      if (kAppUsesMotoConectaBackend &&
-          (productName == null || productName.isEmpty)) {
+      if (productName == null || productName.isEmpty) {
         final imp = m['importador'];
         if (imp is Map) {
           final ibn = imp['business_name']?.toString().trim();
@@ -765,128 +762,7 @@ class SupabaseService {
     }).eq('id', productId);
   }
 
-  static const _trSelectFlat = '''
-    id,
-    aliado_id,
-    product_id,
-    owner_id,
-    status,
-    cantidad,
-    precio_unitario_proveedor,
-    precio_unitario_aliado,
-    precio_total,
-    precio_base_aliado_total,
-    stock_descontado_en,
-    notas_admin,
-    cancelado_por_aliado,
-    aliado_cancelacion_motivo,
-    anulado_por_motolink,
-    motolink_anulacion_motivo,
-    created_at,
-    updated_at,
-    at_aprobado_admin,
-    at_rechazado,
-    at_en_preparacion,
-    at_pedido_listo,
-    at_en_transito,
-    at_entregado,
-    proveedor_factura_storage_path,
-    proveedor_factura_file_name,
-    proveedor_factura_submitted_at,
-    transit_eta_days,
-    transit_eta_hours,
-    transit_eta_set_at,
-    factura_aliado_storage_path,
-    factura_aliado_file_name,
-    factura_aliado_submitted_at,
-    pago_metodo,
-    comprobante_pago_storage_path,
-    comprobante_pago_file_name,
-    comprobante_pago_submitted_at,
-    pago_estado_revision,
-    pago_comprobante_rechazo_nota,
-    pago_aprobado_at,
-    efectivo_respaldo_storage_path,
-    efectivo_respaldo_file_name,
-    efectivo_respaldo_submitted_at,
-    destino_entrega_usa_perfil,
-    destino_entrega_texto,
-    destino_entrega_maps_url,
-    admin_ruta_maps_url,
-    transportista_assignment_acknowledged_at,
-    transportista_recogida_almacen_at,
-    transportista_live_location_opt_in,
-    transportista_live_lat,
-    transportista_live_lng,
-    transportista_live_location_at,
-    transportista_decline_motivo,
-    transportista_declined_at,
-    transportista_gestion_eta_days,
-    transportista_gestion_eta_hours,
-    transportista_gestion_eta_set_at,
-    credit_plan_type,
-    credit_plan_confirmed_at,
-    credit_monto_bloqueado,
-    document_type_preference,
-    motolink_pending_auto_invoice,
-    aliado_experience_stars,
-    aliado_experience_comment,
-    aliado_experience_submitted_at,
-    assigned_transportista_id,
-    is_master_order,
-    tasa_bcv_snapshot,
-    payment_schedule (
-      id, transaction_request_id, installment_index, amount_usd, due_on,
-      pago_metodo, pago_comprobante_storage_path, pago_comprobante_file_name,
-      pago_submitted_at, pago_estado_revision, pago_comprobante_rechazo_nota, pago_aprobado_at
-    ),
-    products ( name, sku, price_usd ),
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, credit_limit, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
-    owner:profiles!transaction_requests_owner_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
-    motolink_ally_document_emissions (
-      id,
-      correlativo,
-      document_type,
-      storage_path,
-      file_name,
-      finalized_at,
-      fragment_index,
-      fragment_total
-    )
-  ''';
-
-  static String get _trSelectWithSubs => '''
-$_trSelectFlat,
-sub_orders (
-  id,
-  parent_order_id,
-  importador_id,
-  status,
-  monto_subtotal,
-  items_count,
-  proveedor_factura_storage_path,
-  proveedor_factura_file_name,
-  proveedor_factura_submitted_at,
-  transit_eta_days,
-  transit_eta_hours,
-  transit_eta_set_at,
-  transportista_recogida_almacen_at,
-  importador:profiles!sub_orders_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
-  order_items (
-    id,
-    product_id,
-    importador_id,
-    cantidad,
-    precio_unitario_proveedor,
-    precio_unitario_aliado,
-    precio_line_total,
-    precio_base_aliado_line,
-    products ( name, sku )
-  )
-)
-''';
-
-  /// MotoConecta: pedido directo (sin `sub_orders`, `payment_schedule`, ni FK a `products`).
+  /// MotoConecta: pedido directo (sin `sub_orders`, `payment_schedule`, ni FK anidada legacy).
   static const _trSelectMotoconecta = '''
     id,
     aliado_id,
@@ -907,25 +783,9 @@ sub_orders (
     importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude )
   ''';
 
-  static String get _trSelectForListWithSubs =>
-      kAppUsesMotoConectaBackend ? _trSelectMotoconecta : _trSelectWithSubs;
+  static String get _trSelectForListWithSubs => _trSelectMotoconecta;
 
-  static String get _trSelectForListFlat =>
-      kAppUsesMotoConectaBackend ? _trSelectMotoconecta : _trSelectFlat;
-
-  /// Líneas de `order_items` al listar un sub-pedido (vista importador).
-  static const _orderItemsSelectImporterSubOrderSlice = '''
-    id,
-    sub_order_id,
-    product_id,
-    importador_id,
-    cantidad,
-    precio_unitario_proveedor,
-    precio_unitario_aliado,
-    precio_line_total,
-    precio_base_aliado_line,
-    products ( name, sku, price_usd )
-  ''';
+  static String get _trSelectForListFlat => _trSelectMotoconecta;
 
   /// Solicitudes del aliado autenticado (todas).
   static Future<List<TransactionRequestModel>> fetchMyTransactionRequests() async {
@@ -951,15 +811,14 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) return [];
 
-    final statusFilter = kAppUsesMotoConectaBackend
-        ? TransactionRequestStatus.motoconectaAliadoPedidosActivosYCerrados
-        : TransactionRequestStatus.aliadoPedidosActivosYCerrados;
-
     final response = await _client
         .from('transaction_requests')
         .select(_trSelectForListWithSubs)
         .eq('aliado_id', uid)
-        .inFilter('status', statusFilter)
+        .inFilter(
+          'status',
+          TransactionRequestStatus.motoconectaAliadoPedidosActivosYCerrados,
+        )
         .order('updated_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -969,205 +828,66 @@ sub_orders (
         .toList();
   }
 
-  /// Aprobados por MotoLink pendientes de la primera acción del importador (pestaña Validados).
+  /// No aplica en MotoConecta (no hay pestaña «Validados» broker).
   static Future<List<TransactionRequestModel>>
       fetchValidatedTransactionRequestsForImporter() async {
-    final uid = _currentUserId;
-    if (uid == null) return [];
-    if (kAppUsesMotoConectaBackend) return [];
-
-    final subSlices = await fetchValidatedSubOrderSlicesForImporter();
-
-    final response = await _client
-        .from('transaction_requests')
-        .select(_trSelectFlat)
-        .eq('owner_id', uid)
-        .inFilter('status', TransactionRequestStatus.importerSoloValidadosAdmin)
-        .order('created_at', ascending: false);
-
-    final list = response as List<dynamic>;
-    final legacy = list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
-        .toList();
-
-    final merged = <TransactionRequestModel>[...subSlices, ...legacy];
-    merged.sort((a, b) {
-      final ta = a.updatedAt ?? a.createdAt;
-      final tb = b.updatedAt ?? b.createdAt;
-      if (ta == null && tb == null) return 0;
-      if (ta == null) return 1;
-      if (tb == null) return -1;
-      return tb.compareTo(ta);
-    });
-    return merged;
+    return [];
   }
 
-  /// Ciclo completo post-validación: aprobado → … → entregado (pestaña Pedidos).
+  /// Pedidos del importador en fases activas (sin uso directo en UI MotoConecta; ver unificado).
   static Future<List<TransactionRequestModel>>
       fetchActiveTransactionRequestsForImporter() async {
     final uid = _currentUserId;
     if (uid == null) return [];
 
-    if (kAppUsesMotoConectaBackend) {
-      final response = await _client
-          .from('transaction_requests')
-          .select(_trSelectMotoconecta)
-          .eq('importador_id', uid)
-          .inFilter('status', TransactionRequestStatus.motoconectaAdminOperationalActive)
-          .order('updated_at', ascending: false);
-      final list = response as List<dynamic>;
-      return list
-          .map((row) => TransactionRequestModel.fromJson(
-              Map<String, dynamic>.from(row as Map)))
-          .toList();
-    }
-
-    final subSlices = await fetchActiveSubOrderSlicesForImporter();
-
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectFlat)
-        .eq('owner_id', uid)
-        .inFilter('status', TransactionRequestStatus.importerPipeline)
-        .order('created_at', ascending: false);
-
+        .select(_trSelectMotoconecta)
+        .eq('importador_id', uid)
+        .inFilter(
+          'status',
+          TransactionRequestStatus.motoconectaAdminOperationalActive,
+        )
+        .order('updated_at', ascending: false);
     final list = response as List<dynamic>;
-    final legacy = list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+    return list
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
-
-    final merged = <TransactionRequestModel>[...subSlices, ...legacy];
-    merged.sort((a, b) {
-      final ta = a.updatedAt ?? a.createdAt;
-      final tb = b.updatedAt ?? b.createdAt;
-      if (ta == null && tb == null) return 0;
-      if (ta == null) return 1;
-      if (tb == null) return -1;
-      return tb.compareTo(ta);
-    });
-    return merged;
   }
 
-  /// Importador: sub-pedidos en cualquier fase operativa o cerrada (vista unificada).
+  /// Importador: sin `sub_orders` en MotoConecta.
   static Future<List<TransactionRequestModel>>
       fetchSubOrderSlicesForImporterUnified() async {
-    final uid = _currentUserId;
-    if (uid == null) return [];
-    if (kAppUsesMotoConectaBackend) return [];
-
-    final rows = await _client
-        .from('sub_orders')
-        .select('''
-          id,
-          status,
-          monto_subtotal,
-          items_count,
-          proveedor_factura_storage_path,
-          proveedor_factura_file_name,
-          proveedor_factura_submitted_at,
-          transit_eta_days,
-          transit_eta_hours,
-          transit_eta_set_at,
-          parent_order_id,
-          importador_id,
-          order_items ( $_orderItemsSelectImporterSubOrderSlice ),
-          transaction_requests!inner ( $_trSelectFlat )
-        ''')
-        .eq('importador_id', uid)
-        .inFilter('status', const [
-          SubOrderStatus.pendiente,
-          SubOrderStatus.preparando,
-          SubOrderStatus.listo,
-          SubOrderStatus.enRuta,
-          SubOrderStatus.entregado,
-        ])
-        .inFilter('transaction_requests.status', TransactionRequestStatus.importerOrdersUnifiedStatuses)
-        .order('updated_at', ascending: false);
-
-    final list = rows as List<dynamic>;
-    return list
-        .map((row) => _transactionRequestFromImporterSubOrderRow(
-              Map<String, dynamic>.from(row as Map),
-            ))
-        .toList();
+    return [];
   }
 
-  /// Importador: pedidos simples + tramos maestro (un solo listado con histórico cerrado).
+  /// Importador: pedidos simples (vista unificada con histórico).
   static Future<List<TransactionRequestModel>>
       fetchUnifiedTransactionRequestsForImporter() async {
     final uid = _currentUserId;
     if (uid == null) return [];
 
-    if (kAppUsesMotoConectaBackend) {
-      final response = await _client
-          .from('transaction_requests')
-          .select(_trSelectMotoconecta)
-          .eq('importador_id', uid)
-          .inFilter(
-              'status', TransactionRequestStatus.motoconectaImporterOrdersUnifiedStatuses)
-          .order('updated_at', ascending: false);
-      final list = response as List<dynamic>;
-      return list
-          .map((row) => TransactionRequestModel.fromJson(
-              Map<String, dynamic>.from(row as Map)))
-          .toList();
-    }
-
-    final subSlices = await fetchSubOrderSlicesForImporterUnified();
-
     final response = await _client
         .from('transaction_requests')
-        .select(_trSelectFlat)
-        .eq('owner_id', uid)
-        .inFilter('status', TransactionRequestStatus.importerOrdersUnifiedStatuses)
-        .order('created_at', ascending: false);
-
-    final list = response as List<dynamic>;
-    final legacy = list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
-        .toList();
-
-    final seen = <String>{};
-    final merged = <TransactionRequestModel>[];
-    for (final r in subSlices) {
-      final k = r.importerSubOrderId != null ? '${r.id}::${r.importerSubOrderId}' : r.id;
-      if (seen.add(k)) merged.add(r);
-    }
-    for (final r in legacy) {
-      if (seen.add(r.id)) merged.add(r);
-    }
-    merged.sort((a, b) {
-      final ta = a.updatedAt ?? a.createdAt;
-      final tb = b.updatedAt ?? b.createdAt;
-      if (ta == null && tb == null) return 0;
-      if (ta == null) return 1;
-      if (tb == null) return -1;
-      return tb.compareTo(ta);
-    });
-    return merged;
-  }
-
-  /// Solo aprobados por MotoLink para un producto (importador dueño vía RLS).
-  static Future<List<TransactionRequestModel>>
-      fetchValidatedTransactionRequestsForProduct(String productId) async {
-    if (productId.isEmpty) return [];
-    if (kAppUsesMotoConectaBackend) return [];
-
-    final response = await _client
-        .from('transaction_requests')
-        .select(_trSelectFlat)
-        .eq('product_id', productId)
-        .inFilter('status', TransactionRequestStatus.importerSoloValidadosAdmin)
-        .order('created_at', ascending: false);
-
+        .select(_trSelectMotoconecta)
+        .eq('importador_id', uid)
+        .inFilter(
+          'status',
+          TransactionRequestStatus.motoconectaImporterOrdersUnifiedStatuses,
+        )
+        .order('updated_at', ascending: false);
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
+  }
+
+  /// No aplica en MotoConecta (sin estado «validado broker» por producto).
+  static Future<List<TransactionRequestModel>>
+      fetchValidatedTransactionRequestsForProduct(String productId) async {
+    return [];
   }
 
   /// Bandeja admin: todas las solicitudes.
@@ -1185,17 +905,16 @@ sub_orders (
         .toList();
   }
 
-  /// Pedidos en curso tras validación MotoLink (pestaña Pedidos activos — admin).
+  /// Pedidos en curso (pestaña Pedidos activos — admin).
   static Future<List<TransactionRequestModel>>
       fetchActiveTransactionRequestsForAdmin() async {
-    final activeStatuses = kAppUsesMotoConectaBackend
-        ? TransactionRequestStatus.motoconectaAdminOperationalActive
-        : TransactionRequestStatus.adminOperationalActive;
-
     final response = await _client
         .from('transaction_requests')
         .select(_trSelectForListWithSubs)
-        .inFilter('status', activeStatuses)
+        .inFilter(
+          'status',
+          TransactionRequestStatus.motoconectaAdminOperationalActive,
+        )
         .order('updated_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -1221,25 +940,10 @@ sub_orders (
         .toList();
   }
 
-  /// Pedidos cerrados asignados al transportista actual (entregados o rechazados).
+  /// MotoConecta no asigna transportista en app.
   static Future<List<TransactionRequestModel>>
       fetchClosedTransactionRequestsForTransportista() async {
-    final uid = _currentUserId;
-    if (uid == null) return [];
-    if (kAppUsesMotoConectaBackend) return [];
-
-    final response = await _client
-        .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
-        .eq('assigned_transportista_id', uid)
-        .inFilter('status', TransactionRequestStatus.adminClosedOrders)
-        .order('updated_at', ascending: false);
-
-    final list = response as List<dynamic>;
-    return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
-        .toList();
+    return [];
   }
 
   /// Reportes admin: encomiendas en un rango de fechas (`created_at`), con filtros opcionales en servidor.
@@ -1277,11 +981,7 @@ sub_orders (
     }
     final owner = ownerId?.trim();
     if (owner != null && owner.isNotEmpty) {
-      if (kAppUsesMotoConectaBackend) {
-        query = query.eq('importador_id', owner);
-      } else {
-        query = query.eq('owner_id', owner);
-      }
+      query = query.eq('importador_id', owner);
     }
 
     final response =
@@ -1564,9 +1264,8 @@ sub_orders (
     final uid = _currentUserId;
     if (uid == null) return 0;
 
-    final exposure = kAppUsesMotoConectaBackend
-        ? TransactionRequestStatus.motoconectaAliadoCreditExposureStatuses
-        : TransactionRequestStatus.aliadoCreditExposureStatuses;
+    const exposure =
+        TransactionRequestStatus.motoconectaAliadoCreditExposureStatuses;
 
     final response = await _client
         .from('transaction_requests')
@@ -1678,7 +1377,6 @@ sub_orders (
     }
 
     final otroDestinoTexto = destinoEntregaTexto?.trim();
-    final mapsTrim = destinoEntregaMapsUrl?.trim();
     if (!destinoEntregaUsaPerfil &&
         (otroDestinoTexto == null || otroDestinoTexto.isEmpty)) {
       throw ArgumentError(
@@ -1711,38 +1409,17 @@ sub_orders (
     }
 
     try {
-      if (kAppUsesMotoConectaBackend) {
-        await _client.from('transaction_requests').insert({
-          'aliado_id': uid,
-          'importador_id': ownerId,
-          'product_id': productId,
-          'status': TransactionRequestStatus.pendiente,
-          'cantidad': cantidad,
-          'precio_total_usd': total,
-        });
-        await _client.from('products').update({
-          'stock': stock - cantidad,
-        }).eq('id', productId).eq('owner_id', ownerId);
-        return;
-      }
-
       await _client.from('transaction_requests').insert({
         'aliado_id': uid,
+        'importador_id': ownerId,
         'product_id': productId,
-        'owner_id': ownerId,
-        'status': 'aprobado_admin',
+        'status': TransactionRequestStatus.pendiente,
         'cantidad': cantidad,
-        'precio_unitario_proveedor': precioUnitarioProveedor,
-        'precio_unitario_aliado': unitAliado,
-        'precio_total': total,
-        'precio_base_aliado_total': total,
-        'destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
-        'destino_entrega_texto':
-            destinoEntregaUsaPerfil ? null : otroDestinoTexto,
-        'destino_entrega_maps_url': destinoEntregaUsaPerfil
-            ? null
-            : (mapsTrim != null && mapsTrim.isNotEmpty ? mapsTrim : null),
+        'precio_total_usd': total,
       });
+      await _client.from('products').update({
+        'stock': stock - cantidad,
+      }).eq('id', productId).eq('owner_id', ownerId);
     } on PostgrestException catch (e) {
       final m = e.message.toLowerCase();
       if (m.contains('stock insuficiente')) {
@@ -1849,65 +1526,10 @@ sub_orders (
     );
   }
 
-  /// Importador: sub-pedidos activos (vista por tramo).
+  /// Sin `sub_orders` en MotoConecta.
   static Future<List<TransactionRequestModel>>
       fetchActiveSubOrderSlicesForImporter() async {
-    final uid = _currentUserId;
-    if (uid == null) return [];
-    if (kAppUsesMotoConectaBackend) return [];
-
-    final rows = await _client
-        .from('sub_orders')
-        .select('''
-          id,
-          status,
-          monto_subtotal,
-          items_count,
-          proveedor_factura_storage_path,
-          proveedor_factura_file_name,
-          proveedor_factura_submitted_at,
-          transit_eta_days,
-          transit_eta_hours,
-          transit_eta_set_at,
-          parent_order_id,
-          importador_id,
-          order_items ( $_orderItemsSelectImporterSubOrderSlice ),
-          transaction_requests!inner (
-            $_trSelectFlat
-          )
-        ''')
-        .eq('importador_id', uid)
-        .inFilter('status', const [
-          SubOrderStatus.preparando,
-          SubOrderStatus.listo,
-          SubOrderStatus.enRuta,
-          SubOrderStatus.entregado,
-        ])
-        .order('updated_at', ascending: false);
-
-    final list = rows as List<dynamic>;
-    return list
-        .map((row) => _transactionRequestFromImporterSubOrderRow(
-              Map<String, dynamic>.from(row as Map),
-            ))
-        .toList();
-  }
-
-  static String _mapSubStatusToTransactionRequestStatus(String subStatus) {
-    switch (subStatus) {
-      case SubOrderStatus.pendiente:
-        return TransactionRequestStatus.aprobadoAdmin;
-      case SubOrderStatus.preparando:
-        return TransactionRequestStatus.enPreparacion;
-      case SubOrderStatus.listo:
-        return TransactionRequestStatus.pedidoListo;
-      case SubOrderStatus.enRuta:
-        return TransactionRequestStatus.enTransito;
-      case SubOrderStatus.entregado:
-        return TransactionRequestStatus.entregado;
-      default:
-        return TransactionRequestStatus.aprobadoAdmin;
-    }
+    return [];
   }
 
   static String? _subStatusFromImporterAdvance(String trNextStatus) {
@@ -1921,101 +1543,9 @@ sub_orders (
     }
   }
 
-  static TransactionRequestModel _transactionRequestFromImporterSubOrderRow(
-    Map<String, dynamic> row,
-  ) {
-    final parentRaw = row['transaction_requests'];
-    if (parentRaw is! Map) {
-      throw StateError('Respuesta inválida: falta transaction_requests');
-    }
-    final parent = Map<String, dynamic>.from(parentRaw);
-    final subId = row['id']?.toString() ?? '';
-
-    final names = <String>[];
-    final oi = row['order_items'];
-    final itemsJson = <Map<String, dynamic>>[];
-    if (oi is List) {
-      for (final e in oi) {
-        if (e is Map) {
-          final m = Map<String, dynamic>.from(e);
-          m.putIfAbsent('sub_order_id', () => subId);
-          itemsJson.add(m);
-          final p = m['products'];
-          if (p is Map) {
-            final n = p['name']?.toString().trim();
-            if (n != null && n.isNotEmpty) names.add(n);
-          }
-        }
-      }
-    }
-    final title = names.isEmpty
-        ? 'Varios repuestos'
-        : (names.length <= 3
-            ? names.join(', ')
-            : '${names.take(2).join(', ')} +${names.length - 2}');
-
-    parent['_importer_sub_order_id'] = subId;
-    parent['_importer_view_order_items'] = itemsJson;
-    parent['status'] =
-        _mapSubStatusToTransactionRequestStatus(row['status']?.toString() ?? '');
-    parent['proveedor_factura_storage_path'] =
-        row['proveedor_factura_storage_path'];
-    parent['proveedor_factura_file_name'] = row['proveedor_factura_file_name'];
-    parent['proveedor_factura_submitted_at'] =
-        row['proveedor_factura_submitted_at'];
-    parent['transit_eta_days'] = row['transit_eta_days'];
-    parent['transit_eta_hours'] = row['transit_eta_hours'];
-    parent['transit_eta_set_at'] = row['transit_eta_set_at'];
-    parent['precio_total'] = row['monto_subtotal'];
-    parent['precio_base_aliado_total'] = row['monto_subtotal'];
-    parent['cantidad'] = row['items_count'];
-    parent['products'] = {'name': title, 'sku': null, 'price_usd': null};
-
-    return TransactionRequestModel.fromJson(parent);
-  }
-
-  /// Sub-pedidos en «Validados»: maestro aprobado y sub aún pendiente de primera acción.
   static Future<List<TransactionRequestModel>>
       fetchValidatedSubOrderSlicesForImporter() async {
-    final uid = _currentUserId;
-    if (uid == null) return [];
-    if (kAppUsesMotoConectaBackend) return [];
-
-    final rows = await _client
-        .from('sub_orders')
-        .select('''
-          id,
-          status,
-          monto_subtotal,
-          items_count,
-          proveedor_factura_storage_path,
-          proveedor_factura_file_name,
-          proveedor_factura_submitted_at,
-          transit_eta_days,
-          transit_eta_hours,
-          transit_eta_set_at,
-          parent_order_id,
-          importador_id,
-          order_items ( $_orderItemsSelectImporterSubOrderSlice ),
-          transaction_requests!inner ( $_trSelectFlat )
-        ''')
-        .eq('importador_id', uid)
-        .eq('status', SubOrderStatus.pendiente)
-        // Si otro importador ya avanzó, el maestro puede pasar a `en_preparacion`
-        // aunque este tramo siga `pendiente`; debe seguir visible para su primera acción.
-        .inFilter('transaction_requests.status', const [
-          TransactionRequestStatus.aprobadoAdmin,
-          TransactionRequestStatus.enPreparacion,
-          TransactionRequestStatus.pedidoListo,
-        ])
-        .order('updated_at', ascending: false);
-
-    final list = rows as List<dynamic>;
-    return list
-        .map((row) => _transactionRequestFromImporterSubOrderRow(
-              Map<String, dynamic>.from(row as Map),
-            ))
-        .toList();
+    return [];
   }
 
   static Future<void> adminUpdateTransactionRequest({
@@ -3393,25 +2923,7 @@ sub_orders (
     required String parentOrderId,
     required String newTransactionStatus,
   }) async {
-    if (kAppUsesMotoConectaBackend) return null;
-    final uid = _currentUserId;
-    if (uid == null) return null;
-    final expectedSubStatus = switch (newTransactionStatus) {
-      TransactionRequestStatus.enPreparacion => SubOrderStatus.pendiente,
-      TransactionRequestStatus.pedidoListo => SubOrderStatus.preparando,
-      _ => null,
-    };
-    var q = _client
-        .from('sub_orders')
-        .select('id')
-        .eq('parent_order_id', parentOrderId)
-        .eq('importador_id', uid);
-    if (expectedSubStatus != null) {
-      q = q.eq('status', expectedSubStatus);
-    }
-    final row = await q.maybeSingle();
-    if (row == null) return null;
-    return Map<String, dynamic>.from(row)['id']?.toString();
+    return null;
   }
 
   /// Avanza el estado del pedido (importador): `aprobado_admin` → `en_preparacion`,

@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../config/app_backend.dart';
 import '../models/app_home_role.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 
-/// MotoConecta: «Recibido» se cierra al tomar el pedido en operación (en preparación o posterior).
+/// «Recibido» se cierra al tomar el pedido en operación (en preparación o posterior).
 bool _recibidoDoneMotoconecta(TransactionRequestModel r) {
   return r.atEnPreparacion != null ||
       r.status == TransactionRequestStatus.enPreparacion ||
@@ -17,29 +16,21 @@ bool _recibidoDoneMotoconecta(TransactionRequestModel r) {
 }
 
 String _recibidoSubtitle(TransactionRequestModel r) {
-  if (kAppUsesMotoConectaBackend) {
-    if (_recibidoDoneMotoconecta(r)) {
-      return 'Importador confirmó el pedido al iniciar la preparación';
-    }
-    return 'Pedido nuevo en su bandeja · marque «En preparación» cuando confirme stock';
+  if (_recibidoDoneMotoconecta(r)) {
+    return 'Importador confirmó el pedido al iniciar la preparación';
   }
-  if (r.atAprobadoAdmin != null) return 'Validado por MotoLink';
-  return 'Pendiente de validación MotoLink';
+  return 'Pedido nuevo en su bandeja · marque «En preparación» cuando confirme stock';
 }
 
 DateTime? _recibidoAt(TransactionRequestModel r) {
-  if (kAppUsesMotoConectaBackend) {
-    if (_recibidoDoneMotoconecta(r)) {
-      return r.atEnPreparacion ?? r.createdAt;
-    }
-    return r.createdAt;
+  if (_recibidoDoneMotoconecta(r)) {
+    return r.atEnPreparacion ?? r.createdAt;
   }
-  return r.atAprobadoAdmin ?? r.createdAt;
+  return r.createdAt;
 }
 
 bool _recibidoDone(TransactionRequestModel r) {
-  if (kAppUsesMotoConectaBackend) return _recibidoDoneMotoconecta(r);
-  return r.atAprobadoAdmin != null;
+  return _recibidoDoneMotoconecta(r);
 }
 
 String _enPreparacionSubtitle(
@@ -50,9 +41,6 @@ String _enPreparacionSubtitle(
     final p = r.resumenProveedoresLineaTimeline;
     if (p != null && p.isNotEmpty) {
       return 'Preparación en su almacén · $p';
-    }
-    if (kAppUsesMotoConectaBackend) {
-      return 'Preparación en su almacén (pedido del aliado vía MotoConecta)';
     }
     return 'Preparación en su almacén (pedido del aliado vía MotoLink)';
   }

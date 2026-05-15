@@ -22,13 +22,17 @@ Solo la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`
 1. `schema.sql` — crea tablas, índices, comisión generada al 5 %, `notifications`, `transaction_request_messages`, triggers mínimos y RLS.
 2. Si la base ya existía con un esquema anterior MotoConecta: ejecuta **`upgrade_lat_lng_sku.sql`** (y revisa columnas nuevas manualmente si hace falta).
 3. Si la app falla con **`proveedor_factura_storage_path` does not exist**: ejecuta en SQL Editor **`upgrade_proveedor_factura.sql`** (solo añade las columnas de adjunto).
-4. Desde la raíz del repo, `supabase/seed.sql` — un importador, un aliado, un admin; perfiles con dirección fiscal de referencia; **15 productos** del importador; un pedido `pendiente` (valida `comision_motoconecta`).
+4. Si el panel **Pedidos** del aliado muestra **PGRST202** / «`aliado_effective_open_exposure` not found»: ejecuta **`upgrade_aliado_effective_open_exposure.sql`** (RPC de suma de pedidos activos para el cupo en pantalla).
+5. Desde la raíz del repo, `supabase/seed.sql` — dos importadores, un aliado, un admin; perfiles con dirección fiscal de referencia; **15 productos por importador** (30 filas); un pedido `pendiente` (valida `comision_motoconecta`).
 
 Contraseña de todos los usuarios seed: **`SeedPass123!`**
 
+Si al ejecutar `seed.sql` aparece **`profiles_id_fkey`**: suele ser un email `@motoconecta.seed` que ya existía en `auth.users` con **otro** UUID (el seed inserta perfiles con IDs fijos). Vuelve a ejecutar el **mismo** `seed.sql` completo: el preámbulo borra esas filas por email antes de recrear. Si pegaste UUIDs a mano, revisa que importador2 sea **`c1000002-0000-4000-8000-000000000001`** (no `c1080802…`). **No hace falta** volver a ejecutar `schema.sql` salvo que hayas borrado tablas.
+
 | Rol | Email |
 |-----|--------|
-| Importador | `importador1@motoconecta.seed` |
+| Importador (Delta) | `importador1@motoconecta.seed` |
+| Importador (Omega) | `importador2@motoconecta.seed` |
 | Aliado | `aliado1@motoconecta.seed` |
 | Admin | `admin@motoconecta.seed` |
 

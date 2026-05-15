@@ -1226,12 +1226,37 @@ class SupabaseService {
   /// Suma efectiva retenida contra el cupo (incl. cuotas de plan ya liberadas al aprobar pago).
   static Future<double> fetchOpenCreditExposureForAliado(String aliadoId) async {
     if (aliadoId.trim().isEmpty) return 0;
-    final v = await _client.rpc(
-      'aliado_effective_open_exposure',
-      params: <String, dynamic>{'p_aliado_id': aliadoId},
-    );
-    if (v is num) return v.toDouble();
-    return 0.0;
+    try {
+      final v = await _client.rpc(
+        'aliado_effective_open_exposure',
+        params: <String, dynamic>{'p_aliado_id': aliadoId},
+      );
+      if (v is num) return v.toDouble();
+      return 0.0;
+    } on PostgrestException catch (e) {
+      final missingRpc = e.code == 'PGRST202' ||
+          e.message.contains('aliado_effective_open_exposure');
+      if (!missingRpc) rethrow;
+      return _sumOpenCreditExposureFallback(aliadoId);
+    }
+  }
+
+  /// Misma suma que [aliado_effective_open_exposure] cuando el RPC no está en la base (PGRST202).
+  static Future<double> _sumOpenCreditExposureFallback(String aliadoId) async {
+    const statuses =
+        TransactionRequestStatus.motoconectaAliadoCreditExposureStatuses;
+    final response = await _client
+        .from('transaction_requests')
+        .select('precio_total_usd')
+        .eq('aliado_id', aliadoId)
+        .inFilter('status', statuses);
+    var total = 0.0;
+    for (final row in response as List<dynamic>) {
+      if (row is! Map) continue;
+      final p = row['precio_total_usd'];
+      if (p is num) total += p.toDouble();
+    }
+    return total;
   }
 
   /// Suma de bloqueo de cupo en pedidos no rechazados (RPC `aliado_effective_open_exposure`):

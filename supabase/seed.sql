@@ -9,17 +9,95 @@
 --
 -- Contraseña común (todos los seed): SeedPass123!
 --   importador1@motoconecta.seed
+--   importador2@motoconecta.seed
 --   aliado1@motoconecta.seed
 --   admin@motoconecta.seed
 --
 -- Validación comisión: pedido de ejemplo `precio_total_usd = 1000` →
 --   `comision_motoconecta` generada = 50.00 (5 %).
+--
+-- Si falla profiles_id_fkey: suele ser (a) email seed ya en auth.users con OTRO id, y el
+-- insert en auth se omite pero el perfil usa UUID fijo; o (b) typo en UUID (importador2
+-- es c1000002…, no c1080802…). Este script limpia primero por email @motoconecta.seed.
 -- =============================================================================
 
 create extension if not exists pgcrypto;
 
 -- ---------------------------------------------------------------------------
--- auth.users + identities (1 importador, 1 aliado, 1 admin)
+-- Limpieza re-seed: orden FK-safe; borra auth por email para eliminar duplicados
+-- ---------------------------------------------------------------------------
+delete from public.transaction_request_messages
+where transaction_request_id in (
+  select tr.id
+  from public.transaction_requests tr
+  where tr.aliado_id in (
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    'c1000002-0000-4000-8000-000000000001'::uuid
+  )
+     or tr.importador_id in (
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    'c1000002-0000-4000-8000-000000000001'::uuid
+  )
+);
+
+delete from public.transaction_requests
+where aliado_id in (
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    'c1000002-0000-4000-8000-000000000001'::uuid
+  )
+   or importador_id in (
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    'c1000002-0000-4000-8000-000000000001'::uuid
+  );
+
+delete from public.notifications
+where user_id in (
+  select id
+  from auth.users
+  where email in (
+    'importador1@motoconecta.seed',
+    'importador2@motoconecta.seed',
+    'aliado1@motoconecta.seed',
+    'admin@motoconecta.seed'
+  )
+);
+
+delete from public.products
+where owner_id in (
+  'c1000001-0000-4000-8000-000000000001'::uuid,
+  'c1000002-0000-4000-8000-000000000001'::uuid
+);
+
+delete from public.profiles
+where id in (
+  'c1000001-0000-4000-8000-000000000001'::uuid,
+  'c1000002-0000-4000-8000-000000000001'::uuid,
+  'c2000001-0000-4000-8000-000000000001'::uuid,
+  'c3000001-0000-4000-8000-000000000001'::uuid
+);
+
+delete from auth.identities
+where user_id in (
+  select id from auth.users where email in (
+    'importador1@motoconecta.seed',
+    'importador2@motoconecta.seed',
+    'aliado1@motoconecta.seed',
+    'admin@motoconecta.seed'
+  )
+);
+
+delete from auth.users
+where email in (
+  'importador1@motoconecta.seed',
+  'importador2@motoconecta.seed',
+  'aliado1@motoconecta.seed',
+  'admin@motoconecta.seed'
+);
+
+-- ---------------------------------------------------------------------------
+-- auth.users + identities (2 importadores, 1 aliado, 1 admin)
 -- ---------------------------------------------------------------------------
 with inst as (
   select coalesce(
@@ -30,6 +108,7 @@ with inst as (
 seed_users (id, email) as (
   values
     ('c1000001-0000-4000-8000-000000000001'::uuid, 'importador1@motoconecta.seed'),
+    ('c1000002-0000-4000-8000-000000000001'::uuid, 'importador2@motoconecta.seed'),
     ('c2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motoconecta.seed'),
     ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed')
 )
@@ -67,10 +146,7 @@ select
   '',
   ''
 from inst
-cross join seed_users s
-where not exists (
-  select 1 from auth.users u where u.id = s.id or u.email = s.email
-);
+cross join seed_users s;
 
 insert into auth.identities (
   id,
@@ -99,6 +175,7 @@ select
 from (
   values
     ('c1000001-0000-4000-8000-000000000001'::uuid, 'importador1@motoconecta.seed'),
+    ('c1000002-0000-4000-8000-000000000001'::uuid, 'importador2@motoconecta.seed'),
     ('c2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motoconecta.seed'),
     ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed')
 ) as s(id, email)
@@ -109,7 +186,7 @@ where exists (select 1 from auth.users u where u.id = s.id)
   );
 
 -- ---------------------------------------------------------------------------
--- Perfiles: 1 importador, 1 aliado, 1 admin (domicilio fiscal de referencia)
+-- Perfiles: 2 importadores, 1 aliado, 1 admin (domicilio fiscal de referencia)
 -- ---------------------------------------------------------------------------
 insert into public.profiles (
   id,
@@ -140,6 +217,21 @@ values
     'https://www.google.com/maps?q=10.4969,-66.8488',
     10.4969,
     -66.8488,
+    now()
+  ),
+  (
+    'c1000002-0000-4000-8000-000000000001',
+    'MotoConecta Import Omega C.A.',
+    'J-402222222',
+    'importador',
+    '+58 424-1000002',
+    null,
+    'Aragua',
+    'Maracay',
+    'Av. Bolívar Norte, galpón 7, zona industrial San Jacinto (referencia fiscal / almacén).',
+    'https://www.google.com/maps?q=10.2442,-67.6061',
+    10.2442,
+    -67.6061,
     now()
   ),
   (
@@ -186,17 +278,9 @@ on conflict (id) do update set
   longitude = excluded.longitude;
 
 -- ---------------------------------------------------------------------------
--- Catálogo: 15 productos del único importador
+-- Catálogo: 15 productos por importador (30 filas en total)
+-- (Pedido, mensajes y productos seed ya se vacían al inicio del script.)
 -- ---------------------------------------------------------------------------
-delete from public.transaction_request_messages
-where transaction_request_id = 'e0000001-0000-4000-8000-000000000001'::uuid;
-
-delete from public.transaction_requests
-where id = 'e0000001-0000-4000-8000-000000000001'::uuid;
-
-delete from public.products
-where owner_id = 'c1000001-0000-4000-8000-000000000001'::uuid;
-
 insert into public.products (
   owner_id,
   name,
@@ -221,7 +305,22 @@ values
   ('c1000001-0000-4000-8000-000000000001', 'Regulador voltaje 12 V 8 cables', 'MC1-12', 'Motor', 19.5000, 60, true),
   ('c1000001-0000-4000-8000-000000000001', 'Amortiguador trasero 325 mm ajustable', 'MC1-13', 'Motor', 88.0000, 22, true),
   ('c1000001-0000-4000-8000-000000000001', 'Kit rodamiento rueda delantera', 'MC1-14', 'Transmisión', 16.4000, 100, true),
-  ('c1000001-0000-4000-8000-000000000001', 'Silenciador deportivo 125 cc homologado', 'MC1-15', 'Motor', 95.0000, 12, true);
+  ('c1000001-0000-4000-8000-000000000001', 'Silenciador deportivo 125 cc homologado', 'MC1-15', 'Motor', 95.0000, 12, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Kit embrague 150cc reforzado', 'MC2-01', 'Transmisión', 48.5000, 95, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Cadena 520 — 120 eslabones O-ring', 'MC2-02', 'Transmisión', 35.2000, 175, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Pastillas freno delantero sinterizado', 'MC2-03', 'Frenos', 21.0000, 72, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Disco freno delantero 260 mm flotante', 'MC2-04', 'Frenos', 55.5000, 38, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Cable acelerador reforzado 1.35 m', 'MC2-05', 'Motor', 6.9000, 140, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Cable embrague teflonado', 'MC2-06', 'Transmisión', 8.4000, 118, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Aceite 4T 15W50 semi-sintético (1 L)', 'MC2-07', 'Motor', 9.1000, 260, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Bujía NGK platino CR8E', 'MC2-08', 'Motor', 5.8000, 300, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Filtro de aire papel de alto flujo', 'MC2-09', 'Motor', 10.5000, 135, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Batería 12N12-BS AGM', 'MC2-10', 'Motor', 66.0000, 30, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Bobina alta tensión performance 3 pin', 'MC2-11', 'Motor', 27.5000, 58, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Rectificador regulador 12 V 11 cables', 'MC2-12', 'Motor', 21.8000, 52, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Amortiguador trasero 330 mm gas', 'MC2-13', 'Motor', 91.0000, 20, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Kit rodamiento rueda trasera', 'MC2-14', 'Transmisión', 17.9000, 92, true),
+  ('c1000002-0000-4000-8000-000000000001', 'Escape corto homologado 150 cc', 'MC2-15', 'Motor', 99.5000, 10, true);
 
 -- ---------------------------------------------------------------------------
 -- Pedido de ejemplo (pendiente) — comisión 5 % generada

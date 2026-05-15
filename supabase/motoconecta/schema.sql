@@ -58,7 +58,8 @@ create table public.products (
   price_usd numeric(14, 4) not null check (price_usd >= 0),
   stock integer not null default 0 check (stock >= 0),
   is_active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  discount_rules jsonb
 );
 
 create index products_owner_idx on public.products (owner_id);
@@ -105,6 +106,11 @@ create table public.transaction_requests (
   destino_entrega_texto text,
   destino_entrega_maps_url text,
   checkout_group_id uuid,
+  discount_rules jsonb,
+  confirmado_por uuid references public.profiles (id),
+  aliado_experience_stars integer,
+  aliado_experience_comment text,
+  aliado_experience_submitted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

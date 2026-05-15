@@ -14,10 +14,18 @@ class ImporterOrderInvoiceSection extends StatefulWidget {
     super.key,
     required this.request,
     required this.onChanged,
+    this.hideMajorTitle = false,
+    /// Junto a [hideMajorTitle] en carritos multi-línea: evita repetir el párrafo largo en cada línea.
+    this.useCompactHelp = false,
+    /// Mismo carrito (`checkout_group_id`): una factura para todas las líneas; debe incluir [request].
+    this.invoiceBundleLines,
   });
 
   final TransactionRequestModel request;
   final VoidCallback onChanged;
+  final bool hideMajorTitle;
+  final bool useCompactHelp;
+  final List<TransactionRequestModel>? invoiceBundleLines;
 
   @override
   State<ImporterOrderInvoiceSection> createState() =>
@@ -28,8 +36,41 @@ class _ImporterOrderInvoiceSectionState
     extends State<ImporterOrderInvoiceSection> {
   bool _busy = false;
 
+  bool _statusPermiteFacturaProveedor(TransactionRequestModel r) {
+    return r.status == TransactionRequestStatus.pendiente ||
+        r.status == TransactionRequestStatus.enPreparacion ||
+        r.status == TransactionRequestStatus.pedidoListo;
+  }
+
+  TransactionRequestModel get _filaFacturaVisual {
+    final b = widget.invoiceBundleLines;
+    if (b == null || b.length <= 1) return widget.request;
+    for (final r in b) {
+      if (r.hasProveedorFactura) return r;
+    }
+    return widget.request;
+  }
+
+  bool get _unArchivoVariasLineas =>
+      widget.invoiceBundleLines != null &&
+      widget.invoiceBundleLines!.length > 1;
+
+  bool get _algunaLineaConFactura {
+    final b = widget.invoiceBundleLines;
+    if (b == null || b.length <= 1) return widget.request.hasProveedorFactura;
+    return b.any((r) => r.hasProveedorFactura);
+  }
+
+  bool get _todasLineasEditablesFactura {
+    final b = widget.invoiceBundleLines;
+    if (b == null || b.length <= 1) {
+      return _statusPermiteFacturaProveedor(widget.request);
+    }
+    return b.every(_statusPermiteFacturaProveedor);
+  }
+
   Future<void> _abrirFactura(BuildContext context) async {
-    final path = widget.request.proveedorFacturaStoragePath?.trim();
+    final path = _filaFacturaVisual.proveedorFacturaStoragePath?.trim();
     if (path == null || path.isEmpty) return;
     try {
       final url = await SupabaseService.createSignedUrlForOrderInvoice(path);
@@ -46,9 +87,7 @@ class _ImporterOrderInvoiceSectionState
 
   Future<void> _pickAndUploadProveedor(BuildContext context) async {
     final r = widget.request;
-    final okStatus = r.status == TransactionRequestStatus.pendiente ||
-        r.status == TransactionRequestStatus.enPreparacion ||
-        r.status == TransactionRequestStatus.pedidoListo;
+    final okStatus = _todasLineasEditablesFactura;
     if (!okStatus) return;
 
     final result = await FilePicker.platform.pickFiles(
@@ -71,11 +110,20 @@ class _ImporterOrderInvoiceSectionState
 
     setState(() => _busy = true);
     try {
-      await SupabaseService.importerSubmitMotoconectaProveedorFactura(
-        transactionRequestId: r.id,
-        bytes: bytes,
-        fileName: name,
-      );
+      final bundle = widget.invoiceBundleLines;
+      if (bundle != null && bundle.length > 1) {
+        await SupabaseService.importerSubmitMotoconectaProveedorFacturaBundle(
+          transactionRequestIds: bundle.map((e) => e.id).toList(),
+          bytes: bytes,
+          fileName: name,
+        );
+      } else {
+        await SupabaseService.importerSubmitMotoconectaProveedorFactura(
+          transactionRequestId: r.id,
+          bytes: bytes,
+          fileName: name,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -96,11 +144,8 @@ class _ImporterOrderInvoiceSectionState
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.request;
-    final editable = r.status == TransactionRequestStatus.pendiente ||
-        r.status == TransactionRequestStatus.enPreparacion ||
-        r.status == TransactionRequestStatus.pedidoListo;
-    if (!editable && !r.hasProveedorFactura) {
+    final editable = _todasLineasEditablesFactura;
+    if (!editable && !_algunaLineaConFactura) {
       return const SizedBox.shrink();
     }
     final soloLectura = !editable;
@@ -108,22 +153,29 @@ class _ImporterOrderInvoiceSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          soloLectura
-              ? 'Factura del proveedor (referencia)'
-              : 'Factura del proveedor',
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
+        if (!widget.hideMajorTitle) ...[
+          Text(
+            soloLectura
+                ? 'Factura del proveedor (referencia)'
+                : 'Factura del proveedor',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+          const SizedBox(height: 6),
+        ],
         Text(
           soloLectura
               ? 'Archivo adjunto · solo consulta.'
-              : 'Adjunte PDF o imagen en preparación o al marcar listo para despacho; '
-                  'lo pediremos antes de indicar «En tránsito».',
+              : (_unArchivoVariasLineas
+                  ? 'Un solo PDF o imagen para este pedido; '
+                      'adjúntelo en preparación o al marcar listo para despacho.'
+                  : (widget.useCompactHelp
+                      ? 'Adjunte o actualice el archivo si MotoLink lo requiere antes de «En tránsito».'
+                      : 'Adjunte PDF o imagen en preparación o al marcar listo para despacho; '
+                          'lo pediremos antes de indicar «En tránsito».')),
           style: TextStyle(
             fontSize: 11,
             height: 1.35,
@@ -131,15 +183,15 @@ class _ImporterOrderInvoiceSectionState
           ),
         ),
         const SizedBox(height: 8),
-        if (r.hasProveedorFactura) ...[
+        if (_algunaLineaConFactura) ...[
           Text(
-            r.proveedorFacturaFileName?.trim().isNotEmpty == true
-                ? 'Archivo: ${r.proveedorFacturaFileName}'
+            _filaFacturaVisual.proveedorFacturaFileName?.trim().isNotEmpty == true
+                ? 'Archivo: ${_filaFacturaVisual.proveedorFacturaFileName}'
                 : 'Factura registrada',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
           ),
           Text(
-            'Fecha: ${formatEsShortDateTime(r.proveedorFacturaSubmittedAt)}',
+            'Fecha: ${formatEsShortDateTime(_filaFacturaVisual.proveedorFacturaSubmittedAt)}',
             style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
@@ -170,7 +222,7 @@ class _ImporterOrderInvoiceSectionState
                   if (!_busy) const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      r.hasProveedorFactura
+                      _algunaLineaConFactura
                           ? 'Reemplazar archivo'
                           : 'Adjuntar factura (PDF o imagen)',
                       textAlign: TextAlign.center,

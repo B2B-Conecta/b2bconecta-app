@@ -11,10 +11,17 @@ class AliadoOrderExperienceSection extends StatefulWidget {
     super.key,
     required this.request,
     required this.onChanged,
+    this.bundleCheckoutGroupId,
+    this.bundleImportadorId,
   });
 
   final TransactionRequestModel request;
   final VoidCallback onChanged;
+
+  /// Si se informa junto con [bundleImportadorId], la valoración aplica a todas las
+  /// líneas del mismo importador dentro del carrito (un solo cuestionario).
+  final String? bundleCheckoutGroupId;
+  final String? bundleImportadorId;
 
   @override
   State<AliadoOrderExperienceSection> createState() =>
@@ -53,11 +60,25 @@ class _AliadoOrderExperienceSectionState
     }
     setState(() => _busy = true);
     try {
-      await SupabaseService.aliadoSubmitOrderExperience(
-        transactionRequestId: widget.request.id,
-        stars: s,
-        comment: _commentCtrl.text,
-      );
+      final bcg = widget.bundleCheckoutGroupId?.trim();
+      final bid = widget.bundleImportadorId?.trim();
+      if (bcg != null &&
+          bcg.isNotEmpty &&
+          bid != null &&
+          bid.isNotEmpty) {
+        await SupabaseService.aliadoSubmitOrderExperienceImportadorGrupo(
+          checkoutGroupId: bcg,
+          importadorId: bid,
+          stars: s,
+          comment: _commentCtrl.text,
+        );
+      } else {
+        await SupabaseService.aliadoSubmitOrderExperience(
+          transactionRequestId: widget.request.id,
+          stars: s,
+          comment: _commentCtrl.text,
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -136,9 +157,12 @@ class _AliadoOrderExperienceSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '¿Cómo fue tu experiencia con este pedido?',
-          style: TextStyle(
+        Text(
+          widget.bundleCheckoutGroupId != null &&
+                  widget.bundleCheckoutGroupId!.trim().isNotEmpty
+              ? '¿Cómo fue tu experiencia con este proveedor en este pedido?'
+              : '¿Cómo fue tu experiencia con este pedido?',
+          style: const TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
             color: AppColors.textPrimary,

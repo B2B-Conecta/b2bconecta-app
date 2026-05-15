@@ -324,10 +324,8 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         ),
         const SizedBox(height: 8),
         Text(
-          'El aliado solo puede enviar comprobante o declarar pago en la app tras la factura MotoLink al aliado; '
-          'puede hacerlo en cualquier fase activa del pedido. En el cronograma de envío no figura como paso del ciclo. '
-          'Marcar en tránsito solo cuando el pedido está «listo» y con facturas cargadas; el ETA lo consultan '
-          'aliado e importador en el enlace de Google Maps que MotoLink publica en la ficha. El pago puede regularizarse antes o después.',
+          'Tras la factura MotoLink al aliado puede declarar pago. '
+          'En tránsito solo con facturas cargadas; ETA en el mapa de la ficha.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
         ),
         const SizedBox(height: 12),
@@ -344,8 +342,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Espere a que el importador marque «Pedido listo»: confirma que la carga está '
-                      'sellada y lista para que MotoLink la retire del almacén.',
+                      'Espere «Pedido listo» del importador antes de retirar la carga.',
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
@@ -409,7 +406,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
                 ))
         else
           Text(
-            'Pendiente: el importador debe adjuntar la factura en su pestaña Pedidos.',
+            'Factura del importador pendiente (su pestaña Pedidos).',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
         const SizedBox(height: 14),
@@ -422,10 +419,10 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          'Referencia fiscal para el aliado; habilita en la app la sección de pago y comprobante.',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-        ),
+          Text(
+            'Habilita pago y comprobante del aliado.',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+          ),
         const SizedBox(height: 6),
         if (hasProveedorFacturaOperativa &&
             r.documentTypePreference != null &&
@@ -477,8 +474,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
             ),
           ],
           Text(
-            'Usa la tasa BCV del día y los porcentajes IVA/IGTF configurados en administración. '
-            'Sustituye adjuntar archivo manual si lo desea.',
+            'Tasa BCV e IVA/IGTF de administración; opcional frente a archivo manual.',
             style: TextStyle(fontSize: 10, color: Colors.grey.shade600, height: 1.2),
           ),
           const SizedBox(height: 8),
@@ -608,7 +604,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
-              'Sin factura MotoLink al aliado: el aliado aún no puede enviar comprobante desde la app.',
+              'Sin factura MotoLink al aliado no puede enviar comprobante.',
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.25),
             ),
           ),
@@ -647,8 +643,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Sin transportista asignado: el perfil Despacho no verá este pedido hasta que MotoLink lo asigne '
-                      '(sección «Transportista (despacho)» arriba en la ficha).',
+                      'Asigne transportista arriba o el despacho no verá este pedido.',
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.35,

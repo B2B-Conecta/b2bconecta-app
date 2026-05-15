@@ -108,6 +108,8 @@ class TransactionRequestModel {
     this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
     this.facturaUrl,
     this.checkoutGroupId,
+    this.confirmadoPor,
+    this.discountRules,
   });
 
   final String id;
@@ -263,6 +265,12 @@ class TransactionRequestModel {
 
   /// Varios ítems del mismo carrito comparten este UUID (`transaction_requests.checkout_group_id`).
   final String? checkoutGroupId;
+
+  /// Operador importador que aprueba pago / primera gestión auditada (`transaction_requests.confirmado_por`).
+  final String? confirmadoPor;
+
+  /// Reglas comerciales snapshot JSON al checkout (p. ej. tramos por volumen).
+  final Map<String, dynamic>? discountRules;
 
   /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
   List<MotolinkAllyDocumentEmissionModel> get motolinkAllyInvoicesDescargables =>
@@ -713,6 +721,40 @@ class TransactionRequestModel {
     return const <OrderItemModel>[];
   }
 
+  /// Partidas para desglose en pantalla (order_items o datos de la fila).
+  List<PedidoProductoLineUi> lineasProductoDesglose({
+    String? forImportadorUserId,
+  }) {
+    final items = orderItemsParaVistaImportador(forImportadorUserId);
+    if (items.isNotEmpty) {
+      return items.map(PedidoProductoLineUi.fromOrderItem).toList();
+    }
+    if (isMasterOrder) {
+      final uid = forImportadorUserId?.trim();
+      final out = <PedidoProductoLineUi>[];
+      for (final s in subOrders) {
+        if (uid != null &&
+            uid.isNotEmpty &&
+            s.importadorId.trim() != uid) {
+          continue;
+        }
+        for (final oi in s.orderItems) {
+          out.add(PedidoProductoLineUi.fromOrderItem(oi));
+        }
+      }
+      if (out.isNotEmpty) return out;
+    }
+    final nm = productName?.trim();
+    return [
+      PedidoProductoLineUi(
+        nombre: (nm != null && nm.isNotEmpty) ? nm : 'Producto',
+        sku: productSku,
+        cantidad: cantidad,
+        precioRef: precioTotal,
+      ),
+    ];
+  }
+
   /// Cabecera corta para fichas importador con desglose por líneas.
   String tituloPedidoImportador(List<OrderItemModel> lines) {
     if (lines.isEmpty) {
@@ -762,6 +804,65 @@ class TransactionRequestModel {
       return n;
     }
     return 'Un importador';
+  }
+
+  /// Nombres de producto en la fila (maestro: todas las partidas en `sub_orders`).
+  List<String> get nombresProductosOrdenAliado {
+    if (!isMasterOrder) {
+      final p = productName?.trim();
+      return (p != null && p.isNotEmpty) ? <String>[p] : <String>[];
+    }
+    final out = <String>[];
+    for (final s in subOrders) {
+      for (final oi in s.orderItems) {
+        final n = oi.productName?.trim();
+        if (n != null && n.isNotEmpty) out.add(n);
+      }
+    }
+    return out;
+  }
+
+  /// Productos en cabeceras de lista (aliado): nombres reales, no solo el almacén.
+  String get etiquetaProductoAliado {
+    final names = nombresProductosOrdenAliado;
+    if (names.isNotEmpty) {
+      if (names.length == 1) return names.first;
+      return '${names[0]} · ${names[1]}${names.length > 2 ? ' +${names.length - 2}' : ''}';
+    }
+    final p = productName?.trim();
+    if (p != null && p.isNotEmpty) return p;
+    return 'Producto';
+  }
+
+  /// Producto(s) en cabeceras de lista (importador): partidas del subpedido o nombre en fila.
+  String etiquetaProductoImportador(String? importadorUserId) {
+    final lines = orderItemsParaVistaImportador(importadorUserId);
+    if (lines.isNotEmpty) {
+      return tituloPedidoImportador(lines);
+    }
+    final p = productName?.trim();
+    if (p != null && p.isNotEmpty) return p;
+    return 'Producto';
+  }
+
+  /// Identificación en el flujo del pedido (importador): **ítem(s)** primero, almacén después.
+  String etiquetaGestionLineaImportador(String? importadorUserId) {
+    final prod = etiquetaProductoImportador(importadorUserId);
+    final imp = ownerBusinessName?.trim();
+    if (imp != null && imp.isNotEmpty && imp != prod && !prod.contains(imp)) {
+      return '$prod · $imp';
+    }
+    return prod;
+  }
+
+  /// Identificación en el flujo (aliado): **ítem(s) solicitados** primero, importador después.
+  String etiquetaGestionLineaAliado() {
+    final prod = etiquetaProductoAliado;
+    final imp = ownerBusinessName?.trim();
+    if (imp != null && imp.isNotEmpty && !prod.contains(imp)) {
+      return '$prod · $imp';
+    }
+    return prod;
   }
 
   /// Título de estructura para la ficha admin: distingue N importadores vs 1 importador y M productos.
@@ -1112,6 +1213,12 @@ class TransactionRequestModel {
       ),
       facturaUrl: _nullableText(json['factura_url']),
       checkoutGroupId: _nullableText(json['checkout_group_id']),
+      confirmadoPor: _nullableText(json['confirmado_por']),
+      discountRules: () {
+        final dr = json['discount_rules'];
+        if (dr is Map) return Map<String, dynamic>.from(dr);
+        return null;
+      }(),
     );
   }
 
@@ -1184,4 +1291,47 @@ class TransactionRequestModel {
     if (v == null) return null;
     return DateTime.tryParse(v.toString());
   }
+}
+
+/// Cabecera compacta: mismo carrito (`checkout_group_id`), varias filas (vista importador).
+String tituloCheckoutGrupoImportador(
+  List<TransactionRequestModel> lines,
+  String? importadorUserId,
+) {
+  if (lines.isEmpty) return 'Pedido';
+  if (lines.length == 1) {
+    return lines.single.etiquetaProductoImportador(importadorUserId);
+  }
+  final labels = <String>[];
+  for (final l in lines) {
+    final e = l.etiquetaProductoImportador(importadorUserId);
+    if (e != 'Producto') labels.add(e);
+  }
+  if (labels.length >= 2) {
+    return '${labels[0]} · ${labels[1]}${lines.length > 2 ? ' +${lines.length - 2}' : ''}';
+  }
+  if (labels.length == 1) return '${labels[0]} +${lines.length - 1} más';
+  return '${lines.length} productos · mismo carrito';
+}
+
+/// Cabecera compacta: mismo carrito, varias filas (vista aliado).
+String tituloCheckoutGrupoAliado(List<TransactionRequestModel> lines) {
+  if (lines.isEmpty) return 'Pedido';
+  if (lines.length == 1) return lines.single.etiquetaProductoAliado;
+  final labels = lines
+      .map((l) => l.etiquetaProductoAliado)
+      .where((s) => s != 'Producto')
+      .toList();
+  if (labels.length >= 2) {
+    return '${labels[0]} · ${labels[1]}${lines.length > 2 ? ' +${lines.length - 2}' : ''}';
+  }
+  if (labels.length == 1) return '${labels[0]} +${lines.length - 1} más';
+  return '${lines.length} productos · un carrito';
+}
+
+/// Todas las filas comparten el mismo [TransactionRequestStatus] (un solo desplegable de seguimiento).
+bool checkoutGroupMismoEstadoEnvio(List<TransactionRequestModel> lines) {
+  if (lines.length <= 1) return true;
+  final s0 = lines.first.status;
+  return lines.every((e) => e.status == s0);
 }

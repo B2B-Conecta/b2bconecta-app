@@ -22,14 +22,32 @@ class AliadoOrderPagoSection extends StatefulWidget {
     required this.onChanged,
     this.profile,
     this.openCreditExposureSum,
+    this.suppressExperience = false,
+    this.suppressPrimaryTitle = false,
+    this.suppressNegotiationIntro = false,
+    /// Si hay varias líneas del mismo importador en el carrito: un solo comprobante
+    /// replica el archivo en todas (vía [SupabaseService.aliadoSubmitComprobantePagoBundle]).
+    this.pagoBundleLines,
   });
 
   final TransactionRequestModel request;
   final VoidCallback onChanged;
   final ProfileModel? profile;
 
+  /// Líneas del mismo proveedor a actualizar con el mismo comprobante (pago MotoConecta sin crédito).
+  final List<TransactionRequestModel>? pagoBundleLines;
+
   /// Suma de `precio_total` de pedidos abiertos del aliado (misma regla que el cupo en servidor).
   final double? openCreditExposureSum;
+
+  /// Si es true, no muestra [AliadoOrderExperienceSection] (el padre muestra una valoración por proveedor).
+  final bool suppressExperience;
+
+  /// El padre muestra un título grupal («Pago al importador») cuando hay varias líneas del mismo almacén.
+  final bool suppressPrimaryTitle;
+
+  /// Junto a [suppressPrimaryTitle]: evita repetir el párrafo de negociación/chat en cada línea.
+  final bool suppressNegotiationIntro;
 
   @override
   State<AliadoOrderPagoSection> createState() => _AliadoOrderPagoSectionState();
@@ -204,16 +222,30 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
 
     setState(() => _busy = true);
     try {
-      await SupabaseService.aliadoSubmitComprobantePago(
-        transactionRequestId: r.id,
-        metodo: metodo,
-        bytes: bytes,
-        fileName: name,
-      );
+      final bundle = widget.pagoBundleLines;
+      if (bundle != null && bundle.length > 1) {
+        await SupabaseService.aliadoSubmitComprobantePagoBundle(
+          lines: bundle,
+          metodo: metodo,
+          bytes: bytes,
+          fileName: name,
+        );
+      } else {
+        await SupabaseService.aliadoSubmitComprobantePago(
+          transactionRequestId: r.id,
+          metodo: metodo,
+          bytes: bytes,
+          fileName: name,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comprobante enviado. El importador verificará la acreditación.'),
+        SnackBar(
+          content: Text(
+            bundle != null && bundle.length > 1
+                ? 'Comprobante enviado. El importador lo revisará.'
+                : 'Comprobante enviado. El importador verificará la acreditación.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -275,15 +307,17 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          referenciaHistorica ? 'Pago (referencia)' : 'Pago al importador',
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
+        if (!widget.suppressPrimaryTitle) ...[
+          Text(
+            referenciaHistorica ? 'Pago (referencia)' : 'Pago al importador',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
+          const SizedBox(height: 4),
+        ],
         if (r.hasAgreedCreditPlan) ...[
           const SizedBox(height: 2),
           Container(
@@ -364,22 +398,22 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
           ),
           const SizedBox(height: 8),
         ],
-        if (!referenciaHistorica)
+        if (!referenciaHistorica && !widget.suppressNegotiationIntro)
           Text(
-            'Negocie condiciones y documentos con el importador en el chat del pedido. '
-            'Aquí solo registra método de pago y comprobante; el importador confirma que recibió el pago.',
+            'Condiciones en el chat del pedido; aquí método y comprobante.',
             style: TextStyle(
               fontSize: 10.5,
               height: 1.35,
               color: Colors.grey.shade700,
             ),
           ),
-        if (!referenciaHistorica) const SizedBox(height: 6),
+        if (!referenciaHistorica && !widget.suppressNegotiationIntro)
+          const SizedBox(height: 6),
         if (referenciaHistorica)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Documentación confirmada · solo consulta (conservada aunque el pedido ya esté entregado).',
+              'Documentación archivada · solo consulta.',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.35,
@@ -407,16 +441,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               fontWeight: FontWeight.w600,
               color: Colors.grey.shade800,
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (!r.hasFacturaAliado &&
-            referenciaHistorica &&
-            r.hasComprobantePago) ...[
-          OutlinedButton.icon(
-            onPressed: () => _abrirComprobante(context),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('Ver comprobante de pago'),
           ),
           const SizedBox(height: 8),
         ],
@@ -460,7 +484,25 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               icon: const Icon(Icons.download_outlined, size: 18),
               label: const Text('Ver / descargar factura'),
             ),
-        ] else if (!referenciaHistorica && !mostrarGestionPago)
+        ],
+        if (referenciaHistorica &&
+            !r.hasAgreedCreditPlan &&
+            r.hasComprobantePago) ...[
+          const SizedBox(height: 10),
+          if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty) ...[
+            Text(
+              'Método: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            ),
+            const SizedBox(height: 8),
+          ],
+          OutlinedButton.icon(
+            onPressed: () => _abrirComprobante(context),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            label: const Text('Ver comprobante de pago'),
+          ),
+        ],
+        if (!r.hasFacturaAliado && !referenciaHistorica && !mostrarGestionPago)
           Text(
             'Aquí podrá registrar método de pago y comprobante cuando el pedido lo permita.',
             style: TextStyle(
@@ -595,7 +637,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               );
             }),
           ],
-        ] else if (mostrarGestionPago) ...[
+        ] else if (mostrarGestionPago && !referenciaHistorica) ...[
           const SizedBox(height: 14),
           const Text(
             'Método de pago',
@@ -610,8 +652,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Disponibles: Zelle, Pago Móvil, Binance y transferencia bancaria. '
-                'El importador verifica el comprobante.',
+                'Zelle, Pago Móvil, Binance o transferencia; el importador verifica.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,
@@ -655,8 +696,8 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             const SizedBox(height: 10),
             Text(
               pe == PagoRevisionEstado.enRevision
-                  ? 'Si subió un archivo por error, puede reemplazarlo; el importador verá de nuevo el comprobante.'
-                  : 'Adjunte una imagen o PDF claro del comprobante según el método elegido (Zelle, Pago Móvil, Binance o transferencia).',
+                  ? 'Puede reemplazar el archivo si hubo error.'
+                  : 'Imagen o PDF legible según el método.',
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.grey.shade700,
@@ -687,7 +728,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Comprobante en revisión por el importador. Puede reemplazar el archivo con el botón de arriba si hubo un error.',
+                'En revisión; puede reemplazar el archivo con el botón de arriba.',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ),
@@ -716,10 +757,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               ),
             ),
         ],
-        AliadoOrderExperienceSection(
-          request: r,
-          onChanged: widget.onChanged,
-        ),
+        if (!widget.suppressExperience)
+          AliadoOrderExperienceSection(
+            request: r,
+            onChanged: widget.onChanged,
+          ),
         const SizedBox(height: 8),
       ],
     );

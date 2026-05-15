@@ -15,10 +15,18 @@ class ImporterOrderPagoVerificationSection extends StatefulWidget {
     super.key,
     required this.request,
     required this.onChanged,
+    /// En el mismo panel, varias líneas: el padre muestra el producto; oculta el título repetido.
+    this.hideMajorTitle = false,
+    /// Mismo carrito e importador: un comprobante y una revisión para todas las líneas.
+    this.bundleLines,
   });
 
   final TransactionRequestModel request;
   final VoidCallback onChanged;
+  final bool hideMajorTitle;
+
+  /// Si se informa con 2+ filas, la UI y la acción de aprobar/rechazar aplican a todas.
+  final List<TransactionRequestModel>? bundleLines;
 
   @override
   State<ImporterOrderPagoVerificationSection> createState() =>
@@ -29,8 +37,15 @@ class _ImporterOrderPagoVerificationSectionState
     extends State<ImporterOrderPagoVerificationSection> {
   bool _busy = false;
 
+  bool get _usaBundle =>
+      widget.bundleLines != null && widget.bundleLines!.length > 1;
+
+  List<TransactionRequestModel> get _lines =>
+      _usaBundle ? widget.bundleLines! : [widget.request];
+
   Future<void> _abrirComprobante(BuildContext context) async {
-    final path = widget.request.comprobantePagoStoragePath?.trim();
+    final ref = _comprobanteRefParaAbrir();
+    final path = ref.comprobantePagoStoragePath?.trim();
     if (path == null || path.isEmpty) return;
     try {
       final url = await SupabaseService.createSignedUrlForComprobantePago(path);
@@ -45,8 +60,14 @@ class _ImporterOrderPagoVerificationSectionState
     }
   }
 
+  /// Línea de referencia para método, archivo y fechas (tras comprobante unificado debería alinearse).
+  TransactionRequestModel _comprobanteRefParaAbrir() {
+    if (!_usaBundle) return widget.request;
+    final withFile = _lines.where((r) => r.hasComprobantePago).toList();
+    return withFile.isNotEmpty ? withFile.first : widget.request;
+  }
+
   Future<void> _setEstado(BuildContext context, String estado) async {
-    final r = widget.request;
     String? nota;
     if (estado == PagoRevisionEstado.rechazado) {
       final ctrl = TextEditingController();
@@ -81,17 +102,26 @@ class _ImporterOrderPagoVerificationSectionState
 
     setState(() => _busy = true);
     try {
-      await SupabaseService.importadorSetPagoRevisionEstado(
-        transactionRequestId: r.id,
-        nuevoEstado: estado,
-        rechazoNota: nota,
-      );
+      final ids = _lines.map((e) => e.id).toList();
+      if (_usaBundle) {
+        await SupabaseService.importadorSetPagoRevisionEstadoBundle(
+          transactionRequestIds: ids,
+          nuevoEstado: estado,
+          rechazoNota: nota,
+        );
+      } else {
+        await SupabaseService.importadorSetPagoRevisionEstado(
+          transactionRequestId: ids.single,
+          nuevoEstado: estado,
+          rechazoNota: nota,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             estado == PagoRevisionEstado.aprobado
-                ? 'Pago acreditado confirmado.'
+                ? 'Pago acreditado.'
                 : 'Comprobante rechazado.',
           ),
           behavior: SnackBarBehavior.floating,
@@ -125,6 +155,199 @@ class _ImporterOrderPagoVerificationSectionState
 
   @override
   Widget build(BuildContext context) {
+    if (_usaBundle) {
+      return _buildBundle(context);
+    }
+    return _buildSingle(context);
+  }
+
+  Widget _buildBundle(BuildContext context) {
+    final uid = SupabaseService.currentUserId ?? '';
+    final ref = _comprobanteRefParaAbrir();
+    final resumen =
+        _lines.map((e) => e.etiquetaProductoImportador(uid)).join(' · ');
+
+    final pathsDistintos = _lines
+        .map((e) => e.comprobantePagoStoragePath?.trim() ?? '')
+        .where((p) => p.isNotEmpty)
+        .toSet()
+        .length;
+
+    final estadosDistintos =
+        _lines.map((e) => e.pagoEstadoRevisionEfectivo).toSet();
+    final pe = estadosDistintos.length == 1
+        ? estadosDistintos.first
+        : ref.pagoEstadoRevisionEfectivo;
+
+    final algunoRechazado =
+        _lines.any((r) => r.status == TransactionRequestStatus.rechazado);
+    final todosComprobante = _lines.every((r) => r.hasComprobantePago);
+    final todosEnRevision = _lines.every(
+      (r) => r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.enRevision,
+    );
+    final mostrarAcciones = !algunoRechazado &&
+        todosComprobante &&
+        todosEnRevision &&
+        pathsDistintos <= 1;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Comprobante de pago del aliado',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blueGrey.shade100),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_lines.length} ítems en este pedido',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.blueGrey.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    resumen,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: Colors.blueGrey.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (pathsDistintos > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Hay comprobantes distintos entre líneas (datos anteriores). Use «Ver comprobante»; si no coincide, contacte a MotoLink.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.amber.shade900,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          if (estadosDistintos.length > 1) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Estado de revisión distinto entre líneas —detalle: '
+              '${_lines.map((r) => _etiquetaEstado(r.pagoEstadoRevisionEfectivo)).join(", ")}',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.orange.shade900,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            ref.pagoMetodo != null && ref.pagoMetodo!.trim().isNotEmpty
+                ? 'Método declarado: ${PagoMetodo.labelEs(ref.pagoMetodo!)}'
+                : 'Método declarado: —',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+          ),
+          if (ref.comprobantePagoSubmittedAt != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Registrado: ${formatEsShortDateTime(ref.comprobantePagoSubmittedAt)}',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            estadosDistintos.length == 1
+                ? 'Estado: ${_etiquetaEstado(pe)}'
+                : 'Estado (referencia): ${_etiquetaEstado(pe)}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.blueGrey.shade900,
+            ),
+          ),
+          if (pe == PagoRevisionEstado.rechazado &&
+              ref.pagoComprobanteRechazoNota != null &&
+              ref.pagoComprobanteRechazoNota!.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Motivo del rechazo: ${ref.pagoComprobanteRechazoNota}',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.red.shade800,
+                height: 1.3,
+              ),
+            ),
+          ],
+          if (ref.hasComprobantePago) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _abrirComprobante(context),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: Text(pathsDistintos > 1
+                  ? 'Ver comprobante (referencia)'
+                  : 'Ver comprobante'),
+            ),
+          ],
+          if (mostrarAcciones) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _setEstado(context, PagoRevisionEstado.aprobado),
+                    child: const Text('Confirmar pago recibido'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _setEstado(context, PagoRevisionEstado.rechazado),
+                    child: const Text('Rechazar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (!_lines.any((r) => r.hasComprobantePago))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'El aliado declara método y comprobante en su ficha del pedido.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingle(BuildContext context) {
     final r = widget.request;
     final pe = r.pagoEstadoRevisionEfectivo;
     final mostrarAcciones = r.status != TransactionRequestStatus.rechazado &&
@@ -136,15 +359,17 @@ class _ImporterOrderPagoVerificationSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Pago del aliado',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: AppColors.textPrimary,
+          if (!widget.hideMajorTitle) ...[
+            const Text(
+              'Pago del aliado',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
+            const SizedBox(height: 6),
+          ],
           Text(
             r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty
                 ? 'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}'

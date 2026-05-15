@@ -1,3 +1,28 @@
+/// Fila lista para mostrar nombre/SKU/cantidad/precio (desglose en UI).
+class PedidoProductoLineUi {
+  const PedidoProductoLineUi({
+    required this.nombre,
+    this.sku,
+    required this.cantidad,
+    required this.precioRef,
+  });
+
+  final String nombre;
+  final String? sku;
+  final int cantidad;
+  final double precioRef;
+
+  factory PedidoProductoLineUi.fromOrderItem(OrderItemModel o) {
+    final n = o.productName?.trim();
+    return PedidoProductoLineUi(
+      nombre: (n != null && n.isNotEmpty) ? n : 'Producto',
+      sku: o.productSku,
+      cantidad: o.cantidad,
+      precioRef: o.precioLineTotal,
+    );
+  }
+}
+
 /// Línea de `order_items` (pedido multi-importador).
 class OrderItemModel {
   const OrderItemModel({

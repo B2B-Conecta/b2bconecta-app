@@ -33,6 +33,28 @@ List<List<TransactionRequestModel>> groupAliadoOrdersByCheckout(
   }).toList();
 }
 
+/// Dentro de un mismo carrito, agrupa líneas por importador (`owner_id`).
+List<List<TransactionRequestModel>> groupCheckoutLinesByImportador(
+  List<TransactionRequestModel> lines,
+) {
+  if (lines.isEmpty) return const [];
+
+  final byImp = <String, List<TransactionRequestModel>>{};
+  final order = <String>[];
+
+  for (final r in lines) {
+    final k = r.ownerId.trim();
+    if (k.isEmpty) continue;
+    if (!byImp.containsKey(k)) {
+      order.add(k);
+      byImp[k] = <TransactionRequestModel>[];
+    }
+    byImp[k]!.add(r);
+  }
+
+  return order.map((k) => byImp[k]!).toList();
+}
+
 /// Clave estable para expandir / animaciones (un grupo o un pedido suelto).
 String checkoutGroupExpandKey(List<TransactionRequestModel> group) {
   if (group.isEmpty) return '';

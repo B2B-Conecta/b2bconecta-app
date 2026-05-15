@@ -6,6 +6,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/aliado_order_grouping.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
 import 'importer_order_invoice_section.dart';
@@ -65,10 +66,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
-    final match = _rows.where((r) => r.id == pending).toList();
-    if (match.isNotEmpty) {
+    final key = _expandKeyForPendingId(pending);
+    if (key != null) {
       MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = _rowKey(match.first));
+      setState(() => _expandedRequestId = key);
     } else if (!_loading) {
       _load();
     }
@@ -77,11 +78,25 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   void _tryExpandFromPendingNotification() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
-    final match = _rows.where((r) => r.id == pending).toList();
-    if (match.isNotEmpty) {
+    final key = _expandKeyForPendingId(pending);
+    if (key != null) {
       MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = _rowKey(match.first));
+      setState(() => _expandedRequestId = key);
     }
+  }
+
+  /// Resuelve la fila expandida ante una notificación por `transaction_request_id`.
+  String? _expandKeyForPendingId(String id) {
+    for (final g in groupAliadoOrdersByCheckout(_rows)) {
+      if (!g.any((r) => r.id == id)) continue;
+      if (g.length == 1) return _rowKey(g.single);
+      final statuses = g.map((x) => x.status).toSet();
+      if (statuses.length > 1) {
+        return _rowKey(g.firstWhere((r) => r.id == id));
+      }
+      return checkoutGroupExpandKey(g);
+    }
+    return null;
   }
 
   Future<void> _load() async {
@@ -137,6 +152,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     return searched.where(_matchesQuickFilter).toList();
   }
 
+  String _rowKey(TransactionRequestModel r) =>
+      r.importerSubOrderId != null ? '${r.id}::${r.importerSubOrderId}' : r.id;
+
   Widget _quickFilterBar() {
     Widget chip(String label, _ImporterQuickFilter value) {
       final sel = _quickFilter == value;
@@ -171,37 +189,67 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     );
   }
 
-  String _rowKey(TransactionRequestModel r) =>
-      r.importerSubOrderId != null ? '${r.id}::${r.importerSubOrderId}' : r.id;
+  /// Agrupa por `checkout_group_id`; si un grupo tiene estados distintos, muestra tarjetas sueltas.
+  List<List<TransactionRequestModel>> _groupsForDisplay(
+    List<TransactionRequestModel> filtered,
+  ) {
+    final buckets = groupAliadoOrdersByCheckout(filtered);
+    final out = <List<TransactionRequestModel>>[];
+    for (final g in buckets) {
+      if (g.length <= 1) {
+        out.add(g);
+        continue;
+      }
+      final statuses = g.map((x) => x.status).toSet();
+      if (statuses.length == 1) {
+        out.add(g);
+      } else {
+        for (final r in g) {
+          out.add(<TransactionRequestModel>[r]);
+        }
+      }
+    }
+    return out;
+  }
 
-  void _toggleExpand(TransactionRequestModel r) {
-    final k = _rowKey(r);
+  String _displayGroupKey(List<TransactionRequestModel> g) {
+    if (g.length == 1) return _rowKey(g.single);
+    return checkoutGroupExpandKey(g);
+  }
+
+  void _toggleExpand(String key) {
     setState(() {
-      _expandedRequestId = _expandedRequestId == k ? null : k;
+      _expandedRequestId = _expandedRequestId == key ? null : key;
     });
   }
 
-  Future<void> _advance(
+  Future<void> _advanceGroup(
     BuildContext context,
-    TransactionRequestModel r,
+    List<TransactionRequestModel> g,
     String next,
   ) async {
-    if (next == TransactionRequestStatus.enTransito && !r.hasProveedorFactura) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Adjunte la factura del proveedor antes de marcar «En tránsito» (despacho).',
-          ),
-        ),
-      );
-      return;
+    if (next == TransactionRequestStatus.enTransito) {
+      for (final r in g) {
+        if (!r.hasProveedorFactura) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Adjunte la factura del proveedor antes de marcar «En tránsito».',
+              ),
+            ),
+          );
+          return;
+        }
+      }
     }
     try {
-      await SupabaseService.importerAdvanceTransactionRequest(
-        id: r.id,
-        newStatus: next,
-        importerSubOrderId: r.importerSubOrderId,
-      );
+      for (final r in g) {
+        await SupabaseService.importerAdvanceTransactionRequest(
+          id: r.id,
+          newStatus: next,
+          importerSubOrderId: r.importerSubOrderId,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -249,9 +297,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Cuando un aliado confirme un pedido sobre su inventario, aparecerá aquí '
-                'para que confirme stock y avance la preparación. Use «Nuevos» para ver '
-                'lo que acaba de ingresar.',
+                'Aparecen aquí los pedidos que MotoLink te asigne. En «Nuevos» ves lo último.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary, height: 1.35),
               ),
@@ -262,6 +308,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
 
     final filtered = _filtered;
+    final groups = _groupsForDisplay(filtered);
     return Stack(
       children: [
         Positioned.fill(
@@ -301,22 +348,25 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         child: ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: filtered.length,
+                          itemCount: groups.length,
                           itemBuilder: (context, i) {
-                            final r = filtered[i];
+                            final g = groups[i];
+                            final primary = g.first;
+                            final isBundle = g.length > 1;
                             final next =
                                 TransactionRequestStatus.nextForImporter(
-                              r.status,
+                              primary.status,
                             );
                             final headline = TransactionRequestStatus
-                                .importerOperationalHeadline(r.status);
-                            final rk = _rowKey(r);
+                                .importerOperationalHeadline(primary.status);
+                            final rk = _displayGroupKey(g);
                             return ImporterExpandableOrderCard(
-                              request: r,
+                              request: primary,
+                              checkoutGroupLines: isBundle ? g : null,
                               expanded: _expandedRequestId == rk,
-                              onToggle: () => _toggleExpand(r),
+                              onToggle: () => _toggleExpand(rk),
                               statusLabel: TransactionRequestStatus
-                                  .importerFilterStatusLabelEs(r.status),
+                                  .importerFilterStatusLabelEs(primary.status),
                               operationalHeadline: headline,
                               nextStatus: next,
                               nextActionLabel: next != null
@@ -325,19 +375,33 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                     )
                                   : null,
                               onAdvance: next != null
-                                  ? () => _advance(context, r, next)
+                                  ? () => _advanceGroup(context, g, next)
                                   : null,
                               expandedFooter: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  ImporterOrderPagoVerificationSection(
-                                    request: r,
-                                    onChanged: _load,
-                                  ),
-                                  ImporterOrderInvoiceSection(
-                                    request: r,
-                                    onChanged: _load,
-                                  ),
+                                  if (g.length == 1) ...[
+                                    ImporterOrderPagoVerificationSection(
+                                      request: g.single,
+                                      onChanged: _load,
+                                    ),
+                                    ImporterOrderInvoiceSection(
+                                      request: g.single,
+                                      onChanged: _load,
+                                    ),
+                                  ] else ...[
+                                    ImporterOrderPagoVerificationSection(
+                                      request: g.first,
+                                      bundleLines: g,
+                                      onChanged: _load,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ImporterOrderInvoiceSection(
+                                      request: g.first,
+                                      invoiceBundleLines: g,
+                                      onChanged: _load,
+                                    ),
+                                  ],
                                 ],
                               ),
                             );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,11 +21,17 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.onThreadChanged,
     this.orderPrecioTotalUsd,
     this.creditPlanRescheduleLocked = false,
+    this.suppressBuiltinTitle = false,
+    /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
+    this.mergedThreadRequestIds,
   });
 
   final String transactionRequestId;
   final bool allowReplyAsAliado;
   final bool allowReplyAsAdmin;
+
+  /// Varios ids de `transaction_requests` (mismo importador en un carrito): se listan mensajes juntos.
+  final List<String>? mergedThreadRequestIds;
 
   /// Despacho asignado al pedido: puede leer y escribir en el mismo hilo que aliado y admin.
   final bool allowReplyAsTransportista;
@@ -33,6 +41,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 
   /// Total del pedido para validar la suma de las cuotas (p. ej. [TransactionRequestModel.precioTotal]).
   final double? orderPrecioTotalUsd;
+
+  /// Cuando el padre ya mostró el título de sección (p. ej. carrito multi‑línea).
+  final bool suppressBuiltinTitle;
 
   /// Si [allowReplyAsAdmin] y el plan ya no puede redefinirse (p. ej. cuota 1 con comprobante).
   final bool creditPlanRescheduleLocked;
@@ -49,37 +60,107 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   bool _sending = false;
   bool _savingPlan = false;
   String? _error;
-  RealtimeChannel? _messagesChannel;
+  final List<RealtimeChannel> _messageChannels = [];
+
+  bool get _usaHiloFusionado =>
+      widget.mergedThreadRequestIds != null &&
+      widget.mergedThreadRequestIds!.length > 1;
 
   @override
   void dispose() {
-    SupabaseService.unsubscribeChannel(_messagesChannel);
+    for (final c in _messageChannels) {
+      SupabaseService.unsubscribeChannel(c);
+    }
+    _messageChannels.clear();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _unsubscribeAll() {
+    for (final c in _messageChannels) {
+      SupabaseService.unsubscribeChannel(c);
+    }
+    _messageChannels.clear();
+  }
+
+  void _subscribeChannels() {
+    _unsubscribeAll();
+    void onInsert() {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _load();
+          widget.onThreadChanged?.call();
+        }
+      });
+    }
+
+    final merge = widget.mergedThreadRequestIds;
+    if (merge != null && merge.length > 1) {
+      _messageChannels.addAll(
+        SupabaseService.subscribeToTransactionRequestMessagesMany(
+          transactionRequestIds: merge,
+          onInsert: onInsert,
+        ),
+      );
+    } else {
+      _messageChannels.add(
+        SupabaseService.subscribeToTransactionRequestMessages(
+          transactionRequestId: widget.transactionRequestId,
+          onInsert: onInsert,
+        ),
+      );
+    }
+  }
+
+  Future<void> _markNotificationsReadAsync() async {
+    final merge = widget.mergedThreadRequestIds;
+    if (merge != null && merge.length > 1) {
+      for (final id in merge) {
+        await SupabaseService.markNotificationsReadForRelatedOrder(id);
+      }
+    } else {
+      await SupabaseService.markNotificationsReadForRelatedOrder(
+        widget.transactionRequestId,
+      );
+    }
   }
 
   @override
   void initState() {
     super.initState();
-    SupabaseService.markNotificationsReadForRelatedOrder(widget.transactionRequestId)
-        .then((_) {
-      // Evita setState del shell en el mismo frame que desmonta subárboles (p. ej. paso a tránsito).
+    _markNotificationsReadAsync().then((_) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         MainShellTabController.requestNotificationsReload();
       });
     });
-    _messagesChannel = SupabaseService.subscribeToTransactionRequestMessages(
-      transactionRequestId: widget.transactionRequestId,
-      onInsert: () {
-        SchedulerBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _load();
-            widget.onThreadChanged?.call();
-          }
-        });
-      },
-    );
+    _subscribeChannels();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant OrderMotolinkThreadSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.transactionRequestId != widget.transactionRequestId ||
+        _listEq(
+              oldWidget.mergedThreadRequestIds,
+              widget.mergedThreadRequestIds,
+            ) ==
+            false) {
+      _unsubscribeAll();
+      _subscribeChannels();
+      unawaited(_markNotificationsReadAsync());
+      _load();
+    }
+  }
+
+  static bool _listEq(List<String>? a, List<String>? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<void> _load() async {
@@ -89,9 +170,16 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
       _error = null;
     });
     try {
-      final list = await SupabaseService.fetchTransactionRequestMessages(
-        widget.transactionRequestId,
-      );
+      final List<TransactionRequestMessageModel> list;
+      if (_usaHiloFusionado) {
+        list = await SupabaseService.fetchTransactionRequestMessagesForRequests(
+          widget.mergedThreadRequestIds!,
+        );
+      } else {
+        list = await SupabaseService.fetchTransactionRequestMessages(
+          widget.transactionRequestId,
+        );
+      }
       if (!mounted) return;
       setState(() {
         _items = list;
@@ -390,42 +478,68 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                transportistaOnlyTitle
-                    ? 'Mensajes del pedido'
-                    : 'Consultas a MotoLink',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: AppColors.textPrimary,
+        if (widget.suppressBuiltinTitle)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (widget.allowReplyAsAdmin)
+                IconButton(
+                  tooltip: widget.creditPlanRescheduleLocked
+                      ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
+                      : 'Ajustar plan de cuotas',
+                  onPressed: _loading ||
+                          _savingPlan ||
+                          widget.creditPlanRescheduleLocked
+                      ? null
+                      : _openPlanModal,
+                  icon: const Icon(Icons.payments_outlined, size: 22),
+                  visualDensity: VisualDensity.compact,
                 ),
-              ),
-            ),
-            if (widget.allowReplyAsAdmin) ...[
               IconButton(
-                tooltip: widget.creditPlanRescheduleLocked
-                    ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
-                    : 'Ajustar plan de cuotas',
-                onPressed: _loading ||
-                        _savingPlan ||
-                        widget.creditPlanRescheduleLocked
-                    ? null
-                    : _openPlanModal,
-                icon: const Icon(Icons.payments_outlined, size: 22),
+                tooltip: 'Actualizar',
+                onPressed: _loading || _savingPlan ? null : _load,
+                icon: const Icon(Icons.refresh, size: 20),
                 visualDensity: VisualDensity.compact,
               ),
             ],
-            IconButton(
-              tooltip: 'Actualizar',
-              onPressed: _loading || _savingPlan ? null : _load,
-              icon: const Icon(Icons.refresh, size: 20),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  transportistaOnlyTitle
+                      ? 'Mensajes del pedido'
+                      : 'Mensajes con MotoLink',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (widget.allowReplyAsAdmin) ...[
+                IconButton(
+                  tooltip: widget.creditPlanRescheduleLocked
+                      ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
+                      : 'Ajustar plan de cuotas',
+                  onPressed: _loading ||
+                          _savingPlan ||
+                          widget.creditPlanRescheduleLocked
+                      ? null
+                      : _openPlanModal,
+                  icon: const Icon(Icons.payments_outlined, size: 22),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+              IconButton(
+                tooltip: 'Actualizar',
+                onPressed: _loading || _savingPlan ? null : _load,
+                icon: const Icon(Icons.refresh, size: 20),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
         const SizedBox(height: 4),
         if (_loading)
           const Padding(

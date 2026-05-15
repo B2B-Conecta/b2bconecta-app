@@ -169,6 +169,8 @@ class CourierTimelineWidget extends StatelessWidget {
     required this.request,
     this.compact = false,
     this.viewerRole,
+    /// En listados con varias líneas, mostrar el título solo en la primera instancia del widget.
+    this.showHeading = true,
   });
 
   final TransactionRequestModel request;
@@ -176,6 +178,9 @@ class CourierTimelineWidget extends StatelessWidget {
 
   /// Ajusta copy del paso «En preparación» (p. ej. importador prepara en su almacén).
   final AppHomeRole? viewerRole;
+
+  /// Si es false, no se muestra el rótulo «Seguimiento del envío» (evita duplicados en el mismo panel).
+  final bool showHeading;
 
   Future<void> _openMaps(BuildContext context, String url) async {
     final uri = Uri.tryParse(url.trim());
@@ -201,7 +206,7 @@ class CourierTimelineWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = request;
     if (r.status == TransactionRequestStatus.rechazado) {
-      return _rejectedCard(r);
+      return _rejectedCard(r, showHeading: showHeading);
     }
 
     final steps = <_CourierStep>[
@@ -267,15 +272,17 @@ class CourierTimelineWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Seguimiento del envío',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: headingSize,
-            color: AppColors.textPrimary,
+        if (showHeading) ...[
+          Text(
+            'Seguimiento del envío',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: headingSize,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        SizedBox(height: compact ? 6 : 8),
+          SizedBox(height: compact ? 6 : 8),
+        ],
         DecoratedBox(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -321,7 +328,7 @@ class CourierTimelineWidget extends StatelessWidget {
     );
   }
 
-  Widget _rejectedCard(TransactionRequestModel r) {
+  Widget _rejectedCard(TransactionRequestModel r, {required bool showHeading}) {
     final cancel = r.canceladoPorAliado;
     final m = r.aliadoCancelacionMotivo;
     final mAnula = r.motolinkAnulacionMotivo;
@@ -329,15 +336,17 @@ class CourierTimelineWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Seguimiento del envío',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
+        if (showHeading) ...[
+          const Text(
+            'Seguimiento del envío',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         Material(
           color: Colors.red.shade50,
           borderRadius: BorderRadius.circular(12),

@@ -143,8 +143,8 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
             children: [
               Text(
                 esCredito
-                    ? 'Indique al aliado el motivo (opcional). Podrá solicitar de nuevo el pago con crédito.'
-                    : 'Indique al aliado qué corregir (opcional). Podrá enviar otro comprobante.',
+                    ? 'Motivo opcional; el aliado puede reintentar.'
+                    : 'Motivo opcional; puede enviar otro comprobante.',
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
               ),
               const SizedBox(height: 12),
@@ -440,7 +440,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Pedido entregado y pagado: MotoLink validó el pago.',
+                      'Pedido entregado y pagado.',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

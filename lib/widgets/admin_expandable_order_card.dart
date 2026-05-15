@@ -168,8 +168,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Pedido listo en despacho: cuando el transporte retire la carga, '
-                                      'marcar en tránsito.',
+                                      'Listo en despacho: al retirar la carga, marque en tránsito.',
                                       style: TextStyle(
                                         fontSize: 11,
                                         height: 1.3,
@@ -202,7 +201,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Entregado y pagado: MotoLink validó el pago.',
+                                      'Entregado y pagado (MotoLink).',
                                       style: TextStyle(
                                         fontSize: 11,
                                         height: 1.3,
@@ -237,8 +236,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Pendiente por pagar: el aliado recibió el pedido; falta comprobante '
-                                      'o aprobación MotoLink.',
+                                      'Pago pendiente de cierre (comprobante o aprobación).',
                                       style: TextStyle(
                                         fontSize: 11,
                                         height: 1.3,
@@ -261,8 +259,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                   border: Border.all(color: Colors.red.shade200),
                                 ),
                                 child: Text(
-                                  'Han pasado 3 o más días hábiles sin completar el pago. MotoLink puede '
-                                  'restringir la cuenta del aliado para pedidos futuros si no se regulariza.',
+                                  '>3 días hábiles sin pago: puede aplicarse restricción de cuenta.',
                                   style: TextStyle(
                                     fontSize: 11,
                                     height: 1.3,

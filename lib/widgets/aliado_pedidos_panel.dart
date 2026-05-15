@@ -6,10 +6,12 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../utils/motolink_volume_discount.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import '../utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
+import 'aliado_order_experience_section.dart';
 import 'aliado_order_pago_section.dart';
 import 'main_shell_tab.dart';
 import 'order_motolink_thread_section.dart';
@@ -190,6 +192,102 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     }
   }
 
+  String _entregaBusyKeyForImportadorChunk(
+    List<TransactionRequestModel> chunk,
+    String? checkoutGroupId,
+  ) {
+    final imp = chunk.first.ownerId.trim();
+    final cg = checkoutGroupId?.trim();
+    if (cg != null && cg.isNotEmpty) return '$cg|$imp';
+    return chunk.first.id;
+  }
+
+  List<TransactionRequestModel> _lineasEnTransitoOCerrables(
+    List<TransactionRequestModel> chunk,
+  ) {
+    return chunk
+        .where(
+          (r) =>
+              r.status == TransactionRequestStatus.enTransito ||
+              r.status == TransactionRequestStatus.enviado,
+        )
+        .toList();
+  }
+
+  bool _puedeConfirmarRecepcionImportador(
+    List<TransactionRequestModel> chunk,
+  ) {
+    final pend = _lineasEnTransitoOCerrables(chunk);
+    if (pend.isEmpty) return false;
+    return pend.every((r) => r.transportistaCompletoRecogidaAlmacen);
+  }
+
+  bool _algunaLineaEsperaRecogidaImportador(
+    List<TransactionRequestModel> chunk,
+  ) {
+    final pend = _lineasEnTransitoOCerrables(chunk);
+    return pend.isNotEmpty &&
+        pend.any((r) => !r.transportistaCompletoRecogidaAlmacen);
+  }
+
+  Future<void> _confirmarEntregaGrupoImportador(
+    BuildContext context, {
+    required List<TransactionRequestModel> chunk,
+    required String? checkoutGroupId,
+  }) async {
+    final key = _entregaBusyKeyForImportadorChunk(chunk, checkoutGroupId);
+    if (_entregaBusyId != null) return;
+    setState(() => _entregaBusyId = key);
+    try {
+      final pagoPendienteAntes =
+          chunk.any((r) => r.pagoMotolinkPendienteEnTransito);
+      final cg = checkoutGroupId?.trim();
+      if (cg != null && cg.isNotEmpty) {
+        await SupabaseService.aliadoMarcarPedidosEntregadosImportadorEnGrupo(
+          checkoutGroupId: cg,
+          importadorId: chunk.first.ownerId,
+        );
+      } else {
+        for (final r in chunk) {
+          if (r.status == TransactionRequestStatus.enTransito ||
+              r.status == TransactionRequestStatus.enviado) {
+            await SupabaseService.aliadoMarcarPedidoEntregado(r.id);
+          }
+        }
+      }
+      MainShellTabController.notifyImporterInventoryReload();
+      if (!context.mounted) return;
+      if (pagoPendienteAntes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
+              'sigue pendiente de registrar o aprobar por MotoLink. Revise la ficha del pedido.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Recepción confirmada. El pedido queda cerrado y registrado para MotoLink.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _entregaBusyId = null);
+    }
+  }
+
   Future<void> _confirmarEntrega(
     BuildContext context,
     TransactionRequestModel r,
@@ -256,17 +354,25 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     List<TransactionRequestModel> g,
   ) {
     final isMulti = g.length > 1;
+    final checkoutGroupId = g.first.checkoutGroupId?.trim();
+
     if (!isMulti) {
       final r = g.single;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AliadoOrderPagoSection(
-            request: r,
-            profile: _profile,
-            openCreditExposureSum: _openCreditExposureSum,
-            onChanged: _load,
+          _PasarelaPagoMotoLinkCard(
+            lineCount: 1,
+            child: AliadoOrderPagoSection(
+              request: r,
+              profile: _profile,
+              openCreditExposureSum: _openCreditExposureSum,
+              onChanged: _load,
+              suppressPrimaryTitle: true,
+              suppressNegotiationIntro: false,
+            ),
           ),
+          const SizedBox(height: 14),
           OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-aliado-${r.id}'),
             transactionRequestId: r.id,
@@ -278,108 +384,269 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ],
       );
     }
+
+    final porImportador = groupCheckoutLinesByImportador(g);
+    final cgForBundle =
+        (checkoutGroupId != null && checkoutGroupId.isNotEmpty)
+            ? checkoutGroupId
+            : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Text(
-            'Pago e hilo con MotoLink por importador. Confirma la recepción por cada línea '
-            'cuando la mercancía de ese importador llegue a tu taller.',
-            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800, height: 1.35),
+            'Pago y recepción por importador. Mensajes con MotoLink: un hilo por proveedor en este carrito.',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: Colors.grey.shade800,
+              height: 1.35,
+            ),
           ),
         ),
-        for (var i = 0; i < g.length; i++) ...[
-          Align(
-            alignment: Alignment.centerLeft,
+        for (var bi = 0; bi < porImportador.length; bi++) ...[
+          _bloqueFooterImportador(
+            context,
+            porImportador[bi],
+            bundleCheckoutGroupId: cgForBundle,
+          ),
+          if (bi < porImportador.length - 1)
+            Divider(height: 32, thickness: 1, color: Colors.grey.shade300),
+        ],
+      ],
+    );
+  }
+
+  /// Una pasarela de pago y un comprobante para todas las líneas de este importador (sin plan de cuotas).
+  Widget _columnPagoUnificadoImportador(
+    List<TransactionRequestModel> chunk, {
+    required bool suppressExperienceParent,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AliadoOrderPagoSection(
+          request: chunk.first,
+          profile: _profile,
+          openCreditExposureSum: _openCreditExposureSum,
+          onChanged: _load,
+          pagoBundleLines: chunk,
+          suppressExperience: suppressExperienceParent,
+          suppressPrimaryTitle: true,
+          suppressNegotiationIntro: false,
+        ),
+      ],
+    );
+  }
+
+  Widget _bloqueFooterImportador(
+    BuildContext context,
+    List<TransactionRequestModel> chunk, {
+    required String? bundleCheckoutGroupId,
+  }) {
+    final name = chunk.first.ownerBusinessName ?? 'Importador';
+    final subtotal =
+        chunk.fold<double>(0, (s, r) => s + r.precioTotal);
+    final disc = computeVolumeDiscountForLines(chunk);
+    final busyKey =
+        _entregaBusyKeyForImportadorChunk(chunk, bundleCheckoutGroupId);
+    final puede = _puedeConfirmarRecepcionImportador(chunk);
+    final esperaRecogida = _algunaLineaEsperaRecogidaImportador(chunk);
+    final cg = chunk.first.checkoutGroupId?.trim() ?? '';
+    final usePagoUnificado = chunk.length > 1 &&
+        !chunk.any((TransactionRequestModel r) => r.hasAgreedCreditPlan) &&
+        cg.isNotEmpty &&
+        chunk.every((TransactionRequestModel r) => r.checkoutGroupId?.trim() == cg);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          name,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: Colors.grey.shade900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${chunk.length} línea(s) · Subtotal ${formatRefAmount(subtotal)} REF',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        if (disc != null) ...[
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade200),
+            ),
             child: Text(
-              '${g[i].ownerBusinessName ?? 'Importador'} · ${g[i].cantidad} uds · '
-              'Total ${formatRefAmount(g[i].precioTotal)} REF',
+              disc.resumenEs,
               style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: Colors.grey.shade900,
+                fontSize: 11.5,
+                height: 1.35,
+                color: Colors.green.shade900,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          if (g[i].status == TransactionRequestStatus.enTransito ||
-              g[i].status == TransactionRequestStatus.enviado)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FilledButton.icon(
-                onPressed: _entregaBusyId != null ||
-                        !g[i].transportistaCompletoRecogidaAlmacen
-                    ? null
-                    : () => _confirmarEntrega(context, g[i]),
-                icon: _entregaBusyId == g[i].id
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.inventory_2_outlined, size: 20),
-                label: Text(
-                  _entregaBusyId == g[i].id
-                      ? 'Confirmando…'
-                      : 'Confirmar recepción en tu taller',
-                ),
-              ),
+        ],
+        const SizedBox(height: 8),
+        if (_lineasEnTransitoOCerrables(chunk).isNotEmpty) ...[
+          FilledButton.icon(
+            onPressed: (_entregaBusyId != null || !puede)
+                ? null
+                : () => _confirmarEntregaGrupoImportador(
+                      context,
+                      chunk: chunk,
+                      checkoutGroupId: bundleCheckoutGroupId,
+                    ),
+            icon: _entregaBusyId == busyKey
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.inventory_2_outlined, size: 20),
+            label: Text(
+              _entregaBusyId == busyKey
+                  ? 'Confirmando…'
+                  : 'Confirmar recepción en tu taller',
             ),
-          if ((g[i].status == TransactionRequestStatus.enTransito ||
-                  g[i].status == TransactionRequestStatus.enviado) &&
-              !g[i].transportistaCompletoRecogidaAlmacen) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline,
-                          size: 18, color: Colors.amber.shade900),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Podrá confirmar esta línea cuando el transportista haya marcado la recogida '
-                          'en el almacén de este importador.',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            height: 1.35,
-                            color: Colors.amber.shade900,
-                            fontWeight: FontWeight.w600,
-                          ),
+          ),
+          if (esperaRecogida) ...[
+            const SizedBox(height: 8),
+            Material(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 18, color: Colors.amber.shade900),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Podrá confirmar cuando el transportista haya marcado la recogida '
+                        'en almacén para los envíos en tránsito de este proveedor.',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          height: 1.35,
+                          color: Colors.amber.shade900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
-          AliadoOrderPagoSection(
-            request: g[i],
-            profile: _profile,
-            openCreditExposureSum: _openCreditExposureSum,
-            onChanged: _load,
+          const SizedBox(height: 10),
+        ],
+        _PasarelaPagoMotoLinkCard(
+          lineCount: chunk.length,
+          singleComprobantePorProveedor: usePagoUnificado,
+          child: usePagoUnificado
+              ? _columnPagoUnificadoImportador(
+                  chunk,
+                  suppressExperienceParent: bundleCheckoutGroupId != null,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < chunk.length; i++) ...[
+                      if (chunk.length > 1) ...[
+                        if (i > 0) ...[
+                          const SizedBox(height: 8),
+                          Divider(height: 1, color: Colors.grey.shade200),
+                          const SizedBox(height: 12),
+                        ],
+                        Text(
+                          chunk[i].etiquetaProductoAliado,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: AppColors.brandBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      AliadoOrderPagoSection(
+                        request: chunk[i],
+                        profile: _profile,
+                        openCreditExposureSum: _openCreditExposureSum,
+                        onChanged: _load,
+                        suppressExperience: bundleCheckoutGroupId != null,
+                        suppressPrimaryTitle: true,
+                        suppressNegotiationIntro: i > 0,
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: 14),
+        if (chunk.length > 1) ...[
+          Text(
+            'Mensajes con MotoLink — un hilo por proveedor en este carrito.',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+              color: Colors.grey.shade800,
+              height: 1.35,
+            ),
           ),
+          const SizedBox(height: 10),
           OrderMotolinkThreadSection(
-            key: ValueKey<String>('trm-aliado-${g[i].id}'),
-            transactionRequestId: g[i].id,
-            allowReplyAsAliado: _esEnCurso(g[i].status),
+            key: ValueKey<String>(
+              'trm-aliado-merge-${chunk.first.ownerId}-${chunk.map((e) => e.id).join("-")}',
+            ),
+            transactionRequestId: chunk.first.id,
+            mergedThreadRequestIds: chunk.map((e) => e.id).toList(),
+            allowReplyAsAliado:
+                chunk.any((l) => _esEnCurso(l.status)),
             allowReplyAsAdmin: false,
             onThreadChanged: _load,
-            orderPrecioTotalUsd: g[i].precioTotal,
+            orderPrecioTotalUsd: chunk.fold<double>(
+              0,
+              (a, r) => a + r.precioTotal,
+            ),
+            suppressBuiltinTitle: true,
           ),
-          if (i < g.length - 1)
-            Divider(height: 32, thickness: 1, color: Colors.grey.shade300),
+        ] else ...[
+          OrderMotolinkThreadSection(
+            key: ValueKey<String>('trm-aliado-${chunk.single.id}'),
+            transactionRequestId: chunk.single.id,
+            allowReplyAsAliado: _esEnCurso(chunk.single.status),
+            allowReplyAsAdmin: false,
+            onThreadChanged: _load,
+            orderPrecioTotalUsd: chunk.single.precioTotal,
+          ),
         ],
+        if (bundleCheckoutGroupId != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: AliadoOrderExperienceSection(
+              request: chunk.first,
+              onChanged: _load,
+              bundleCheckoutGroupId: bundleCheckoutGroupId,
+              bundleImportadorId: chunk.first.ownerId,
+            ),
+          ),
       ],
     );
   }
@@ -461,7 +728,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Cuando MotoLink apruebe una solicitud, verás aquí el pedido en curso o cerrado.',
+                'Tras aprobación MotoLink, aquí verás pedidos en curso y cerrados.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
               ),
@@ -556,6 +823,80 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Contenedor único de pasarela MotoLink por bloque importador–aliado en el pie del pedido.
+class _PasarelaPagoMotoLinkCard extends StatelessWidget {
+  const _PasarelaPagoMotoLinkCard({
+    required this.lineCount,
+    this.singleComprobantePorProveedor = false,
+    required this.child,
+  });
+
+  final int lineCount;
+  /// Varios ítems mismo importador: un archivo para todas las líneas (sin duplicar UI).
+  final bool singleComprobantePorProveedor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceTinted.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 22,
+                  color: AppColors.brandBlue,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pasarela de pago MotoLink',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        singleComprobantePorProveedor
+                            ? 'Un comprobante por proveedor; el importador revisa aquí.'
+                            : lineCount > 1
+                                ? 'Plan de cuotas u otros casos: un registro por ítem.'
+                                : 'Método y comprobante según el estado de esta línea.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.35,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
     );
   }
 }

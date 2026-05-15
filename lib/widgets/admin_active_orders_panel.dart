@@ -303,8 +303,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Pedido aprobado o en curso: MotoLink puede cerrar la operación. '
-            'Si había plan de cuotas, se limpia; el inventario vuelve si ya se descontó al facturar.',
+            'Cierra el pedido en curso; requiere motivo. Inventario puede revertirse.',
             style: TextStyle(
               fontSize: 10.5,
               height: 1.35,

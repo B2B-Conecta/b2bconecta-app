@@ -184,6 +184,26 @@ class SupabaseService {
     return TransactionRequestModel.fromJson(Map<String, dynamic>.from(row));
   }
 
+  /// Filas del mismo carrito (`checkout_group_id`) que [requestId], orden cronológico. Sin grupo → una sola fila.
+  static Future<List<TransactionRequestModel>>
+      fetchCheckoutGroupLinesForTransactionRequest(String requestId) async {
+    final primary = await fetchTransactionRequestById(requestId);
+    if (primary == null) return const [];
+    final cg = primary.checkoutGroupId?.trim();
+    if (cg == null || cg.isEmpty) return [primary];
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelectForListWithSubs)
+        .eq('checkout_group_id', cg)
+        .order('created_at', ascending: true);
+    final list = response as List<dynamic>;
+    return list
+        .map((row) => TransactionRequestModel.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
   /// Resumen para notificaciones (producto + aliado) por IDs de pedidos.
   static Future<Map<String, NotificationOrderSummary>>
       fetchNotificationOrderSummariesByRequestIds(
@@ -768,6 +788,7 @@ class SupabaseService {
     aliado_id,
     importador_id,
     product_id,
+    products ( name, sku ),
     status,
     cantidad,
     precio_total_usd,
@@ -788,6 +809,8 @@ class SupabaseService {
     destino_entrega_texto,
     destino_entrega_maps_url,
     checkout_group_id,
+    discount_rules,
+    confirmado_por,
     created_at,
     updated_at,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
@@ -2003,6 +2026,136 @@ class SupabaseService {
     }
   }
 
+  /// Aliado: un solo archivo de comprobante aplicado a todas las líneas del mismo carrito
+  /// e importador (MotoConecta pago directo, sin plan de cuotas por línea).
+  static Future<void> aliadoSubmitComprobantePagoBundle({
+    required List<TransactionRequestModel> lines,
+    required String metodo,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    if (lines.length < 2) {
+      throw ArgumentError('Se requieren al menos 2 líneas para el comprobante unificado.');
+    }
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final ids = lines.map((e) => e.id).toList();
+    final cg0 = lines.first.checkoutGroupId?.trim() ?? '';
+    if (cg0.isEmpty) {
+      throw StateError(
+        'Las líneas deben compartir el mismo carrito (checkout) para un comprobante único.',
+      );
+    }
+    if (!lines.every((r) => (r.checkoutGroupId?.trim() ?? '') == cg0)) {
+      throw StateError('Todas las líneas deben pertenecer al mismo carrito.');
+    }
+    final imp0 = lines.first.ownerId.trim();
+    if (!lines.every((r) => r.ownerId.trim() == imp0)) {
+      throw StateError('Todas las líneas deben ser del mismo importador.');
+    }
+    if (!lines.every((r) => r.aliadoId == uid)) {
+      throw StateError('No autorizado para alguna de las líneas.');
+    }
+    if (lines.any((r) => r.hasAgreedCreditPlan)) {
+      throw StateError(
+        'Este bloque tiene plan de cuotas: gestione el comprobante por línea o por cuota.',
+      );
+    }
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use imagen o PDF.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
+
+    final rows = await _client
+        .from('transaction_requests')
+        .select(
+            'id, pago_estado_revision, comprobante_pago_storage_path, status')
+        .eq('aliado_id', uid)
+        .inFilter('id', ids);
+
+    if (rows.length != ids.length) {
+      throw StateError('No se encontraron todas las líneas del pedido.');
+    }
+    for (final m in rows) {
+      final map = Map<String, dynamic>.from(m as Map<dynamic, dynamic>);
+      if (map['status']?.toString() == TransactionRequestStatus.rechazado) {
+        throw StateError('Una de las líneas está rechazada.');
+      }
+      final pe = map['pago_estado_revision']?.toString().trim();
+      if (pe == PagoRevisionEstado.aprobado) {
+        throw StateError(
+          'El pago ya fue confirmado en una línea; no puede modificar el comprobante.',
+        );
+      }
+    }
+
+    for (final old in rows) {
+      final map = Map<String, dynamic>.from(old as Map<dynamic, dynamic>);
+      final op = map['comprobante_pago_storage_path']?.toString().trim();
+      if (op != null && op.isNotEmpty) {
+        try {
+          await _client.storage.from(_orderPaymentProofsBucket).remove([op]);
+        } catch (_) {}
+      }
+    }
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final primaryId = lines.first.id;
+    final path = '$primaryId/${stamp}_bundle_$safeBase';
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    try {
+      final fname = fileName.trim();
+      for (final id in ids) {
+        await _client.rpc(
+          'aliado_registra_comprobante_pago',
+          params: <String, dynamic>{
+            'p_request_id': id,
+            'p_metodo': metodo,
+            'p_storage_path': path,
+            'p_file_name': fname,
+          },
+        );
+      }
+    } catch (e) {
+      try {
+        await _client.storage.from(_orderPaymentProofsBucket).remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  /// Importador: mismo estado de revisión del comprobante en todas las líneas del carrito (mismo comprobante).
+  static Future<void> importadorSetPagoRevisionEstadoBundle({
+    required List<String> transactionRequestIds,
+    required String nuevoEstado,
+    String? rechazoNota,
+  }) async {
+    if (transactionRequestIds.isEmpty) return;
+    for (final id in transactionRequestIds) {
+      await importadorSetPagoRevisionEstado(
+        transactionRequestId: id,
+        nuevoEstado: nuevoEstado,
+        rechazoNota: rechazoNota,
+      );
+    }
+  }
+
   /// Importador: aprueba o rechaza el comprobante registrado por el aliado (`importador_set_pago_revision_estado`).
   static Future<void> importadorSetPagoRevisionEstado({
     required String transactionRequestId,
@@ -2441,6 +2594,129 @@ class SupabaseService {
     }).eq('id', transactionRequestId);
   }
 
+  /// Mismo archivo de factura del proveedor para todas las líneas del carrito (mismo importador).
+  static Future<void> importerSubmitMotoconectaProveedorFacturaBundle({
+    required List<String> transactionRequestIds,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final ids = transactionRequestIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    if (ids.isEmpty) {
+      throw ArgumentError('Debe indicar al menos un pedido.');
+    }
+    if (ids.length == 1) {
+      await importerSubmitMotoconectaProveedorFactura(
+        transactionRequestId: ids.single,
+        bytes: bytes,
+        fileName: fileName,
+      );
+      return;
+    }
+
+    final rows = await _client
+        .from('transaction_requests')
+        .select(
+          'id, importador_id, status, proveedor_factura_storage_path, checkout_group_id',
+        )
+        .inFilter('id', ids);
+
+    final list = rows as List<dynamic>;
+    if (list.length != ids.length) {
+      throw StateError(
+        'No se encontraron todas las líneas del carrito; actualice la lista.',
+      );
+    }
+
+    final parsed = list
+        .map((e) {
+          if (e is! Map) return null;
+          return Map<String, dynamic>.from(e);
+        })
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    String? checkoutGroupId;
+    for (final m in parsed) {
+      if (m['importador_id']?.toString() != uid) {
+        throw StateError('No autorizado: las líneas deben ser de su almacén.');
+      }
+      final st = m['status']?.toString();
+      if (st != TransactionRequestStatus.pendiente &&
+          st != TransactionRequestStatus.enPreparacion &&
+          st != TransactionRequestStatus.pedidoListo) {
+        throw StateError(
+          'Solo puede adjuntar la factura mientras todas las líneas están pendientes, '
+          'en preparación o listas para despacho.',
+        );
+      }
+      final cg =
+          m['checkout_group_id']?.toString().trim();
+      if (cg == null || cg.isEmpty) {
+        throw StateError(
+          'Las líneas del carrito no comparten checkout; use adjuntar por pedido.',
+        );
+      }
+      checkoutGroupId ??= cg;
+      if (checkoutGroupId != cg) {
+        throw StateError('Las líneas no pertenecen al mismo carrito (checkout).');
+      }
+    }
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) {
+      safeBase = 'factura.$ext';
+    }
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path =
+        'bundle_${checkoutGroupId!}/${stamp}_$safeBase';
+
+    final oldPaths = <String>{};
+    for (final m in parsed) {
+      final op =
+          m['proveedor_factura_storage_path']?.toString().trim();
+      if (op != null && op.isNotEmpty) {
+        oldPaths.add(op);
+      }
+    }
+    for (final op in oldPaths) {
+      try {
+        await _client.storage.from(_orderInvoicesBucket).remove([op]);
+      } catch (_) {}
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderInvoicesBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client.from('transaction_requests').update({
+      'proveedor_factura_storage_path': path,
+      'proveedor_factura_file_name': fileName.trim(),
+      'proveedor_factura_submitted_at': now,
+      'updated_at': now,
+    }).inFilter('id', ids);
+  }
+
   /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación
   /// y antes de que MotoLink confirme la factura oficial al aliado.
   /// Con [subOrderId], actualiza el sub-pedido (pedido maestro).
@@ -2689,6 +2965,54 @@ class SupabaseService {
               Map<String, dynamic>.from(row as Map),
             ))
         .toList();
+  }
+
+  /// Mensajes de varias líneas del mismo carrito/importador, ordenados por fecha.
+  static Future<List<TransactionRequestMessageModel>>
+      fetchTransactionRequestMessagesForRequests(
+    List<String> transactionRequestIds,
+  ) async {
+    final ids = transactionRequestIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (ids.isEmpty) return [];
+    if (ids.length == 1) {
+      return fetchTransactionRequestMessages(ids.single);
+    }
+    final response = await _client
+        .from('transaction_request_messages')
+        .select(_trMessagesSelect)
+        .inFilter('transaction_request_id', ids)
+        .order('created_at', ascending: true);
+
+    final list = response as List<dynamic>;
+    return list
+        .map(
+          (row) => TransactionRequestMessageModel.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
+        .toList();
+  }
+
+  /// Un canal Realtime por solicitud; desuscribir cada uno con [unsubscribeChannel].
+  static List<RealtimeChannel> subscribeToTransactionRequestMessagesMany({
+    required List<String> transactionRequestIds,
+    required void Function() onInsert,
+  }) {
+    final out = <RealtimeChannel>[];
+    for (final raw in transactionRequestIds) {
+      final id = raw.trim();
+      if (id.isEmpty) continue;
+      out.add(
+        subscribeToTransactionRequestMessages(
+          transactionRequestId: id,
+          onInsert: onInsert,
+        ),
+      );
+    }
+    return out;
   }
 
   static Future<void> insertTransactionRequestMessageAsAliado({
@@ -2943,6 +3267,41 @@ class SupabaseService {
     await _client.rpc(
       'aliado_marca_pedido_entregado',
       params: {'p_request_id': transactionRequestId},
+    );
+  }
+
+  /// Cierra todas las líneas `en_transito` | `enviado` del mismo importador en un carrito.
+  static Future<int> aliadoMarcarPedidosEntregadosImportadorEnGrupo({
+    required String checkoutGroupId,
+    required String importadorId,
+  }) async {
+    final res = await _client.rpc(
+      'aliado_marca_pedidos_entregados_importador_en_grupo',
+      params: <String, dynamic>{
+        'p_checkout_group_id': checkoutGroupId,
+        'p_importador_id': importadorId,
+      },
+    );
+    if (res is int) return res;
+    if (res is num) return res.toInt();
+    return int.tryParse(res?.toString() ?? '') ?? 0;
+  }
+
+  /// A6: calificación por proveedor cuando varias líneas comparten carrito.
+  static Future<void> aliadoSubmitOrderExperienceImportadorGrupo({
+    required String checkoutGroupId,
+    required String importadorId,
+    required int stars,
+    String? comment,
+  }) async {
+    await _client.rpc(
+      'aliado_submit_order_experience_importador_grupo',
+      params: <String, dynamic>{
+        'p_checkout_group_id': checkoutGroupId,
+        'p_importador_id': importadorId,
+        'p_stars': stars,
+        'p_comment': comment?.trim() ?? '',
+      },
     );
   }
 

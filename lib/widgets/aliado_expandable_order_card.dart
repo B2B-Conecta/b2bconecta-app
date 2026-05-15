@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/ves_amount_format.dart';
 import 'courier_timeline_widget.dart';
+import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 import 'transportista_recogida_almacen_section.dart';
 
@@ -46,6 +47,13 @@ class AliadoExpandableOrderCard extends StatelessWidget {
         : <TransactionRequestModel>[request];
     final isCheckoutGroup = lines.length > 1;
     final r = request;
+    final distinctImporterIds = lines
+        .map((e) => e.ownerId.trim())
+        .where((s) => s.isNotEmpty)
+        .toSet();
+    /// Mismo almacén en todas las líneas: un solo bloque de contacto B2B.
+    final consolidarDatosImportador =
+        isCheckoutGroup && distinctImporterIds.length <= 1;
     final puedeConfirmarRecepcion = r.transportistaCompletoRecogidaAlmacen;
     final String tracking;
     final bool showHeadline;
@@ -110,8 +118,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   isCheckoutGroup
-                                      ? 'Pedido multi-importador (${lines.length} líneas)'
-                                      : r.tituloFichaPrincipalPedido,
+                                      ? tituloCheckoutGrupoAliado(lines)
+                                      : r.etiquetaProductoAliado,
                                   maxLines: expanded ? 3 : 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -150,12 +158,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             isCheckoutGroup
                                 ? _checkoutGroupResumen(lines)
                                 : (r.isMasterOrder
-                                    ? '${r.subOrders.isEmpty ? 0 : r.subOrders.length} '
-                                        '${r.subOrders.length == 1 ? "importador" : "importadores"} · '
-                                        '${r.totalUnidadesAliado} uds · Total REF '
-                                        '${formatRefAmount(r.precioTotal)}'
+                                    ? '${r.totalUnidadesAliado} uds · '
+                                        '${formatRefAmount(r.precioTotal)} REF'
                                         '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}'
-                                    : '${r.cantidad} uds · Total estimado '
+                                        '${r.subOrders.length > 1 ? " · ${r.subOrders.length} importadores" : ""}'
+                                        '${(r.lineasProductoCount > 1 || r.subOrders.length > 1) ? " · ${r.lineasProductoCount} prod." : ""}'
+                                    : '${r.cantidad} uds · '
                                         '${formatRefAmount(r.precioTotal)} REF'),
                             style: TextStyle(
                               fontSize: 12,
@@ -163,30 +171,21 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          if (!isCheckoutGroup &&
-                              r.isMasterOrder &&
-                              r.subOrders.isNotEmpty) ...[
-                            const SizedBox(height: 2),
+                          if (!expanded) ...[
+                            const SizedBox(height: 4),
                             Text(
-                              '${r.subOrders.length} almacén(es) · '
-                              '${r.lineasProductoCount} partida(s) de producto',
+                              lines.first.destinoEntregaLineaCompactaEs,
                               style: TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 11,
                                 color: Colors.grey.shade700,
-                                height: 1.2,
+                                height: 1.25,
                               ),
                             ),
                           ],
-                          const SizedBox(height: 4),
-                          Text(
-                            lines.first.destinoEntregaLineaCompactaEs,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade700,
-                              height: 1.25,
-                            ),
-                          ),
-                          if (!isCheckoutGroup && r.aliadoPagoEstadoResumenEs != null) ...[
+                          if (!isCheckoutGroup &&
+                              r.aliadoPagoEstadoResumenEs != null &&
+                              !r.pedidoEntregadoYPagado &&
+                              !r.pagoMotolinkPendienteTrasEntrega) ...[
                             const SizedBox(height: 4),
                             Text(
                               r.aliadoPagoEstadoResumenEs!,
@@ -209,7 +208,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 border: Border.all(color: Colors.green.shade200),
                               ),
                               child: Text(
-                                'Entregado y pagado: MotoLink validó su pago.',
+                                'Entregado y pagado.',
                                 style: TextStyle(
                                   fontSize: 11,
                                   height: 1.3,
@@ -229,8 +228,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 border: Border.all(color: Colors.amber.shade300),
                               ),
                               child: Text(
-                                'Pago pendiente: MotoLink aún no ha aprobado el comprobante o la declaración de pago. '
-                                'Complete el registro en esta ficha cuando corresponda.',
+                                'Pago pendiente de revisión MotoLink.',
                                 style: TextStyle(
                                   fontSize: 11,
                                   height: 1.3,
@@ -250,8 +248,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                   border: Border.all(color: Colors.red.shade200),
                                 ),
                                 child: Text(
-                                  'Lleva varios días hábiles sin completar el pago. Si no regulariza, MotoLink '
-                                  'podría desactivar su cuenta para nuevos pedidos.',
+                                  '>3 días hábiles sin pago: posible restricción de nuevos pedidos.',
                                   style: TextStyle(
                                     fontSize: 11,
                                     height: 1.3,
@@ -263,11 +260,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             ],
                           ],
                           if (!isCheckoutGroup &&
+                              !expanded &&
                               r.status == TransactionRequestStatus.enTransito &&
                               r.hasTransitEta) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Llegada estimada: ~${r.transitEtaResumenEs} desde el envío',
+                              'Llegada ~${r.transitEtaResumenEs}',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -278,8 +276,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           if (!isCheckoutGroup && r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Crédito MotoLink asignado: '
-                              '${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} REF',
+                              'Cupo MotoLink: ${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} REF',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -323,8 +320,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                   cancelarSolicitudPendienteBusy
                       ? 'Cancelando…'
                       : isCheckoutGroup
-                          ? 'Cancelar todas las solicitudes (antes de aprobarse)'
-                          : 'Cancelar solicitud (antes de aprobarse)',
+                          ? 'Cancelar carrito'
+                          : 'Cancelar pedido',
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red.shade800,
@@ -334,7 +331,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: Text(
-                'Solo mientras MotoLink aún no ha aprobado. Debe indicar un motivo; se notifica a MotoLink.',
+                'Solo si sigue pendiente; motivo obligatorio.',
                 style: TextStyle(
                   fontSize: 10.5,
                   height: 1.35,
@@ -387,9 +384,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 r.isMasterOrder && r.subOrders.isNotEmpty
-                                    ? 'Podrá confirmar cuando el transportista haya marcado la recogida '
-                                        'en todos los almacenes de este pedido (${r.subOrdersRecogidasAlmacenCount}/${r.subOrders.length} listos).'
-                                    : 'Podrá confirmar cuando el transportista haya marcado la recogida en el almacén del importador.',
+                                    ? 'Recogida en almacén: '
+                                        '${r.subOrdersRecogidasAlmacenCount}/${r.subOrders.length} lista(s).'
+                                    : 'Active cuando el transportista confirme recogida en almacén.',
                                 style: TextStyle(
                                   fontSize: 11,
                                   height: 1.35,
@@ -406,11 +403,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     request.pagoMotolinkPendienteEnTransito
-                        ? 'Puede confirmar la recepción aunque el pago siga pendiente ante MotoLink. '
-                            'El pedido quedará como entregado y deberá completar o esperar la aprobación '
-                            'del comprobante en esta misma ficha.'
-                        : 'Marca este paso cuando hayas recibido la mercancía. Se cierra el pedido y queda '
-                            'registrada la fecha de entrega para MotoLink y el importador.',
+                        ? 'Puede confirmar entrega con pago aún pendiente.'
+                        : 'Confirme al recibir la mercancía.',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.3,
@@ -447,42 +441,45 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             request: lines.first,
                           ),
                           const SizedBox(height: 12),
-                          for (var i = 0; i < lines.length; i++) ...[
-                            if (i > 0) ...[
-                              Divider(height: 1, color: Colors.grey.shade300),
-                              const SizedBox(height: 12),
-                            ],
-                            _CheckoutGroupLineHeading(line: lines[i]),
-                            const SizedBox(height: 10),
+                          TransactionRequestProductosDesgloseSection(
+                            lines: lines,
+                            compact: true,
+                            viewer: PedidoDesgloseViewer.aliado,
+                            showPrecioHelp: false,
+                          ),
+                          const SizedBox(height: 12),
+                          if (consolidarDatosImportador) ...[
                             TransactionRequestImporterContactSection(
-                              request: lines[i],
+                              request: lines.first,
                             ),
                             const SizedBox(height: 12),
+                          ],
+                          if (checkoutGroupMismoEstadoEnvio(lines)) ...[
                             CourierTimelineWidget(
-                              request: lines[i],
+                              request: lines.first,
                               compact: true,
                               viewerRole: AppHomeRole.aliado,
+                              showHeading: true,
                             ),
-                            if (lines[i].status ==
-                                TransactionRequestStatus.enTransito) ...[
-                              const SizedBox(height: 12),
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color:
-                                      Colors.teal.shade50.withOpacity(0.45),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border:
-                                      Border.all(color: Colors.teal.shade100),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: TransportistaRecogidaAlmacenSection(
-                                    request: lines[i],
-                                    viewerRole: AppHomeRole.aliado,
-                                  ),
-                                ),
+                            ..._postTimelineBloquesAliado(
+                              lines: lines,
+                              consolidarDatosImportador: consolidarDatosImportador,
+                            ),
+                          ] else ...[
+                            const Text(
+                              'Seguimiento del envío',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
+                                color: AppColors.textPrimary,
                               ),
-                            ],
+                            ),
+                            const SizedBox(height: 8),
+                            ..._postTimelineBloquesAliado(
+                              lines: lines,
+                              consolidarDatosImportador: consolidarDatosImportador,
+                              timelinePorLinea: true,
+                            ),
                           ],
                         ] else ...[
                           TransactionRequestImporterContactSection(request: r),
@@ -491,10 +488,18 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             request: r,
                           ),
                           const SizedBox(height: 12),
+                          TransactionRequestProductosDesgloseSection(
+                            lines: <TransactionRequestModel>[r],
+                            compact: true,
+                            viewer: PedidoDesgloseViewer.aliado,
+                            showPrecioHelp: false,
+                          ),
+                          const SizedBox(height: 12),
                           CourierTimelineWidget(
                             request: r,
                             compact: true,
                             viewerRole: AppHomeRole.aliado,
+                            showHeading: true,
                           ),
                           if (r.status ==
                               TransactionRequestStatus.enTransito) ...[
@@ -530,6 +535,92 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   }
 }
 
+/// Tras el timeline: contacto por importador (si no está unificado arriba) y bloques de recogida por línea en tránsito.
+/// Los productos no se repiten aquí (están en «Productos de tu pedido»).
+List<Widget> _postTimelineBloquesAliado({
+  required List<TransactionRequestModel> lines,
+  required bool consolidarDatosImportador,
+  bool timelinePorLinea = false,
+}) {
+  final out = <Widget>[];
+  if (timelinePorLinea) {
+    for (var i = 0; i < lines.length; i++) {
+      if (out.isNotEmpty) {
+        out.add(Divider(height: 1, color: Colors.grey.shade300));
+        out.add(const SizedBox(height: 12));
+      }
+      if (!consolidarDatosImportador) {
+        out.add(TransactionRequestImporterContactSection(request: lines[i]));
+        out.add(const SizedBox(height: 12));
+      }
+      out.add(
+        CourierTimelineWidget(
+          request: lines[i],
+          compact: true,
+          viewerRole: AppHomeRole.aliado,
+          showHeading: false,
+        ),
+      );
+      if (lines[i].status == TransactionRequestStatus.enTransito) {
+        out.add(const SizedBox(height: 12));
+        out.add(
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.teal.shade50.withOpacity(0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.teal.shade100),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: TransportistaRecogidaAlmacenSection(
+                request: lines[i],
+                viewerRole: AppHomeRole.aliado,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  } else {
+    if (!consolidarDatosImportador) {
+      for (var i = 0; i < lines.length; i++) {
+        if (i > 0) {
+          out.add(Divider(height: 1, color: Colors.grey.shade300));
+          out.add(const SizedBox(height: 12));
+        }
+        out.add(TransactionRequestImporterContactSection(request: lines[i]));
+      }
+      if (lines.isNotEmpty) {
+        out.add(const SizedBox(height: 12));
+      }
+    }
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].status == TransactionRequestStatus.enTransito) {
+        if (out.isNotEmpty) {
+          out.add(const SizedBox(height: 12));
+        }
+        out.add(
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.teal.shade50.withOpacity(0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.teal.shade100),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: TransportistaRecogidaAlmacenSection(
+                request: lines[i],
+                viewerRole: AppHomeRole.aliado,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  }
+  return out;
+}
+
 String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
   if (lines.isEmpty) return '';
   final uds = lines.fold<int>(0, (a, r) => a + r.cantidad);
@@ -537,62 +628,17 @@ String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
   final imp = lines.length;
   final buf = StringBuffer(
     '$imp ${imp == 1 ? "importador" : "importadores"} · $uds uds · '
-    'Total REF ${formatRefAmount(totalRef)}',
+    '${formatRefAmount(totalRef)} REF',
   );
   final bsVals = lines.map((r) => r.precioTotalBsUi).whereType<double>().toList();
   if (bsVals.length == lines.length && bsVals.isNotEmpty) {
     final sumBs = bsVals.fold<double>(0, (a, b) => a + b);
     buf.write(' · ~${formatVesAmount(sumBs)} Bs');
   }
-  return buf.toString();
-}
-
-class _CheckoutGroupLineHeading extends StatelessWidget {
-  const _CheckoutGroupLineHeading({required this.line});
-
-  final TransactionRequestModel line;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          line.ownerBusinessName ?? 'Importador',
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          line.tituloFichaPrincipalPedido,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            color: Colors.grey.shade800,
-          ),
-        ),
-        if (line.productSku != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            'SKU: ${line.productSku}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-          ),
-        ],
-        const SizedBox(height: 2),
-        Text(
-          '${line.cantidad} uds · Total REF ${formatRefAmount(line.precioTotal)}',
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade800,
-          ),
-        ),
-      ],
-    );
+  if (lines.any(
+        (r) => r.discountRules != null && r.discountRules!.isNotEmpty,
+      )) {
+    buf.write(' · descuentos volumen en ficha');
   }
+  return buf.toString();
 }

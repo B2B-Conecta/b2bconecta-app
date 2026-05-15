@@ -32,6 +32,11 @@ create table public.profiles (
   ciudad text,
   direccion text,
   fiscal_maps_url text,
+  primeros_pedidos_contado_entregados integer default 0,
+  pedidos_suspendidos_morosidad boolean default false,
+  kyc_status text,
+  credit_limit numeric(14, 4),
+  credito_consumido_acumulado numeric(14, 4) default 0,
   latitude double precision,
   longitude double precision,
   location_updated_at timestamptz,
@@ -70,7 +75,10 @@ create table public.transaction_requests (
       status = any (
         array[
           'pendiente'::text,
+          'aprobado_admin'::text,
           'en_preparacion'::text,
+          'pedido_listo'::text,
+          'en_transito'::text,
           'enviado'::text,
           'entregado'::text,
           'rechazado'::text
@@ -86,6 +94,17 @@ create table public.transaction_requests (
   proveedor_factura_file_name text,
   proveedor_factura_submitted_at timestamptz,
   tiempo_estimado_envio text,
+  pago_metodo text,
+  comprobante_pago_storage_path text,
+  comprobante_pago_file_name text,
+  comprobante_pago_submitted_at timestamptz,
+  pago_estado_revision text,
+  pago_comprobante_rechazo_nota text,
+  pago_aprobado_at timestamptz,
+  destino_entrega_usa_perfil boolean default true,
+  destino_entrega_texto text,
+  destino_entrega_maps_url text,
+  checkout_group_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -161,6 +180,8 @@ declare
   v_aliado uuid;
   v_imp uuid;
 begin
+  perform set_config ('row_security', 'off', true);
+
   select tr.aliado_id, tr.importador_id
     into v_aliado, v_imp
   from public.transaction_requests tr
@@ -218,6 +239,165 @@ after insert on public.transaction_request_messages
 for each row
 execute function public.mc_notify_trm_insert ();
 
+-- Nuevo pedido → notificación al importador (una por importador y carrito si hay checkout_group_id)
+create or replace function public.mc_notify_tr_insert ()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_es_duplicado_misma_linea_importador boolean;
+begin
+  perform set_config ('row_security', 'off', true);
+
+  if new.checkout_group_id is not null then
+    select exists (
+      select 1
+      from public.transaction_requests tr
+      where tr.checkout_group_id = new.checkout_group_id
+        and tr.importador_id = new.importador_id
+        and tr.id <> new.id
+    )
+    into v_es_duplicado_misma_linea_importador;
+
+    if v_es_duplicado_misma_linea_importador then
+      return new;
+    end if;
+  end if;
+
+  insert into public.notifications (user_id, title, body, type, related_id)
+  values (
+    new.importador_id,
+    'Nuevo pedido',
+    'Un aliado solicitó un pedido. Revíselo en Pedidos.',
+    'pedido',
+    new.id::text
+  );
+  return new;
+end;
+$$;
+
+create trigger trg_mc_notify_tr_insert
+after insert on public.transaction_requests
+for each row
+execute function public.mc_notify_tr_insert ();
+
+-- Cambio de estado → notificación al aliado o al importador
+create or replace function public.mc_notify_tr_status_changed ()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform set_config ('row_security', 'off', true);
+
+  if old.status is not distinct from new.status then
+    return new;
+  end if;
+
+  if new.status in (
+    'en_preparacion'::text,
+    'pedido_listo'::text,
+    'en_transito'::text,
+    'enviado'::text
+  )
+  then
+    insert into public.notifications (user_id, title, body, type, related_id)
+    values (
+      new.aliado_id,
+      case new.status
+        when 'en_preparacion' then 'Pedido en preparación'
+        when 'pedido_listo' then 'Listo para despacho'
+        when 'en_transito' then 'Pedido en tránsito'
+        else 'Actualización de pedido'
+      end,
+      case new.status
+        when 'en_preparacion' then
+          'El importador confirmó la solicitud y está preparando tu pedido.'
+        when 'pedido_listo' then
+          'El importador marcó el pedido como listo para despacho.'
+        when 'en_transito' then
+          'El pedido fue despachado y va en camino a tu taller.'
+        else
+          'Hay un cambio de estado en su pedido.'
+      end,
+      'pedido',
+      new.id::text
+    );
+  elsif new.status = 'entregado'::text then
+    insert into public.notifications (user_id, title, body, type, related_id)
+    values (
+      new.importador_id,
+      'Pedido recibido en taller',
+      'El aliado confirmó la recepción del pedido en su taller.',
+      'pedido',
+      new.id::text
+    );
+  elsif new.status = 'rechazado'::text then
+    insert into public.notifications (user_id, title, body, type, related_id)
+    values (
+      new.aliado_id,
+      'Pedido rechazado',
+      'Un pedido pasó a rechazado. Revíselo en Pedidos.',
+      'pedido',
+      new.id::text
+    );
+  end if;
+
+  insert into public.notifications (user_id, title, body, type, related_id)
+  select
+    adm.id,
+    'Supervisión · cambio de estado',
+    format (
+      'Pedido %s: %s → %s',
+      substring (new.id::text, 1, 8) || '…',
+      old.status,
+      new.status
+    ),
+    'supervision',
+    new.id::text
+  from public.profiles adm
+  where adm.role = 'administrador';
+
+  return new;
+end;
+$$;
+
+create trigger trg_mc_notify_tr_status
+after update of status on public.transaction_requests
+for each row
+execute function public.mc_notify_tr_status_changed ();
+
+-- Aliado: confirma recepción (en tránsito / legado enviado → entregado)
+create or replace function public.aliado_marca_pedido_entregado (p_request_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid () is null then
+    raise exception 'not authenticated' using errcode = '42501';
+  end if;
+
+  update public.transaction_requests tr
+  set status = 'entregado'::text
+  where tr.id = p_request_id
+    and tr.aliado_id = auth.uid ()
+    and tr.status = any (array['en_transito'::text, 'enviado'::text]);
+
+  if not found then
+    raise exception
+      'No se puede marcar como entregado (estado o permiso inválido).'
+      using errcode = 'P0001';
+  end if;
+end;
+$$;
+
+grant execute on function public.aliado_marca_pedido_entregado (uuid) to authenticated;
+
 -- Realtime (ignora error si la publicación no existe en entornos mínimos)
 do $$
 begin
@@ -266,6 +446,8 @@ begin
           array[
             'pendiente'::text,
             'en_preparacion'::text,
+            'pedido_listo'::text,
+            'en_transito'::text,
             'enviado'::text
           ]
         )
@@ -425,6 +607,41 @@ create policy notifications_delete_own
   to authenticated
   using (user_id = auth.uid ());
 
+-- Inserts: pedidos (triggers) y mensajes — solo si el destinatario es la contraparte del pedido.
+create policy notifications_insert_tr_participant
+  on public.notifications for insert
+  to authenticated
+  with check (
+    related_id is not null
+    and exists (
+      select 1
+      from public.transaction_requests tr
+      where tr.id::text = related_id
+        and (
+          (
+            tr.aliado_id = user_id
+            and tr.importador_id = auth.uid ()
+          )
+          or (
+            tr.importador_id = user_id
+            and tr.aliado_id = auth.uid ()
+          )
+          or (
+            exists (
+              select 1
+              from public.profiles p
+              where p.id = auth.uid ()
+                and p.role = 'administrador'
+            )
+            and (
+              tr.aliado_id = user_id
+              or tr.importador_id = user_id
+            )
+          )
+        )
+    )
+  );
+
 -- Permisos API (PostgREST)
 grant usage on schema public to anon, authenticated, service_role;
 
@@ -432,7 +649,7 @@ grant select, insert, update, delete on public.profiles to authenticated;
 grant select, insert, update, delete on public.products to authenticated;
 grant select, insert, update, delete on public.transaction_requests to authenticated;
 grant select, insert, update, delete on public.transaction_request_messages to authenticated;
-grant select, update, delete on public.notifications to authenticated;
+grant select, insert, update, delete on public.notifications to authenticated;
 
 grant all on public.profiles to service_role;
 grant all on public.products to service_role;

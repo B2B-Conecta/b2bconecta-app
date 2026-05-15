@@ -5,7 +5,9 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/aliado_order_grouping.dart';
 import '../utils/transaction_request_filter_utils.dart';
+import '../utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
 import 'aliado_order_pago_section.dart';
@@ -62,12 +64,20 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     super.dispose();
   }
 
+  String? _expandKeyForTransactionId(String id) {
+    for (final g in groupAliadoOrdersByCheckout(_rows)) {
+      if (g.any((r) => r.id == id)) return checkoutGroupExpandKey(g);
+    }
+    return null;
+  }
+
   void _onNotificationPedidosDeepLink() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
-    if (_rows.any((r) => r.id == pending)) {
+    final key = _expandKeyForTransactionId(pending);
+    if (key != null) {
       MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = pending);
+      setState(() => _expandedRequestId = key);
     } else if (!_loading) {
       _load();
     }
@@ -76,9 +86,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   void _tryExpandFromPendingNotification() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
-    if (_rows.any((r) => r.id == pending)) {
+    final key = _expandKeyForTransactionId(pending);
+    if (key != null) {
       MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = pending);
+      setState(() => _expandedRequestId = key);
     }
   }
 
@@ -130,24 +141,31 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     });
   }
 
-  Future<void> _cancelarPendiente(
+  Future<void> _cancelarGrupoPendiente(
     BuildContext context,
-    TransactionRequestModel r,
+    List<TransactionRequestModel> rows,
   ) async {
     if (_cancelarBusyId != null) return;
+    final expandKey = checkoutGroupExpandKey(rows);
     final m = await showAliadoCancelarPedidoPendienteDialog(context);
     if (m == null) return;
     if (!context.mounted) return;
-    setState(() => _cancelarBusyId = r.id);
+    setState(() => _cancelarBusyId = expandKey);
     try {
-      await SupabaseService.aliadoCancelaPedidoPendiente(
-        transactionRequestId: r.id,
-        motivo: m,
-      );
+      for (final r in rows) {
+        await SupabaseService.aliadoCancelaPedidoPendiente(
+          transactionRequestId: r.id,
+          motivo: m,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solicitud cancelada. MotoLink ha sido notificada.'),
+        SnackBar(
+          content: Text(
+            rows.length > 1
+                ? 'Se cancelaron ${rows.length} solicitudes. MotoLink ha sido notificada.'
+                : 'Solicitud cancelada. MotoLink ha sido notificada.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -217,6 +235,183 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String _label(TransactionRequestModel r) =>
       r.statusLabelEs(aliadoViewer: true);
 
+  String _labelGrupo(List<TransactionRequestModel> g) {
+    if (g.isEmpty) return '';
+    final st0 = g.first.status;
+    if (g.every((r) => r.status == st0)) return _label(g.first);
+    return 'Varios estados';
+  }
+
+  bool _grupoPuedeCancelar(List<TransactionRequestModel> g) {
+    return g.isNotEmpty &&
+        g.every(
+          (r) =>
+              r.aliadoPuedeCancelarAntesDeGestionImportadores &&
+              r.status == TransactionRequestStatus.pendiente,
+        );
+  }
+
+  Widget _orderCardFooter(
+    BuildContext context,
+    List<TransactionRequestModel> g,
+  ) {
+    final isMulti = g.length > 1;
+    if (!isMulti) {
+      final r = g.single;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AliadoOrderPagoSection(
+            request: r,
+            profile: _profile,
+            openCreditExposureSum: _openCreditExposureSum,
+            onChanged: _load,
+          ),
+          OrderMotolinkThreadSection(
+            key: ValueKey<String>('trm-aliado-${r.id}'),
+            transactionRequestId: r.id,
+            allowReplyAsAliado: _esEnCurso(r.status),
+            allowReplyAsAdmin: false,
+            onThreadChanged: _load,
+            orderPrecioTotalUsd: r.precioTotal,
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Pago e hilo con MotoLink por importador. Confirma la recepción por cada línea '
+            'cuando la mercancía de ese importador llegue a tu taller.',
+            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800, height: 1.35),
+          ),
+        ),
+        for (var i = 0; i < g.length; i++) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${g[i].ownerBusinessName ?? 'Importador'} · ${g[i].cantidad} uds · '
+              'Total ${formatRefAmount(g[i].precioTotal)} REF',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: Colors.grey.shade900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (g[i].status == TransactionRequestStatus.enTransito ||
+              g[i].status == TransactionRequestStatus.enviado)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: FilledButton.icon(
+                onPressed: _entregaBusyId != null ||
+                        !g[i].transportistaCompletoRecogidaAlmacen
+                    ? null
+                    : () => _confirmarEntrega(context, g[i]),
+                icon: _entregaBusyId == g[i].id
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.inventory_2_outlined, size: 20),
+                label: Text(
+                  _entregaBusyId == g[i].id
+                      ? 'Confirmando…'
+                      : 'Confirmar recepción en tu taller',
+                ),
+              ),
+            ),
+          if ((g[i].status == TransactionRequestStatus.enTransito ||
+                  g[i].status == TransactionRequestStatus.enviado) &&
+              !g[i].transportistaCompletoRecogidaAlmacen) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 18, color: Colors.amber.shade900),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Podrá confirmar esta línea cuando el transportista haya marcado la recogida '
+                          'en el almacén de este importador.',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            height: 1.35,
+                            color: Colors.amber.shade900,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+          AliadoOrderPagoSection(
+            request: g[i],
+            profile: _profile,
+            openCreditExposureSum: _openCreditExposureSum,
+            onChanged: _load,
+          ),
+          OrderMotolinkThreadSection(
+            key: ValueKey<String>('trm-aliado-${g[i].id}'),
+            transactionRequestId: g[i].id,
+            allowReplyAsAliado: _esEnCurso(g[i].status),
+            allowReplyAsAdmin: false,
+            onThreadChanged: _load,
+            orderPrecioTotalUsd: g[i].precioTotal,
+          ),
+          if (i < g.length - 1)
+            Divider(height: 32, thickness: 1, color: Colors.grey.shade300),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildOrderCard(
+    BuildContext context,
+    List<TransactionRequestModel> g,
+  ) {
+    final expandKey = checkoutGroupExpandKey(g);
+    final primary = g.first;
+    final isMulti = g.length > 1;
+    return AliadoExpandableOrderCard(
+      request: primary,
+      checkoutGroupLines: isMulti ? g : null,
+      expanded: _expandedRequestId == expandKey,
+      onToggle: () => _toggleExpand(expandKey),
+      statusLabel: isMulti ? _labelGrupo(g) : _label(primary),
+      onConfirmarRecepcion: isMulti
+          ? null
+          : ((primary.status == TransactionRequestStatus.enTransito ||
+                  primary.status == TransactionRequestStatus.enviado)
+              ? () => _confirmarEntrega(context, primary)
+              : null),
+      confirmarRecepcionBusy: !isMulti && _entregaBusyId == primary.id,
+      onCancelarSolicitudPendiente: _grupoPuedeCancelar(g)
+          ? () => _cancelarGrupoPendiente(context, g)
+          : null,
+      cancelarSolicitudPendienteBusy: _cancelarBusyId == expandKey,
+      expandedFooter: _orderCardFooter(context, g),
+    );
+  }
+
   bool _esEnCurso(String status) =>
       TransactionRequestStatus.aliadoPedidosEnCurso.contains(status);
 
@@ -277,8 +472,12 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     }
 
     final filtered = _filtered;
-    final enCurso = filtered.where((r) => _esEnCurso(r.status)).toList();
-    final cerrados = filtered.where((r) => !_esEnCurso(r.status)).toList();
+    final enCursoGroups = groupAliadoOrdersByCheckout(
+      filtered.where((r) => _esEnCurso(r.status)).toList(),
+    );
+    final cerradosGroups = groupAliadoOrdersByCheckout(
+      filtered.where((r) => !_esEnCurso(r.status)).toList(),
+    );
 
     return Stack(
       children: [
@@ -322,104 +521,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                           children: [
-                            if (enCurso.isNotEmpty) ...[
+                            if (enCursoGroups.isNotEmpty) ...[
                               _sectionTitle('En curso'),
-                              ...enCurso.map(
-                                (r) => AliadoExpandableOrderCard(
-                                  request: r,
-                                  expanded: _expandedRequestId == r.id,
-                                  onToggle: () => _toggleExpand(r.id),
-                                  statusLabel: _label(r),
-                                  onConfirmarRecepcion:
-                                      r.status ==
-                                              TransactionRequestStatus
-                                                  .enTransito
-                                          ? () => _confirmarEntrega(context, r)
-                                          : null,
-                                  confirmarRecepcionBusy:
-                                      _entregaBusyId == r.id,
-                                  onCancelarSolicitudPendiente: r
-                                          .aliadoPuedeCancelarAntesDeGestionImportadores
-                                      ? () => _cancelarPendiente(
-                                            context,
-                                            r,
-                                          )
-                                      : null,
-                                  cancelarSolicitudPendienteBusy:
-                                      _cancelarBusyId == r.id,
-                                  expandedFooter: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      AliadoOrderPagoSection(
-                                        request: r,
-                                        profile: _profile,
-                                        openCreditExposureSum:
-                                            _openCreditExposureSum,
-                                        onChanged: _load,
-                                      ),
-                                      OrderMotolinkThreadSection(
-                                        key: ValueKey<String>(
-                                          'trm-aliado-${r.id}',
-                                        ),
-                                        transactionRequestId: r.id,
-                                        allowReplyAsAliado: _esEnCurso(r.status),
-                                        allowReplyAsAdmin: false,
-                                        onThreadChanged: _load,
-                                        orderPrecioTotalUsd: r.precioTotal,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              ...enCursoGroups.map(
+                                (g) => _buildOrderCard(context, g),
                               ),
                             ],
-                            if (cerrados.isNotEmpty) ...[
+                            if (cerradosGroups.isNotEmpty) ...[
                               _sectionTitle('Cerrados'),
-                              ...cerrados.map(
-                                (r) => AliadoExpandableOrderCard(
-                                  request: r,
-                                  expanded: _expandedRequestId == r.id,
-                                  onToggle: () => _toggleExpand(r.id),
-                                  statusLabel: _label(r),
-                                  onConfirmarRecepcion:
-                                      r.status ==
-                                              TransactionRequestStatus
-                                                  .enTransito
-                                          ? () => _confirmarEntrega(context, r)
-                                          : null,
-                                  confirmarRecepcionBusy:
-                                      _entregaBusyId == r.id,
-                                  onCancelarSolicitudPendiente: r
-                                          .aliadoPuedeCancelarAntesDeGestionImportadores
-                                      ? () => _cancelarPendiente(
-                                            context,
-                                            r,
-                                          )
-                                      : null,
-                                  cancelarSolicitudPendienteBusy:
-                                      _cancelarBusyId == r.id,
-                                  expandedFooter: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      AliadoOrderPagoSection(
-                                        request: r,
-                                        profile: _profile,
-                                        openCreditExposureSum:
-                                            _openCreditExposureSum,
-                                        onChanged: _load,
-                                      ),
-                                      OrderMotolinkThreadSection(
-                                        key: ValueKey<String>(
-                                          'trm-aliado-${r.id}',
-                                        ),
-                                        transactionRequestId: r.id,
-                                        allowReplyAsAliado: _esEnCurso(r.status),
-                                        allowReplyAsAdmin: false,
-                                        onThreadChanged: _load,
-                                        orderPrecioTotalUsd: r.precioTotal,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              ...cerradosGroups.map(
+                                (g) => _buildOrderCard(context, g),
                               ),
                             ],
                           ],

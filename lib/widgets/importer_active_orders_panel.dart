@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
 import 'importer_order_invoice_section.dart';
+import 'importer_order_pago_verification_section.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
@@ -118,6 +119,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         return s == TransactionRequestStatus.pendiente;
       case _ImporterQuickFilter.enProceso:
         return s == TransactionRequestStatus.enPreparacion ||
+            s == TransactionRequestStatus.pedidoListo ||
+            s == TransactionRequestStatus.enTransito ||
             s == TransactionRequestStatus.enviado;
       case _ImporterQuickFilter.cerrados:
         return s == TransactionRequestStatus.entregado ||
@@ -183,12 +186,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     TransactionRequestModel r,
     String next,
   ) async {
-    if (next == TransactionRequestStatus.enviado &&
-        !r.hasProveedorFactura) {
+    if (next == TransactionRequestStatus.enTransito && !r.hasProveedorFactura) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Adjunte la factura del proveedor antes de marcar «Enviado».',
+            'Adjunte la factura del proveedor antes de marcar «En tránsito» (despacho).',
           ),
         ),
       );
@@ -325,9 +327,18 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                               onAdvance: next != null
                                   ? () => _advance(context, r, next)
                                   : null,
-                              expandedFooter: ImporterOrderInvoiceSection(
-                                request: r,
-                                onChanged: _load,
+                              expandedFooter: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  ImporterOrderPagoVerificationSection(
+                                    request: r,
+                                    onChanged: _load,
+                                  ),
+                                  ImporterOrderInvoiceSection(
+                                    request: r,
+                                    onChanged: _load,
+                                  ),
+                                ],
                               ),
                             );
                           },

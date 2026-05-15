@@ -107,6 +107,7 @@ class TransactionRequestModel {
     this.transportistaGestionEtaSetAt,
     this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
     this.facturaUrl,
+    this.checkoutGroupId,
   });
 
   final String id;
@@ -260,6 +261,9 @@ class TransactionRequestModel {
   /// URL pública de factura / documento del importador (`transaction_requests.factura_url`).
   final String? facturaUrl;
 
+  /// Varios ítems del mismo carrito comparten este UUID (`transaction_requests.checkout_group_id`).
+  final String? checkoutGroupId;
+
   /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
   List<MotolinkAllyDocumentEmissionModel> get motolinkAllyInvoicesDescargables =>
       motolinkAllyDocumentEmissions.where((e) => e.isFinalized).toList();
@@ -323,10 +327,14 @@ class TransactionRequestModel {
     return DateTime.now().difference(t) < const Duration(minutes: 12);
   }
 
-  /// Todo lo necesario en almacén antes de seguir ruta al aliado (para copy UI).
+  /// Todo lo necesario en almacén antes de seguir ruta al aliado (p. ej. flujo con transportista asignado en app).
+  /// Sin transportista en plataforma: en `en_transito` el aliado puede confirmar recepción al recibir.
   bool get transportistaCompletoRecogidaAlmacen {
-    if (status != TransactionRequestStatus.enTransito) return false;
-    if (!hasAssignedTransportista) return false;
+    if (status != TransactionRequestStatus.enTransito &&
+        status != TransactionRequestStatus.enviado) {
+      return false;
+    }
+    if (!hasAssignedTransportista) return true;
     if (isMasterOrder && subOrders.isNotEmpty) {
       return subOrders.isNotEmpty &&
           subOrders.every((s) => s.transportistaRecogioEnAlmacen);
@@ -404,10 +412,8 @@ class TransactionRequestModel {
           facturaAliadoStoragePath!.trim().isNotEmpty) ||
       motolinkAllyDocumentEmissions.any((e) => e.isFinalized);
 
-  /// Con factura MotoLink hace falta elegir nota vs factura fiscal antes de pagar.
-  bool get aliadoDebeElegirDocumentTypeAntesDePago =>
-      hasFacturaAliado &&
-      (documentTypePreference == null || documentTypePreference!.trim().isEmpty);
+  /// Negocio nota vs factura fiscal: solo en el chat con el importador (sin selector en app).
+  bool get aliadoDebeElegirDocumentTypeAntesDePago => false;
 
   bool get hasComprobantePago =>
       comprobantePagoStoragePath != null &&
@@ -430,9 +436,12 @@ class TransactionRequestModel {
     return true;
   }
 
-  /// En tránsito con factura pero pago sin aprobar (aviso antes de confirmar recepción).
+  /// En tránsito (o legado enviado) con factura pero pago sin aprobar (aviso antes de confirmar recepción).
   bool get pagoMotolinkPendienteEnTransito {
-    if (status != TransactionRequestStatus.enTransito) return false;
+    if (status != TransactionRequestStatus.enTransito &&
+        status != TransactionRequestStatus.enviado) {
+      return false;
+    }
     if (!hasFacturaAliado) return false;
     final pe = pagoEstadoRevision?.trim();
     if (pe == PagoRevisionEstado.aprobado) return false;
@@ -483,6 +492,9 @@ class TransactionRequestModel {
     }
     if (status == TransactionRequestStatus.rechazado && anuladoPorMotolink) {
       return 'Anulada por MotoLink';
+    }
+    if (aliadoViewer && status == TransactionRequestStatus.entregado) {
+      return 'Recibido';
     }
     return TransactionRequestStatus.labelEs(status);
   }
@@ -819,9 +831,8 @@ class TransactionRequestModel {
     return 'Entrega: otro destino';
   }
 
-  /// `pendiente` si ya hay factura MotoLink pero aún no hay estado persistido.
+  /// `pendiente` si aún no hay estado persistido en servidor.
   String get pagoEstadoRevisionEfectivo {
-    if (!hasFacturaAliado) return PagoRevisionEstado.pendiente;
     final r = pagoEstadoRevision?.trim();
     if (r == null || r.isEmpty) return PagoRevisionEstado.pendiente;
     return r;
@@ -833,15 +844,25 @@ class TransactionRequestModel {
     if (!TransactionRequestStatus.aliadoDeclaracionPagoMultietapa.contains(status)) {
       return null;
     }
-    if (!hasFacturaAliado) {
-      if (status == TransactionRequestStatus.entregado) return null;
-      return 'Tras la factura MotoLink al aliado podrá gestionar el pago aquí; no forma parte del cronograma de envío.';
-    }
     if (status == TransactionRequestStatus.entregado) {
       if (pagoEstadoRevisionEfectivo == PagoRevisionEstado.aprobado) {
-        return 'Entrega confirmada · pago validado por MotoLink.';
+        return 'Entrega confirmada · pago validado por el importador.';
       }
-      return 'Entrega confirmada · pendiente: comprobante o aprobación de pago por MotoLink.';
+      return 'Entrega confirmada · pendiente de validación del pago por el importador.';
+    }
+    if (!hasFacturaAliado) {
+      switch (pagoEstadoRevisionEfectivo) {
+        case PagoRevisionEstado.pendiente:
+          return 'Elija método, pague al importador y adjunte comprobante; el importador verificará la acreditación.';
+        case PagoRevisionEstado.enRevision:
+          return 'Comprobante en revisión por el importador.';
+        case PagoRevisionEstado.rechazado:
+          return 'Comprobante no aceptado · puede enviar otro.';
+        case PagoRevisionEstado.aprobado:
+          return 'Pago confirmado por el importador.';
+        default:
+          return null;
+      }
     }
     final metodo = pagoMetodo?.trim();
     if (metodo == PagoMetodo.efectivo) {
@@ -1090,6 +1111,7 @@ class TransactionRequestModel {
         json['motolink_ally_document_emissions'],
       ),
       facturaUrl: _nullableText(json['factura_url']),
+      checkoutGroupId: _nullableText(json['checkout_group_id']),
     );
   }
 

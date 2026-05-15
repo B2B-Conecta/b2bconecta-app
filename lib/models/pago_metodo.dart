@@ -11,12 +11,21 @@ abstract final class PagoMetodo {
   static const pagoMovil = 'pago_movil';
   static const zelleDivisas = 'zelle_divisas';
   static const transferencia = 'transferencia';
+  static const binance = 'binance';
   static const efectivo = 'efectivo';
 
   /// Línea de crédito MotoLink (solo tras fase contado y con cupo asignado).
   static const creditoSistema = 'credito_sistema';
 
-  static const values = [pagoMovil, zelleDivisas, transferencia, efectivo];
+  /// MotoConecta: única pasarela acordada; verificación por el importador.
+  static const valuesMotoconecta = [
+    zelleDivisas,
+    pagoMovil,
+    binance,
+    transferencia,
+  ];
+
+  static const values = [pagoMovil, zelleDivisas, transferencia, efectivo, binance];
 
   /// Solo durante onboarding (primeras entregas contado): transferencia y efectivo.
   static const valuesFaseContado = [transferencia, efectivo];
@@ -35,9 +44,11 @@ abstract final class PagoMetodo {
       case pagoMovil:
         return 'Pago Móvil';
       case zelleDivisas:
-        return 'Zelle (divisas)';
+        return 'Zelle';
       case transferencia:
         return 'Transferencia';
+      case binance:
+        return 'Binance';
       case efectivo:
         return 'Efectivo';
       case creditoSistema:

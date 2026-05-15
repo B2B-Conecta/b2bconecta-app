@@ -31,6 +31,8 @@ begin
           array[
             'pendiente'::text,
             'en_preparacion'::text,
+            'pedido_listo'::text,
+            'en_transito'::text,
             'enviado'::text
           ]
         )

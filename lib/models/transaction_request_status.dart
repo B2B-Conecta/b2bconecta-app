@@ -13,6 +13,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> aliadoPedidosEnCurso = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
   ];
 
@@ -20,6 +22,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> aliadoPedidosActivosYCerrados = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
     entregado,
     rechazado,
@@ -29,6 +33,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> motoconectaAliadoCreditExposureStatuses = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
   ];
 
@@ -36,6 +42,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> aliadoCreditExposureStatuses = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
   ];
 
@@ -43,6 +51,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> motoconectaAliadoPedidosActivosYCerrados = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
     entregado,
     rechazado,
@@ -52,6 +62,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> motoconectaImporterOrdersUnifiedStatuses = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
     entregado,
     rechazado,
@@ -61,6 +73,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> motoconectaAdminOperationalActive = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
   ];
 
@@ -68,6 +82,8 @@ abstract final class TransactionRequestStatus {
   static const List<String> importerOrdersUnifiedStatuses = [
     pendiente,
     enPreparacion,
+    pedidoListo,
+    enTransito,
     enviado,
     entregado,
     rechazado,
@@ -116,7 +132,7 @@ abstract final class TransactionRequestStatus {
       case enPreparacion:
         return 'En preparación';
       case pedidoListo:
-        return 'Pedido listo';
+        return 'Listo para despacho';
       case enTransito:
         return 'En tránsito';
       case enviado:
@@ -129,13 +145,17 @@ abstract final class TransactionRequestStatus {
   }
 
   /// Siguiente estado que puede aplicar el importador, o null si es terminal.
+  /// Ciclo: pendiente → en preparación → listo para despacho → en tránsito.
   static String? nextForImporter(String current) {
     switch (current) {
       case pendiente:
         return enPreparacion;
       case enPreparacion:
-        return enviado;
+        return pedidoListo;
+      case pedidoListo:
+        return enTransito;
       case enviado:
+      case enTransito:
       case entregado:
       case rechazado:
         return null;
@@ -144,9 +164,9 @@ abstract final class TransactionRequestStatus {
     }
   }
 
-  /// Solo el aliado puede cerrar: `enviado` → `entregado`.
+  /// Solo el aliado cierra: en tránsito (o legado `enviado`) → `entregado` (recibido).
   static String? nextForAliado(String current) {
-    if (current == enviado) return entregado;
+    if (current == enTransito || current == enviado) return entregado;
     return null;
   }
 
@@ -160,9 +180,9 @@ abstract final class TransactionRequestStatus {
       case enPreparacion:
         return 'Marcar en preparación';
       case pedidoListo:
-        return 'Marcar pedido listo para recolección';
+        return 'Marcar listo para despacho';
       case enTransito:
-        return 'Marcar en tránsito';
+        return 'Marcar en tránsito (despachado)';
       case enviado:
         return 'Marcar enviado';
       case entregado:
@@ -178,8 +198,12 @@ abstract final class TransactionRequestStatus {
         return 'Pedido cerrado';
       case rechazado:
         return '—';
+      case pedidoListo:
+        return 'Listo para despacho · coordine el transporte';
+      case enTransito:
+        return 'En tránsito · el aliado confirma la recepción';
       case enviado:
-        return 'Enviado · el aliado confirma la recepción';
+        return 'En ruta · el aliado confirma la recepción';
       case enPreparacion:
         return 'En preparación';
       case pendiente:
@@ -199,8 +223,12 @@ abstract final class TransactionRequestStatus {
         return 'Pendiente · el importador confirmará preparación';
       case enPreparacion:
         return 'Tu pedido se está preparando';
+      case pedidoListo:
+        return 'Listo para despacho · esperando salida';
+      case enTransito:
+        return 'En camino · confirma al recibir en tu taller';
       case enviado:
-        return 'Enviado · confirma la recepción cuando llegue';
+        return 'En ruta · confirma la recepción cuando llegue';
       case entregado:
         return 'Pedido completado';
       case rechazado:

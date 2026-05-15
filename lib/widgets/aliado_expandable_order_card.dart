@@ -14,6 +14,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   const AliadoExpandableOrderCard({
     super.key,
     required this.request,
+    this.checkoutGroupLines,
     required this.expanded,
     required this.onToggle,
     required this.statusLabel,
@@ -25,6 +26,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   });
 
   final TransactionRequestModel request;
+  /// Varias filas del mismo carrito (mismo `checkout_group_id`). Si es una sola fila, dejar null.
+  final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
   final VoidCallback onToggle;
   final String statusLabel;
@@ -38,14 +41,32 @@ class AliadoExpandableOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lines = (checkoutGroupLines != null && checkoutGroupLines!.isNotEmpty)
+        ? checkoutGroupLines!
+        : <TransactionRequestModel>[request];
+    final isCheckoutGroup = lines.length > 1;
     final r = request;
     final puedeConfirmarRecepcion = r.transportistaCompletoRecogidaAlmacen;
-    final tracking = TransactionRequestStatus.aliadoTrackingHeadline(
-      r.status,
-      canceladoPorAliado: r.canceladoPorAliado,
-      anuladoPorMotolink: r.anuladoPorMotolink,
-    );
-    final showHeadline = tracking.isNotEmpty && tracking != '—';
+    final String tracking;
+    final bool showHeadline;
+    if (isCheckoutGroup) {
+      final sameStatus = lines.every((x) => x.status == lines.first.status);
+      tracking = sameStatus
+          ? TransactionRequestStatus.aliadoTrackingHeadline(
+              lines.first.status,
+              canceladoPorAliado: lines.first.canceladoPorAliado,
+              anuladoPorMotolink: lines.first.anuladoPorMotolink,
+            )
+          : 'Varias líneas en distinto estado';
+      showHeadline = tracking.isNotEmpty && tracking != '—';
+    } else {
+      tracking = TransactionRequestStatus.aliadoTrackingHeadline(
+        r.status,
+        canceladoPorAliado: r.canceladoPorAliado,
+        anuladoPorMotolink: r.anuladoPorMotolink,
+      );
+      showHeadline = tracking.isNotEmpty && tracking != '—';
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -72,11 +93,14 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 11,
-                                color: r.status == TransactionRequestStatus.rechazado
-                                    ? Colors.red.shade800
-                                    : r.status == TransactionRequestStatus.entregado
-                                        ? Colors.green.shade800
-                                        : AppColors.brandBlue,
+                                color: isCheckoutGroup &&
+                                        !lines.every((x) => x.status == lines.first.status)
+                                    ? AppColors.brandBlue
+                                    : r.status == TransactionRequestStatus.rechazado
+                                        ? Colors.red.shade800
+                                        : r.status == TransactionRequestStatus.entregado
+                                            ? Colors.green.shade800
+                                            : AppColors.brandBlue,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -85,7 +109,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  r.tituloFichaPrincipalPedido,
+                                  isCheckoutGroup
+                                      ? 'Pedido multi-importador (${lines.length} líneas)'
+                                      : r.tituloFichaPrincipalPedido,
                                   maxLines: expanded ? 3 : 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -107,7 +133,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          if (!r.isMasterOrder && r.productSku != null) ...[
+                          if (!isCheckoutGroup &&
+                              !r.isMasterOrder &&
+                              r.productSku != null) ...[
                             const SizedBox(height: 2),
                             Text(
                               'SKU: ${r.productSku}',
@@ -119,21 +147,25 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           ],
                           const SizedBox(height: 4),
                           Text(
-                            r.isMasterOrder
-                                ? '${r.subOrders.isEmpty ? 0 : r.subOrders.length} '
-                                    '${r.subOrders.length == 1 ? "importador" : "importadores"} · '
-                                    '${r.totalUnidadesAliado} uds · Total REF '
-                                    '${formatRefAmount(r.precioTotal)}'
-                                    '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}'
-                                : '${r.cantidad} uds · Total estimado '
-                                    '${formatRefAmount(r.precioTotal)} REF',
+                            isCheckoutGroup
+                                ? _checkoutGroupResumen(lines)
+                                : (r.isMasterOrder
+                                    ? '${r.subOrders.isEmpty ? 0 : r.subOrders.length} '
+                                        '${r.subOrders.length == 1 ? "importador" : "importadores"} · '
+                                        '${r.totalUnidadesAliado} uds · Total REF '
+                                        '${formatRefAmount(r.precioTotal)}'
+                                        '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}'
+                                    : '${r.cantidad} uds · Total estimado '
+                                        '${formatRefAmount(r.precioTotal)} REF'),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          if (r.isMasterOrder && r.subOrders.isNotEmpty) ...[
+                          if (!isCheckoutGroup &&
+                              r.isMasterOrder &&
+                              r.subOrders.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(
                               '${r.subOrders.length} almacén(es) · '
@@ -147,14 +179,14 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           ],
                           const SizedBox(height: 4),
                           Text(
-                            r.destinoEntregaLineaCompactaEs,
+                            lines.first.destinoEntregaLineaCompactaEs,
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey.shade700,
                               height: 1.25,
                             ),
                           ),
-                          if (r.aliadoPagoEstadoResumenEs != null) ...[
+                          if (!isCheckoutGroup && r.aliadoPagoEstadoResumenEs != null) ...[
                             const SizedBox(height: 4),
                             Text(
                               r.aliadoPagoEstadoResumenEs!,
@@ -166,7 +198,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (r.pedidoEntregadoYPagado) ...[
+                          if (!isCheckoutGroup && r.pedidoEntregadoYPagado) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -186,7 +218,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
+                          ] else if (!isCheckoutGroup && r.pagoMotolinkPendienteTrasEntrega) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -230,7 +262,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ],
-                          if (r.status == TransactionRequestStatus.enTransito &&
+                          if (!isCheckoutGroup &&
+                              r.status == TransactionRequestStatus.enTransito &&
                               r.hasTransitEta) ...[
                             const SizedBox(height: 4),
                             Text(
@@ -242,7 +275,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
+                          if (!isCheckoutGroup && r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
                             const SizedBox(height: 4),
                             Text(
                               'Crédito MotoLink asignado: '
@@ -266,8 +299,13 @@ class AliadoExpandableOrderCard extends StatelessWidget {
               ),
             ),
             ),
-          if (r.status == TransactionRequestStatus.pendiente &&
-              onCancelarSolicitudPendiente != null) ...[
+          if (onCancelarSolicitudPendiente != null &&
+              (!isCheckoutGroup
+                  ? r.status == TransactionRequestStatus.pendiente
+                  : lines.every(
+                      (l) =>
+                          l.status == TransactionRequestStatus.pendiente,
+                    ))) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
               child: OutlinedButton.icon(
@@ -284,7 +322,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                 label: Text(
                   cancelarSolicitudPendienteBusy
                       ? 'Cancelando…'
-                      : 'Cancelar solicitud (antes de aprobarse)',
+                      : isCheckoutGroup
+                          ? 'Cancelar todas las solicitudes (antes de aprobarse)'
+                          : 'Cancelar solicitud (antes de aprobarse)',
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red.shade800,
@@ -303,7 +343,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
               ),
             ),
           ],
-          if (onConfirmarRecepcion != null)
+          if (!isCheckoutGroup && onConfirmarRecepcion != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               child: Column(
@@ -329,7 +369,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           : 'Confirmar recepción en tu taller',
                     ),
                   ),
-                  if (r.status == TransactionRequestStatus.enTransito &&
+                  if ((r.status == TransactionRequestStatus.enTransito ||
+                          r.status == TransactionRequestStatus.enviado) &&
                       !puedeConfirmarRecepcion) ...[
                     const SizedBox(height: 8),
                     Material(
@@ -401,29 +442,78 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        TransactionRequestImporterContactSection(request: r),
-                        const SizedBox(height: 12),
-                        TransactionRequestDestinoEntregaSection(
-                          request: r,
-                        ),
-                        const SizedBox(height: 12),
-                        CourierTimelineWidget(request: r, compact: true),
-                        if (r.status == TransactionRequestStatus.enTransito) ...[
+                        if (isCheckoutGroup) ...[
+                          TransactionRequestDestinoEntregaSection(
+                            request: lines.first,
+                          ),
                           const SizedBox(height: 12),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.teal.shade50.withOpacity(0.45),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.teal.shade100),
+                          for (var i = 0; i < lines.length; i++) ...[
+                            if (i > 0) ...[
+                              Divider(height: 1, color: Colors.grey.shade300),
+                              const SizedBox(height: 12),
+                            ],
+                            _CheckoutGroupLineHeading(line: lines[i]),
+                            const SizedBox(height: 10),
+                            TransactionRequestImporterContactSection(
+                              request: lines[i],
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: TransportistaRecogidaAlmacenSection(
-                                request: r,
-                                viewerRole: AppHomeRole.aliado,
+                            const SizedBox(height: 12),
+                            CourierTimelineWidget(
+                              request: lines[i],
+                              compact: true,
+                              viewerRole: AppHomeRole.aliado,
+                            ),
+                            if (lines[i].status ==
+                                TransactionRequestStatus.enTransito) ...[
+                              const SizedBox(height: 12),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color:
+                                      Colors.teal.shade50.withOpacity(0.45),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border:
+                                      Border.all(color: Colors.teal.shade100),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: TransportistaRecogidaAlmacenSection(
+                                    request: lines[i],
+                                    viewerRole: AppHomeRole.aliado,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ] else ...[
+                          TransactionRequestImporterContactSection(request: r),
+                          const SizedBox(height: 12),
+                          TransactionRequestDestinoEntregaSection(
+                            request: r,
+                          ),
+                          const SizedBox(height: 12),
+                          CourierTimelineWidget(
+                            request: r,
+                            compact: true,
+                            viewerRole: AppHomeRole.aliado,
+                          ),
+                          if (r.status ==
+                              TransactionRequestStatus.enTransito) ...[
+                            const SizedBox(height: 12),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50.withOpacity(0.45),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.teal.shade100),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: TransportistaRecogidaAlmacenSection(
+                                  request: r,
+                                  viewerRole: AppHomeRole.aliado,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),
@@ -436,6 +526,73 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
+  if (lines.isEmpty) return '';
+  final uds = lines.fold<int>(0, (a, r) => a + r.cantidad);
+  final totalRef = lines.fold<double>(0, (a, r) => a + r.precioTotal);
+  final imp = lines.length;
+  final buf = StringBuffer(
+    '$imp ${imp == 1 ? "importador" : "importadores"} · $uds uds · '
+    'Total REF ${formatRefAmount(totalRef)}',
+  );
+  final bsVals = lines.map((r) => r.precioTotalBsUi).whereType<double>().toList();
+  if (bsVals.length == lines.length && bsVals.isNotEmpty) {
+    final sumBs = bsVals.fold<double>(0, (a, b) => a + b);
+    buf.write(' · ~${formatVesAmount(sumBs)} Bs');
+  }
+  return buf.toString();
+}
+
+class _CheckoutGroupLineHeading extends StatelessWidget {
+  const _CheckoutGroupLineHeading({required this.line});
+
+  final TransactionRequestModel line;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          line.ownerBusinessName ?? 'Importador',
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          line.tituloFichaPrincipalPedido,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        if (line.productSku != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            'SKU: ${line.productSku}',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+          ),
+        ],
+        const SizedBox(height: 2),
+        Text(
+          '${line.cantidad} uds · Total REF ${formatRefAmount(line.precioTotal)}',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+      ],
     );
   }
 }

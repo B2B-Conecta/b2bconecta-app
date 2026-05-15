@@ -35,7 +35,7 @@ class _CartScreenState extends State<CartScreen> {
     if (_tasa == null) {
       SupabaseService.fetchGlobalTasaBcv().then((v) {
         if (mounted) setState(() => _tasa = v);
-      });
+      }).catchError((_) {});
     }
   }
 

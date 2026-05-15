@@ -11,15 +11,23 @@ import '../utils/app_date_format.dart';
 bool _recibidoDoneMotoconecta(TransactionRequestModel r) {
   return r.atEnPreparacion != null ||
       r.status == TransactionRequestStatus.enPreparacion ||
+      r.status == TransactionRequestStatus.pedidoListo ||
+      r.status == TransactionRequestStatus.enTransito ||
       r.status == TransactionRequestStatus.enviado ||
       r.status == TransactionRequestStatus.entregado;
 }
 
-String _recibidoSubtitle(TransactionRequestModel r) {
+String _recibidoSubtitle(TransactionRequestModel r, {AppHomeRole? viewerRole}) {
   if (_recibidoDoneMotoconecta(r)) {
-    return 'Importador confirmó el pedido al iniciar la preparación';
+    if (viewerRole == AppHomeRole.importador) {
+      return 'Importador confirmó el pedido al iniciar la preparación';
+    }
+    return 'El importador tomó el pedido y está en preparación.';
   }
-  return 'Pedido nuevo en su bandeja · marque «En preparación» cuando confirme stock';
+  if (viewerRole == AppHomeRole.importador) {
+    return 'Pedido nuevo en su bandeja · marque «En preparación» cuando confirme stock';
+  }
+  return 'Solicitud enviada · el importador confirmará y preparará el pedido.';
 }
 
 DateTime? _recibidoAt(TransactionRequestModel r) {
@@ -31,6 +39,52 @@ DateTime? _recibidoAt(TransactionRequestModel r) {
 
 bool _recibidoDone(TransactionRequestModel r) {
   return _recibidoDoneMotoconecta(r);
+}
+
+/// MotoConecta sin columnas `at_*` populadas: decide pasos completados según [TransactionRequestModel.status].
+int _motoconectaTimelineRank(String status) {
+  switch (status) {
+    case TransactionRequestStatus.pendiente:
+      return 0;
+    case TransactionRequestStatus.enPreparacion:
+      return 1;
+    case TransactionRequestStatus.pedidoListo:
+      return 2;
+    case TransactionRequestStatus.enTransito:
+    case TransactionRequestStatus.enviado:
+      return 3;
+    case TransactionRequestStatus.entregado:
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+bool _pasoPreparacionHecho(TransactionRequestModel r) {
+  if (r.atEnPreparacion != null) return true;
+  return _motoconectaTimelineRank(r.status) >= 2;
+}
+
+bool _pasoListoHecho(TransactionRequestModel r) {
+  if (r.atPedidoListo != null) return true;
+  return _motoconectaTimelineRank(r.status) >= 3;
+}
+
+bool _pasoEnCaminoHecho(TransactionRequestModel r) {
+  if (r.atEnTransito != null) return true;
+  return _motoconectaTimelineRank(r.status) >= 4;
+}
+
+bool _pasoEntregadoHecho(TransactionRequestModel r) {
+  if (r.atEntregado != null) return true;
+  return r.status == TransactionRequestStatus.entregado;
+}
+
+/// Barra superior: avance por fase actual (en preparación ≈ 40 %), no solo pasos con `done`.
+double _timelineBarProgress(TransactionRequestModel r) {
+  if (r.status == TransactionRequestStatus.rechazado) return 0;
+  final rank = _motoconectaTimelineRank(r.status);
+  return (rank.clamp(0, 4) + 1) / 5.0;
 }
 
 String _enPreparacionSubtitle(
@@ -67,8 +121,10 @@ String _enPreparacionSubtitle(
 }
 
 String _enCaminoRecogidaSubtitle(TransactionRequestModel r) {
-  if (r.status != TransactionRequestStatus.enTransito) {
-    return 'En tránsito hacia el aliado';
+  final enRuta = r.status == TransactionRequestStatus.enTransito ||
+      r.status == TransactionRequestStatus.enviado;
+  if (!enRuta) {
+    return 'Avance al marcar «En tránsito» (despacho) en Pedidos.';
   }
   if (r.isMasterOrder && r.subOrders.isNotEmpty) {
     final done = r.subOrdersRecogidasAlmacenCount;
@@ -103,7 +159,7 @@ String _listoParaDespachoSubtitle(TransactionRequestModel r) {
     }
     return 'Importadores: $done/$total listos para recolección · faltan ${total - done}';
   }
-  return 'Listo para recolección (importador)';
+  return 'Listo para despacho; adjunte factura si aún no lo hizo antes de marcar en tránsito.';
 }
 
 /// Línea de tiempo visual estilo courier (FedEx/DHL) para el ciclo logístico del pedido.
@@ -152,7 +208,7 @@ class CourierTimelineWidget extends StatelessWidget {
       _CourierStep(
         icon: Icons.inventory_2_outlined,
         title: 'Recibido',
-        subtitle: _recibidoSubtitle(r),
+        subtitle: _recibidoSubtitle(r, viewerRole: viewerRole),
         at: _recibidoAt(r),
         done: _recibidoDone(r),
         current: r.status == TransactionRequestStatus.pendiente,
@@ -162,7 +218,7 @@ class CourierTimelineWidget extends StatelessWidget {
         title: 'En preparación',
         subtitle: _enPreparacionSubtitle(r, viewerRole: viewerRole),
         at: r.atEnPreparacion,
-        done: r.atEnPreparacion != null,
+        done: _pasoPreparacionHecho(r),
         current: r.status == TransactionRequestStatus.enPreparacion,
       ),
       _CourierStep(
@@ -170,7 +226,7 @@ class CourierTimelineWidget extends StatelessWidget {
         title: 'Listo para despacho',
         subtitle: _listoParaDespachoSubtitle(r),
         at: r.atPedidoListo,
-        done: r.atPedidoListo != null,
+        done: _pasoListoHecho(r),
         current: r.status == TransactionRequestStatus.pedidoListo,
       ),
       _CourierStep(
@@ -178,8 +234,9 @@ class CourierTimelineWidget extends StatelessWidget {
         title: 'En camino',
         subtitle: _enCaminoRecogidaSubtitle(r),
         at: r.atEnTransito,
-        done: r.atEnTransito != null,
-        current: r.status == TransactionRequestStatus.enTransito,
+        done: _pasoEnCaminoHecho(r),
+        current: r.status == TransactionRequestStatus.enTransito ||
+            r.status == TransactionRequestStatus.enviado,
         trailing: r.status == TransactionRequestStatus.enTransito &&
                 r.hasAdminRutaMapsUrl &&
                 viewerRole != AppHomeRole.transportista
@@ -199,10 +256,12 @@ class CourierTimelineWidget extends StatelessWidget {
         title: 'Entregado',
         subtitle: 'Cierre en taller del aliado',
         at: r.atEntregado,
-        done: r.atEntregado != null,
+        done: _pasoEntregadoHecho(r),
         current: r.status == TransactionRequestStatus.entregado,
       ),
     ];
+
+    final barProgress = _timelineBarProgress(r);
 
     final headingSize = compact ? 12.5 : 13.5;
     return Column(
@@ -235,7 +294,11 @@ class CourierTimelineWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _ProgressBar(steps: steps, compact: compact),
+                _ProgressBar(
+                  steps: steps,
+                  compact: compact,
+                  progressValue: barProgress,
+                ),
                 SizedBox(height: compact ? 10 : 14),
                 ...List.generate(steps.length, (i) {
                   final s = steps[i];
@@ -358,15 +421,19 @@ class _CourierStep {
 }
 
 class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.steps, required this.compact});
+  const _ProgressBar({
+    required this.steps,
+    required this.compact,
+    required this.progressValue,
+  });
 
   final List<_CourierStep> steps;
   final bool compact;
+  final double progressValue;
 
   @override
   Widget build(BuildContext context) {
-    final doneCount = steps.where((s) => s.done).length;
-    final progress = steps.isEmpty ? 0.0 : doneCount / steps.length;
+    final progress = progressValue.clamp(0.0, 1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

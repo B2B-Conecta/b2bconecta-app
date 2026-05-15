@@ -320,9 +320,17 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon = Icons.payments_outlined;
         bg = Colors.red.shade700;
         break;
+      case 'supervision':
+        icon = Icons.admin_panel_settings_outlined;
+        bg = Colors.indigo.shade700;
+        break;
       case 'mensaje':
         icon = Icons.chat_bubble_outline;
         bg = AppColors.brandBlue;
+        break;
+      case 'pedido':
+        icon = Icons.local_shipping_outlined;
+        bg = AppColors.brand;
         break;
       case 'envio':
       case 'logistica':

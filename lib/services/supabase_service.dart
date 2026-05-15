@@ -777,6 +777,17 @@ class SupabaseService {
     proveedor_factura_file_name,
     proveedor_factura_submitted_at,
     tiempo_estimado_envio,
+    pago_metodo,
+    comprobante_pago_storage_path,
+    comprobante_pago_file_name,
+    comprobante_pago_submitted_at,
+    pago_estado_revision,
+    pago_comprobante_rechazo_nota,
+    pago_aprobado_at,
+    destino_entrega_usa_perfil,
+    destino_entrega_texto,
+    destino_entrega_maps_url,
+    checkout_group_id,
     created_at,
     updated_at,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
@@ -1500,16 +1511,20 @@ class SupabaseService {
 
   /// Tasa BCV configurada (solo lectura; usar [TransactionRequestModel.tasaBcvSnapshot] por pedido).
   static Future<double?> fetchGlobalTasaBcv() async {
-    final row = await _client
-        .from('app_global_config')
-        .select('value_numeric')
-        .eq('key', 'tasa_bcv')
-        .maybeSingle();
-    if (row == null) return null;
-    final m = Map<String, dynamic>.from(row);
-    final v = m['value_numeric'];
-    if (v is num) return v.toDouble();
-    return double.tryParse(v?.toString() ?? '');
+    try {
+      final row = await _client
+          .from('app_global_config')
+          .select('value_numeric')
+          .eq('key', 'tasa_bcv')
+          .maybeSingle();
+      if (row == null) return null;
+      final m = Map<String, dynamic>.from(row);
+      final v = m['value_numeric'];
+      if (v is num) return v.toDouble();
+      return double.tryParse(v?.toString() ?? '');
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<void> adminSetTasaBcv(double tasa) async {
@@ -1948,7 +1963,7 @@ class SupabaseService {
       final pe = m['pago_estado_revision']?.toString().trim();
       if (pe == PagoRevisionEstado.aprobado) {
         throw StateError(
-          'El pago ya fue aprobado por MotoLink; no puede modificar el comprobante.',
+          'El pago ya fue confirmado; no puede modificar el comprobante.',
         );
       }
       final oldPath =
@@ -1986,6 +2001,23 @@ class SupabaseService {
       } catch (_) {}
       rethrow;
     }
+  }
+
+  /// Importador: aprueba o rechaza el comprobante registrado por el aliado (`importador_set_pago_revision_estado`).
+  static Future<void> importadorSetPagoRevisionEstado({
+    required String transactionRequestId,
+    required String nuevoEstado,
+    String? rechazoNota,
+  }) async {
+    if (_currentUserId == null) throw StateError('No hay sesión activa.');
+    await _client.rpc(
+      'importador_set_pago_revision_estado',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_nuevo_estado': nuevoEstado,
+        'p_rechazo_nota': rechazoNota,
+      },
+    );
   }
 
   /// Aliado: solicita pago con línea de crédito MotoLink (sin archivo; revisión admin).
@@ -2361,9 +2393,11 @@ class SupabaseService {
     }
     final st = m['status']?.toString();
     if (st != TransactionRequestStatus.pendiente &&
-        st != TransactionRequestStatus.enPreparacion) {
+        st != TransactionRequestStatus.enPreparacion &&
+        st != TransactionRequestStatus.pedidoListo) {
       throw StateError(
-        'Solo puede adjuntar la factura mientras el pedido está pendiente o en preparación.',
+        'Solo puede adjuntar o actualizar la factura mientras el pedido está pendiente, '
+        'en preparación o listo para despacho (antes de marcar en tránsito).',
       );
     }
 
@@ -2951,8 +2985,8 @@ class SupabaseService {
     return null;
   }
 
-  /// Avanza el estado del pedido (importador): `aprobado_admin` → `en_preparacion`,
-  /// `en_preparacion` → `pedido_listo`. El tránsito lo marca MotoLink (RPC).
+  /// Avanza el estado del pedido (importador): pendiente → preparación → listo para despacho
+  /// → en tránsito (despacho).
   /// Con [importerSubOrderId] (pedido maestro), actualiza el sub-pedido vía RPC.
   static Future<void> importerAdvanceTransactionRequest({
     required String id,

@@ -95,12 +95,11 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     TransactionRequestModel r,
     String next,
   ) async {
-    if (next == TransactionRequestStatus.enviado &&
-        !r.hasProveedorFactura) {
+    if (next == TransactionRequestStatus.enTransito && !r.hasProveedorFactura) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Adjunte la factura del proveedor antes de marcar «Enviado».',
+            'Adjunte la factura del proveedor antes de marcar «En tránsito» (despacho).',
           ),
         ),
       );

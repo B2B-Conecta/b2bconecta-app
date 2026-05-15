@@ -47,7 +47,8 @@ class _ImporterOrderInvoiceSectionState
   Future<void> _pickAndUploadProveedor(BuildContext context) async {
     final r = widget.request;
     final okStatus = r.status == TransactionRequestStatus.pendiente ||
-        r.status == TransactionRequestStatus.enPreparacion;
+        r.status == TransactionRequestStatus.enPreparacion ||
+        r.status == TransactionRequestStatus.pedidoListo;
     if (!okStatus) return;
 
     final result = await FilePicker.platform.pickFiles(
@@ -97,7 +98,8 @@ class _ImporterOrderInvoiceSectionState
   Widget build(BuildContext context) {
     final r = widget.request;
     final editable = r.status == TransactionRequestStatus.pendiente ||
-        r.status == TransactionRequestStatus.enPreparacion;
+        r.status == TransactionRequestStatus.enPreparacion ||
+        r.status == TransactionRequestStatus.pedidoListo;
     if (!editable && !r.hasProveedorFactura) {
       return const SizedBox.shrink();
     }
@@ -120,7 +122,8 @@ class _ImporterOrderInvoiceSectionState
         Text(
           soloLectura
               ? 'Archivo adjunto · solo consulta.'
-              : 'Adjunte PDF o imagen antes de marcar el pedido como enviado.',
+              : 'Adjunte PDF o imagen en preparación o al marcar listo para despacho; '
+                  'lo pediremos antes de indicar «En tránsito».',
           style: TextStyle(
             fontSize: 11,
             height: 1.35,

@@ -558,15 +558,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       IconButton(
                         icon: const Icon(Icons.shopping_cart_outlined),
                         color: AppColors.textSecondary,
-                        onPressed: () async {
-                          final tasa =
-                              await SupabaseService.fetchGlobalTasaBcv();
-                          if (!context.mounted) return;
-                          await Navigator.of(context).push<bool>(
+                        onPressed: () {
+                          Navigator.of(context).push<bool>(
                             MaterialPageRoute(
                               builder: (_) => CartScreen(
                                 profile: widget.profile,
-                                liveTasaBcv: tasa,
+                                liveTasaBcv: null,
                               ),
                             ),
                           );

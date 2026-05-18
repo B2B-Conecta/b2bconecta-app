@@ -21,7 +21,6 @@ class AliadoOrderPagoSection extends StatefulWidget {
     required this.request,
     required this.onChanged,
     this.profile,
-    this.openCreditExposureSum,
     this.suppressExperience = false,
     this.suppressPrimaryTitle = false,
     this.suppressNegotiationIntro = false,
@@ -34,11 +33,8 @@ class AliadoOrderPagoSection extends StatefulWidget {
   final VoidCallback onChanged;
   final ProfileModel? profile;
 
-  /// Líneas del mismo proveedor a actualizar con el mismo comprobante (pago MotoConecta sin crédito).
+  /// Líneas del mismo proveedor a actualizar con el mismo comprobante.
   final List<TransactionRequestModel>? pagoBundleLines;
-
-  /// Suma de `precio_total` de pedidos abiertos del aliado (misma regla que el cupo en servidor).
-  final double? openCreditExposureSum;
 
   /// Si es true, no muestra [AliadoOrderExperienceSection] (el padre muestra una valoración por proveedor).
   final bool suppressExperience;
@@ -58,7 +54,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   bool _busy = false;
   final Map<String, String> _metodoPorCuotaId = {};
 
-  /// MotoConecta: Zelle, Pago Móvil, Binance y transferencia (verificación por el importador).
+  /// MotoConecta: Zelle, Pago Móvil, Binance, transferencia y efectivo (verificación por el importador).
   List<String> get _metodosPermitidos => PagoMetodo.valuesMotoconecta;
 
   void _syncMetodoSeleccionado() {
@@ -85,8 +81,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
     if (oldWidget.request.id != widget.request.id ||
         oldWidget.profile?.primerosPedidosContadoEntregados !=
-            widget.profile?.primerosPedidosContadoEntregados ||
-        oldWidget.profile?.creditLimit != widget.profile?.creditLimit) {
+            widget.profile?.primerosPedidosContadoEntregados) {
       _syncMetodoSeleccionado();
     }
   }
@@ -333,8 +328,8 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               children: [
                 Text(
                   r.creditPlanType == 1
-                      ? 'Pago al contado acordado con MotoLink (1 cuota).'
-                      : 'Plan de ${r.creditPlanType} cuotas acordado con MotoLink (venc. cada 15 días, desde la fecha de registro).',
+                      ? 'Pago al contado acordado con el importador (1 cuota).'
+                      : 'Plan de ${r.creditPlanType} cuotas acordado con el importador (venc. cada 15 días).',
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -345,7 +340,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 if (r.creditPlanConfirmedAt != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Plan confirmado: ${formatEsShortDateTime(r.creditPlanConfirmedAt)} (fecha/hora al formalizar con MotoLink).',
+                    'Plan confirmado: ${formatEsShortDateTime(r.creditPlanConfirmedAt)}.',
                     style: TextStyle(
                       fontSize: 10.5,
                       fontStyle: FontStyle.italic,
@@ -357,22 +352,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 if (r.saldoPendienteRealConPlan != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Saldo pendiente real: ${formatRefAmount(r.saldoPendienteRealConPlan!)} REF (total menos cuotas aprobadas por MotoLink).',
+                    'Saldo pendiente: ${formatRefAmount(r.saldoPendienteRealConPlan!)} REF (total menos cuotas verificadas por el importador).',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       color: Colors.indigo.shade900,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-                if (r.creditMontoBloqueado != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Monto vinculado a su cupo: ${formatRefAmount(r.creditMontoBloqueado!)} REF al formalizar el plan.',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: Colors.blueGrey.shade800,
                       height: 1.3,
                     ),
                   ),
@@ -652,7 +636,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Zelle, Pago Móvil, Binance o transferencia; el importador verifica.',
+                'Zelle, Pago Móvil, Binance, transferencia o efectivo; el importador verifica.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,

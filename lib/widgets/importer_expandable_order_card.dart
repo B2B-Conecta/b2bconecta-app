@@ -6,8 +6,8 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'courier_timeline_widget.dart';
-import 'transportista_recogida_almacen_section.dart';
 import 'importer_aliado_solicitud_section.dart';
+import 'order_motolink_thread_section.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para importador: resumen, acción rápida, detalle con aliado y fechas.
@@ -24,6 +24,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.nextActionLabel,
     this.onAdvance,
     this.expandedFooter,
+    this.onThreadChanged,
   });
 
   final TransactionRequestModel request;
@@ -38,6 +39,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final String? nextActionLabel;
   final VoidCallback? onAdvance;
   final Widget? expandedFooter;
+  final VoidCallback? onThreadChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +102,19 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 color: r.status == TransactionRequestStatus.entregado
                                     ? Colors.green.shade800
                                     : AppColors.brandBlue,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          if (r.hasTransitEta &&
+                              (r.status == TransactionRequestStatus.enTransito ||
+                                  r.status == TransactionRequestStatus.enviado)) ...[
+                            Text(
+                              'ETA al taller: ${r.transitEtaResumenEs}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.teal.shade800,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -317,27 +332,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                            for (var li = 0; li < lines.length; li++) ...[
-                              if (transportistaRecogidaAlmacenSectionVisible(
-                                lines[li],
-                              )) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  lines[li].etiquetaGestionLineaImportador(uid),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TransportistaRecogidaAlmacenCard(
-                                  request: lines[li],
-                                  viewerRole: AppHomeRole.importador,
-                                ),
-                              ],
-                            ],
                           ] else ...[
                             const Text(
                               'Seguimiento del envío',
@@ -366,15 +360,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 viewerRole: AppHomeRole.importador,
                                 showHeading: false,
                               ),
-                              if (transportistaRecogidaAlmacenSectionVisible(
-                                lines[li],
-                              )) ...[
-                                const SizedBox(height: 12),
-                                TransportistaRecogidaAlmacenCard(
-                                  request: lines[li],
-                                  viewerRole: AppHomeRole.importador,
-                                ),
-                              ],
                             ],
                           ],
                         ] else ...[
@@ -398,14 +383,47 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             viewerRole: AppHomeRole.importador,
                             showHeading: true,
                           ),
-                          if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
-                            const SizedBox(height: 12),
-                            TransportistaRecogidaAlmacenCard(
-                              request: r,
-                              viewerRole: AppHomeRole.importador,
-                            ),
-                          ],
                         ],
+                        const SizedBox(height: 12),
+                        OrderMotolinkThreadSection(
+                          key: ValueKey<String>(
+                            isCheckoutGroup
+                                ? 'trm-imp-merge-${lines.map((e) => e.id).join("-")}'
+                                : 'trm-imp-${r.id}',
+                          ),
+                          transactionRequestId: lines.first.id,
+                          mergedThreadRequestIds: isCheckoutGroup
+                              ? lines.map((e) => e.id).toList()
+                              : null,
+                          allowReplyAsAliado: false,
+                          allowReplyAsAdmin: false,
+                          allowReplyAsImportador: lines.any(
+                            (l) =>
+                                l.status !=
+                                    TransactionRequestStatus.entregado &&
+                                l.status !=
+                                    TransactionRequestStatus.rechazado,
+                          ),
+                          allowManageCreditPlan: lines.any(
+                            (l) =>
+                                l.status !=
+                                    TransactionRequestStatus.entregado &&
+                                l.status !=
+                                    TransactionRequestStatus.rechazado,
+                          ),
+                          orderPrecioTotalUsd: isCheckoutGroup
+                              ? lines.fold<double>(
+                                  0,
+                                  (s, l) => s + l.precioTotal,
+                                )
+                              : r.precioTotal,
+                          creditPlanRescheduleLocked: isCheckoutGroup
+                              ? lines.every(
+                                  (l) => l.creditPlanLockedForAdminReschedule,
+                                )
+                              : r.creditPlanLockedForAdminReschedule,
+                          onThreadChanged: onThreadChanged,
+                        ),
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),
                           expandedFooter!,

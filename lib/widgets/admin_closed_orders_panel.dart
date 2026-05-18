@@ -213,9 +213,6 @@ class _AdminClosedOrdersPanelState extends State<AdminClosedOrdersPanel> {
                                     allowReplyAsAliado: false,
                                     allowReplyAsAdmin: true,
                                     onThreadChanged: _load,
-                                    orderPrecioTotalUsd: r.precioTotal,
-                                    creditPlanRescheduleLocked:
-                                        r.creditPlanLockedForAdminReschedule,
                                   ),
                                 ],
                               ),

@@ -1,9 +1,8 @@
 /// Método de pago del aliado (`transaction_requests.pago_metodo`).
 ///
 /// En los **primeros pedidos contado** (onboarding) la UI solo ofrece [valuesFaseContado].
-/// **Después** de esa fase, sin cupo asignado sigue igual hasta que MotoLink autorice línea (>0);
-/// entonces se ofrecen el resto de medios y [creditoSistema]. Transferencia y efectivo quedan siempre
-/// para compras al contado.
+/// Tras esa fase, MotoConecta ofrece los medios en [valuesMotoconecta]; plazos y cuotas se acuerdan
+/// con el importador en el chat del pedido.
 abstract final class PagoMetodo {
   /// Recargo sobre [precio_base_aliado_total] al elegir efectivo (servidor y cliente alineados).
   static const double recargoEfectivoTasa = 0.04;
@@ -14,30 +13,22 @@ abstract final class PagoMetodo {
   static const binance = 'binance';
   static const efectivo = 'efectivo';
 
-  /// Línea de crédito MotoLink (solo tras fase contado y con cupo asignado).
+  /// Legado: línea MotoLink en plataforma (pedidos históricos; ya no se ofrece en UI nueva).
   static const creditoSistema = 'credito_sistema';
 
-  /// MotoConecta: única pasarela acordada; verificación por el importador.
+  /// MotoConecta: medios acordados; verificación por el importador.
   static const valuesMotoconecta = [
     zelleDivisas,
     pagoMovil,
     binance,
     transferencia,
+    efectivo,
   ];
 
   static const values = [pagoMovil, zelleDivisas, transferencia, efectivo, binance];
 
   /// Solo durante onboarding (primeras entregas contado): transferencia y efectivo.
   static const valuesFaseContado = [transferencia, efectivo];
-
-  /// Tras onboarding: todos los medios habituales + crédito MotoLink (si hay cupo en perfil).
-  static const valuesPostContadoConCredito = [
-    pagoMovil,
-    zelleDivisas,
-    transferencia,
-    efectivo,
-    creditoSistema,
-  ];
 
   static String labelEs(String code) {
     switch (code.trim()) {
@@ -52,7 +43,7 @@ abstract final class PagoMetodo {
       case efectivo:
         return 'Efectivo';
       case creditoSistema:
-        return 'Crédito del sistema (MotoLink)';
+        return 'Crédito del sistema (legado)';
       default:
         return code;
     }

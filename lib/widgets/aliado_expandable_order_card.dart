@@ -13,7 +13,6 @@ import 'aliado_order_experience_display.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
-import 'transportista_recogida_almacen_section.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
 class AliadoExpandableOrderCard extends StatelessWidget {
@@ -469,13 +468,6 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             viewerRole: AppHomeRole.aliado,
                             showHeading: true,
                           ),
-                          if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
-                            const SizedBox(height: 12),
-                            TransportistaRecogidaAlmacenCard(
-                              request: r,
-                              viewerRole: AppHomeRole.aliado,
-                            ),
-                          ],
                         ],
                         if (!useMultiImporterTabs && expandedFooter != null) ...[
                           const SizedBox(height: 12),
@@ -518,15 +510,6 @@ List<Widget> _postTimelineBloquesAliado({
           showHeading: false,
         ),
       );
-      if (transportistaRecogidaAlmacenSectionVisible(lines[i])) {
-        out.add(const SizedBox(height: 12));
-        out.add(
-          TransportistaRecogidaAlmacenCard(
-            request: lines[i],
-            viewerRole: AppHomeRole.aliado,
-          ),
-        );
-      }
     }
   } else {
     if (!consolidarDatosImportador) {
@@ -540,18 +523,6 @@ List<Widget> _postTimelineBloquesAliado({
       if (lines.isNotEmpty) {
         out.add(const SizedBox(height: 12));
       }
-    }
-    for (var i = 0; i < lines.length; i++) {
-      if (!transportistaRecogidaAlmacenSectionVisible(lines[i])) continue;
-      if (out.isNotEmpty) {
-        out.add(const SizedBox(height: 12));
-      }
-      out.add(
-        TransportistaRecogidaAlmacenCard(
-          request: lines[i],
-          viewerRole: AppHomeRole.aliado,
-        ),
-      );
     }
   }
   return out;

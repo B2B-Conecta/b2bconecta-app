@@ -8,8 +8,6 @@ abstract final class ProfileRoleLabels {
         return 'Aliado';
       case 'administrador':
         return 'MotoLink · administración';
-      case 'transportista':
-        return 'Transportista';
       default:
         return 'Usuario';
     }

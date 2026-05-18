@@ -628,36 +628,6 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           onRegistered: widget.onRefresh,
         ),
         const SizedBox(height: 14),
-        if (puedeTransito &&
-            (r.assignedTransportistaId == null ||
-                r.assignedTransportistaId!.trim().isEmpty)) ...[
-          Material(
-            color: Colors.deepOrange.shade50,
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: Colors.deepOrange.shade900),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Asigne transportista arriba o el despacho no verá este pedido.',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.deepOrange.shade900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         Text(
           'Envío en tránsito',
           style: TextStyle(

@@ -37,7 +37,8 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile?.id != widget.profile?.id ||
         oldWidget.profile?.kycStatus != widget.profile?.kycStatus ||
-        oldWidget.profile?.creditLimit != widget.profile?.creditLimit ||
+        oldWidget.profile?.primerosPedidosContadoEntregados !=
+            widget.profile?.primerosPedidosContadoEntregados ||
         oldWidget.profile?.pedidosSuspendidosMorosidad !=
             widget.profile?.pedidosSuspendidosMorosidad) {
       _reloadDocs();
@@ -164,38 +165,24 @@ class _AliadoAuthorizationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final faseContado = profile.esAliadoEnFaseContado;
-    final tieneCupo = profile.tieneLineaCreditoMotoLink;
     final kycGlobal = profile.kycStatus?.trim();
     final kycOk = kycGlobal == KycStatus.aprobado;
 
-    final cupoLabelEs = faseContado &&
-            profile.puedeUsarLineaCreditoMotoLinkPreactivada
-        ? 'MotoLink le habilitó el cupo desde el inicio (confianza): '
-            '${profile.creditLimit!.toStringAsFixed(2)} REF. '
-            'Puede usar la línea de crédito aun en fase contado. '
-            '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} REF imputados acumulados (entregas a crédito sin plan, o al completar un plan a cuotas). '
-            'El cupo restante se ve en su perfil.'
-        : faseContado
-            ? 'Primeros pedidos (contado): con RIF, domicilio fiscal y enlace Google Maps puede pedir hasta '
-                '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad. '
-                'El cupo revolvente y la documentación completa se revisan al solicitar línea de crédito MotoLink.'
-            : tieneCupo
-                ? 'Cupo MotoLink ${profile.creditLimit!.toStringAsFixed(2)} REF · '
-                    '${(profile.creditoConsumidoAcumulado ?? 0).toStringAsFixed(2)} REF imputados acumulados. '
-                    'Compromiso, imputado y disponible se muestran en este perfil.'
-                : 'Sin línea de crédito asignada: puede seguir solicitando repuestos pagando al contado '
-                    '(transferencia o efectivo). MotoLink puede habilitar cupo y más medios de pago cuando lo solicite.';
+    final operacionLabelEs = faseContado
+        ? 'Primeros pedidos (contado): con RIF, domicilio fiscal y enlace Google Maps puede solicitar hasta '
+            '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad (un pedido activo a la vez). '
+            'Tras esa fase, los plazos y cuotas se acuerdan directamente con cada importador en el chat del pedido.'
+        : 'Puede solicitar repuestos en el catálogo. El pago al contado o en cuotas se negocia con cada importador '
+            '(Zelle, Pago Móvil, transferencia, efectivo, etc.).';
 
     final kycLabelEs = faseContado && !kycOk
         ? 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
-            'No bloquea pedidos en contado mientras tenga RIF, domicilio fiscal y enlace Maps; '
-            'la revisión completa de documentos aplica al solicitar crédito MotoLink.'
+            'No bloquea pedidos en contado mientras tenga RIF, domicilio fiscal y enlace Maps.'
         : (kycOk
             ? 'Verificación documental aprobada (todos los documentos requeridos).'
             : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}.');
 
-    // La fila resume cupo; operar al contado tras la fase inicial no requiere límite asignado.
-    const cupoRowOk = true;
+    const operacionRowOk = true;
     final kycRowOk = faseContado || kycOk;
 
     return DecoratedBox(
@@ -212,7 +199,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  kycRowOk && cupoRowOk
+                  kycRowOk && operacionRowOk
                       ? Icons.check_circle_outline
                       : Icons.info_outline,
                   size: 22,
@@ -270,8 +257,8 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _CheckRow(
-              ok: cupoRowOk,
-              label: cupoLabelEs,
+              ok: operacionRowOk,
+              label: operacionLabelEs,
             ),
             const SizedBox(height: 6),
             _CheckRow(

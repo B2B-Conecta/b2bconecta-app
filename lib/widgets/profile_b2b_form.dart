@@ -78,14 +78,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'importador';
   }
 
-  bool get _persistedAsTransportista {
-    return widget.initial?.role?.trim().toLowerCase() == 'transportista';
-  }
-
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
     final r = _role.trim().toLowerCase();
-    return r == 'importador' || r == 'aliado' || r == 'transportista';
+    return r == 'importador' || r == 'aliado';
   }
 
   void _bumpAuthorizationSection() {
@@ -109,10 +105,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
     final r = i?.role?.trim().toLowerCase();
-    if (r == 'importador' ||
-        r == 'aliado' ||
-        r == 'administrador' ||
-        r == 'transportista') {
+    if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
     }
     if (_persistedAsAliado) {
@@ -222,8 +215,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         return 'ENLACE GOOGLE MAPS · ALMACÉN / DOMICILIO FISCAL';
       case 'aliado':
         return 'ENLACE GOOGLE MAPS · TALLER / DOMICILIO FISCAL';
-      case 'transportista':
-        return 'ENLACE GOOGLE MAPS · BASE OPERATIVA / DOMICILIO FISCAL';
       default:
         return 'ENLACE GOOGLE MAPS (OPCIONAL)';
     }
@@ -239,10 +230,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         return 'Pegue el enlace «Compartir» de Google Maps apuntando a su taller o domicilio fiscal. '
             'MotoLink lo usa como destino al armar la ruta en vivo desde el importador cuando el pedido '
             'está en tránsito (junto con el enlace del importador en su perfil).';
-      case 'transportista':
-        return 'Pegue el enlace «Compartir» de Google Maps apuntando a su base operativa o domicilio fiscal. '
-            'Debe coincidir con la dirección indicada arriba: MotoLink usa esas coordenadas para asignación '
-            'por proximidad y las rutas en tránsito.';
       default:
         return 'Pegue un enlace público (compartir ubicación) para que MotoLink y los participantes '
             'abran su domicilio fiscal en el mapa.';
@@ -251,10 +238,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   String _ubicacionFiscalIntroText() {
     switch (_role.trim().toLowerCase()) {
-      case 'transportista':
-        return 'Indique la ubicación de su base operativa o casa matriz. Estado, ciudad y domicilio '
-            'son obligatorios; al guardar, MotoLink geocodifica la dirección para registrar coordenadas '
-            'en su perfil y en su expediente de transportista (proximidad a almacenes).';
       case 'importador':
       case 'aliado':
         return 'Visible en el catálogo para ubicar proveedores y talleres. '
@@ -316,12 +299,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     await AuthService.signOut();
   }
 
-  /// Geocodifica el domicilio fiscal (importador/aliado: catálogo; transportista: perfil + transportista_info).
+  /// Geocodifica el domicilio fiscal del importador o aliado (catálogo / proximidad).
   Future<void> _tryGeocodeAndSaveCoordinates() async {
     final role = _role.trim().toLowerCase();
-    if (role != 'importador' &&
-        role != 'aliado' &&
-        role != 'transportista') {
+    if (role != 'importador' && role != 'aliado') {
       return;
     }
     final dir = _fiscalAddressController.text.trim();
@@ -336,13 +317,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         latitude: first.latitude,
         longitude: first.longitude,
       );
-      if (role == 'transportista') {
-        await SupabaseService.syncTransportistaInfoBaseFromProfileCoordinates(
-          latitude: first.latitude,
-          longitude: first.longitude,
-          rifAlignedWithProfile: _rifController.text,
-        );
-      }
     } catch (_) {}
   }
 
@@ -454,60 +428,47 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ),
           const SizedBox(height: 24),
           _sectionLabel('TIPO DE CUENTA'),
-          if (_persistedAsTransportista)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Chip(
-                avatar: const Icon(Icons.local_shipping_outlined,
-                    size: 18, color: AppColors.brandBlue),
-                label: const Text('Transportista · despacho'),
-                backgroundColor: AppColors.fieldFill,
-                side: BorderSide(color: Colors.grey.shade300),
-              ),
-            )
-          else ...[
-            Row(
-              children: [
-                Expanded(
-                  child: _RoleChoiceTile(
-                    label: 'Importador',
-                    icon: Icons.local_shipping_outlined,
-                    selected: _role == 'importador',
-                    enabled: !_roleLocked,
-                    onTap: _saving || _roleLocked
-                        ? null
-                        : () => setState(() => _role = 'importador'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _RoleChoiceTile(
-                    label: 'Aliado',
-                    icon: Icons.person_outline,
-                    selected: _role == 'aliado',
-                    enabled: !_roleLocked,
-                    onTap: _saving || _roleLocked
-                        ? null
-                        : () => setState(() => _role = 'aliado'),
-                  ),
-                ),
-              ],
-            ),
-            if (_showAdministradorRoleOption) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
+          Row(
+            children: [
+              Expanded(
                 child: _RoleChoiceTile(
-                  label: 'Administrador (broker)',
-                  icon: Icons.admin_panel_settings_outlined,
-                  selected: _role == 'administrador',
+                  label: 'Importador',
+                  icon: Icons.local_shipping_outlined,
+                  selected: _role == 'importador',
                   enabled: !_roleLocked,
                   onTap: _saving || _roleLocked
                       ? null
-                      : () => setState(() => _role = 'administrador'),
+                      : () => setState(() => _role = 'importador'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _RoleChoiceTile(
+                  label: 'Aliado',
+                  icon: Icons.person_outline,
+                  selected: _role == 'aliado',
+                  enabled: !_roleLocked,
+                  onTap: _saving || _roleLocked
+                      ? null
+                      : () => setState(() => _role = 'aliado'),
                 ),
               ),
             ],
+          ),
+          if (_showAdministradorRoleOption) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: _RoleChoiceTile(
+                label: 'Administrador (broker)',
+                icon: Icons.admin_panel_settings_outlined,
+                selected: _role == 'administrador',
+                enabled: !_roleLocked,
+                onTap: _saving || _roleLocked
+                    ? null
+                    : () => setState(() => _role = 'administrador'),
+              ),
+            ),
           ],
           const SizedBox(height: 20),
           _sectionLabel('NOMBRE DEL NEGOCIO'),

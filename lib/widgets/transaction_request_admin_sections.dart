@@ -13,6 +13,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/ves_amount_format.dart';
+import 'transaction_request_counterparty_profile_section.dart';
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
   Future<String> Function() signed,
@@ -62,20 +63,32 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        _PartyCard(
-          icon: Icons.storefront_outlined,
-          title: 'Aliado',
+        TransactionRequestCounterpartyProfileSection(
+          profileId: r.aliadoId,
+          partyLabel: 'Aliado',
           businessName: r.aliadoBusinessName,
           rif: r.aliadoRif,
           phone: r.aliadoPhone,
+          estado: r.aliadoEstado,
+          ciudad: r.aliadoCiudad,
+          direccion: r.aliadoDireccion,
+          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+          logoStoragePath: r.aliadoLogoStoragePath,
+          kycStatus: r.aliadoKycStatus,
         ),
         const SizedBox(height: 10),
-        _PartyCard(
-          icon: Icons.local_shipping_outlined,
-          title: 'Importador',
+        TransactionRequestCounterpartyProfileSection(
+          profileId: r.ownerId,
+          partyLabel: 'Importador',
           businessName: r.ownerBusinessName,
           rif: r.ownerRif,
           phone: r.ownerPhone,
+          estado: r.ownerEstado,
+          ciudad: r.ownerCiudad,
+          direccion: r.ownerDireccion,
+          fiscalMapsUrl: r.ownerFiscalMapsUrl,
+          logoStoragePath: r.ownerLogoStoragePath,
+          kycStatus: r.ownerKycStatus,
         ),
       ],
     );
@@ -217,12 +230,18 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        _PartyCard(
-          icon: Icons.storefront_outlined,
-          title: 'Aliado',
+        TransactionRequestCounterpartyProfileSection(
+          profileId: request.aliadoId,
+          partyLabel: 'Aliado',
           businessName: request.aliadoBusinessName,
           rif: request.aliadoRif,
           phone: request.aliadoPhone,
+          estado: request.aliadoEstado,
+          ciudad: request.aliadoCiudad,
+          direccion: request.aliadoDireccion,
+          fiscalMapsUrl: request.aliadoFiscalMapsUrl,
+          logoStoragePath: request.aliadoLogoStoragePath,
+          kycStatus: request.aliadoKycStatus,
         ),
       ],
     );
@@ -262,12 +281,18 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        _PartyCard(
-          icon: Icons.local_shipping_outlined,
-          title: 'Importador',
+        TransactionRequestCounterpartyProfileSection(
+          profileId: r.ownerId,
+          partyLabel: 'Importador',
           businessName: r.ownerBusinessName,
           rif: r.ownerRif,
           phone: r.ownerPhone,
+          estado: r.ownerEstado,
+          ciudad: r.ownerCiudad,
+          direccion: r.ownerDireccion,
+          fiscalMapsUrl: r.ownerFiscalMapsUrl,
+          logoStoragePath: r.ownerLogoStoragePath,
+          kycStatus: r.ownerKycStatus,
         ),
       ],
     );
@@ -653,27 +678,20 @@ class SubOrderImporterLineasCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (s.importadorRif != null && s.importadorRif!.trim().isNotEmpty)
-              Text(
-                'RIF: ${s.importadorRif}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-              ),
-            if (s.importadorPhone != null && s.importadorPhone!.trim().isNotEmpty)
-              Text(
-                'Tel: ${s.importadorPhone}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-              ),
-            if (s.importadorEstado != null && s.importadorEstado!.trim().isNotEmpty)
-              Text(
-                [
-                  s.importadorEstado,
-                  if (s.importadorCiudad != null && s.importadorCiudad!.trim().isNotEmpty)
-                    s.importadorCiudad,
-                ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' · '),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.2),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+            const SizedBox(height: 10),
+            TransactionRequestCounterpartyProfileSection(
+              profileId: s.importadorId,
+              partyLabel: 'Importador',
+              businessName: s.importadorBusinessName,
+              rif: s.importadorRif,
+              phone: s.importadorPhone,
+              estado: s.importadorEstado,
+              ciudad: s.importadorCiudad,
+              direccion: s.importadorDireccion,
+              fiscalMapsUrl: s.importadorFiscalMapsUrl,
+              logoStoragePath: null,
+              kycStatus: null,
+            ),
             if (s.montoSubtotal > 0) ...[
               const SizedBox(height: 4),
               Text(
@@ -975,7 +993,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
       );
     }
 
-    // Comprobantes por cuota (crédito / plan MotoLink), mismo bucket que pago con comprobante.
+    // Comprobantes por cuota (plan acordado con importador).
     if (r.hasAgreedCreditPlan) {
       for (final c in r.paymentSchedule) {
         if (!c.hasPagoComprobante) continue;
@@ -983,7 +1001,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         final name = c.pagoComprobanteFileName?.trim();
         final label = (name != null && name.isNotEmpty)
             ? 'Cuota ${c.installmentIndex} · comprobante · $name'
-            : 'Comprobante cuota ${c.installmentIndex} (línea crédito)';
+            : 'Comprobante cuota ${c.installmentIndex} (plan de pago)';
         chips.add(
           OutlinedButton.icon(
             onPressed: () => _launchSignedOrderDoc(
@@ -1019,7 +1037,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           r.hasAgreedCreditPlan
-              ? 'Archivos del pedido, incluidos comprobantes por cuota (crédito) que haya subido el aliado. '
+              ? 'Archivos del pedido, incluidos comprobantes por cuota que haya subido el aliado. '
                   'Misma referencia que en «Factura y pago — revisión de cuota». Enlace temporal al abrir.'
               : 'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
@@ -1220,7 +1238,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
       final pagoAprobado =
           r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
       if (pagoAprobado || r.status == TransactionRequestStatus.enTransito) {
-        return 'Pendiente por registrar (transportista o MotoLink)';
+        return 'Pendiente por registrar (MotoLink)';
       }
       return '—';
     }

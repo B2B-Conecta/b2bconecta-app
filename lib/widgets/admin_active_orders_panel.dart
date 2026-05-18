@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../models/document_type_preference.dart';
-import '../models/app_home_role.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -13,24 +12,14 @@ import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_motolink_anula_pedido_dialog.dart';
 import 'admin_order_pre_transit_section.dart';
-import 'admin_transportista_assignment_section.dart';
-import 'transportista_factura_aliado_section.dart';
 import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 import 'order_motolink_thread_section.dart';
-import 'transaction_request_route_map_section.dart';
-
 /// Pedidos activos del broker (pestaña Pedidos): no entregados ni rechazados.
 class AdminActiveOrdersPanel extends StatefulWidget {
-  const AdminActiveOrdersPanel({
-    super.key,
-    this.isTransportistaView = false,
-  });
-
-  /// Solo despacho: contacto + respaldo efectivo + hilo (sin acciones de broker).
-  final bool isTransportistaView;
+  const AdminActiveOrdersPanel({super.key});
 
   @override
   State<AdminActiveOrdersPanel> createState() => _AdminActiveOrdersPanelState();
@@ -115,28 +104,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
       _error = null;
     });
     try {
-      var rows = await SupabaseService.fetchActiveTransactionRequestsForAdmin();
-      if (widget.isTransportistaView) {
-        rows = List<TransactionRequestModel>.from(rows)
-          ..sort((a, b) {
-            int priority(TransactionRequestModel x) {
-              if (!x.hasAssignedTransportista) return 4;
-              if (!x.transportistaReconocioAsignacion) return 0;
-              if (x.status == TransactionRequestStatus.pedidoListo) return 1;
-              if (x.status == TransactionRequestStatus.enTransito) return 2;
-              return 3;
-            }
-
-            final c = priority(a).compareTo(priority(b));
-            if (c != 0) return c;
-            final ta = a.updatedAt ?? a.createdAt;
-            final tb = b.updatedAt ?? b.createdAt;
-            if (ta == null && tb == null) return 0;
-            if (ta == null) return 1;
-            if (tb == null) return -1;
-            return tb.compareTo(ta);
-          });
-      }
+      final rows = await SupabaseService.fetchActiveTransactionRequestsForAdmin();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -144,9 +112,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
         _expandedRequestId = null;
       });
       _tryExpandFromPendingNotification();
-      if (!widget.isTransportistaView) {
-        unawaited(_runPendingMotolinkAutoInvoices(rows));
-      }
+      unawaited(_runPendingMotolinkAutoInvoices(rows));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -247,36 +213,6 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     BuildContext context,
     TransactionRequestModel r,
   ) {
-    if (widget.isTransportistaView) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Contacto e importadores ya están en la ficha expandida (arriba).
-          if (r.status == TransactionRequestStatus.enTransito) ...[
-            TransactionRequestRouteMapSection(request: r),
-            const SizedBox(height: 12),
-          ],
-          if (r.hasFacturaAliado) ...[
-            TransportistaFacturaAliadoSection(request: r),
-            const SizedBox(height: 12),
-          ],
-          EfectivoRespaldoRegistrar(
-            request: r,
-            onRegistered: _load,
-          ),
-          const Divider(height: 20),
-          OrderMotolinkThreadSection(
-            key: ValueKey<String>('trm-trans-${r.id}'),
-            transactionRequestId: r.id,
-            allowReplyAsAliado: false,
-            allowReplyAsAdmin: false,
-            allowReplyAsTransportista: true,
-            onThreadChanged: _load,
-            orderPrecioTotalUsd: r.precioTotal,
-          ),
-        ],
-      );
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -312,11 +248,6 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
           ),
           const SizedBox(height: 12),
         ],
-        AdminTransportistaAssignmentSection(
-          key: ValueKey<String>('tr-assign-${r.id}-${r.assignedTransportistaId ?? ''}'),
-          request: r,
-          onMutated: _load,
-        ),
         if (r.status == TransactionRequestStatus.enTransito ||
             r.status == TransactionRequestStatus.entregado)
           Padding(
@@ -353,8 +284,6 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
           allowReplyAsAliado: false,
           allowReplyAsAdmin: true,
           onThreadChanged: _load,
-          orderPrecioTotalUsd: r.precioTotal,
-          creditPlanRescheduleLocked: r.creditPlanLockedForAdminReschedule,
         ),
       ],
     );
@@ -366,9 +295,6 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
   ) async {
     try {
       await SupabaseService.adminMarcaPedidoEnTransito(requestId: r.id);
-      try {
-        await SupabaseService.adminTryAutoPublishRutaMapsUrl(r.id);
-      } catch (_) {}
       if (!context.mounted) return;
       FocusManager.instance.primaryFocus?.unfocus();
       // Evita desmontar el subárbol del pedido en el mismo frame que aún tiene foco/herencia activa.
@@ -436,9 +362,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
             OrderListFilterBar(
               searchController: _searchCtrl,
               onSearchChanged: (_) => setState(() {}),
-              hintText: widget.isTransportistaView
-                  ? 'Buscar por aliado, importador, producto o SKU'
-                  : 'Buscar por producto, SKU o empresa',
+              hintText: 'Buscar por producto, SKU o empresa',
               statusOptions: _statusOptions,
               selectedStatus: _statusFilter,
               onStatusChanged: (s) => setState(() => _statusFilter = s),
@@ -480,9 +404,6 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
                             statusLabel: _statusLabel(r),
                             expandedFooter:
                                 _buildAdminExpandedFooter(context, r),
-                            cardViewerRole: widget.isTransportistaView
-                                ? AppHomeRole.transportista
-                                : AppHomeRole.administrador,
                             onRequestMutated: _load,
                           );
                         },

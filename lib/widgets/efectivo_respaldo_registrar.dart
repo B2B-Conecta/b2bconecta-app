@@ -5,7 +5,7 @@ import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
-/// Foto de respaldo del cobro en efectivo (transportista o MotoLink).
+/// Foto de respaldo del cobro en efectivo (MotoLink).
 /// Puede registrarse durante tránsito o después de entregado (solo una vez).
 class EfectivoRespaldoRegistrar extends StatefulWidget {
   const EfectivoRespaldoRegistrar({

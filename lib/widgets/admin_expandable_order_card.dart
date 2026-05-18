@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../models/app_home_role.dart';
 import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
+import '../models/app_home_role.dart';
 import 'courier_timeline_widget.dart';
 import 'transaction_request_admin_sections.dart';
-import 'transportista_assignment_ack_section.dart';
-import 'transportista_recogida_almacen_section.dart';
 
 /// Ficha compacta: un toque en la cabecera despliega contactos, crédito y ciclo del envío.
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -19,8 +17,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
     required this.onToggle,
     required this.statusLabel,
     this.expandedFooter,
-    /// Broker MotoLink vs transportista (afecta bloque «pedido listo» y secciones de despacho).
-    this.cardViewerRole = AppHomeRole.administrador,
     this.onRequestMutated,
   });
 
@@ -29,10 +25,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
   final VoidCallback onToggle;
   final String statusLabel;
   final Widget? expandedFooter;
-  final AppHomeRole cardViewerRole;
   final VoidCallback? onRequestMutated;
-
-  bool get _isTransportista => cardViewerRole == AppHomeRole.transportista;
 
   @override
   Widget build(BuildContext context) {
@@ -146,8 +139,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               height: 1.25,
                             ),
                           ),
-                          if (r.status == TransactionRequestStatus.pedidoListo &&
-                              !_isTransportista) ...[
+                          if (r.status == TransactionRequestStatus.pedidoListo) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -181,7 +173,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (!_isTransportista && r.pedidoEntregadoYPagado) ...[
+                          if (r.pedidoEntregadoYPagado) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -213,8 +205,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                          ] else if (!_isTransportista &&
-                              r.pagoMotolinkPendienteTrasEntrega) ...[
+                          ] else if (r.pagoMotolinkPendienteTrasEntrega) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -304,13 +295,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (_isTransportista) ...[
-                          TransportistaAssignmentAckSection(
-                            request: r,
-                            onAcknowledged: () => onRequestMutated?.call(),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
                         TransactionRequestPartiesContactSection(request: r),
                         const SizedBox(height: 12),
                         TransactionRequestCommissionSection(request: r),
@@ -318,54 +302,20 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         TransactionRequestDestinoEntregaSection(
                           request: r,
                         ),
-                        if (!_isTransportista) ...[
-                          const SizedBox(height: 12),
-                          TransactionRequestDocumentPreferenceAdminSection(
-                            request: r,
-                          ),
-                          const SizedBox(height: 12),
-                          TransactionRequestAliadoExperienceAdminSection(
-                            request: r,
-                          ),
-                          if (r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.account_balance_wallet_outlined,
-                                  size: 18,
-                                  color: Colors.grey.shade700,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Crédito MotoLink asignado (aliado): '
-                                    '${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} REF',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.brandBlue,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+                        const SizedBox(height: 12),
+                        TransactionRequestDocumentPreferenceAdminSection(
+                          request: r,
+                        ),
+                        const SizedBox(height: 12),
+                        TransactionRequestAliadoExperienceAdminSection(
+                          request: r,
+                        ),
                         const SizedBox(height: 12),
                         CourierTimelineWidget(
                           request: r,
                           compact: true,
-                          viewerRole: cardViewerRole,
+                          viewerRole: AppHomeRole.administrador,
                         ),
-                        if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
-                          const SizedBox(height: 12),
-                          TransportistaRecogidaAlmacenCard(
-                            request: r,
-                            viewerRole: cardViewerRole,
-                            onUpdated: onRequestMutated,
-                          ),
-                        ],
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 8),
                           expandedFooter!,

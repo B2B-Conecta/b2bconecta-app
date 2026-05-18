@@ -135,13 +135,26 @@ class NotificationProvider extends ChangeNotifier {
         case AppHomeRole.importador:
           MainShellTabController.navigateToProfileKycDocumentation();
           return;
-        case AppHomeRole.transportista:
-          return;
       }
     }
     if (t0 == 'credito' && homeRole == AppHomeRole.administrador) {
       MainShellTabController.navigateToAdminActivosForNotification();
       return;
+    }
+    if (t0 == 'supervision' && homeRole == AppHomeRole.administrador) {
+      MainShellTabController.navigateToAdminActivosForNotification();
+      return;
+    }
+    if (t0 == 'mensaje') {
+      switch (homeRole) {
+        case AppHomeRole.aliado:
+        case AppHomeRole.importador:
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.administrador:
+          MainShellTabController.navigateToAdminActivosForNotification();
+          return;
+      }
     }
     if (t0 == 'comision') {
       MainShellTabController.setPendingCommissionSettlementId(n.relatedId);
@@ -153,7 +166,6 @@ class NotificationProvider extends ChangeNotifier {
           MainShellTabController.navigateToImporterCommissionSettlementsForNotification();
           return;
         case AppHomeRole.aliado:
-        case AppHomeRole.transportista:
           return;
       }
     }
@@ -164,7 +176,6 @@ class NotificationProvider extends ChangeNotifier {
           MainShellTabController.navigateToPedidosForNotification();
           return;
         case AppHomeRole.administrador:
-        case AppHomeRole.transportista:
           break;
       }
     }
@@ -179,7 +190,6 @@ class NotificationProvider extends ChangeNotifier {
     }
     switch (homeRole) {
       case AppHomeRole.administrador:
-      case AppHomeRole.transportista:
         MainShellTabController.navigateToAdminActivosForNotification();
         return;
       case AppHomeRole.aliado:

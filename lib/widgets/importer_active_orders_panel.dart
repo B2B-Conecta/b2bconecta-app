@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
+import '../utils/importer_order_advance.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_order_grouping.dart';
 import '../utils/transaction_request_filter_utils.dart';
@@ -228,42 +229,23 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     List<TransactionRequestModel> g,
     String next,
   ) async {
-    if (next == TransactionRequestStatus.enTransito) {
-      for (final r in g) {
-        if (!r.hasProveedorFactura) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Adjunte la factura del proveedor antes de marcar «En tránsito».',
-              ),
-            ),
-          );
-          return;
-        }
-      }
-    }
-    try {
-      for (final r in g) {
-        await SupabaseService.importerAdvanceTransactionRequest(
-          id: r.id,
-          newStatus: next,
-          importerSubOrderId: r.importerSubOrderId,
-        );
-      }
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Estado actualizado.'),
-          behavior: SnackBarBehavior.floating,
+    final ok = await advanceImporterOrderGroup(
+      context,
+      lines: g,
+      nextStatus: next,
+    );
+    if (!ok || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next == TransactionRequestStatus.enTransito
+              ? 'Pedido marcado en tránsito con ETA registrado.'
+              : 'Estado actualizado.',
         ),
-      );
-      await _load();
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    await _load();
   }
 
   @override
@@ -377,6 +359,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                               onAdvance: next != null
                                   ? () => _advanceGroup(context, g, next)
                                   : null,
+                              onThreadChanged: _load,
                               expandedFooter: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [

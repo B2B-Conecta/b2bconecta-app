@@ -30,12 +30,12 @@ class ProfileModel {
   final String? businessName;
   final String? rif;
 
-  /// `importador`, `aliado`, `administrador` (broker) o `transportista`.
+  /// `importador`, `aliado` o `administrador` (broker MotoLink).
   final String? role;
   final String? phone;
   final DateTime? createdAt;
 
-  /// Riesgo / crédito (solo relevante para aliados en flujo broker).
+  /// Legado en base de datos; ya no define cupo en la app.
   final int? creditScore;
   final double? creditLimit;
 
@@ -45,22 +45,14 @@ class ProfileModel {
   /// Entregas completadas contadas hacia la fase “primeros 3 pedidos contado” (0–3).
   final int? primerosPedidosContadoEntregados;
 
-  /// Suma de pedidos entregados pagados con `credito_sistema` (tope vs [creditLimit]).
+  /// Legado en base de datos; ya no se usa para cupo en plataforma.
   final double? creditoConsumidoAcumulado;
 
-  /// Admin MotoLink: puede usar línea de crédito aun en fase contado (confianza / historial).
+  /// Legado en base de datos (`credito_preactivado_por_admin`); ya no usado en UI.
   final bool creditoPreactivadoPorAdmin;
 
   /// MotoLink suspendió nuevos pedidos por morosidad (entregas con pago sin aprobar).
   final bool pedidosSuspendidosMorosidad;
-
-  /// Cupo asignado y autorizado para usar en la app aunque [esAliadoEnFaseContado].
-  bool get puedeUsarLineaCreditoMotoLinkPreactivada {
-    final lim = creditLimit;
-    return creditoPreactivadoPorAdmin &&
-        lim != null &&
-        lim > 0;
-  }
 
   /// Estado / ciudad (Venezuela u otro) para catálogo y pedidos.
   final String? estado;
@@ -104,39 +96,10 @@ class ProfileModel {
   }
 
   /// `true` mientras no haya completado las primeras [CashPhasePolicy.entregasRequeridas] entregas
-  /// en modalidad contado (onboarding). Tras esa fase puede seguir pagando al contado (p. ej. efectivo o transferencia)
-  /// según las opciones del pedido, además de crédito MotoLink si aplica.
+  /// en modalidad contado (onboarding). Tras esa fase negocia pago y cuotas con cada importador.
   bool get esAliadoEnFaseContado {
     if (role?.trim().toLowerCase() != 'aliado') return false;
     return (primerosPedidosContadoEntregados ?? 0) < CashPhasePolicy.entregasRequeridas;
-  }
-
-  /// Cupo MotoLink asignado y usable (> 0). Sin cupo, el aliado puede seguir pidiendo al contado
-  /// (transferencia/efectivo) tras la fase inicial; otros medios y crédito sistema requieren cupo.
-  bool get tieneLineaCreditoMotoLink {
-    final lim = creditLimit;
-    return lim != null && lim > 0;
-  }
-
-  /// Resumen de cupo en Créditos admin: solo con línea MotoLink asignada (`credit_limit` > 0).
-  bool get debeMostrarCreditoMotoLinkAsignado => tieneLineaCreditoMotoLink;
-
-  /// Cupo mostrado al aliado: en fase contado es 0 salvo [creditoPreactivadoPorAdmin] con cupo asignado.
-  double? get limiteCreditoMostradoAliado {
-    if (esAliadoEnFaseContado && !creditoPreactivadoPorAdmin) return 0;
-    return creditLimit;
-  }
-
-  /// Línea disponible: límite − saldo activo (pedidos en curso / cuotas pendientes) −
-  /// [imputadoCerradoAcumulado] (imputado al entregar con crédito sin plan, o al aprobar la **última** cuota del plan).
-  double? cupoDisponible(
-    double exposicionCupoEfectivo,
-    double imputadoCerradoAcumulado,
-  ) {
-    final lim = creditLimit;
-    if (lim == null) return null;
-    return (lim - exposicionCupoEfectivo - imputadoCerradoAcumulado)
-        .clamp(0.0, double.infinity);
   }
 
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
@@ -144,8 +107,7 @@ class ProfileModel {
     final r = role?.trim().toLowerCase();
     final hasRole = r == 'importador' ||
         r == 'aliado' ||
-        r == 'administrador' ||
-        r == 'transportista';
+        r == 'administrador';
     final base = businessName != null &&
         businessName!.trim().isNotEmpty &&
         rif != null &&
@@ -154,7 +116,7 @@ class ProfileModel {
     if (!base) return false;
     if (r == 'administrador') return true;
     if (!hasRegisteredLocation) return false;
-    if (r == 'importador' || r == 'aliado' || r == 'transportista') {
+    if (r == 'importador' || r == 'aliado') {
       return hasFiscalMapsShareLink;
     }
     return true;

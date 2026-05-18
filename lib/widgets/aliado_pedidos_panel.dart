@@ -31,7 +31,6 @@ class AliadoPedidosPanel extends StatefulWidget {
 class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   List<TransactionRequestModel> _rows = [];
   ProfileModel? _profile;
-  double _openCreditExposureSum = 0;
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
@@ -107,13 +106,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       final rows =
           await SupabaseService.fetchMyPedidosActivosYCerradosForAliado();
       final profile = await SupabaseService.fetchMyProfile();
-      final exposure =
-          await SupabaseService.fetchOpenCreditExposureForCurrentAliado();
       if (!mounted) return;
       setState(() {
         _rows = rows;
         _profile = profile;
-        _openCreditExposureSum = exposure;
         _loading = false;
         _expandedRequestId = null;
       });
@@ -222,15 +218,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   ) {
     final pend = _lineasEnTransitoOCerrables(chunk);
     if (pend.isEmpty) return false;
-    return pend.every((r) => r.transportistaCompletoRecogidaAlmacen);
-  }
-
-  bool _algunaLineaEsperaRecogidaImportador(
-    List<TransactionRequestModel> chunk,
-  ) {
-    final pend = _lineasEnTransitoOCerrables(chunk);
-    return pend.isNotEmpty &&
-        pend.any((r) => !r.transportistaCompletoRecogidaAlmacen);
+    return pend.every((r) => r.puedeConfirmarRecepcionAliado);
   }
 
   Future<void> _confirmarEntregaGrupoImportador(
@@ -359,9 +347,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final cg = g.first.checkoutGroupId?.trim();
     final bloques = aliadoRecepcionBloquesDesdePedido(
       lines: g,
-      lineaPuedeConfirmar: (r) => r.transportistaCompletoRecogidaAlmacen,
+      lineaPuedeConfirmar: (r) => r.puedeConfirmarRecepcionAliado,
       chunkPuedeConfirmar: _puedeConfirmarRecepcionImportador,
-      chunkEsperaRecogida: _algunaLineaEsperaRecogidaImportador,
       busyKeyForChunk: (chunk) =>
           _entregaBusyKeyForImportadorChunk(chunk, cg),
       entregaBusyId: _entregaBusyId,
@@ -395,7 +382,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             child: AliadoOrderPagoSection(
               request: r,
               profile: _profile,
-              openCreditExposureSum: _openCreditExposureSum,
               onChanged: _load,
               suppressPrimaryTitle: true,
               suppressNegotiationIntro: false,
@@ -494,7 +480,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                       AliadoOrderPagoSection(
                         request: chunk[i],
                         profile: _profile,
-                        openCreditExposureSum: _openCreditExposureSum,
                         onChanged: _load,
                         suppressExperience: bundleCheckoutGroupId != null,
                         suppressPrimaryTitle: true,
@@ -567,7 +552,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         AliadoOrderPagoSection(
           request: chunk.first,
           profile: _profile,
-          openCreditExposureSum: _openCreditExposureSum,
           onChanged: _load,
           pagoBundleLines: chunk,
           suppressExperience: suppressExperienceParent,

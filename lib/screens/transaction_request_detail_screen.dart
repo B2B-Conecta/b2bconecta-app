@@ -10,11 +10,6 @@ import '../utils/ves_amount_format.dart';
 import '../widgets/courier_timeline_widget.dart';
 import '../widgets/importer_aliado_solicitud_section.dart';
 import '../widgets/transaction_request_admin_sections.dart';
-import '../widgets/admin_transportista_assignment_section.dart';
-import '../widgets/transaction_request_route_map_section.dart';
-import '../widgets/transportista_assignment_ack_section.dart';
-import '../widgets/transportista_recogida_almacen_section.dart';
-import '../widgets/transportista_factura_aliado_section.dart';
 
 class TransactionRequestDetailScreen extends StatefulWidget {
   const TransactionRequestDetailScreen({
@@ -111,8 +106,6 @@ class _TransactionRequestDetailScreenState
             (x) => x.pagoPendienteRiesgoCuentaTresDiasHabiles,
           );
           final anyPedidoListo = lines.any(_mostrarBannerPedidoListo);
-          final anyEnTransito =
-              lines.any((x) => x.status == TransactionRequestStatus.enTransito);
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
             children: [
@@ -198,41 +191,6 @@ class _TransactionRequestDetailScreenState
               ],
               const SizedBox(height: 12),
               _contactByRole(r),
-              if (widget.homeRole == AppHomeRole.transportista) ...[
-                const SizedBox(height: 12),
-                TransportistaAssignmentAckSection(
-                  request: r,
-                  onAcknowledged: _reloadRequest,
-                ),
-                if (r.hasFacturaAliado) ...[
-                  const SizedBox(height: 12),
-                  TransportistaFacturaAliadoSection(request: r),
-                ],
-              ],
-              if (anyEnTransito) ...[
-                const SizedBox(height: 12),
-                TransactionRequestRouteMapSection(request: r),
-              ],
-              if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
-                const SizedBox(height: 12),
-                TransportistaRecogidaAlmacenCard(
-                  request: r,
-                  viewerRole: widget.homeRole,
-                  onUpdated: _reloadRequest,
-                  padding: const EdgeInsets.all(14),
-                  borderRadius: 14,
-                ),
-              ],
-              if (widget.homeRole == AppHomeRole.administrador) ...[
-                const SizedBox(height: 12),
-                AdminTransportistaAssignmentSection(
-                  key: ValueKey<String>(
-                    'detail-assign-${r.id}-${r.assignedTransportistaId ?? ''}',
-                  ),
-                  request: r,
-                  onMutated: _reloadRequest,
-                ),
-              ],
               const SizedBox(height: 12),
               _masInformacionSection(context, r, lines),
             ],
@@ -272,8 +230,7 @@ class _TransactionRequestDetailScreenState
 
   bool _mostrarBannerPedidoListo(TransactionRequestModel r) {
     if (r.status != TransactionRequestStatus.pedidoListo) return false;
-    return widget.homeRole == AppHomeRole.administrador ||
-        widget.homeRole == AppHomeRole.transportista;
+    return widget.homeRole == AppHomeRole.administrador;
   }
 
   Widget _pedidoListoPickupBanner() {
@@ -291,7 +248,7 @@ class _TransactionRequestDetailScreenState
             Expanded(
               child: Text(
                 'Importador confirmó pedido listo para recolección: coordine el retiro de la carga y, '
-                'tras el despacho del transportista, marque «En tránsito» desde Pedidos activos.',
+                'cuando corresponda, marque «En tránsito» desde Pedidos activos.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -570,7 +527,6 @@ class _TransactionRequestDetailScreenState
       case AppHomeRole.aliado:
         return 'Ítems en este flujo: ${tituloCheckoutGrupoAliado(lines)}';
       case AppHomeRole.administrador:
-      case AppHomeRole.transportista:
         return 'Ítems en este flujo: ${tituloCheckoutGrupoAliado(lines)}';
     }
   }
@@ -583,7 +539,6 @@ class _TransactionRequestDetailScreenState
       case AppHomeRole.aliado:
         return line.etiquetaGestionLineaAliado();
       case AppHomeRole.administrador:
-      case AppHomeRole.transportista:
         final imp = line.ownerBusinessName?.trim();
         final p = line.productName?.trim();
         if (p != null &&
@@ -801,7 +756,6 @@ class _TransactionRequestDetailScreenState
       case AppHomeRole.importador:
         return TransactionRequestAliadoContactSection(request: r);
       case AppHomeRole.administrador:
-      case AppHomeRole.transportista:
         return TransactionRequestPartiesContactSection(request: r);
     }
   }

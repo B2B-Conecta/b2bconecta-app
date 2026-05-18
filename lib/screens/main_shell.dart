@@ -17,7 +17,6 @@ import '../widgets/main_shell_tab.dart';
 import '../widgets/motolink_app_bar.dart';
 import '../widgets/notification_center_sheet.dart';
 import '../widgets/profile_b2b_form.dart';
-import '../widgets/transportista_closed_orders_panel.dart';
 import 'account_settings_screen.dart';
 import 'home_screen.dart';
 
@@ -287,80 +286,10 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildTransportistaShell() {
-    return Scaffold(
-      body: IndexedStack(
-        index: _tabIndex,
-        children: [
-          _adminOrdersScaffold(
-            title: 'Despacho',
-            subtitle:
-                'Pedidos asignados a usted. Confirme la orden, retire en cada '
-                'almacén y siga la ruta hasta el taller del aliado.',
-            child: const AdminActiveOrdersPanel(
-              isTransportistaView: true,
-            ),
-          ),
-          _adminOrdersScaffold(
-            title: 'Pedidos cerrados',
-            subtitle:
-                'Envíos finalizados (entregados o cerrados por MotoLink) en los que '
-                'sigue figurando como transportista asignado.',
-            child: const TransportistaClosedOrdersPanel(),
-          ),
-          _ProfileTab(
-            profile: _profile,
-            homeRole: AppHomeRole.transportista,
-            onProfileSaved: _refreshProfile,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
-        ],
-      ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceTinted,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _tabIndex,
-          type: BottomNavigationBarType.fixed,
-          onTap: (i) => setState(() => _tabIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping_outlined),
-              activeIcon: Icon(Icons.local_shipping),
-              label: 'Despacho',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_outlined),
-              activeIcon: Icon(Icons.history),
-              label: 'Cerrados',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (widget.homeRole == AppHomeRole.administrador) {
       return _buildAdminShell();
-    }
-    if (widget.homeRole == AppHomeRole.transportista) {
-      return _buildTransportistaShell();
     }
     if (widget.homeRole == AppHomeRole.importador) {
       return _buildImportadorShell();
@@ -467,7 +396,6 @@ class _OrdersTab extends StatelessWidget {
         AppHomeRole.importador => const ImporterActiveOrdersPanel(),
         AppHomeRole.administrador => const SizedBox.shrink(),
         AppHomeRole.aliado => const AliadoPedidosPanel(),
-        AppHomeRole.transportista => const SizedBox.shrink(),
       },
     );
   }

@@ -16,7 +16,7 @@ abstract final class KycStatus {
       case rechazado:
         return 'Rechazado';
       default:
-        return '—';
+        return 'Pendiente por validación';
     }
   }
 }

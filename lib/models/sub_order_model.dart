@@ -25,7 +25,7 @@ class SubOrderModel {
     this.importadorFiscalMapsUrl,
     this.importadorLatitude,
     this.importadorLongitude,
-    this.transportistaRecogidaAlmacenAt,
+    this.recogidaAlmacenAt,
     this.orderItems = const [],
   });
 
@@ -50,11 +50,10 @@ class SubOrderModel {
   final String? importadorFiscalMapsUrl;
   final double? importadorLatitude;
   final double? importadorLongitude;
-  final DateTime? transportistaRecogidaAlmacenAt;
+  final DateTime? recogidaAlmacenAt;
   final List<OrderItemModel> orderItems;
 
-  bool get transportistaRecogioEnAlmacen =>
-      transportistaRecogidaAlmacenAt != null;
+  bool get recogioEnAlmacen => recogidaAlmacenAt != null;
 
   bool get hasProveedorFactura =>
       proveedorFacturaStoragePath != null &&
@@ -106,7 +105,7 @@ class SubOrderModel {
       importadorFiscalMapsUrl: _nullableText(imp?['fiscal_maps_url']),
       importadorLatitude: _asDoubleNullable(imp?['latitude']),
       importadorLongitude: _asDoubleNullable(imp?['longitude']),
-      transportistaRecogidaAlmacenAt:
+      recogidaAlmacenAt:
           _parseDate(json['transportista_recogida_almacen_at']),
       orderItems: items,
     );

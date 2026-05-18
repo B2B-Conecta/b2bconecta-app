@@ -56,7 +56,7 @@ Si tu base es **MotoLink legacy** con `transaction_requests.owner_id`, revisa el
 ## Próximos pasos (Flutter, rama `version/MotoConecta`)
 
 1. Enlazar `.env` al proyecto Supabase MotoConecta (URL + clave publicable); no commitear secretos.
-2. Retirar rol **transportista**: `AppHomeRole`, `main_shell`, paneles y servicios de envío/maps/ruta.
+2. ~~Retirar rol **transportista**~~ (hecho en Flutter: sin `AppHomeRole.transportista`, paneles de asignación/ruta/recogida ni RPCs de despacho).
 3. **Chat:** suscripción Realtime a `transaction_request_messages`; pantalla de hilo por pedido.
 4. **Factura importador:** archivo en `order-invoices` + columnas `proveedor_factura_*` en `transaction_requests` (la app las actualiza vía Flutter).
 5. **Admin → Comisiones (C1):** cortes semanales, factura PDF `ML-COM-…`, revisión de pago del importador.
@@ -68,3 +68,12 @@ Migraciones en `supabase/migrations/` (prefijo `20260520…` / `20260526…`): d
 - **Admin:** pestaña Comisiones — generar corte, emitir factura (genera PDF), confirmar pago.
 - **Importador:** Perfil → Cortes de comisión — ver PDF, registrar comprobante.
 - **Storage:** `commission-settlement-invoices` (PDF) y `order-payment-proofs/commission-settlements/` (comprobantes).
+
+## Comunicación y KYC en pedido (C2)
+
+Migración `20260527120000_minuta7_c2_chat_sla_kyc.sql`:
+
+- **Chat del pedido:** aliado e importador en el mismo hilo; MotoLink (admin) lee y puede intervenir.
+- **SLA 12 h:** `run_importer_sla_admin_alerts` programado cada 15 min (pg_cron) si está disponible.
+- **Visibilidad KYC:** logo, dirección fiscal, estado KYC y documentos **aprobados** de la contraparte en la ficha del pedido.
+- **Storage:** bucket `profile-documents` con lectura de contraparte vía políticas RLS.

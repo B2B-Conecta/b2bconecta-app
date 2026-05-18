@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../models/credit_limit_exception.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/kyc_verification_exception.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
@@ -574,14 +573,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           content: Text(
             'Pedido registrado. El importador confirmará stock y preparación.',
           ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } on CreditLimitException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
           behavior: SnackBarBehavior.floating,
         ),
       );

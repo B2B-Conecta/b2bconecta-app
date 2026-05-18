@@ -9,7 +9,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 
-/// Verificación del comprobante declarado por el aliado (Zelle, Pago Móvil, Binance, transferencia).
+/// Verificación del comprobante declarado por el aliado (Zelle, Pago Móvil, Binance, transferencia, efectivo).
 class ImporterOrderPagoVerificationSection extends StatefulWidget {
   const ImporterOrderPagoVerificationSection({
     super.key,

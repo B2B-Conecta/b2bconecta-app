@@ -8,7 +8,6 @@ import '../utils/ves_amount_format.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
-import 'transportista_recogida_almacen_section.dart';
 
 /// Cabecera del pedido maestro (carrito multi-importador).
 class AliadoPedidoMaestroHeader extends StatelessWidget {
@@ -604,13 +603,6 @@ class _AliadoImporterShippingPanel extends StatelessWidget {
                   viewerRole: AppHomeRole.aliado,
                   showHeading: false,
                 ),
-                if (transportistaRecogidaAlmacenSectionVisible(ref)) ...[
-                  const SizedBox(height: 12),
-                  TransportistaRecogidaAlmacenCard(
-                    request: ref,
-                    viewerRole: AppHomeRole.aliado,
-                  ),
-                ],
               ],
             ),
           ),

@@ -10,19 +10,15 @@ class AliadoConfirmarRecepcionBloque {
     this.importadorNombre,
     required this.busy,
     required this.puedeConfirmar,
-    required this.esperaRecogidaTransportista,
     required this.onConfirmar,
     this.pagoPendienteEnTransito = false,
-    this.requestRef,
   });
 
   final String? importadorNombre;
   final bool busy;
   final bool puedeConfirmar;
-  final bool esperaRecogidaTransportista;
   final VoidCallback onConfirmar;
   final bool pagoPendienteEnTransito;
-  final TransactionRequestModel? requestRef;
 }
 
 /// Recepción en taller: se muestra al inicio de la ficha expandida del pedido.
@@ -85,7 +81,6 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
           const SizedBox(height: 12),
           ...List.generate(bloques.length, (i) {
             final b = bloques[i];
-            final r = b.requestRef;
             return Padding(
               padding: EdgeInsets.only(bottom: i < bloques.length - 1 ? 14 : 0),
               child: Column(
@@ -127,44 +122,6 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                           : 'Confirmar recepción en tu taller',
                     ),
                   ),
-                  if (b.esperaRecogidaTransportista) ...[
-                    const SizedBox(height: 8),
-                    Material(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.info_outline,
-                                size: 18, color: Colors.amber.shade900),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                r != null &&
-                                        r.isMasterOrder &&
-                                        r.subOrders.isNotEmpty
-                                    ? 'Recogida en almacén: '
-                                        '${r.subOrdersRecogidasAlmacenCount}/${r.subOrders.length} lista(s).'
-                                    : varios
-                                        ? 'Podrá confirmar cuando el transportista haya marcado '
-                                            'la recogida en almacén para este proveedor.'
-                                        : 'Podrá confirmar cuando el transportista confirme '
-                                            'recogida en almacén.',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  height: 1.35,
-                                  color: Colors.amber.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                   if (b.pagoPendienteEnTransito) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -201,7 +158,6 @@ List<AliadoConfirmarRecepcionBloque> aliadoRecepcionBloquesDesdePedido({
   required List<TransactionRequestModel> lines,
   required bool Function(TransactionRequestModel line) lineaPuedeConfirmar,
   required bool Function(List<TransactionRequestModel> chunk) chunkPuedeConfirmar,
-  required bool Function(List<TransactionRequestModel> chunk) chunkEsperaRecogida,
   required String? Function(List<TransactionRequestModel> chunk) busyKeyForChunk,
   required String? entregaBusyId,
   required void Function(TransactionRequestModel line) onConfirmarLinea,
@@ -241,16 +197,10 @@ List<AliadoConfirmarRecepcionBloque> aliadoRecepcionBloquesDesdePedido({
         puedeConfirmar: chunk.length == 1
             ? lineaPuedeConfirmar(ref)
             : chunkPuedeConfirmar(chunk),
-        esperaRecogidaTransportista: chunk.length == 1
-            ? ((ref.status == TransactionRequestStatus.enTransito ||
-                    ref.status == TransactionRequestStatus.enviado) &&
-                !lineaPuedeConfirmar(ref))
-            : chunkEsperaRecogida(chunk),
         onConfirmar: chunk.length == 1
             ? () => onConfirmarLinea(ref)
             : () => onConfirmarChunk(chunk),
         pagoPendienteEnTransito: chunk.any((r) => r.pagoMotolinkPendienteEnTransito),
-        requestRef: ref,
       ),
     );
   }

@@ -1,14 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:latlong2/latlong.dart' hide Haversine;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/aliado_motolink_cupo_snapshot.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
 import '../models/commission_settlement_model.dart';
-import '../models/credit_limit_exception.dart';
 import '../models/document_review_status.dart';
 import '../models/document_type_preference.dart';
 import '../models/in_app_notification_model.dart';
@@ -25,11 +22,9 @@ import '../models/transaction_request_message_model.dart';
 import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
-import '../models/transportista_info_model.dart';
 import '../utils/app_date_format.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
-import '../utils/maps_route_utils.dart';
 import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
 import 'motolink_commission_invoice_pdf_service.dart';
@@ -332,7 +327,7 @@ class SupabaseService {
     return ProfileModel.fromJson(Map<String, dynamic>.from(data));
   }
 
-  /// Nombre de negocio para mostrar (p. ej. transportista asignado).
+  /// Nombre de negocio para mostrar en etiquetas de pedido.
   static Future<String?> fetchProfileBusinessName(String profileId) async {
     final id = profileId.trim();
     if (id.isEmpty) return null;
@@ -395,8 +390,7 @@ class SupabaseService {
     final existingRole = existing?.role?.trim().toLowerCase();
     final roleAlreadySet = existingRole == 'importador' ||
         existingRole == 'aliado' ||
-        existingRole == 'administrador' ||
-        existingRole == 'transportista';
+        existingRole == 'administrador';
 
     final payload = <String, dynamic>{
       'id': uid,
@@ -821,10 +815,39 @@ class SupabaseService {
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
+    credit_plan_type,
+    credit_plan_confirmed_at,
+    credit_monto_bloqueado,
+    transit_eta_days,
+    transit_eta_hours,
+    transit_eta_set_at,
+    at_aprobado_admin,
+    at_rechazado,
+    at_en_preparacion,
+    at_pedido_listo,
+    at_en_transito,
+    at_entregado,
+    factura_aliado_storage_path,
+    factura_aliado_file_name,
+    factura_aliado_submitted_at,
     created_at,
     updated_at,
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
-    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude )
+    payment_schedule (
+      id,
+      transaction_request_id,
+      installment_index,
+      amount_usd,
+      due_on,
+      pago_metodo,
+      pago_comprobante_storage_path,
+      pago_comprobante_file_name,
+      pago_submitted_at,
+      pago_estado_revision,
+      pago_comprobante_rechazo_nota,
+      pago_aprobado_at
+    ),
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, credit_limit ),
+    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status )
   ''';
 
   static String get _trSelectForListWithSubs => _trSelectMotoconecta;
@@ -984,12 +1007,6 @@ class SupabaseService {
         .toList();
   }
 
-  /// MotoConecta no asigna transportista en app.
-  static Future<List<TransactionRequestModel>>
-      fetchClosedTransactionRequestsForTransportista() async {
-    return [];
-  }
-
   /// Reportes admin: encomiendas en un rango de fechas (`created_at`), con filtros opcionales en servidor.
   static Future<List<TransactionRequestModel>>
       fetchTransactionRequestsForAdminReport({
@@ -1050,29 +1067,6 @@ class SupabaseService {
         .map((row) =>
             ProfileModel.fromJson(Map<String, dynamic>.from(row as Map)))
         .toList();
-  }
-
-  /// Broker: actualiza el cupo negociable del aliado (`profiles.credit_limit`) con auditoría.
-  /// [creditoPreactivadoPorAdmin]: puede usar línea MotoLink aun en fase contado (solo si admin lo autoriza).
-  static Future<void> adminSetAliadoCreditLimit({
-    required String aliadoId,
-    required double creditLimit,
-    bool creditoPreactivadoPorAdmin = false,
-    required String reason,
-  }) async {
-    final t = reason.trim();
-    if (t.isEmpty) {
-      throw ArgumentError('Debe indicar el motivo del ajuste (auditoría de cupo).');
-    }
-    await _client.rpc(
-      'admin_set_aliado_credit_limit',
-      params: <String, dynamic>{
-        'p_aliado_id': aliadoId,
-        'p_credit_limit': creditLimit,
-        'p_credito_preactivado': creditoPreactivadoPorAdmin,
-        'p_reason': t,
-      },
-    );
   }
 
   /// Broker: actualiza estado KYC del aliado.
@@ -1267,68 +1261,7 @@ class SupabaseService {
     }
   }
 
-  /// Suma efectiva retenida contra el cupo (incl. cuotas de plan ya liberadas al aprobar pago).
-  static Future<double> fetchOpenCreditExposureForAliado(String aliadoId) async {
-    if (aliadoId.trim().isEmpty) return 0;
-    try {
-      final v = await _client.rpc(
-        'aliado_effective_open_exposure',
-        params: <String, dynamic>{'p_aliado_id': aliadoId},
-      );
-      if (v is num) return v.toDouble();
-      return 0.0;
-    } on PostgrestException catch (e) {
-      final missingRpc = e.code == 'PGRST202' ||
-          e.message.contains('aliado_effective_open_exposure');
-      if (!missingRpc) rethrow;
-      return _sumOpenCreditExposureFallback(aliadoId);
-    }
-  }
-
-  /// Misma suma que [aliado_effective_open_exposure] cuando el RPC no está en la base (PGRST202).
-  static Future<double> _sumOpenCreditExposureFallback(String aliadoId) async {
-    const statuses =
-        TransactionRequestStatus.motoconectaAliadoCreditExposureStatuses;
-    final response = await _client
-        .from('transaction_requests')
-        .select('precio_total_usd')
-        .eq('aliado_id', aliadoId)
-        .inFilter('status', statuses);
-    var total = 0.0;
-    for (final row in response as List<dynamic>) {
-      if (row is! Map) continue;
-      final p = row['precio_total_usd'];
-      if (p is num) total += p.toDouble();
-    }
-    return total;
-  }
-
-  /// Suma de bloqueo de cupo en pedidos no rechazados (RPC `aliado_effective_open_exposure`):
-  /// saldo activo; en planes a cuotas baja al aprobar pagos. Incluye entregas con plan y saldo pendiente.
-  static Future<double> fetchOpenCreditExposureForCurrentAliado() async {
-    final uid = _currentUserId;
-    if (uid == null) return 0;
-    return fetchOpenCreditExposureForAliado(uid);
-  }
-
-  /// Corte atómico (límite, imputado, saldo activo) para coherente [Disponible] en el perfil.
-  static Future<AliadoMotoLinkCupoSnapshot?> fetchAliadoMotoLinkCupoSnapshot() async {
-    if (_currentUserId == null) return null;
-    final v = await _client.rpc('aliado_motolink_cupo_snapshot');
-    if (v is List && v.isNotEmpty) {
-      final m = v.first;
-      if (m is Map) {
-        return AliadoMotoLinkCupoSnapshot.fromRpcRow(
-          Map<String, dynamic>.from(m),
-        );
-      }
-    } else if (v is Map) {
-      return AliadoMotoLinkCupoSnapshot.fromRpcRow(Map<String, dynamic>.from(v));
-    }
-    return null;
-  }
-
-  /// Cantidad de pedidos abiertos (misma lista que el cupo).
+  /// Cantidad de pedidos abiertos (no entregados ni rechazados).
   static Future<int> fetchOpenTransactionRequestCountForCurrentAliado() async {
     final uid = _currentUserId;
     if (uid == null) return 0;
@@ -1344,8 +1277,6 @@ class SupabaseService {
 
     return (response as List<dynamic>).length;
   }
-
-  static const double _creditTol = 0.01;
 
   static Future<void> insertTransactionRequest({
     required String productId,
@@ -1405,7 +1336,7 @@ class SupabaseService {
 
     // Misma regla en toda la vida del aliado: RIF + domicilio (ya validado arriba); solo
     // documentación explícitamente rechazada bloquea pedidos al contado. KYC completo no es
-    // requisito para generar pedidos (sí para cupo y métodos ampliados cuando aplique).
+    // requisito para generar pedidos.
     final rif = profile.rif?.trim();
     if (rif == null || rif.isEmpty) {
         throw KycVerificationException(
@@ -1461,19 +1392,6 @@ class SupabaseService {
           'tener un pedido activo a la vez. Cuando el actual se entregue o lo cancele con MotoLink, '
           'podrá solicitar otro.',
         );
-      }
-    } else {
-      final limit = profile.creditLimit;
-      if (limit != null && limit > 0) {
-    final exposure = await fetchOpenCreditExposureForCurrentAliado();
-        final consumido = profile.creditoConsumidoAcumulado ?? 0;
-        if (exposure + consumido + total > limit + _creditTol) {
-      throw CreditLimitException(
-            'Este pedido (${total.toStringAsFixed(2)} REF) más su uso de línea actual '
-            '(${(exposure + consumido).toStringAsFixed(2)} REF: ver perfil) '
-            'supera su límite autorizado (${limit.toStringAsFixed(2)} REF).',
-          );
-        }
       }
     }
 
@@ -2183,17 +2101,7 @@ class SupabaseService {
     );
   }
 
-  /// Aliado: solicita pago con línea de crédito MotoLink (sin archivo; revisión admin).
-  static Future<void> aliadoDeclararPagoCreditoSistema({
-    required String transactionRequestId,
-  }) async {
-    await _client.rpc(
-      'aliado_declara_pago_credito_sistema',
-      params: <String, dynamic>{'p_request_id': transactionRequestId},
-    );
-  }
-
-  /// MotoLink o transportista: sube foto respaldo y registra vía RPC.
+  /// MotoLink: sube foto respaldo del cobro en efectivo y registra vía RPC.
   static Future<void> registrarRespaldoCobroEfectivo({
     required String transactionRequestId,
     required Uint8List bytes,
@@ -2236,280 +2144,6 @@ class SupabaseService {
       } catch (_) {}
       rethrow;
     }
-  }
-
-  /// Transportista: lectura de su expediente (`transportista_info`).
-  static Future<TransportistaInfoModel?> fetchMyTransportistaInfo() async {
-    final uid = currentUserId;
-    if (uid == null) return null;
-    final row = await _client
-        .from('transportista_info')
-        .select()
-        .eq('id', uid)
-        .maybeSingle();
-    if (row == null) return null;
-    return TransportistaInfoModel.fromJson(Map<String, dynamic>.from(row));
-  }
-
-  /// Tras geocodificar el domicilio en perfil: mantiene alineadas las coords de [transportista_info]
-  /// (usadas por el RPC de proximidad). Inserta fila mínima si aún no existe.
-  static Future<void> syncTransportistaInfoBaseFromProfileCoordinates({
-    required double latitude,
-    required double longitude,
-    String? rifAlignedWithProfile,
-  }) async {
-    final uid = currentUserId;
-    if (uid == null) return;
-    final now = DateTime.now().toUtc().toIso8601String();
-    final rif = rifAlignedWithProfile?.trim();
-    final existing = await _client
-        .from('transportista_info')
-        .select('id')
-        .eq('id', uid)
-        .maybeSingle();
-    if (existing != null) {
-      final patch = <String, dynamic>{
-        'base_operativa_latitude': latitude,
-        'base_operativa_longitude': longitude,
-        'location_updated_at': now,
-        'updated_at': now,
-      };
-      if (rif != null && rif.isNotEmpty) {
-        patch['rif'] = rif;
-      }
-      await _client.from('transportista_info').update(patch).eq('id', uid);
-      return;
-    }
-    await _client.from('transportista_info').insert({
-      'id': uid,
-      if (rif != null && rif.isNotEmpty) 'rif': rif,
-      'base_operativa_latitude': latitude,
-      'base_operativa_longitude': longitude,
-      'location_updated_at': now,
-      'updated_at': now,
-    });
-  }
-
-  /// Transportista: crea o actualiza expediente y base operativa.
-  static Future<void> upsertMyTransportistaInfo({
-    required double baseOperativaLatitude,
-    required double baseOperativaLongitude,
-    String? rif,
-    String? documentoConstitutivoStoragePath,
-    String? rifDocumentoStoragePath,
-    String? otrosDocumentosStoragePath,
-  }) async {
-    final uid = currentUserId;
-    if (uid == null) {
-      throw StateError('Se requiere sesión para guardar transportista_info.');
-    }
-    final now = DateTime.now().toUtc().toIso8601String();
-    await _client.from('transportista_info').upsert({
-      'id': uid,
-      'rif': rif,
-      'documento_constitutivo_storage_path': documentoConstitutivoStoragePath,
-      'rif_documento_storage_path': rifDocumentoStoragePath,
-      'otros_documentos_storage_path': otrosDocumentosStoragePath,
-      'base_operativa_latitude': baseOperativaLatitude,
-      'base_operativa_longitude': baseOperativaLongitude,
-      'location_updated_at': now,
-      'updated_at': now,
-    });
-  }
-
-  /// MotoLink: ranking de transportistas por distancia media a los almacenes (perfil importador).
-  static Future<List<TransportistaProximityCandidate>>
-      adminRankTransportistasByImporterProximity({
-    required List<String> importerProfileIds,
-    int limit = 20,
-  }) async {
-    final res = await _client.rpc(
-      'rpc_rank_transportistas_by_importer_proximity',
-      params: <String, dynamic>{
-        'p_importer_profile_ids': importerProfileIds,
-        'p_limit': limit,
-      },
-    );
-    if (res == null) return const <TransportistaProximityCandidate>[];
-    if (res is! List) return const <TransportistaProximityCandidate>[];
-    return res
-        .map((e) {
-          if (e is! Map) return null;
-          return TransportistaProximityCandidate.fromJson(
-            Map<String, dynamic>.from(e),
-          );
-        })
-        .whereType<TransportistaProximityCandidate>()
-        .toList();
-  }
-
-  /// MotoLink: asigna o desasigna transportista en un pedido maestro o simple.
-  static Future<void> adminAssignTransportistaPedido({
-    required String requestId,
-    String? transportistaId,
-    String? cambioMotivoEnTransito,
-  }) async {
-    final m = cambioMotivoEnTransito?.trim();
-    final params = <String, dynamic>{
-      'p_request_id': requestId,
-      'p_transportista_id': transportistaId,
-      // Siempre enviar el tercer argumento para que PostgREST resuelva la única firma (uuid, uuid, text).
-      'p_cambio_motivo':
-          (m != null && m.isNotEmpty) ? m : null,
-    };
-    await _client.rpc(
-      'admin_assign_transportista_pedido',
-      params: params,
-    );
-  }
-
-  /// Transportista asignado: confirma la orden e indica tiempo estimado de gestión (días 0–365, horas 0–23).
-  static Future<void> transportistaAcknowledgeAssignment({
-    required String requestId,
-    required int gestionEtaDays,
-    required int gestionEtaHours,
-  }) async {
-    await _client.rpc(
-      'transportista_acknowledge_assignment',
-      params: <String, dynamic>{
-        'p_request_id': requestId,
-        'p_gestion_eta_days': gestionEtaDays,
-        'p_gestion_eta_hours': gestionEtaHours,
-      },
-    );
-  }
-
-  /// Transportista asignado: rechaza la asignación (quita asignación) con motivo obligatorio.
-  static Future<void> transportistaDeclineAssignment({
-    required String requestId,
-    required String motivo,
-  }) async {
-    await _client.rpc(
-      'transportista_decline_assignment',
-      params: <String, dynamic>{
-        'p_request_id': requestId,
-        'p_motivo': motivo,
-      },
-    );
-  }
-
-  /// Transportista: confirma retiro de carga en almacén del importador.
-  /// Pedido maestro: [subOrderId] obligatorio; pedido simple: [subOrderId] null.
-  static Future<void> transportistaMarcaRecogidaEnAlmacen({
-    required String requestId,
-    String? subOrderId,
-  }) async {
-    await _client.rpc(
-      'transportista_marca_recogida_en_almacen',
-      params: <String, dynamic>{
-        'p_request_id': requestId,
-        'p_sub_order_id': subOrderId,
-      },
-    );
-  }
-
-  /// Transportista: publica en servidor la URL de Maps con almacenes **pendientes** y destino.
-  /// Usa la posición en vivo reciente del pedido si aplica. Devuelve `false` si no hubo URL válida.
-  static Future<bool> transportistaTryRefreshRutaMapsRemaining(
-    String requestId,
-  ) async {
-    final uid = _currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-    final r = await fetchTransactionRequestById(requestId);
-    if (r == null) return false;
-    if (r.assignedTransportistaId?.trim() != uid) return false;
-    if (r.status != TransactionRequestStatus.enTransito) return false;
-    final tid = r.assignedTransportistaId!.trim();
-    final transportista = await fetchProfileById(tid);
-    LatLng? live;
-    if (r.transportistaLiveLocationOptIn && r.hasRecentTransportistaLiveLocation) {
-      final la = r.transportistaLiveLat;
-      final lo = r.transportistaLiveLng;
-      if (la != null && lo != null) live = LatLng(la, lo);
-    }
-    final uri = googleMapsRemainingRouteUrl(
-          request: r,
-          transportista: transportista,
-          livePosition: live,
-        ) ??
-        googleMapsRemainingRouteAddressFallback(
-          request: r,
-          transportista: transportista,
-        ) ??
-        googleMapsDrivingDirectionsSupplierToAliado(
-          r,
-          originOverride: live,
-        );
-    await _client.rpc(
-      'transportista_publica_ruta_maps_actualizada',
-      params: <String, dynamic>{
-        'p_request_id': requestId,
-        'p_maps_url': uri.toString(),
-      },
-    );
-    return true;
-  }
-
-  static Future<void> transportistaSetLiveTrackingOptIn({
-    required String requestId,
-    required bool enabled,
-  }) async {
-    await _client.rpc(
-      'transportista_set_live_tracking_opt_in',
-      params: <String, dynamic>{
-        'p_request_id': requestId,
-        'p_enabled': enabled,
-      },
-    );
-  }
-
-  static Future<void> transportistaReportLiveLocation({
-    required String requestId,
-    required double lat,
-    required double lng,
-  }) async {
-    await _client.rpc(
-      'transportista_report_live_location',
-      params: <String, dynamic>{
-        'p_request_id': requestId,
-        'p_lat': lat,
-        'p_lng': lng,
-      },
-    );
-  }
-
-  /// MotoLink: tras asignar transportista, intenta publicar `admin_ruta_maps_url`
-  /// (base → almacén(es) → destino) si hay al menos dos puntos con coordenadas.
-  /// No lanza si faltan datos; devuelve `false` si no se guardó URL.
-  static Future<bool> adminTryAutoPublishRutaMapsUrl(String requestId) async {
-    final uid = _currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-    final me = await fetchMyProfile();
-    if (me?.role?.trim().toLowerCase() != 'administrador') {
-      throw StateError('Solo MotoLink puede publicar la ruta.');
-    }
-    final r = await fetchTransactionRequestById(requestId);
-    if (r == null || !r.hasAssignedTransportista) return false;
-    if (!TransactionRequestStatus.adminOperationalActive.contains(r.status)) {
-      return false;
-    }
-    final tid = r.assignedTransportistaId!.trim();
-    final transportista = await fetchProfileById(tid);
-    final coordUri = googleMapsAutoRutaForAssignedPedido(
-      request: r,
-      transportista: transportista,
-    );
-    final uri = coordUri ??
-        googleMapsAutoRutaAddressFallback(
-          request: r,
-          transportista: transportista,
-        ) ??
-        googleMapsDrivingDirectionsSupplierToAliado(r);
-    await _client.from('transaction_requests').update({
-      'admin_ruta_maps_url': uri.toString(),
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', requestId);
-    return true;
   }
 
   static Future<void> adminAprobarPagoAliado(String requestId) async {
@@ -2892,6 +2526,22 @@ class SupabaseService {
     }).eq('id', transactionRequestId);
   }
 
+  /// Importador: `pedido_listo` → `en_transito` con ETA obligatorio (días 0–365, horas 0–23).
+  static Future<void> importerMarcaPedidoEnTransito({
+    required String requestId,
+    required int transitEtaDays,
+    required int transitEtaHours,
+  }) async {
+    await _client.rpc(
+      'importer_marca_pedido_en_transito',
+      params: <String, dynamic>{
+        'p_request_id': requestId,
+        'p_transit_eta_days': transitEtaDays,
+        'p_transit_eta_hours': transitEtaHours,
+      },
+    );
+  }
+
   /// MotoLink: pasa el pedido a `en_transito`. [transitEtaDays]/[transitEtaHours] son opcionales
   /// (por defecto 0); el ETA en vivo se espera en el enlace de Google Maps del pedido.
   static Future<void> adminMarcaPedidoEnTransito({
@@ -3025,6 +2675,48 @@ class SupabaseService {
     return out;
   }
 
+  /// Documentos KYC aprobados de una contraparte con la que el usuario comparte pedido.
+  static Future<List<ProfileDocumentModel>> fetchCounterpartyProfileDocuments(
+    String counterpartyProfileId,
+  ) async {
+    final pid = counterpartyProfileId.trim();
+    if (pid.isEmpty) return [];
+
+    final response = await _client
+        .from('profile_documents')
+        .select(_profileDocumentsSelect)
+        .eq('profile_id', pid)
+        .eq('is_current', true)
+        .eq('review_status', DocumentReviewStatus.aprobado)
+        .order('doc_type', ascending: true);
+
+    final list = response as List<dynamic>;
+    return list
+        .map(
+          (row) => ProfileDocumentModel.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
+        .toList();
+  }
+
+  static Future<void> insertTransactionRequestMessageAsImportador({
+    required String transactionRequestId,
+    required String body,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final t = body.trim();
+    if (t.isEmpty) return;
+
+    await _client.from('transaction_request_messages').insert({
+      'transaction_request_id': transactionRequestId,
+      'author_id': uid,
+      'author_role': 'importador',
+      'body': t,
+    });
+  }
+
   static Future<void> insertTransactionRequestMessageAsAliado({
     required String transactionRequestId,
     required String body,
@@ -3055,23 +2747,6 @@ class SupabaseService {
       'transaction_request_id': transactionRequestId,
       'author_id': uid,
       'author_role': 'administrador',
-      'body': t,
-    });
-  }
-
-  static Future<void> insertTransactionRequestMessageAsTransportista({
-    required String transactionRequestId,
-    required String body,
-  }) async {
-    final uid = _currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-    final t = body.trim();
-    if (t.isEmpty) return;
-
-    await _client.from('transaction_request_messages').insert({
-      'transaction_request_id': transactionRequestId,
-      'author_id': uid,
-      'author_role': 'transportista',
       'body': t,
     });
   }
@@ -3112,8 +2787,8 @@ class SupabaseService {
     );
   }
 
-  /// [amountsUsd]: 1–3 importes en USD cuya suma = `precio_total` del pedido.
-  static Future<void> confirmOrderCreditPlan({
+  /// Importador: acuerda 1–3 cuotas cuya suma = total del pedido; notifica en el chat.
+  static Future<void> importerConfirmOrderCreditPlan({
     required String transactionRequestId,
     required List<double> amountsUsd,
     required bool montosPersonalizados,
@@ -3127,7 +2802,7 @@ class SupabaseService {
       suma += a;
     }
     await _client.rpc(
-      'admin_confirm_order_credit_plan',
+      'importer_confirm_order_credit_plan',
       params: <String, dynamic>{
         'p_request_id': transactionRequestId,
         'p_amounts_usd': amountsUsd,
@@ -3146,15 +2821,14 @@ class SupabaseService {
       }
     }
     final atStr = formatEsShortDateTime(confirmadoEn);
-    final w = StringBuffer()..write('MOTO-SISTEMA: ');
+    final w = StringBuffer();
     if (n == 1) {
       w.write(
-        'MotoLink fijó 1 cuota (contado) por '
-        '${suma.toStringAsFixed(2)} REF. ',
+        'Acordamos 1 cuota (contado) por ${suma.toStringAsFixed(2)} REF. ',
       );
     } else {
       w.write(
-        'MotoLink fijó $n cuotas (cada 15 días) por un total de '
+        'Acordamos $n cuotas (cada 15 días) por un total de '
         '${suma.toStringAsFixed(2)} REF. ',
       );
     }
@@ -3162,14 +2836,25 @@ class SupabaseService {
       w.write('Desglose personalizado. ');
     }
     w.write(
-      'Confirmado: $atStr. Vea en la sección Pago importes y vencimientos de cada cuota.',
+      'Confirmado: $atStr. Revise la sección Pago del pedido para vencimientos y comprobantes.',
     );
-    final body = w.toString();
-    await insertTransactionRequestMessageAsAdmin(
+    await insertTransactionRequestMessageAsImportador(
       transactionRequestId: transactionRequestId,
-      body: body,
+      body: w.toString(),
     );
   }
+
+  /// @deprecated Use [importerConfirmOrderCreditPlan]. Conservado por compatibilidad interna.
+  static Future<void> confirmOrderCreditPlan({
+    required String transactionRequestId,
+    required List<double> amountsUsd,
+    required bool montosPersonalizados,
+  }) =>
+      importerConfirmOrderCreditPlan(
+        transactionRequestId: transactionRequestId,
+        amountsUsd: amountsUsd,
+        montosPersonalizados: montosPersonalizados,
+      );
 
   /// Sólo total del pedido (hilo de chat / cupo de cuotas).
   static Future<double?> fetchTransactionRequestPrecioTotal(
@@ -3179,11 +2864,11 @@ class SupabaseService {
     if (id.isEmpty) return null;
     final row = await _client
         .from('transaction_requests')
-        .select('precio_total')
+        .select('precio_total_usd')
         .eq('id', id)
         .maybeSingle();
     if (row == null) return null;
-    final pt = Map<String, dynamic>.from(row)['precio_total'];
+    final pt = Map<String, dynamic>.from(row)['precio_total_usd'];
     if (pt is num) return pt.toDouble();
     return double.tryParse(pt?.toString() ?? '');
   }

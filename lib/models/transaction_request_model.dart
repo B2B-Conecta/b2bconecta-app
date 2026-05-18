@@ -47,6 +47,8 @@ class TransactionRequestModel {
     this.aliadoFiscalMapsUrl,
     this.aliadoLatitude,
     this.aliadoLongitude,
+    this.aliadoLogoStoragePath,
+    this.aliadoKycStatus,
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
@@ -56,6 +58,8 @@ class TransactionRequestModel {
     this.ownerFiscalMapsUrl,
     this.ownerLatitude,
     this.ownerLongitude,
+    this.ownerLogoStoragePath,
+    this.ownerKycStatus,
     this.proveedorFacturaStoragePath,
     this.proveedorFacturaFileName,
     this.proveedorFacturaSubmittedAt,
@@ -93,18 +97,6 @@ class TransactionRequestModel {
     this.subOrders = const <SubOrderModel>[],
     this.importerSubOrderId,
     this.importerViewOrderItems = const <OrderItemModel>[],
-    this.assignedTransportistaId,
-    this.transportistaAssignmentAcknowledgedAt,
-    this.transportistaRecogidaAlmacenAt,
-    this.transportistaLiveLocationOptIn = false,
-    this.transportistaLiveLat,
-    this.transportistaLiveLng,
-    this.transportistaLiveLocationAt,
-    this.transportistaDeclineMotivo,
-    this.transportistaDeclinedAt,
-    this.transportistaGestionEtaDays,
-    this.transportistaGestionEtaHours,
-    this.transportistaGestionEtaSetAt,
     this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
     this.facturaUrl,
     this.checkoutGroupId,
@@ -160,6 +152,8 @@ class TransactionRequestModel {
   final String? aliadoFiscalMapsUrl;
   final double? aliadoLatitude;
   final double? aliadoLongitude;
+  final String? aliadoLogoStoragePath;
+  final String? aliadoKycStatus;
 
   final String? ownerBusinessName;
   final String? ownerRif;
@@ -170,6 +164,8 @@ class TransactionRequestModel {
   final String? ownerFiscalMapsUrl;
   final double? ownerLatitude;
   final double? ownerLongitude;
+  final String? ownerLogoStoragePath;
+  final String? ownerKycStatus;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -195,7 +191,7 @@ class TransactionRequestModel {
   final String? pagoComprobanteRechazoNota;
   final DateTime? pagoAprobadoAt;
 
-  /// Foto respaldo de cobro en efectivo (`order-payment-proofs`), registra transportista/MotoLink.
+  /// Foto respaldo de cobro en efectivo (`order-payment-proofs`), registra MotoLink.
   final String? efectivoRespaldoStoragePath;
   final String? efectivoRespaldoFileName;
   final DateTime? efectivoRespaldoSubmittedAt;
@@ -208,7 +204,7 @@ class TransactionRequestModel {
   /// URL de Google Maps de la ruta publicada por MotoLink (visible en tránsito).
   final String? adminRutaMapsUrl;
 
-  /// 1 = contado (1 cuota), 2 o 3 cuotas (cada 15 días), fijado por admin en el chat.
+  /// 1 = contado (1 cuota), 2 o 3 cuotas (cada 15 días), acordado por el importador.
   final int? creditPlanType;
   final DateTime? creditPlanConfirmedAt;
   final double? creditMontoBloqueado;
@@ -236,30 +232,6 @@ class TransactionRequestModel {
 
   /// Líneas del sub-pedido del importador (solo en listados por `sub_orders`; ver [orderItemsParaVistaImportador]).
   final List<OrderItemModel> importerViewOrderItems;
-
-  /// Transportista asignado al pedido (`transaction_requests.assigned_transportista_id`).
-  final String? assignedTransportistaId;
-
-  /// Cuándo el transportista confirmó en la app haber recibido la asignación.
-  final DateTime? transportistaAssignmentAcknowledgedAt;
-
-  /// Pedido simple: retiro confirmado en almacén del importador (`owner`).
-  final DateTime? transportistaRecogidaAlmacenAt;
-
-  /// El transportista autoriza enviar coordenadas del teléfono para este envío (`en_transito`).
-  final bool transportistaLiveLocationOptIn;
-  final double? transportistaLiveLat;
-  final double? transportistaLiveLng;
-  final DateTime? transportistaLiveLocationAt;
-
-  /// Motivo si el transportista rechazó la asignación antes de confirmar.
-  final String? transportistaDeclineMotivo;
-  final DateTime? transportistaDeclinedAt;
-
-  /// Tiempo de gestión estimado declarado al confirmar la asignación (independiente del ETA de tránsito MotoLink).
-  final int? transportistaGestionEtaDays;
-  final int? transportistaGestionEtaHours;
-  final DateTime? transportistaGestionEtaSetAt;
 
   /// Emisiones de documento MotoLink al aliado (nota / factura; puede haber varias hojas).
   final List<MotolinkAllyDocumentEmissionModel> motolinkAllyDocumentEmissions;
@@ -299,75 +271,10 @@ class TransactionRequestModel {
   bool get hasMultiFragmentMotolinkAllyDocs =>
       motolinkAllyInvoicesDescargables.any((e) => e.fragmentTotal > 1);
 
-  /// Perfiles importador (almacenes) para el RPC de proximidad: sub-pedidos o dueño en pedido simple.
-  List<String> get importerProfileIdsForTransportistaProximity {
-    if (isMasterOrder && subOrders.isNotEmpty) {
-      final ids = <String>{};
-      for (final s in subOrders) {
-        final id = s.importadorId.trim();
-        if (id.isNotEmpty) ids.add(id);
-      }
-      return ids.toList();
-    }
-    final o = ownerId.trim();
-    if (o.isEmpty) return const <String>[];
-    return <String>[o];
-  }
-
-  bool get canComputeTransportistaProximity =>
-      importerProfileIdsForTransportistaProximity.isNotEmpty;
-
-  bool get hasAssignedTransportista =>
-      assignedTransportistaId != null &&
-      assignedTransportistaId!.trim().isNotEmpty;
-
-  bool get transportistaReconocioAsignacion =>
-      transportistaAssignmentAcknowledgedAt != null;
-
-  /// Texto legible del ETA de gestión declarado por el transportista (null si no aplica).
-  String? get transportistaGestionEtaLabelEs {
-    final d = transportistaGestionEtaDays ?? 0;
-    final h = transportistaGestionEtaHours ?? 0;
-    if (d <= 0 && h <= 0) return null;
-    if (d > 0 && h > 0) return '$d día(s) y $h hora(s)';
-    if (d > 0) return '$d día(s)';
-    return '$h hora(s)';
-  }
-
-  /// Tramos maestro con retiro en almacén ya marcado.
-  int get subOrdersRecogidasAlmacenCount {
-    if (!isMasterOrder || subOrders.isEmpty) return 0;
-    return subOrders.where((s) => s.transportistaRecogioEnAlmacen).length;
-  }
-
-  /// Pedido simple: ya hubo confirmación de retiro en almacén.
-  bool get transportistaRecogioAlmacenSimple =>
-      transportistaRecogidaAlmacenAt != null;
-
-  /// Hay coordenadas recientes de tracking en vivo (p. ej. para el mapa).
-  bool get hasRecentTransportistaLiveLocation {
-    if (transportistaLiveLat == null || transportistaLiveLng == null) {
-      return false;
-    }
-    final t = transportistaLiveLocationAt;
-    if (t == null) return false;
-    return DateTime.now().difference(t) < const Duration(minutes: 12);
-  }
-
-  /// Todo lo necesario en almacén antes de seguir ruta al aliado (p. ej. flujo con transportista asignado en app).
-  /// Sin transportista en plataforma: en `en_transito` el aliado puede confirmar recepción al recibir.
-  bool get transportistaCompletoRecogidaAlmacen {
-    if (status != TransactionRequestStatus.enTransito &&
-        status != TransactionRequestStatus.enviado) {
-      return false;
-    }
-    if (!hasAssignedTransportista) return true;
-    if (isMasterOrder && subOrders.isNotEmpty) {
-      return subOrders.isNotEmpty &&
-          subOrders.every((s) => s.transportistaRecogioEnAlmacen);
-    }
-    return transportistaRecogioAlmacenSimple;
-  }
+  /// El aliado puede confirmar recepción cuando el pedido está en tránsito o enviado.
+  bool get puedeConfirmarRecepcionAliado =>
+      status == TransactionRequestStatus.enTransito ||
+      status == TransactionRequestStatus.enviado;
 
   bool get hasAgreedCreditPlan =>
       creditPlanType != null &&
@@ -376,6 +283,8 @@ class TransactionRequestModel {
       paymentSchedule.isNotEmpty;
 
   /// True si la cuota 1 ya tiene comprobante, envío a revisión o no está pendiente: el plan no se puede cambiar.
+  bool get creditPlanLockedForReschedule => creditPlanLockedForAdminReschedule;
+
   bool get creditPlanLockedForAdminReschedule {
     if (!hasAgreedCreditPlan) return false;
     for (final c in paymentSchedule) {
@@ -390,7 +299,7 @@ class TransactionRequestModel {
     return false;
   }
 
-  /// Suma de cuotas ya aprobadas por MotoLink.
+  /// Suma de cuotas ya verificadas por el importador.
   double get montoAprobadoEnPlanCuotas {
     var s = 0.0;
     for (final c in paymentSchedule) {
@@ -490,9 +399,6 @@ class TransactionRequestModel {
     return businessDaysElapsedAfterUtcDate(at.toUtc()) >= 3;
   }
 
-  /// Muestra línea MotoLink en ficha de pedido (`credit_limit` > 0).
-  bool get muestraCreditoMotoLinkAsignadoEnPedido => (aliadoCreditLimit ?? 0) > 0;
-
   /// Total pedido en bolívares (solo presentación UI). Fuente de verdad: [precioTotal] en REF.
   double? get precioTotalBsUi =>
       tasaBcvSnapshot != null ? precioTotal * tasaBcvSnapshot! : null;
@@ -553,73 +459,6 @@ class TransactionRequestModel {
     final bn = ownerBusinessName?.trim();
     if (bn != null && bn.isNotEmpty) return bn;
     return 'Almacén importador';
-  }
-
-  /// Origen(s) de recogida para el transportista: un bloque por almacén en pedido maestro.
-  String get transportistaOrigenRecoleccionTextoEs {
-    if (isMasterOrder && subOrders.isNotEmpty) {
-      final sorted = List<SubOrderModel>.from(subOrders)
-        ..sort((a, b) => a.id.compareTo(b.id));
-      final buf = StringBuffer();
-      for (var i = 0; i < sorted.length; i++) {
-        final s = sorted[i];
-        if (i > 0) buf.writeln();
-        final idx = i + 1;
-        final name = s.importadorBusinessName?.trim();
-        final title =
-            (name != null && name.isNotEmpty) ? name : 'Almacén $idx';
-        final pick = s.transportistaRecogioEnAlmacen ? ' · recogido' : '';
-        buf.writeln('$idx. $title$pick');
-        final locParts = <String>[];
-        final est = s.importadorEstado?.trim();
-        final ciu = s.importadorCiudad?.trim();
-        if (est != null && est.isNotEmpty) locParts.add(est);
-        if (ciu != null && ciu.isNotEmpty) locParts.add(ciu);
-        if (locParts.isNotEmpty) buf.writeln(locParts.join(' · '));
-        final dir = s.importadorDireccion?.trim();
-        if (dir != null && dir.isNotEmpty) buf.writeln(dir);
-        final ph = s.importadorPhone?.trim();
-        if (ph != null && ph.isNotEmpty) buf.writeln('Tel: $ph');
-        final rif = s.importadorRif?.trim();
-        if (rif != null && rif.isNotEmpty) buf.writeln('RIF: $rif');
-      }
-      return buf.toString().trim();
-    }
-    final simple = ownerUbicacionFiscalMultilineaEs?.trim();
-    if (simple != null && simple.isNotEmpty) return simple;
-    final bn = ownerBusinessName?.trim();
-    if (bn != null && bn.isNotEmpty) return bn;
-    return 'Sin dirección en perfil';
-  }
-
-  /// Hay datos para abrir Maps desde el bloque de origen (enlace, coordenadas o texto).
-  bool get transportistaOrigenPermiteAbrirMapa {
-    if (isMasterOrder && subOrders.isNotEmpty) {
-      for (final s in subOrders) {
-        if (s.importadorFiscalMapsUrl?.trim().isNotEmpty == true) {
-          return true;
-        }
-        if (s.importadorLatitude != null && s.importadorLongitude != null) {
-          return true;
-        }
-        final loc = [
-          s.importadorDireccion,
-          s.importadorEstado,
-          s.importadorCiudad,
-          s.importadorBusinessName,
-        ]
-            .whereType<String>()
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .join(', ');
-        if (loc.isNotEmpty) return true;
-      }
-      return false;
-    }
-    return ownerFiscalMapsUrl?.trim().isNotEmpty == true ||
-        (ownerUbicacionFiscalMultilineaEs != null &&
-            ownerUbicacionFiscalMultilineaEs!.trim().isNotEmpty) ||
-        (ownerBusinessName?.trim().isNotEmpty == true);
   }
 
   /// Texto breve de proveedor(es) importador para la línea de tiempo (p. ej. admin).
@@ -1027,7 +866,7 @@ class TransactionRequestModel {
     }
   }
 
-  /// Transportista o MotoLink pueden subir foto respaldo si aplica.
+  /// MotoLink puede subir foto respaldo del cobro en efectivo si aplica.
   bool get puedeRegistrarRespaldoEfectivo {
     if (pagoMetodo?.trim() != PagoMetodo.efectivo) return false;
     if (hasEfectivoRespaldo) return false;
@@ -1147,6 +986,8 @@ class TransactionRequestModel {
       aliadoFiscalMapsUrl: _nullableText(aliadoMap?['fiscal_maps_url']),
       aliadoLatitude: _asNullableDouble(aliadoMap?['latitude']),
       aliadoLongitude: _asNullableDouble(aliadoMap?['longitude']),
+      aliadoLogoStoragePath: _nullableText(aliadoMap?['logo_storage_path']),
+      aliadoKycStatus: _nullableText(aliadoMap?['kyc_status']),
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),
@@ -1156,6 +997,8 @@ class TransactionRequestModel {
       ownerFiscalMapsUrl: _nullableText(ownerMap?['fiscal_maps_url']),
       ownerLatitude: _asNullableDouble(ownerMap?['latitude']),
       ownerLongitude: _asNullableDouble(ownerMap?['longitude']),
+      ownerLogoStoragePath: _nullableText(ownerMap?['logo_storage_path']),
+      ownerKycStatus: _nullableText(ownerMap?['kyc_status']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:
@@ -1204,28 +1047,6 @@ class TransactionRequestModel {
       importerSubOrderId: _nullableText(json['_importer_sub_order_id']),
       importerViewOrderItems:
           _parseImporterViewOrderItems(json['_importer_view_order_items']),
-      assignedTransportistaId:
-          _nullableText(json['assigned_transportista_id']),
-      transportistaAssignmentAcknowledgedAt:
-          _parseDate(json['transportista_assignment_acknowledged_at']),
-      transportistaRecogidaAlmacenAt:
-          _parseDate(json['transportista_recogida_almacen_at']),
-      transportistaLiveLocationOptIn:
-          json['transportista_live_location_opt_in'] == true,
-      transportistaLiveLat: _asNullableDouble(json['transportista_live_lat']),
-      transportistaLiveLng: _asNullableDouble(json['transportista_live_lng']),
-      transportistaLiveLocationAt:
-          _parseDate(json['transportista_live_location_at']),
-      transportistaDeclineMotivo:
-          _nullableText(json['transportista_decline_motivo']),
-      transportistaDeclinedAt:
-          _parseDate(json['transportista_declined_at']),
-      transportistaGestionEtaDays:
-          _asNullableInt(json['transportista_gestion_eta_days']),
-      transportistaGestionEtaHours:
-          _asNullableInt(json['transportista_gestion_eta_hours']),
-      transportistaGestionEtaSetAt:
-          _parseDate(json['transportista_gestion_eta_set_at']),
       motolinkAllyDocumentEmissions:
           MotolinkAllyDocumentEmissionModel.listFromJson(
         json['motolink_ally_document_emissions'],

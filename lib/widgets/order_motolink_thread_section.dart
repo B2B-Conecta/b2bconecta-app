@@ -10,14 +10,15 @@ import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import 'main_shell_tab.dart';
 
-/// Hilo de mensajes aliado ↔ MotoLink ↔ transportista (despacho) sobre un pedido.
+/// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión MotoLink.
 class OrderMotolinkThreadSection extends StatefulWidget {
   const OrderMotolinkThreadSection({
     super.key,
     required this.transactionRequestId,
     required this.allowReplyAsAliado,
     required this.allowReplyAsAdmin,
-    this.allowReplyAsTransportista = false,
+    this.allowReplyAsImportador = false,
+    this.allowManageCreditPlan = false,
     this.onThreadChanged,
     this.orderPrecioTotalUsd,
     this.creditPlanRescheduleLocked = false,
@@ -29,14 +30,15 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   final String transactionRequestId;
   final bool allowReplyAsAliado;
   final bool allowReplyAsAdmin;
+  final bool allowReplyAsImportador;
+
+  /// Importador: acuerda plan de cuotas con el aliado (antes solo admin MotoLink).
+  final bool allowManageCreditPlan;
 
   /// Varios ids de `transaction_requests` (mismo importador en un carrito): se listan mensajes juntos.
   final List<String>? mergedThreadRequestIds;
 
-  /// Despacho asignado al pedido: puede leer y escribir en el mismo hilo que aliado y admin.
-  final bool allowReplyAsTransportista;
-
-  /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido (cuotas, cupo).
+  /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido (cuotas, pago).
   final VoidCallback? onThreadChanged;
 
   /// Total del pedido para validar la suma de las cuotas (p. ej. [TransactionRequestModel.precioTotal]).
@@ -45,7 +47,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   /// Cuando el padre ya mostró el título de sección (p. ej. carrito multi‑línea).
   final bool suppressBuiltinTitle;
 
-  /// Si [allowReplyAsAdmin] y el plan ya no puede redefinirse (p. ej. cuota 1 con comprobante).
+  /// Si el plan ya no puede redefinirse (p. ej. cuota 1 con comprobante).
   final bool creditPlanRescheduleLocked;
 
   @override
@@ -54,6 +56,8 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 }
 
 class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection> {
+  bool get _canManageCreditPlan => widget.allowManageCreditPlan;
+
   final _ctrl = TextEditingController();
   List<TransactionRequestMessageModel> _items = [];
   bool _loading = true;
@@ -396,7 +400,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     if (!mounted) return;
     setState(() => _savingPlan = true);
     try {
-      await SupabaseService.confirmOrderCreditPlan(
+      await SupabaseService.importerConfirmOrderCreditPlan(
         transactionRequestId: widget.transactionRequestId,
         amountsUsd: amounts,
         montosPersonalizados: personalizado,
@@ -407,17 +411,16 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Plan de cuotas registrado. El aliado lo verá al instante.'),
+          content: Text(
+            'Plan de cuotas registrado. El aliado lo verá en Pago y en este chat.',
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       final s = e.toString();
       var friendly = s;
-      if (s.contains('CUPO_INSUFICIENTE') || s.contains('cupo disponible')) {
-        friendly =
-            'Cupo del aliado insuficiente. Revise límites, pedidos abiertos o cuotas ya aprobadas.';
-      } else if (s.contains('MONTOS_NO_COINCIDEN')) {
+      if (s.contains('MONTOS_NO_COINCIDEN')) {
         friendly = 'La suma de las cuotas no coincide con el total; verifique e intente de nuevo.';
       } else if (s.contains('PLAN_CUOTAS_BLOQUEADO')) {
         friendly =
@@ -447,8 +450,8 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           transactionRequestId: widget.transactionRequestId,
           body: text,
         );
-      } else if (widget.allowReplyAsTransportista) {
-        await SupabaseService.insertTransactionRequestMessageAsTransportista(
+      } else if (widget.allowReplyAsImportador) {
+        await SupabaseService.insertTransactionRequestMessageAsImportador(
           transactionRequestId: widget.transactionRequestId,
           body: text,
         );
@@ -470,10 +473,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     final uid = SupabaseService.currentUserId;
     final canReply = widget.allowReplyAsAliado ||
         widget.allowReplyAsAdmin ||
-        widget.allowReplyAsTransportista;
-    final transportistaOnlyTitle = widget.allowReplyAsTransportista &&
-        !widget.allowReplyAsAliado &&
-        !widget.allowReplyAsAdmin;
+        widget.allowReplyAsImportador;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,7 +482,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (widget.allowReplyAsAdmin)
+              if (_canManageCreditPlan)
                 IconButton(
                   tooltip: widget.creditPlanRescheduleLocked
                       ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
@@ -508,9 +508,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             children: [
               Expanded(
                 child: Text(
-                  transportistaOnlyTitle
-                      ? 'Mensajes del pedido'
-                      : 'Mensajes con MotoLink',
+                  'Chat del pedido',
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
@@ -518,7 +516,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                   ),
                 ),
               ),
-              if (widget.allowReplyAsAdmin) ...[
+              if (_canManageCreditPlan) ...[
                 IconButton(
                   tooltip: widget.creditPlanRescheduleLocked
                       ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
@@ -540,6 +538,11 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
               ),
             ],
           ),
+        const SizedBox(height: 4),
+        Text(
+          'Aliado e importador coordinan aquí. MotoLink puede leer el hilo en tiempo real.',
+          style: TextStyle(fontSize: 11, height: 1.3, color: Colors.grey.shade700),
+        ),
         const SizedBox(height: 4),
         if (_loading)
           const Padding(
@@ -574,15 +577,13 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                   ? 'Tú'
                   : (m.isFromAdmin
                       ? 'MotoLink'
-                      : (m.isFromTransportista
-                          ? 'Transportista'
-                          : 'Aliado'));
+                      : (m.isFromImportador ? 'Importador' : 'Aliado'));
               final align =
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
               final bg = m.isFromAdmin
                   ? AppColors.surfaceTinted.withOpacity(0.55)
-                  : (m.isFromTransportista
-                      ? Colors.teal.shade50
+                  : (m.isFromImportador
+                      ? Colors.orange.shade50
                       : (mine
                           ? AppColors.brandBlue.withOpacity(0.12)
                           : Colors.grey.shade200));
@@ -627,9 +628,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             decoration: InputDecoration(
               hintText: widget.allowReplyAsAdmin
                   ? 'Respuesta al aliado…'
-                  : widget.allowReplyAsTransportista
-                      ? 'Mensaje a MotoLink y aliado…'
-                      : 'Escriba a MotoLink…',
+                  : 'Escriba su mensaje…',
               isDense: true,
               border: const OutlineInputBorder(),
             ),

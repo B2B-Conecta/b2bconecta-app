@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
+import '../utils/importer_order_advance.dart';
 import '../theme/app_theme.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
@@ -95,39 +96,27 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     TransactionRequestModel r,
     String next,
   ) async {
-    if (next == TransactionRequestStatus.enTransito && !r.hasProveedorFactura) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Adjunte la factura del proveedor antes de marcar «En tránsito» (despacho).',
-          ),
-        ),
-      );
-      return;
+    final ok = await advanceImporterOrderGroup(
+      context,
+      lines: [r],
+      nextStatus: next,
+    );
+    if (!ok || !context.mounted) return;
+    if (next == TransactionRequestStatus.enPreparacion) {
+      MainShellTabController.goTo(1);
+      MainShellTabController.notifyImporterPedidosReload();
     }
-    try {
-      await SupabaseService.importerAdvanceTransactionRequest(
-        id: r.id,
-        newStatus: next,
-      );
-      if (!context.mounted) return;
-      if (next == TransactionRequestStatus.enPreparacion) {
-        MainShellTabController.goTo(1);
-        MainShellTabController.notifyImporterPedidosReload();
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Estado actualizado.'),
-          behavior: SnackBarBehavior.floating,
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next == TransactionRequestStatus.enTransito
+              ? 'Pedido marcado en tránsito con ETA registrado.'
+              : 'Estado actualizado.',
         ),
-      );
-      await _load();
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    await _load();
   }
 
   @override

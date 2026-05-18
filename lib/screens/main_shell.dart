@@ -11,6 +11,7 @@ import '../widgets/admin_active_orders_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
 import '../widgets/admin_commission_settlements_panel.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
+import '../widgets/admin_kyc_review_panel.dart';
 import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
@@ -163,6 +164,12 @@ class _MainShellState extends State<MainShell> {
                 'Devengo al marcar Recibido · corte semanal y facturación por importador.',
             child: const AdminCommissionSettlementsPanel(),
           ),
+          _adminOrdersScaffold(
+            title: 'Verificación KYC',
+            subtitle:
+                'Revise documentación de aliados e importadores; apruebe por archivo o el estado global.',
+            child: const AdminKycReviewPanel(),
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.administrador,
@@ -207,6 +214,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.payments_outlined),
               activeIcon: Icon(Icons.payments),
               label: 'Comisiones',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.verified_user_outlined),
+              activeIcon: Icon(Icons.verified_user),
+              label: 'KYC',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

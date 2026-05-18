@@ -129,7 +129,8 @@ class NotificationProvider extends ChangeNotifier {
     if (t0 == 'kyc') {
       switch (homeRole) {
         case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminProfileForKycNotification();
+          MainShellTabController.setPendingKycProfileId(n.relatedId);
+          MainShellTabController.navigateToAdminKycForNotification();
           return;
         case AppHomeRole.aliado:
         case AppHomeRole.importador:

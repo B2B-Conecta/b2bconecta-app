@@ -9,7 +9,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
-import 'aliado_kyc_documents_section.dart';
+import 'profile_kyc_documents_section.dart';
 import 'importer_commission_settlements_section.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
@@ -601,12 +601,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 20),
             const ImporterCommissionSettlementsSection(),
           ],
-          if (_persistedAsAliado) ...[
+          if (_persistedAsAliado || _persistedAsImportador) ...[
             const SizedBox(height: 20),
             _sectionLabel('DOCUMENTACIÓN KYC'),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
-              child: AliadoKycDocumentsSection(
+              child: ProfileKycDocumentsSection(
+                role: _persistedAsImportador ? 'importador' : 'aliado',
                 kycStatus: widget.initial?.kycStatus,
                 esAliadoEnFaseContado:
                     widget.initial?.esAliadoEnFaseContado ?? false,
@@ -619,8 +620,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ),
             ),
           ],
-          const SizedBox(height: 20),
-          const ProfileKycDocumentsInfo(),
+          if (!_showAdministradorRoleOption) ...[
+            const SizedBox(height: 20),
+            const ProfileKycDocumentsInfo(),
+          ],
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _saving ? null : _submit,

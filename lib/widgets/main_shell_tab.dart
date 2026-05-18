@@ -20,6 +20,8 @@ class MainShellTabController {
   static String? _pendingCommissionSettlementId;
   static VoidCallback? _adminCommissionSettlementDeepLink;
   static VoidCallback? _importerCommissionSettlementDeepLink;
+  static String? _pendingKycProfileId;
+  static VoidCallback? _adminKycNotificationDeepLink;
 
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
@@ -38,6 +40,8 @@ class MainShellTabController {
     _pendingCommissionSettlementId = null;
     _adminCommissionSettlementDeepLink = null;
     _importerCommissionSettlementDeepLink = null;
+    _pendingKycProfileId = null;
+    _adminKycNotificationDeepLink = null;
   }
 
   /// [ImporterInventoryDashboard] registra [reload] para refrescar stock tras entrega.
@@ -138,9 +142,17 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Perfil (índice 4 tras quitar Crédito).
-  static void navigateToAdminProfileForKycNotification() {
+  /// Admin: pestaña Verificación KYC (índice 4).
+  static void navigateToAdminKycForNotification() {
     _goTo?.call(4);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminKycNotificationDeepLink?.call();
+    });
+  }
+
+  /// Admin: pestaña Perfil (índice 5).
+  static void navigateToAdminProfileTab() {
+    _goTo?.call(5);
   }
 
   /// Admin: pestaña Comisiones (índice 3).
@@ -213,4 +225,25 @@ class MainShellTabController {
   }
 
   static void requestNotificationsReload() => _notificationsReload?.call();
+
+  static void registerAdminKycNotificationDeepLink(VoidCallback? onNavigate) {
+    _adminKycNotificationDeepLink = onNavigate;
+  }
+
+  static void setPendingKycProfileId(String? profileId) {
+    final s = profileId?.trim();
+    _pendingKycProfileId = (s == null || s.isEmpty) ? null : s;
+  }
+
+  static String? peekPendingKycProfileId() {
+    final s = _pendingKycProfileId?.trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
+  }
+
+  static String? consumePendingKycProfileId() {
+    final v = _pendingKycProfileId;
+    _pendingKycProfileId = null;
+    return v;
+  }
 }

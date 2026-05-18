@@ -62,10 +62,7 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
     if (p == null) return const SizedBox.shrink();
 
     final role = p.role?.trim().toLowerCase();
-    if (role == 'importador') {
-      return _ImportadorAuthorizationCard(profile: p);
-    }
-    if (role == 'aliado') {
+    if (role == 'importador' || role == 'aliado') {
       return FutureBuilder<List<ProfileDocumentModel>>(
         future: _docsFuture,
         builder: (context, snap) {
@@ -82,6 +79,12 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
             );
           }
           final docs = snap.data ?? [];
+          if (role == 'importador') {
+            return _ImportadorAuthorizationCard(
+              profile: p,
+              documents: docs,
+            );
+          }
           return _AliadoAuthorizationCard(
             profile: p,
             documents: docs,
@@ -94,13 +97,36 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
 }
 
 class _ImportadorAuthorizationCard extends StatelessWidget {
-  const _ImportadorAuthorizationCard({required this.profile});
+  const _ImportadorAuthorizationCard({
+    required this.profile,
+    required this.documents,
+  });
 
   final ProfileModel profile;
+  final List<ProfileDocumentModel> documents;
+
+  ProfileDocumentModel? _docFor(String type) {
+    for (final d in documents) {
+      if (d.docType == type) return d;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final complete = profile.isComplete;
+    final kycGlobal = profile.kycStatus?.trim();
+    final kycOk = kycGlobal == KycStatus.aprobado;
+
+    final operacionLabelEs = complete
+        ? 'Perfil B2B completo: puede gestionar inventario y pedidos.'
+        : 'Complete nombre, RIF, domicilio fiscal y enlace Google Maps.';
+
+    final kycLabelEs = kycOk
+        ? 'Verificación documental aprobada.'
+        : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
+            'Suba el expediente en la sección de documentación.';
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.brandBlueContainer,
@@ -115,7 +141,9 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  complete ? Icons.check_circle_outline : Icons.info_outline,
+                  complete && kycOk
+                      ? Icons.check_circle_outline
+                      : Icons.info_outline,
                   size: 22,
                   color: AppColors.brandBlue,
                 ),
@@ -133,12 +161,51 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            _CheckRow(
-              ok: complete,
-              label: complete
-                  ? 'Perfil B2B completo: puede gestionar inventario y pedidos validados.'
-                  : 'Complete nombre, RIF, domicilio fiscal y enlace Google Maps para operar con normalidad.',
+            _CheckRow(ok: complete, label: operacionLabelEs),
+            const SizedBox(height: 6),
+            _CheckRow(ok: kycOk, label: kycLabelEs),
+            const SizedBox(height: 10),
+            const Text(
+              'Documentos (revisión individual)',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
+            const SizedBox(height: 6),
+            ...AliadoDocType.all.map((type) {
+              final d = _docFor(type);
+              final st = d?.reviewStatus?.trim();
+              final line = d == null
+                  ? 'Sin archivo — ${AliadoDocType.labelEs(type)}'
+                  : '${AliadoDocType.labelEs(type)}: ${DocumentReviewStatus.labelEs(st ?? DocumentReviewStatus.pendiente)}';
+              final docOk = st == DocumentReviewStatus.aprobado;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      docOk ? Icons.check_circle : Icons.radio_button_off,
+                      size: 16,
+                      color: docOk ? AppColors.successGreen : Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        line,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),

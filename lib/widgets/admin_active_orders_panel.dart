@@ -8,6 +8,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/notification_related_order_match.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_motolink_anula_pedido_dialog.dart';
@@ -81,9 +82,10 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
   void _onNotificationAdminActivosDeepLink() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
-    if (_rows.any((r) => r.id == pending)) {
+    final expandId = adminExpandRequestIdForNotification(_rows, pending);
+    if (expandId != null) {
       MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = pending);
+      setState(() => _expandedRequestId = expandId);
     } else if (!_loading) {
       _load();
     }
@@ -92,9 +94,10 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
   void _tryExpandFromPendingNotification() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
-    if (_rows.any((r) => r.id == pending)) {
+    final expandId = adminExpandRequestIdForNotification(_rows, pending);
+    if (expandId != null) {
       MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = pending);
+      setState(() => _expandedRequestId = expandId);
     }
   }
 

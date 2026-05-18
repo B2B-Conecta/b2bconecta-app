@@ -8,6 +8,7 @@ import '../services/supabase_service.dart';
 import '../utils/importer_order_advance.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../utils/notification_related_order_match.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
 import 'importer_order_invoice_section.dart';
@@ -86,19 +87,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
   }
 
-  /// Resuelve la fila expandida ante una notificación por `transaction_request_id`.
-  String? _expandKeyForPendingId(String id) {
-    for (final g in groupAliadoOrdersByCheckout(_rows)) {
-      if (!g.any((r) => r.id == id)) continue;
-      if (g.length == 1) return _rowKey(g.single);
-      final statuses = g.map((x) => x.status).toSet();
-      if (statuses.length > 1) {
-        return _rowKey(g.firstWhere((r) => r.id == id));
-      }
-      return checkoutGroupExpandKey(g);
-    }
-    return null;
-  }
+  String? _expandKeyForPendingId(String id) =>
+      orderExpandKeyForNotification(_rows, id);
 
   Future<void> _load() async {
     setState(() {

@@ -10,31 +10,35 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'kyc_status_highlight_widgets.dart';
 
-/// Subida de documentos legales/comerciales y envío a revisión MotoLink.
-class AliadoKycDocumentsSection extends StatefulWidget {
-  const AliadoKycDocumentsSection({
+/// Subida de documentos KYC y envío a revisión MotoLink (aliado o importador).
+class ProfileKycDocumentsSection extends StatefulWidget {
+  const ProfileKycDocumentsSection({
     super.key,
     required this.kycStatus,
+    required this.role,
     this.onChanged,
     this.esAliadoEnFaseContado = false,
     this.primerosPedidosContadoEntregados,
   });
 
   final String? kycStatus;
+
+  /// `aliado` o `importador`.
+  final String role;
   final VoidCallback? onChanged;
 
-  /// Mientras no se completen las entregas iniciales en contado, no se envía expediente a MotoLink.
+  /// Solo aliado: bloquea envío oficial durante fase contado inicial.
   final bool esAliadoEnFaseContado;
-
-  /// Para mensajes X / N en la advertencia.
   final int? primerosPedidosContadoEntregados;
 
+  bool get _isAliado => role.trim().toLowerCase() == 'aliado';
+
   @override
-  State<AliadoKycDocumentsSection> createState() =>
-      _AliadoKycDocumentsSectionState();
+  State<ProfileKycDocumentsSection> createState() =>
+      _ProfileKycDocumentsSectionState();
 }
 
-class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
+class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> {
   List<ProfileDocumentModel> _docs = [];
   bool _loading = true;
   String? _busyDocType;
@@ -47,7 +51,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
   }
 
   @override
-  void didUpdateWidget(covariant AliadoKycDocumentsSection oldWidget) {
+  void didUpdateWidget(covariant ProfileKycDocumentsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.kycStatus != widget.kycStatus) {
       _load();
@@ -108,7 +112,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
     }
     setState(() => _busyDocType = docType);
     try {
-      await SupabaseService.uploadAliadoProfileDocument(
+      await SupabaseService.uploadMyProfileDocument(
         docType: docType,
         bytes: bytes,
         fileName: name,
@@ -133,7 +137,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
   }
 
   Future<void> _submitReview() async {
-    if (widget.esAliadoEnFaseContado) {
+    if (widget._isAliado && widget.esAliadoEnFaseContado) {
       final pce = widget.primerosPedidosContadoEntregados ?? 0;
       await showDialog<void>(
         context: context,
@@ -145,8 +149,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
               '${CashPhasePolicy.entregasRequeridas} pedidos). '
               'Lleva $pce de ${CashPhasePolicy.entregasRequeridas} entregas registradas.\n\n'
               'Complete esa fase antes de enviar la documentación a revisión MotoLink. '
-              'Puede seguir subiendo archivos aquí como borrador; el envío oficial quedará '
-              'habilitado al completar los requisitos iniciales.',
+              'Puede seguir subiendo archivos aquí como borrador.',
               style: const TextStyle(height: 1.4),
             ),
           ),
@@ -162,7 +165,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
     }
     setState(() => _submittingReview = true);
     try {
-      await SupabaseService.aliadoSubmitKycForReview();
+      await SupabaseService.profileSubmitKycForReview();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -188,14 +191,15 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
         st == KycStatus.rechazado ||
         st == KycStatus.enRevision;
     final pce = widget.primerosPedidosContadoEntregados ?? 0;
-    final bloqueoFaseInicial = widget.esAliadoEnFaseContado;
+    final bloqueoFaseInicial = widget._isAliado && widget.esAliadoEnFaseContado;
+    final roleLabel = widget._isAliado ? 'aliado' : 'importador';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Documentación para verificación',
-          style: TextStyle(
+        Text(
+          'Documentación para verificación ($roleLabel)',
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -221,8 +225,7 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                   Expanded(
                     child: Text(
                       'Fase inicial: $pce / ${CashPhasePolicy.entregasRequeridas} entregas en contado. '
-                      'El botón «Enviar a revisión MotoLink» se habilita al completar esa fase. '
-                      'Puede subir archivos mientras tanto.',
+                      'El envío a revisión se habilita al completar esa fase.',
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.4,
@@ -380,24 +383,12 @@ class _AliadoKycDocumentsSectionState extends State<AliadoKycDocumentsSection> {
                                 !has
                                     ? 'Subir'
                                     : esAprobado
-                                        ? 'Actualizar documento'
+                                        ? 'Actualizar'
                                         : 'Cambiar',
                               ),
                             ),
                         ],
                       ),
-                      if (has && esAprobado) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'La versión aprobada no se borra: se archiva una copia y la nueva '
-                          'queda pendiente de revisión MotoLink.',
-                          style: TextStyle(
-                            fontSize: 10,
-                            height: 1.3,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),

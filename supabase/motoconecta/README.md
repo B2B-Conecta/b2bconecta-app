@@ -71,9 +71,10 @@ Migraciones en `supabase/migrations/` (prefijo `20260520…` / `20260526…`): d
 
 ## Comunicación y KYC en pedido (C2)
 
-Migración `20260527120000_minuta7_c2_chat_sla_kyc.sql`:
+Migraciones `20260527120000_minuta7_c2_chat_sla_kyc.sql` y `20260529120000_minuta7_c2_kyc_admin_sla_completion.sql`:
 
 - **Chat del pedido:** aliado e importador en el mismo hilo; MotoLink (admin) lee y puede intervenir.
-- **SLA 12 h:** `run_importer_sla_admin_alerts` programado cada 15 min (pg_cron) si está disponible.
-- **Visibilidad KYC:** logo, dirección fiscal, estado KYC y documentos **aprobados** de la contraparte en la ficha del pedido.
-- **Storage:** bucket `profile-documents` con lectura de contraparte vía políticas RLS.
+- **SLA 12 h:** `run_importer_sla_admin_alerts` cada 15 min (pg_cron); `related_id` = id de pedido ancla (deep link).
+- **KYC aliado e importador:** subida en perfil; cola admin pestaña **KYC**; notificación `type=kyc` a administradores al enviar expediente.
+- **Visibilidad KYC en pedido:** logo, fiscal, estado y documentos **aprobados** de la contraparte.
+- **Storage:** bucket `profile-documents` con lectura de contraparte vía RLS.

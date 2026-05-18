@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../utils/notification_related_order_match.dart';
 import '../utils/motolink_volume_discount.dart';
 import 'aliado_importador_factura_section.dart';
 import '../utils/transaction_request_filter_utils.dart';
@@ -68,12 +69,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     super.dispose();
   }
 
-  String? _expandKeyForTransactionId(String id) {
-    for (final g in groupAliadoOrdersByCheckout(_rows)) {
-      if (g.any((r) => r.id == id)) return checkoutGroupExpandKey(g);
-    }
-    return null;
-  }
+  String? _expandKeyForTransactionId(String id) =>
+      orderExpandKeyForNotification(_rows, id);
 
   void _onNotificationPedidosDeepLink() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();

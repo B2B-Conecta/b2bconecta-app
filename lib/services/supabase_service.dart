@@ -1054,12 +1054,12 @@ class SupabaseService {
         .toList();
   }
 
-  /// Perfiles aliado para asignar `credit_limit` (vista admin).
-  static Future<List<ProfileModel>> fetchAliadoProfilesForAdmin() async {
+  /// Perfiles B2B (aliado e importador) para cola KYC admin.
+  static Future<List<ProfileModel>> fetchB2BProfilesForAdminKycReview() async {
     final response = await _client
         .from('profiles')
         .select()
-        .eq('role', 'aliado')
+        .inFilter('role', ['aliado', 'importador'])
         .order('business_name', ascending: true);
 
     final list = response as List<dynamic>;
@@ -1069,15 +1069,15 @@ class SupabaseService {
         .toList();
   }
 
-  /// Broker: actualiza estado KYC del aliado.
-  static Future<void> adminSetAliadoKycStatus({
-    required String aliadoId,
+  /// Broker: actualiza estado KYC global del perfil (aliado o importador).
+  static Future<void> adminSetProfileKycStatus({
+    required String profileId,
     required String status,
   }) async {
     await _client.rpc(
-      'admin_set_aliado_kyc_status',
+      'admin_set_profile_kyc_status',
       params: <String, dynamic>{
-        'p_aliado_id': aliadoId,
+        'p_profile_id': profileId,
         'p_status': status,
       },
     );
@@ -1113,10 +1113,9 @@ class SupabaseService {
     );
   }
 
-  /// Broker: fija el estado de revisión de un documento concreto del aliado.
-  /// [note] obligatoria si [status] es rechazado (validación en servidor).
+  /// Broker: revisión por documento (`profile_documents` vigente).
   static Future<void> adminSetProfileDocumentReviewStatus({
-    required String aliadoId,
+    required String profileId,
     required String docType,
     required String status,
     String? note,
@@ -1124,7 +1123,7 @@ class SupabaseService {
     await _client.rpc(
       'admin_set_profile_document_review_status',
       params: <String, dynamic>{
-        'p_aliado_id': aliadoId,
+        'p_profile_id': profileId,
         'p_doc_type': docType,
         'p_status': status,
         'p_note': note,
@@ -1132,9 +1131,9 @@ class SupabaseService {
     );
   }
 
-  /// Aliado: marca documentación en revisión (`en_revision`).
-  static Future<void> aliadoSubmitKycForReview() async {
-    await _client.rpc('aliado_submit_kyc_for_review');
+  /// Aliado o importador: envía expediente a revisión MotoLink.
+  static Future<void> profileSubmitKycForReview() async {
+    await _client.rpc('profile_submit_kyc_for_review');
   }
 
   static const _profileDocumentsSelect = 'id, profile_id, doc_type, '
@@ -1161,16 +1160,16 @@ class SupabaseService {
         .toList();
   }
 
-  /// Admin: todas las versiones de documentos de un aliado (vigente + histórico).
-  static Future<List<ProfileDocumentModel>> fetchProfileDocumentsForAliado(
-    String aliadoId,
+  /// Admin: documentos de un perfil B2B (vigente + histórico).
+  static Future<List<ProfileDocumentModel>> fetchProfileDocumentsForProfile(
+    String profileId,
   ) async {
-    if (aliadoId.isEmpty) return [];
+    if (profileId.isEmpty) return [];
 
     final response = await _client
         .from('profile_documents')
         .select(_profileDocumentsSelect)
-        .eq('profile_id', aliadoId)
+        .eq('profile_id', profileId)
         .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -1191,7 +1190,7 @@ class SupabaseService {
 
   /// Sube una **nueva versión** de documento KYC (PDF / imagen).
   /// Las versiones anteriores permanecen en Storage y en BD; el trigger marca `is_current`.
-  static Future<void> uploadAliadoProfileDocument({
+  static Future<void> uploadMyProfileDocument({
     required String docType,
     required Uint8List bytes,
     required String fileName,

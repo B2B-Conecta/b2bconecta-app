@@ -129,7 +129,7 @@ class NotificationProvider extends ChangeNotifier {
     if (t0 == 'kyc') {
       switch (homeRole) {
         case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminCreditoForKycNotification();
+          MainShellTabController.navigateToAdminProfileForKycNotification();
           return;
         case AppHomeRole.aliado:
         case AppHomeRole.importador:
@@ -140,8 +140,22 @@ class NotificationProvider extends ChangeNotifier {
       }
     }
     if (t0 == 'credito' && homeRole == AppHomeRole.administrador) {
-      MainShellTabController.navigateToAdminCreditoForKycNotification();
+      MainShellTabController.navigateToAdminActivosForNotification();
       return;
+    }
+    if (t0 == 'comision') {
+      MainShellTabController.setPendingCommissionSettlementId(n.relatedId);
+      switch (homeRole) {
+        case AppHomeRole.administrador:
+          MainShellTabController.navigateToAdminComisionesForNotification();
+          return;
+        case AppHomeRole.importador:
+          MainShellTabController.navigateToImporterCommissionSettlementsForNotification();
+          return;
+        case AppHomeRole.aliado:
+        case AppHomeRole.transportista:
+          return;
+      }
     }
     if (t0 == 'pago') {
       switch (homeRole) {

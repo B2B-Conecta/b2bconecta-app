@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/cash_phase_policy.dart';
 import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
@@ -12,7 +11,6 @@ import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'aliado_kyc_documents_section.dart';
 import 'importer_commission_settlements_section.dart';
-import 'aliado_solicitar_credito_sheet.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
 
@@ -54,10 +52,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   String _role = 'importador';
   bool _saving = false;
   bool _logoBusy = false;
-  double? _openExposure;
-  /// Corte con el servidor (mismo request que [saldo activo]); ver [_loadOpenExposure].
-  double? _imputadoServidor;
-  bool _loadingExposure = false;
 
   /// Recrea [AuthorizationStatusSection] al actualizar documentos KYC.
   int _authSectionTick = 0;
@@ -122,94 +116,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       _role = r!;
     }
     if (_persistedAsAliado) {
-      _loadOpenExposure();
       MainShellTabController.registerKycDocumentationSectionKey(
         _kycDocumentationSectionKey,
       );
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant ProfileB2BForm oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_persistedAsAliado) return;
-    if (oldWidget.initial?.id != widget.initial?.id ||
-        oldWidget.initial?.creditoConsumidoAcumulado !=
-            widget.initial?.creditoConsumidoAcumulado ||
-        oldWidget.initial?.creditLimit != widget.initial?.creditLimit ||
-        oldWidget.initial?.creditoPreactivadoPorAdmin !=
-            widget.initial?.creditoPreactivadoPorAdmin) {
-      _loadOpenExposure();
-    }
-  }
-
-  void _scrollToKycDocumentation() {
-    final target = _kycDocumentationSectionKey.currentContext;
-    if (target == null) return;
-    Scrollable.ensureVisible(
-      target,
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOutCubic,
-      alignment: 0.12,
-    );
-  }
-
-  void _onSolicitarCreditoContinuar() {
-    final p = widget.initial;
-    if (p == null) return;
-    final rifOk = p.rif?.trim().isNotEmpty ?? false;
-    if (!rifOk || !p.hasRegisteredLocation || !p.hasFiscalMapsShareLink) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Indique RIF, domicilio fiscal (estado, ciudad y dirección) y enlace de Google Maps '
-            'en este formulario antes de cargar la documentación.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    _scrollToKycDocumentation();
-  }
-
-  void _openSolicitarCreditoSheet() {
-    final p = widget.initial;
-    if (p == null) return;
-    AliadoSolicitarCreditoSheet.show(
-      context,
-      profile: p,
-      onContinuar: _onSolicitarCreditoContinuar,
-    );
-  }
-
-  Future<void> _loadOpenExposure() async {
-    setState(() => _loadingExposure = true);
-    try {
-      final s = await SupabaseService.fetchAliadoMotoLinkCupoSnapshot();
-      if (s != null) {
-        if (!mounted) return;
-        setState(() {
-          _openExposure = s.saldoActivoExposicion;
-          _imputadoServidor = s.imputadoAcumulado;
-          _loadingExposure = false;
-        });
-        return;
-      }
-      final v = await SupabaseService.fetchOpenCreditExposureForCurrentAliado();
-      if (!mounted) return;
-      setState(() {
-        _imputadoServidor = null;
-        _openExposure = v;
-        _loadingExposure = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _imputadoServidor = null;
-        _openExposure = null;
-        _loadingExposure = false;
-      });
     }
   }
 
@@ -304,117 +213,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    );
-  }
-
-  Widget _aliadoCreditSummary() {
-    final limMostrado = widget.initial?.limiteCreditoMostradoAliado;
-    final limRaw = widget.initial?.creditLimit;
-    final exp = _openExposure ?? 0.0;
-    final cons = _imputadoServidor ?? widget.initial?.creditoConsumidoAcumulado ?? 0.0;
-    final disponible =
-        ((limMostrado ?? 0) - exp - cons).clamp(0.0, double.infinity);
-    final pce = widget.initial?.primerosPedidosContadoEntregados ?? 0;
-    final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
-    final preact =
-        widget.initial?.puedeUsarLineaCreditoMotoLinkPreactivada ?? false;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.fieldFill,
-        borderRadius: AppDecorations.radius12,
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (enFaseContado) ...[
-              Text(
-                'Primeros pedidos (contado): $pce de '
-                '${CashPhasePolicy.entregasRequeridas} entregas registradas. '
-                'Mientras tanto, solo un pedido activo a la vez.',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: Colors.grey.shade800,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (preact) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'MotoLink le habilitó el cupo desde el inicio: puede usar la línea de crédito '
-                  'en pedidos y pagos aun en esta fase.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.brandBlue,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-            ],
-            Text(
-              limRaw == null && !enFaseContado
-                  ? 'Sin cupo asignado: puede solicitar pedidos pagando al contado (transferencia o efectivo). '
-                      'MotoLink puede asignar límite cuando lo solicite (pestaña Crédito).'
-                  : enFaseContado && !preact
-                      ? 'Límite mostrado (fase contado): ${(limMostrado ?? 0).toStringAsFixed(2)} REF'
-                      : 'Límite autorizado: ${(limMostrado ?? 0).toStringAsFixed(2)} REF',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            if (limRaw != null || enFaseContado || preact) ...[
-              const SizedBox(height: 10),
-              if (_loadingExposure)
-                const LinearProgressIndicator(minHeight: 3)
-              else ...[
-                Text(
-                  'Compromiso (saldo activo vía cupo / plan): ${exp.toStringAsFixed(2)} REF',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Imputado acumulado (lo ya “cerrado” y descontado en disponible): '
-                  '${cons.toStringAsFixed(2)} REF (entregas a crédito sin plan, o al aprobar la última cuota de un plan).',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Disponible estimado: ${disponible.toStringAsFixed(2)} REF',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.brandBlue,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Fórmula: límite mostrado − saldo activo (compromiso) − imputado acumulado. '
-                  'El saldo activo baja con cada cuota; el imputado sube una sola vez al completar el plan.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -844,35 +642,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ],
           if (_persistedAsAliado) ...[
             const SizedBox(height: 20),
-            _sectionLabel('CUPO AUTORIZADO (MOTOLINK)'),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: AppColors.brandBlue,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: widget.initial == null ? null : _openSolicitarCreditoSheet,
-                icon: const Icon(Icons.credit_score_outlined, size: 22),
-                label: const Text(
-                  'Solicitar crédito MotoLink',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Revise requisitos, su progreso en la fase inicial y la documentación requerida.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _aliadoCreditSummary(),
-            const SizedBox(height: 20),
+            _sectionLabel('DOCUMENTACIÓN KYC'),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
               child: AliadoKycDocumentsSection(

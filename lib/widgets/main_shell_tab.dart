@@ -15,9 +15,11 @@ class MainShellTabController {
   static VoidCallback? _adminActivosNotificationDeepLink;
   static int? _b2bProfileTabIndex;
   static bool _importerPedidosPreferNuevosFilter = false;
-  static VoidCallback? _adminCreditoKycNotificationDeepLink;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
+  static String? _pendingCommissionSettlementId;
+  static VoidCallback? _adminCommissionSettlementDeepLink;
+  static VoidCallback? _importerCommissionSettlementDeepLink;
 
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
@@ -31,9 +33,11 @@ class MainShellTabController {
     _adminActivosNotificationDeepLink = null;
     _b2bProfileTabIndex = null;
     _importerPedidosPreferNuevosFilter = false;
-    _adminCreditoKycNotificationDeepLink = null;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
+    _pendingCommissionSettlementId = null;
+    _adminCommissionSettlementDeepLink = null;
+    _importerCommissionSettlementDeepLink = null;
   }
 
   /// [ImporterInventoryDashboard] registra [reload] para refrescar stock tras entrega.
@@ -95,12 +99,6 @@ class MainShellTabController {
     _adminActivosNotificationDeepLink = onNavigate;
   }
 
-  /// [AdminAliadosCreditPanel] expande la fila del aliado en Límites de crédito (KYC).
-  static void registerAdminCreditoKycNotificationDeepLink(
-      VoidCallback? onNavigate) {
-    _adminCreditoKycNotificationDeepLink = onNavigate;
-  }
-
   /// Pestaña Pedidos (índice 1) + expande pedido vinculado a la notificación [mensaje].
   static void navigateToPedidosForNotification() {
     _goTo?.call(1);
@@ -140,12 +138,53 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Crédito (índice 2) donde se revisa KYC / cupos de aliados.
-  static void navigateToAdminCreditoForKycNotification() {
-    _goTo?.call(2);
+  /// Admin: pestaña Perfil (índice 4 tras quitar Crédito).
+  static void navigateToAdminProfileForKycNotification() {
+    _goTo?.call(4);
+  }
+
+  /// Admin: pestaña Comisiones (índice 3).
+  static void navigateToAdminComisionesForNotification() {
+    _goTo?.call(3);
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      _adminCreditoKycNotificationDeepLink?.call();
+      _adminCommissionSettlementDeepLink?.call();
     });
+  }
+
+  /// Importador: Perfil + sección cortes de comisión.
+  static void navigateToImporterCommissionSettlementsForNotification() {
+    _goTo?.call(_resolvedB2BProfileTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _importerCommissionSettlementDeepLink?.call();
+    });
+  }
+
+  static void registerAdminCommissionSettlementDeepLink(
+      VoidCallback? onNavigate) {
+    _adminCommissionSettlementDeepLink = onNavigate;
+  }
+
+  static void registerImporterCommissionSettlementDeepLink(
+      VoidCallback? onNavigate) {
+    _importerCommissionSettlementDeepLink = onNavigate;
+  }
+
+  static void setPendingCommissionSettlementId(String? id) {
+    final s = id?.trim();
+    _pendingCommissionSettlementId =
+        (s == null || s.isEmpty) ? null : s;
+  }
+
+  static String? peekPendingCommissionSettlementId() {
+    final s = _pendingCommissionSettlementId?.trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
+  }
+
+  static String? consumePendingCommissionSettlementId() {
+    final v = _pendingCommissionSettlementId;
+    _pendingCommissionSettlementId = null;
+    return v;
   }
 
   /// Guarda `related_id` de una notificación para que la vista destino lo consuma.

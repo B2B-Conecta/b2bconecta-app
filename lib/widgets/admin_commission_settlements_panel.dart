@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../models/commission_settlement_model.dart';
 import '../models/catalog_filters.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'main_shell_tab.dart';
 
 /// Admin — Minuta #7 C1: cortes semanales, facturación y cobro de comisiones MotoLink.
 class AdminCommissionSettlementsPanel extends StatefulWidget {
@@ -22,11 +26,27 @@ class _AdminCommissionSettlementsPanelState
   double _defaultRate = 0.05;
   bool _busy = false;
   final Map<String, List<CommissionSettlementLineModel>> _linesCache = {};
+  final Set<String> _expandedSettlementIds = {};
 
   @override
   void initState() {
     super.initState();
+    MainShellTabController.registerAdminCommissionSettlementDeepLink(
+      _onCommissionNotificationDeepLink,
+    );
     _load();
+  }
+
+  @override
+  void dispose() {
+    MainShellTabController.registerAdminCommissionSettlementDeepLink(null);
+    super.dispose();
+  }
+
+  void _onCommissionNotificationDeepLink() {
+    final id = MainShellTabController.consumePendingCommissionSettlementId();
+    if (id == null) return;
+    setState(() => _expandedSettlementIds.add(id));
   }
 
   Future<void> _load() async {
@@ -43,6 +63,12 @@ class _AdminCommissionSettlementsPanelState
         _rows = rows;
         _loading = false;
       });
+      if (MainShellTabController.peekPendingCommissionSettlementId() != null) {
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _onCommissionNotificationDeepLink();
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -64,6 +90,43 @@ class _AdminCommissionSettlementsPanelState
     await _generateForWeek(prevWeek);
   }
 
+  Future<void> _generateCurrentWeek() async {
+    setState(() => _busy = true);
+    try {
+      final result =
+          await SupabaseService.adminGenerateCommissionSettlementsCurrentWeek();
+      if (!mounted) return;
+      _showGenerateResult(result, label: 'semana actual');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showGenerateResult(
+    Map<String, dynamic> result, {
+    required String label,
+  }) {
+    final n = (result['created_count'] as num?)?.toInt() ?? 0;
+    final ws = result['week_start']?.toString();
+    final we = result['week_end']?.toString();
+    final period = (ws != null && we != null) ? ' ($ws → $we)' : '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          n > 0
+              ? 'Se generaron $n corte(s) en borrador ($label$period).'
+              : 'Sin líneas devengadas pendientes para $label$period. '
+                  'Use «Semana actual» si acaba de marcar pedidos Recibido hoy.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _generateForWeek(DateTime weekStart) async {
     setState(() => _busy = true);
     try {
@@ -71,16 +134,7 @@ class _AdminCommissionSettlementsPanelState
         weekStart: weekStart,
       );
       if (!mounted) return;
-      final n = (result['created_count'] as num?)?.toInt() ?? 0;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            n > 0
-                ? 'Se generaron $n corte(s) en borrador.'
-                : 'No hay líneas devengadas pendientes de corte para esa semana.',
-          ),
-        ),
-      );
+      _showGenerateResult(result, label: 'semana seleccionada');
       _linesCache.clear();
       await _load();
     } catch (e) {
@@ -113,25 +167,29 @@ class _AdminCommissionSettlementsPanelState
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlg) => AlertDialog(
           title: const Text('Tasa por importador'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                value: selectedId,
-                decoration: const InputDecoration(labelText: 'Importador'),
-                items: importers
-                    .map(
-                      (o) => DropdownMenuItem(
-                        value: o.id,
-                        child: Text(
-                          o.businessName,
-                          overflow: TextOverflow.ellipsis,
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Importador'),
+                  items: importers
+                      .map(
+                        (o) => DropdownMenuItem(
+                          value: o.id,
+                          child: Text(
+                            o.businessName,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setDlg(() => selectedId = v),
-              ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setDlg(() => selectedId = v),
+                ),
               const SizedBox(height: 12),
               TextField(
                 controller: ctrl,
@@ -141,7 +199,8 @@ class _AdminCommissionSettlementsPanelState
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -245,17 +304,27 @@ class _AdminCommissionSettlementsPanelState
   }
 
   Future<void> _issueSettlement(CommissionSettlementModel s) async {
-    final ctrl = TextEditingController();
+    String previewRef = '';
+    try {
+      previewRef = await SupabaseService.peekCommissionInvoiceReference();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo obtener la referencia: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Emitir factura MotoLink'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(
-            labelText: 'Nº / referencia de factura',
-          ),
-          textCapitalization: TextCapitalization.characters,
+        content: Text(
+          'Se asignará automáticamente la referencia:\n\n'
+          '$previewRef\n\n'
+          'Formato: ML-COM-{año}-{secuencia de 6 dígitos}. '
+          'El importador la verá en sus cortes de comisión.',
+          style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade800),
         ),
         actions: [
           TextButton(
@@ -270,16 +339,170 @@ class _AdminCommissionSettlementsPanelState
       ),
     );
     if (ok != true || !mounted) return;
-    if (ctrl.text.trim().isEmpty) return;
     setState(() => _busy = true);
     try {
-      await SupabaseService.adminIssueCommissionSettlement(
+      final assignedRef = await SupabaseService.adminIssueCommissionSettlement(
         settlementId: s.id,
-        invoiceReference: ctrl.text,
+      );
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      CommissionSettlementModel? emitted;
+      for (final row in _rows) {
+        if (row.id == s.id) {
+          emitted = row;
+          break;
+        }
+      }
+      if (emitted != null && emitted.isEmitido) {
+        try {
+          await SupabaseService.generateAndUploadCommissionSettlementInvoicePdf(
+            settlement: emitted,
+          );
+          if (!mounted) return;
+          await _load();
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Corte emitido ($assignedRef) pero falló el PDF: $e',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            assignedRef.isNotEmpty
+                ? 'Corte emitido. Factura: $assignedRef (PDF listo).'
+                : 'Corte marcado como emitido.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _abrirFacturaPdf(CommissionSettlementModel s) async {
+    final path = s.invoicePdfStoragePath?.trim();
+    if (path == null || path.isEmpty) return;
+    try {
+      final url =
+          await SupabaseService.createSignedUrlForCommissionInvoicePdf(path);
+      final uri = Uri.parse(url);
+      if (!mounted) return;
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _generarFacturaPdf(CommissionSettlementModel s) async {
+    setState(() => _busy = true);
+    try {
+      await SupabaseService.generateAndUploadCommissionSettlementInvoicePdf(
+        settlement: s,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Corte marcado como emitido.')),
+        const SnackBar(content: Text('Factura PDF generada.')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al generar PDF: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _abrirComprobante(CommissionSettlementModel s) async {
+    final path = s.pagoComprobanteStoragePath?.trim();
+    if (path == null || path.isEmpty) return;
+    try {
+      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
+      final uri = Uri.parse(url);
+      if (!mounted) return;
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _approvePago(CommissionSettlementModel s) async {
+    setState(() => _busy = true);
+    try {
+      await SupabaseService.adminApproveCommissionSettlementPago(s.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pago confirmado. Se notificó al importador.')),
+      );
+      _linesCache.remove(s.id);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _rejectPago(CommissionSettlementModel s) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rechazar comprobante'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Motivo (opcional)',
+            hintText: 'Indique qué debe corregir el importador',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Rechazar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await SupabaseService.adminRejectCommissionSettlementPago(
+        settlementId: s.id,
+        nota: ctrl.text,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Comprobante rechazado. Se notificó al importador.')),
       );
       await _load();
     } catch (e) {
@@ -296,10 +519,10 @@ class _AdminCommissionSettlementsPanelState
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Marcar como pagado'),
+        title: const Text('Marcar como pagado (sin comprobante)'),
         content: Text(
           '¿Confirma el cobro de USD ${s.totalCommissionUsd.toStringAsFixed(2)} '
-          'del importador ${s.importadorBusinessName ?? s.importadorId}?',
+          'de ${s.importadorBusinessName ?? s.importadorId} sin comprobante en la plataforma?',
         ),
         actions: [
           TextButton(
@@ -422,7 +645,8 @@ class _AdminCommissionSettlementsPanelState
                 defaultRatePct: _defaultRate * 100,
                 onEditRate: _busy ? null : _editDefaultRate,
                 onEditImportadorRate: _busy ? null : _editImportadorRate,
-                onGenerateWeek: _busy ? null : _generatePreviousWeek,
+                onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
+                onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
               ),
               const SizedBox(height: 12),
               Text(
@@ -460,9 +684,20 @@ class _AdminCommissionSettlementsPanelState
   }
 
   Widget _settlementTile(CommissionSettlementModel s) {
+    final expanded = _expandedSettlementIds.contains(s.id);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
+        initiallyExpanded: expanded,
+        onExpansionChanged: (v) {
+          setState(() {
+            if (v) {
+              _expandedSettlementIds.add(s.id);
+            } else {
+              _expandedSettlementIds.remove(s.id);
+            }
+          });
+        },
         title: Text(
           s.importadorBusinessName ?? 'Importador',
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
@@ -527,6 +762,23 @@ class _AdminCommissionSettlementsPanelState
                     'Pagado: ${formatEsShortDateTime(s.paidAt)}',
                     style: const TextStyle(fontSize: 12),
                   ),
+                if (s.isEmitido && s.pagoEstadoLabelEs.isNotEmpty)
+                  Text(
+                    'Pago: ${s.pagoEstadoLabelEs}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: s.pagoEnRevision
+                          ? Colors.orange.shade900
+                          : Colors.grey.shade800,
+                    ),
+                  ),
+                if (s.pagoRechazado && s.pagoRechazoNota != null &&
+                    s.pagoRechazoNota!.trim().isNotEmpty)
+                  Text(
+                    'Rechazo: ${s.pagoRechazoNota}',
+                    style: TextStyle(fontSize: 11, color: Colors.red.shade700),
+                  ),
                 const SizedBox(height: 8),
                 FutureBuilder<List<CommissionSettlementLineModel>>(
                   future: _linesFor(s.id),
@@ -577,10 +829,41 @@ class _AdminCommissionSettlementsPanelState
                         child: const Text('Anular'),
                       ),
                     ],
-                    if (s.isEmitido)
+                    if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _abrirFacturaPdf(s),
+                        icon: const Icon(Icons.picture_as_pdf, size: 18),
+                        label: const Text('Ver factura PDF'),
+                      ),
+                    if ((s.isEmitido || s.isPagado) && !s.tieneFacturaPdf)
+                      OutlinedButton(
+                        onPressed: _busy ? null : () => _generarFacturaPdf(s),
+                        child: const Text('Generar factura PDF'),
+                      ),
+                    if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
+                      TextButton(
+                        onPressed: _busy ? null : () => _generarFacturaPdf(s),
+                        child: const Text('Regenerar PDF'),
+                      ),
+                    if (s.isEmitido && s.pagoEnRevision) ...[
+                      if (s.tieneComprobantePago)
+                        OutlinedButton(
+                          onPressed: _busy ? null : () => _abrirComprobante(s),
+                          child: const Text('Ver comprobante'),
+                        ),
                       FilledButton(
+                        onPressed: _busy ? null : () => _approvePago(s),
+                        child: const Text('Confirmar pago'),
+                      ),
+                      TextButton(
+                        onPressed: _busy ? null : () => _rejectPago(s),
+                        child: const Text('Rechazar'),
+                      ),
+                    ],
+                    if (s.isEmitido && !s.pagoEnRevision)
+                      TextButton(
                         onPressed: _busy ? null : () => _markPaid(s),
-                        child: const Text('Marcar pagado'),
+                        child: const Text('Pagado sin comprobante'),
                       ),
                   ],
                 ),
@@ -598,13 +881,15 @@ class _ConfigCard extends StatelessWidget {
     required this.defaultRatePct,
     this.onEditRate,
     this.onEditImportadorRate,
-    this.onGenerateWeek,
+    this.onGenerateCurrentWeek,
+    this.onGeneratePreviousWeek,
   });
 
   final double defaultRatePct;
   final VoidCallback? onEditRate;
   final VoidCallback? onEditImportadorRate;
-  final VoidCallback? onGenerateWeek;
+  final VoidCallback? onGenerateCurrentWeek;
+  final VoidCallback? onGeneratePreviousWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -624,7 +909,9 @@ class _ConfigCard extends StatelessWidget {
             Text(
               'La comisión se devenga cuando el aliado marca Recibido. '
               'Tasa global actual: ${defaultRatePct.toStringAsFixed(2)} % '
-              '(cada importador puede tener tasa propia).',
+              '(cada importador puede tener tasa propia). '
+              'Los lunes 07:00 UTC se genera el corte de la semana anterior. '
+              'Al emitir, la referencia es automática y se genera el PDF de factura de comisión.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade800, height: 1.35),
             ),
             const SizedBox(height: 12),
@@ -642,10 +929,31 @@ class _ConfigCard extends StatelessWidget {
                   icon: const Icon(Icons.store, size: 18),
                   label: const Text('Tasa importador'),
                 ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Generar corte (pruebas)',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
                 FilledButton.icon(
-                  onPressed: onGenerateWeek,
+                  onPressed: onGenerateCurrentWeek,
+                  icon: const Icon(Icons.play_arrow, size: 18),
+                  label: const Text('Semana actual'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onGeneratePreviousWeek,
                   icon: const Icon(Icons.calendar_view_week, size: 18),
-                  label: const Text('Corte semana anterior'),
+                  label: const Text('Semana anterior'),
                 ),
               ],
             ),

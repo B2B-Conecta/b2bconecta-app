@@ -32,6 +32,7 @@ import '../utils/haversine.dart';
 import '../utils/maps_route_utils.dart';
 import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
+import 'motolink_commission_invoice_pdf_service.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -41,6 +42,8 @@ class SupabaseService {
   static const _orderInvoicesBucket = 'order-invoices';
   static const _orderAllyInvoicesBucket = 'order-ally-invoices';
   static const _orderPaymentProofsBucket = 'order-payment-proofs';
+  static const _commissionSettlementInvoicesBucket =
+      'commission-settlement-invoices';
   static const _profileLogosBucket = 'profile-logos';
 
   static String? get currentUserId => _currentUserId;
@@ -3550,9 +3553,20 @@ class SupabaseService {
     paid_at,
     notes,
     created_at,
+    pago_comprobante_storage_path,
+    pago_comprobante_file_name,
+    pago_comprobante_submitted_at,
+    pago_estado_revision,
+    pago_rechazo_nota,
+    invoice_pdf_storage_path,
+    invoice_pdf_file_name,
     importador:profiles!commission_settlements_importador_id_fkey (
       business_name,
-      rif
+      rif,
+      direccion,
+      estado,
+      ciudad,
+      phone
     )
   ''';
 
@@ -3628,6 +3642,16 @@ class SupabaseService {
         .toList();
   }
 
+  /// Genera cortes en borrador para la semana en curso (lunes–domingo).
+  static Future<Map<String, dynamic>>
+      adminGenerateCommissionSettlementsCurrentWeek() async {
+    final raw = await _client.rpc(
+      'admin_generate_commission_settlements_current_week',
+    );
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{};
+  }
+
   /// Genera cortes en borrador para la semana [weekStart] (lunes). Si es null, la RPC usa la semana anterior.
   static Future<Map<String, dynamic>> adminGenerateCommissionSettlementsWeek({
     DateTime? weekStart,
@@ -3645,15 +3669,198 @@ class SupabaseService {
     return <String, dynamic>{};
   }
 
-  static Future<void> adminIssueCommissionSettlement({
+  static Future<String> createSignedUrlForCommissionInvoicePdf(
+    String storagePath,
+  ) async {
+    final p = storagePath.trim();
+    if (p.isEmpty) throw ArgumentError('Ruta de PDF vacía.');
+    return _client.storage
+        .from(_commissionSettlementInvoicesBucket)
+        .createSignedUrl(p, 3600);
+  }
+
+  /// Genera el PDF de comisión y lo sube a Storage (admin, tras emitir corte).
+  static Future<void> generateAndUploadCommissionSettlementInvoicePdf({
+    required CommissionSettlementModel settlement,
+  }) async {
+    final lines = await fetchCommissionSettlementLines(settlement.id);
+    if (lines.isEmpty) {
+      throw StateError('El corte no tiene líneas para la factura PDF.');
+    }
+
+    Map<String, dynamic>? impMap;
+    final row = await _client
+        .from('commission_settlements')
+        .select('''
+          importador:profiles!commission_settlements_importador_id_fkey (
+            direccion, estado, ciudad, phone
+          )
+        ''')
+        .eq('id', settlement.id)
+        .maybeSingle();
+    if (row != null) {
+      final imp = row['importador'];
+      if (imp is Map) impMap = Map<String, dynamic>.from(imp);
+    }
+
+    final tasa = await fetchGlobalTasaBcv() ?? 1.0;
+    final ref = settlement.invoiceReference?.trim();
+    final safeRef = (ref != null && ref.isNotEmpty)
+        ? ref.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
+        : settlement.id.substring(0, 8);
+    final fileName = 'MotoLink_comision_$safeRef.pdf';
+    final path = '${settlement.id}/$fileName';
+
+    final oldPath = settlement.invoicePdfStoragePath?.trim();
+    if (oldPath != null && oldPath.isNotEmpty) {
+      try {
+        await _client.storage
+            .from(_commissionSettlementInvoicesBucket)
+            .remove([oldPath]);
+      } catch (_) {}
+    }
+
+    final bytes = await MotolinkCommissionInvoicePdfService.build(
+      settlement: settlement,
+      lines: lines,
+      tasaBcvEmision: tasa,
+      importadorDireccion: impMap?['direccion']?.toString(),
+      importadorEstado: impMap?['estado']?.toString(),
+      importadorCiudad: impMap?['ciudad']?.toString(),
+      importadorPhone: impMap?['phone']?.toString(),
+    );
+
+    await _client.storage.from(_commissionSettlementInvoicesBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(
+            contentType: 'application/pdf',
+            upsert: true,
+          ),
+        );
+
+    await _client.rpc(
+      'admin_attach_commission_invoice_pdf',
+      params: <String, dynamic>{
+        'p_settlement_id': settlement.id,
+        'p_storage_path': path,
+        'p_file_name': fileName,
+      },
+    );
+  }
+
+  /// Vista previa del siguiente Nº de factura de comisión (sin consumir secuencia).
+  static Future<String> peekCommissionInvoiceReference() async {
+    final raw = await _client.rpc('motoconecta_peek_commission_invoice_reference');
+    return raw?.toString().trim() ?? '';
+  }
+
+  /// Emite el corte. Si [invoiceReference] es null/vacío, la BD asigna ML-COM-{año}-{seq}.
+  static Future<String> adminIssueCommissionSettlement({
     required String settlementId,
-    required String invoiceReference,
+    String? invoiceReference,
+  }) async {
+    final params = <String, dynamic>{'p_settlement_id': settlementId};
+    final manual = invoiceReference?.trim();
+    if (manual != null && manual.isNotEmpty) {
+      params['p_invoice_reference'] = manual;
+    }
+    final raw = await _client.rpc(
+      'admin_issue_commission_settlement',
+      params: params,
+    );
+    return raw?.toString().trim() ?? '';
+  }
+
+  /// Importador: sube comprobante y envía a revisión MotoLink.
+  static Future<void> importadorSubmitCommissionSettlementPago({
+    required String settlementId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+
+    final ext = _profileDocExtension(fileName);
+    if (!_isAllowedProfileDocExtension(ext)) {
+      throw ArgumentError('Formato no permitido. Use imagen o PDF.');
+    }
+
+    var safeBase =
+        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
+
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final path = 'commission-settlements/$settlementId/${stamp}_$safeBase';
+
+    final row = await _client
+        .from('commission_settlements')
+        .select('pago_comprobante_storage_path, pago_estado_revision, status')
+        .eq('id', settlementId)
+        .eq('importador_id', uid)
+        .maybeSingle();
+    if (row != null) {
+      final m = Map<String, dynamic>.from(row);
+      final pe = m['pago_estado_revision']?.toString().trim();
+      if (pe == PagoRevisionEstado.enRevision) {
+        throw StateError('Ya hay un comprobante en revisión.');
+      }
+      if (m['status']?.toString() == 'pagado') {
+        throw StateError('Este corte ya está pagado.');
+      }
+      final oldPath = m['pago_comprobante_storage_path']?.toString().trim();
+      if (oldPath != null && oldPath.isNotEmpty) {
+        try {
+          await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
+        } catch (_) {}
+      }
+    }
+
+    final contentType = _mimeForProfileDocExtension(ext);
+    await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            upsert: true,
+          ),
+        );
+
+    try {
+      await _client.rpc(
+        'importador_registra_pago_comision_corte',
+        params: <String, dynamic>{
+          'p_settlement_id': settlementId,
+          'p_storage_path': path,
+          'p_file_name': fileName.trim(),
+        },
+      );
+    } catch (e) {
+      try {
+        await _client.storage.from(_orderPaymentProofsBucket).remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  static Future<void> adminApproveCommissionSettlementPago(
+    String settlementId,
+  ) async {
+    await _client.rpc(
+      'admin_approve_commission_settlement_pago',
+      params: <String, dynamic>{'p_settlement_id': settlementId},
+    );
+  }
+
+  static Future<void> adminRejectCommissionSettlementPago({
+    required String settlementId,
+    String? nota,
   }) async {
     await _client.rpc(
-      'admin_issue_commission_settlement',
+      'admin_reject_commission_settlement_pago',
       params: <String, dynamic>{
         'p_settlement_id': settlementId,
-        'p_invoice_reference': invoiceReference.trim(),
+        'p_nota': nota?.trim(),
       },
     );
   }

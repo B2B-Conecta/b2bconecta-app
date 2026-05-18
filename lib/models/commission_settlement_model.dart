@@ -1,3 +1,5 @@
+import 'pago_revision_estado.dart';
+
 /// Corte de cuenta semanal de comisiones MotoLink por importador.
 class CommissionSettlementModel {
   const CommissionSettlementModel({
@@ -15,6 +17,13 @@ class CommissionSettlementModel {
     this.createdAt,
     this.importadorBusinessName,
     this.importadorRif,
+    this.pagoComprobanteStoragePath,
+    this.pagoComprobanteFileName,
+    this.pagoComprobanteSubmittedAt,
+    this.pagoEstadoRevision,
+    this.pagoRechazoNota,
+    this.invoicePdfStoragePath,
+    this.invoicePdfFileName,
   });
 
   final String id;
@@ -31,11 +40,39 @@ class CommissionSettlementModel {
   final DateTime? createdAt;
   final String? importadorBusinessName;
   final String? importadorRif;
+  final String? pagoComprobanteStoragePath;
+  final String? pagoComprobanteFileName;
+  final DateTime? pagoComprobanteSubmittedAt;
+  final String? pagoEstadoRevision;
+  final String? pagoRechazoNota;
+  final String? invoicePdfStoragePath;
+  final String? invoicePdfFileName;
+
+  bool get tieneFacturaPdf =>
+      invoicePdfStoragePath != null &&
+      invoicePdfStoragePath!.trim().isNotEmpty;
 
   bool get isBorrador => status == 'borrador';
   bool get isEmitido => status == 'emitido';
   bool get isPagado => status == 'pagado';
   bool get isAnulado => status == 'anulado';
+
+  bool get tieneComprobantePago =>
+      pagoComprobanteStoragePath != null &&
+      pagoComprobanteStoragePath!.trim().isNotEmpty;
+
+  bool get pagoEnRevision =>
+      pagoEstadoRevision?.trim() == PagoRevisionEstado.enRevision;
+
+  bool get pagoRechazado =>
+      pagoEstadoRevision?.trim() == PagoRevisionEstado.rechazado;
+
+  bool get importadorPuedeRegistrarPago =>
+      isEmitido &&
+      !pagoEnRevision &&
+      (pagoEstadoRevision == null ||
+          pagoEstadoRevision == PagoRevisionEstado.pendiente ||
+          pagoRechazado);
 
   static String statusLabelEs(String status) {
     switch (status) {
@@ -99,7 +136,26 @@ class CommissionSettlementModel {
           : null,
       importadorBusinessName: impMap?['business_name']?.toString(),
       importadorRif: impMap?['rif']?.toString(),
+      pagoComprobanteStoragePath:
+          json['pago_comprobante_storage_path']?.toString(),
+      pagoComprobanteFileName: json['pago_comprobante_file_name']?.toString(),
+      pagoComprobanteSubmittedAt: json['pago_comprobante_submitted_at'] != null
+          ? DateTime.tryParse(json['pago_comprobante_submitted_at'].toString())
+          : null,
+      pagoEstadoRevision: json['pago_estado_revision']?.toString(),
+      pagoRechazoNota: json['pago_rechazo_nota']?.toString(),
+      invoicePdfStoragePath: json['invoice_pdf_storage_path']?.toString(),
+      invoicePdfFileName: json['invoice_pdf_file_name']?.toString(),
     );
+  }
+
+  String get pagoEstadoLabelEs {
+    final pe = pagoEstadoRevision?.trim();
+    if (isPagado || pe == PagoRevisionEstado.aprobado) return 'Pago confirmado';
+    if (pe == PagoRevisionEstado.enRevision) return 'Comprobante en revisión';
+    if (pe == PagoRevisionEstado.rechazado) return 'Comprobante rechazado';
+    if (isEmitido) return 'Pendiente de pago';
+    return '';
   }
 }
 

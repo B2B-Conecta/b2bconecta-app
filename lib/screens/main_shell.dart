@@ -8,7 +8,6 @@ import '../services/notification_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/admin_active_orders_panel.dart';
-import '../widgets/admin_aliados_credit_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
 import '../widgets/admin_commission_settlements_panel.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
@@ -156,10 +155,6 @@ class _MainShellState extends State<MainShell> {
             child: const AdminClosedOrdersPanel(),
           ),
           _adminOrdersScaffold(
-            title: 'Límites de crédito',
-            child: const AdminAliadosCreditPanel(),
-          ),
-          _adminOrdersScaffold(
             title: 'Reportes de encomiendas',
             child: const AdminEncomiendasReportPanel(),
           ),
@@ -203,11 +198,6 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.archive_outlined),
               activeIcon: Icon(Icons.archive),
               label: 'Cerrados',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_outlined),
-              activeIcon: Icon(Icons.account_balance),
-              label: 'Crédito',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.analytics_outlined),

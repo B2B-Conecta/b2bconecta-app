@@ -8,6 +8,9 @@
 --   supabase db query --linked -f supabase/seed.sql
 --
 -- Contraseña común (todos los seed): SeedPass123!
+--
+-- C1 comisiones: al final hay 2 pedidos «entregado» con devengo (importador1/2).
+-- En admin → Comisiones → «Semana actual» para generar cortes de prueba.
 --   importador1@motoconecta.seed
 --   importador2@motoconecta.seed
 --   aliado1@motoconecta.seed
@@ -23,6 +26,12 @@ create extension if not exists pgcrypto;
 -- ---------------------------------------------------------------------------
 -- Limpieza re-seed: orden FK-safe; borra auth por email para eliminar duplicados
 -- ---------------------------------------------------------------------------
+delete from public.commission_settlements
+where importador_id in (
+  'c1000001-0000-4000-8000-000000000001'::uuid,
+  'c1000002-0000-4000-8000-000000000001'::uuid
+);
+
 delete from public.transaction_request_messages
 where transaction_request_id in (
   select tr.id
@@ -318,3 +327,74 @@ values
   ('c1000002-0000-4000-8000-000000000001', 'Amortiguador trasero 330 mm gas', 'MC2-13', 'Motor', 91.0000, 20, true),
   ('c1000002-0000-4000-8000-000000000001', 'Kit rodamiento rueda trasera', 'MC2-14', 'Transmisión', 17.9000, 92, true),
   ('c1000002-0000-4000-8000-000000000001', 'Escape corto homologado 150 cc', 'MC2-15', 'Motor', 99.5000, 10, true);
+
+-- ---------------------------------------------------------------------------
+-- C1 (Minuta #7): pedidos entregados con comisión devengada (prueba de cortes)
+-- Usar «Semana actual» en Comisiones MotoLink tras aplicar seed + migraciones C1.
+-- ---------------------------------------------------------------------------
+insert into public.transaction_requests (
+  id,
+  aliado_id,
+  importador_id,
+  product_id,
+  status,
+  cantidad,
+  precio_total_usd,
+  commission_rate_snapshot,
+  comision_devengada_usd,
+  comision_devengada_at,
+  destino_entrega_usa_perfil,
+  created_at,
+  updated_at
+)
+values
+  (
+    'd1000001-0000-4000-8000-000000000001'::uuid,
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    (
+      select p.id
+      from public.products p
+      where p.owner_id = 'c1000001-0000-4000-8000-000000000001'::uuid
+        and p.sku = 'MC1-01'
+      limit 1
+    ),
+    'entregado',
+    2,
+    90.0000,
+    0.05,
+    4.5000,
+    now(),
+    true,
+    now(),
+    now()
+  ),
+  (
+    'd1000002-0000-4000-8000-000000000002'::uuid,
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'c1000002-0000-4000-8000-000000000001'::uuid,
+    (
+      select p.id
+      from public.products p
+      where p.owner_id = 'c1000002-0000-4000-8000-000000000001'::uuid
+        and p.sku = 'MC2-01'
+      limit 1
+    ),
+    'entregado',
+    1,
+    48.5000,
+    0.05,
+    2.4250,
+    now(),
+    true,
+    now(),
+    now()
+  )
+on conflict (id) do update set
+  status = excluded.status,
+  precio_total_usd = excluded.precio_total_usd,
+  commission_rate_snapshot = excluded.commission_rate_snapshot,
+  comision_devengada_usd = excluded.comision_devengada_usd,
+  comision_devengada_at = excluded.comision_devengada_at,
+  commission_settlement_id = null,
+  updated_at = now();

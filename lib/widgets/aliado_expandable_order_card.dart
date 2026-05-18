@@ -306,17 +306,6 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (!isCheckoutGroup && r.muestraCreditoMotoLinkAsignadoEnPedido) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'Cupo MotoLink: ${(r.aliadoCreditLimit ?? 0).toStringAsFixed(2)} REF',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.brandBlue.withOpacity(0.95),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),

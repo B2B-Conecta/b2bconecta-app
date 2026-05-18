@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/commission_settlement_model.dart';
@@ -7,6 +8,7 @@ import '../models/catalog_filters.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'commission_settlement_lines_section.dart';
 import 'main_shell_tab.dart';
 
 /// Admin — Minuta #7 C1: cortes semanales, facturación y cobro de comisiones MotoLink.
@@ -25,7 +27,6 @@ class _AdminCommissionSettlementsPanelState
   String? _error;
   double _defaultRate = 0.05;
   bool _busy = false;
-  final Map<String, List<CommissionSettlementLineModel>> _linesCache = {};
   final Set<String> _expandedSettlementIds = {};
 
   @override
@@ -87,24 +88,12 @@ class _AdminCommissionSettlementsPanelState
     final prevWeek = _mondayOfWeek(
       DateTime.now().subtract(const Duration(days: 7)),
     );
-    await _generateForWeek(prevWeek);
+    await _generateForWeek(prevWeek, label: 'semana anterior');
   }
 
+  /// Solo QA: pedidos devengados en la semana en curso (quitar antes de prod).
   Future<void> _generateCurrentWeek() async {
-    setState(() => _busy = true);
-    try {
-      final result =
-          await SupabaseService.adminGenerateCommissionSettlementsCurrentWeek();
-      if (!mounted) return;
-      _showGenerateResult(result, label: 'semana actual');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _generateForWeek(_mondayOfWeek(DateTime.now()), label: 'semana actual');
   }
 
   void _showGenerateResult(
@@ -120,22 +109,23 @@ class _AdminCommissionSettlementsPanelState
         content: Text(
           n > 0
               ? 'Se generaron $n corte(s) en borrador ($label$period).'
-              : 'Sin líneas devengadas pendientes para $label$period. '
-                  'Use «Semana actual» si acaba de marcar pedidos Recibido hoy.',
+              : 'Sin líneas devengadas pendientes para $label$period.',
         ),
       ),
     );
   }
 
-  Future<void> _generateForWeek(DateTime weekStart) async {
+  Future<void> _generateForWeek(
+    DateTime weekStart, {
+    required String label,
+  }) async {
     setState(() => _busy = true);
     try {
       final result = await SupabaseService.adminGenerateCommissionSettlementsWeek(
         weekStart: weekStart,
       );
       if (!mounted) return;
-      _showGenerateResult(result, label: 'semana seleccionada');
-      _linesCache.clear();
+      _showGenerateResult(result, label: label);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -455,7 +445,6 @@ class _AdminCommissionSettlementsPanelState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pago confirmado. Se notificó al importador.')),
       );
-      _linesCache.remove(s.id);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -581,7 +570,6 @@ class _AdminCommissionSettlementsPanelState
     try {
       await SupabaseService.adminCancelCommissionSettlement(s.id);
       if (!mounted) return;
-      _linesCache.remove(s.id);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -593,11 +581,38 @@ class _AdminCommissionSettlementsPanelState
     }
   }
 
-  Future<List<CommissionSettlementLineModel>> _linesFor(String id) async {
-    if (_linesCache.containsKey(id)) return _linesCache[id]!;
-    final lines = await SupabaseService.fetchCommissionSettlementLines(id);
-    _linesCache[id] = lines;
-    return lines;
+  Future<void> _exportSettlementCsv(CommissionSettlementModel s) async {
+    setState(() => _busy = true);
+    try {
+      final lines = await SupabaseService.fetchCommissionSettlementLines(s.id);
+      final buf = StringBuffer()
+        ..writeln(
+          'periodo,importador,factura,estado,total_usd,lineas,pedido,producto,venta_usd,comision_usd',
+        );
+      for (final l in lines) {
+        buf.writeln(
+          '"${s.periodLabelEs}","${s.importadorBusinessName ?? ''}",'
+          '"${s.invoiceReference ?? ''}","${s.status}",'
+          '${s.totalCommissionUsd},${s.lineCount},'
+          '"${l.requestId}","${(l.productName ?? '').replaceAll('"', "'")}",'
+          '${l.precioTotalUsd},${l.comisionDevengadaUsd}',
+        );
+      }
+      await Clipboard.setData(ClipboardData(text: buf.toString()));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Detalle del corte copiado al portapapeles (CSV).'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Color _statusColor(String status) {
@@ -641,12 +656,14 @@ class _AdminCommissionSettlementsPanelState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
             children: [
+              if (_rows.isNotEmpty) _CommissionSummaryCard(rows: _rows),
+              if (_rows.isNotEmpty) const SizedBox(height: 12),
               _ConfigCard(
                 defaultRatePct: _defaultRate * 100,
                 onEditRate: _busy ? null : _editDefaultRate,
                 onEditImportadorRate: _busy ? null : _editImportadorRate,
-                onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
                 onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
+                onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
               ),
               const SizedBox(height: 12),
               Text(
@@ -780,40 +797,7 @@ class _AdminCommissionSettlementsPanelState
                     style: TextStyle(fontSize: 11, color: Colors.red.shade700),
                   ),
                 const SizedBox(height: 8),
-                FutureBuilder<List<CommissionSettlementLineModel>>(
-                  future: _linesFor(s.id),
-                  builder: (context, snap) {
-                    if (snap.connectionState != ConnectionState.done) {
-                      return const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: LinearProgressIndicator(),
-                      );
-                    }
-                    final lines = snap.data ?? const [];
-                    if (lines.isEmpty) {
-                      return const Text('Sin líneas.', style: TextStyle(fontSize: 12));
-                    }
-                    return Column(
-                      children: lines
-                          .map(
-                            (l) => ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                l.productName ?? l.requestId.substring(0, 8),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              subtitle: Text(
-                                'Venta USD ${l.precioTotalUsd.toStringAsFixed(2)} · '
-                                'Comisión USD ${l.comisionDevengadaUsd.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    );
-                  },
-                ),
+                CommissionSettlementLinesSection(settlementId: s.id),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -844,6 +828,12 @@ class _AdminCommissionSettlementsPanelState
                       TextButton(
                         onPressed: _busy ? null : () => _generarFacturaPdf(s),
                         child: const Text('Regenerar PDF'),
+                      ),
+                    if (!s.isBorrador && !s.isAnulado)
+                      TextButton.icon(
+                        onPressed: _busy ? null : () => _exportSettlementCsv(s),
+                        icon: const Icon(Icons.copy, size: 18),
+                        label: const Text('Copiar CSV'),
                       ),
                     if (s.isEmitido && s.pagoEnRevision) ...[
                       if (s.tieneComprobantePago)
@@ -876,20 +866,102 @@ class _AdminCommissionSettlementsPanelState
   }
 }
 
+class _CommissionSummaryCard extends StatelessWidget {
+  const _CommissionSummaryCard({required this.rows});
+
+  final List<CommissionSettlementModel> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    var borrador = 0;
+    var emitido = 0;
+    var enRevision = 0;
+    var pagado = 0;
+    double usdEmitido = 0;
+    double usdPagado = 0;
+
+    for (final s in rows) {
+      if (s.isBorrador) borrador++;
+      if (s.isEmitido) {
+        emitido++;
+        usdEmitido += s.totalCommissionUsd;
+        if (s.pagoEnRevision) enRevision++;
+      }
+      if (s.isPagado) {
+        pagado++;
+        usdPagado += s.totalCommissionUsd;
+      }
+    }
+
+    return Material(
+      color: Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Resumen de cortes',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: [
+                _chip('Borrador', borrador, AppColors.brandBlue),
+                _chip('Emitido', emitido, Colors.orange.shade800),
+                _chip('Pago en revisión', enRevision, Colors.deepOrange),
+                _chip('Pagado', pagado, Colors.green.shade700),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'USD pendiente de cobro (emitido): ${usdEmitido.toStringAsFixed(2)} · '
+              'USD cobrado (pagado): ${usdPagado.toStringAsFixed(2)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Text(
+        '$label: $count',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
 class _ConfigCard extends StatelessWidget {
   const _ConfigCard({
     required this.defaultRatePct,
     this.onEditRate,
     this.onEditImportadorRate,
-    this.onGenerateCurrentWeek,
     this.onGeneratePreviousWeek,
+    this.onGenerateCurrentWeek,
   });
 
   final double defaultRatePct;
   final VoidCallback? onEditRate;
   final VoidCallback? onEditImportadorRate;
-  final VoidCallback? onGenerateCurrentWeek;
   final VoidCallback? onGeneratePreviousWeek;
+  final VoidCallback? onGenerateCurrentWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -932,28 +1004,23 @@ class _ConfigCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              'Generar corte (pruebas)',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade800,
-              ),
-            ),
-            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                FilledButton.icon(
-                  onPressed: onGenerateCurrentWeek,
-                  icon: const Icon(Icons.play_arrow, size: 18),
-                  label: const Text('Semana actual'),
-                ),
                 OutlinedButton.icon(
                   onPressed: onGeneratePreviousWeek,
                   icon: const Icon(Icons.calendar_view_week, size: 18),
-                  label: const Text('Semana anterior'),
+                  label: const Text('Generar corte semana anterior'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onGenerateCurrentWeek,
+                  icon: const Icon(Icons.science_outlined, size: 18),
+                  label: const Text('Semana actual (prueba)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.deepOrange.shade800,
+                    side: BorderSide(color: Colors.deepOrange.shade300),
+                  ),
                 ),
               ],
             ),

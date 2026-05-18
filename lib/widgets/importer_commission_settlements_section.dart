@@ -4,6 +4,8 @@ import 'package:flutter/scheduler.dart';
 import '../models/commission_settlement_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_date_format.dart';
+import 'commission_settlement_lines_section.dart';
 import 'importer_commission_pago_section.dart';
 import 'main_shell_tab.dart';
 
@@ -183,14 +185,31 @@ class _ImporterCommissionSettlementsSectionState
                               color: Colors.grey.shade700,
                             ),
                           ),
+                        if (s.paidAt != null)
+                          Text(
+                            'Pagado: ${formatEsShortDateTime(s.paidAt)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
                       ],
                     ),
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: ImporterCommissionPagoSection(
-                          settlement: s,
-                          onChanged: _load,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            CommissionSettlementLinesSection(
+                              settlementId: s.id,
+                            ),
+                            const SizedBox(height: 10),
+                            ImporterCommissionPagoSection(
+                              settlement: s,
+                              onChanged: _load,
+                            ),
+                          ],
                         ),
                       ),
                     ],

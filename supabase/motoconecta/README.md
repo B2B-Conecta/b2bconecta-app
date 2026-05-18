@@ -23,7 +23,7 @@ Solo la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`
 2. Si la base ya existía con un esquema anterior MotoConecta: ejecuta **`upgrade_lat_lng_sku.sql`** (y revisa columnas nuevas manualmente si hace falta).
 3. Si la app falla con **`proveedor_factura_storage_path` does not exist**: ejecuta en SQL Editor **`upgrade_proveedor_factura.sql`** (solo añade las columnas de adjunto).
 4. Si el panel **Pedidos** del aliado muestra **PGRST202** / «`aliado_effective_open_exposure` not found»: ejecuta **`upgrade_aliado_effective_open_exposure.sql`** (RPC de suma de pedidos activos para el cupo en pantalla).
-5. Desde la raíz del repo, `supabase/seed.sql` — dos importadores, un aliado, un admin; perfiles con dirección fiscal de referencia; **15 productos por importador** (30 filas); un pedido `pendiente` (valida `comision_motoconecta`).
+5. Desde la raíz del repo, `supabase/seed.sql` — dos importadores, un aliado, un admin; **15 productos por importador**; pedidos `entregado` con comisión devengada y un **corte emitido** de demo (C1).
 
 Contraseña de todos los usuarios seed: **`SeedPass123!`**
 
@@ -59,4 +59,12 @@ Si tu base es **MotoLink legacy** con `transaction_requests.owner_id`, revisa el
 2. Retirar rol **transportista**: `AppHomeRole`, `main_shell`, paneles y servicios de envío/maps/ruta.
 3. **Chat:** suscripción Realtime a `transaction_request_messages`; pantalla de hilo por pedido.
 4. **Factura importador:** archivo en `order-invoices` + columnas `proveedor_factura_*` en `transaction_requests` (la app las actualiza vía Flutter).
-5. **Admin:** solo lectura agregada / reportes sobre `transaction_requests` y `comision_motoconecta` (sin aprobación previa de pedidos).
+5. **Admin → Comisiones (C1):** cortes semanales, factura PDF `ML-COM-…`, revisión de pago del importador.
+
+## Comisiones MotoLink (C1)
+
+Migraciones en `supabase/migrations/` (prefijo `20260520…` / `20260526…`): devengo al Recibido, cortes, referencia automática, PDF, pago con comprobante, cron semanal (lunes 07:00 UTC).
+
+- **Admin:** pestaña Comisiones — generar corte, emitir factura (genera PDF), confirmar pago.
+- **Importador:** Perfil → Cortes de comisión — ver PDF, registrar comprobante.
+- **Storage:** `commission-settlement-invoices` (PDF) y `order-payment-proofs/commission-settlements/` (comprobantes).

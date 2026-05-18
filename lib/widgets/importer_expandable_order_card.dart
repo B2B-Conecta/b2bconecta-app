@@ -289,6 +289,12 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           compact: true,
                           viewer: PedidoDesgloseViewer.importador,
                         ),
+                        for (final line in lines)
+                          if (line.status != TransactionRequestStatus.pendiente &&
+                              line.status != TransactionRequestStatus.rechazado) ...[
+                            const SizedBox(height: 10),
+                            TransactionRequestCommissionSection(request: line),
+                          ],
                         const SizedBox(height: 12),
                         if (isCheckoutGroup) ...[
                           if (checkoutGroupMismoEstadoEnvio(lines)) ...[

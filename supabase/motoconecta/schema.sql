@@ -95,6 +95,24 @@ create table public.commission_settlements (
   notes text,
   created_at timestamptz not null default now(),
   created_by uuid references public.profiles (id),
+  pago_comprobante_storage_path text,
+  pago_comprobante_file_name text,
+  pago_comprobante_submitted_at timestamptz,
+  pago_estado_revision text
+    check (
+      pago_estado_revision is null
+      or pago_estado_revision = any (
+        array[
+          'pendiente'::text,
+          'en_revision'::text,
+          'aprobado'::text,
+          'rechazado'::text
+        ]
+      )
+    ),
+  pago_rechazo_nota text,
+  invoice_pdf_storage_path text,
+  invoice_pdf_file_name text,
   constraint commission_settlements_period_chk check (period_end >= period_start),
   constraint commission_settlements_importador_week_uniq unique (importador_id, period_start, period_end)
 );

@@ -143,6 +143,17 @@ class NotificationProvider extends ChangeNotifier {
       MainShellTabController.navigateToAdminCreditoForKycNotification();
       return;
     }
+    if (t0 == 'pago') {
+      switch (homeRole) {
+        case AppHomeRole.aliado:
+        case AppHomeRole.importador:
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.administrador:
+        case AppHomeRole.transportista:
+          break;
+      }
+    }
     final type = n.type.trim();
     final legacyOrderAsActive = homeRole == AppHomeRole.administrador &&
         type == 'envio' &&

@@ -313,6 +313,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         ],
                         TransactionRequestPartiesContactSection(request: r),
                         const SizedBox(height: 12),
+                        TransactionRequestCommissionSection(request: r),
+                        const SizedBox(height: 12),
                         TransactionRequestDestinoEntregaSection(
                           request: r,
                         ),
@@ -356,22 +358,12 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           compact: true,
                           viewerRole: cardViewerRole,
                         ),
-                        if (r.status == TransactionRequestStatus.enTransito) ...[
+                        if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
                           const SizedBox(height: 12),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.teal.shade50.withOpacity(0.45),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.teal.shade100),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: TransportistaRecogidaAlmacenSection(
-                                request: r,
-                                viewerRole: cardViewerRole,
-                                onUpdated: onRequestMutated,
-                              ),
-                            ),
+                          TransportistaRecogidaAlmacenCard(
+                            request: r,
+                            viewerRole: cardViewerRole,
+                            onUpdated: onRequestMutated,
                           ),
                         ],
                         if (expandedFooter != null) ...[

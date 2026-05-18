@@ -7,6 +7,7 @@ import '../models/aliado_motolink_cupo_snapshot.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
+import '../models/commission_settlement_model.dart';
 import '../models/credit_limit_exception.dart';
 import '../models/document_review_status.dart';
 import '../models/document_type_preference.dart';
@@ -792,7 +793,10 @@ class SupabaseService {
     status,
     cantidad,
     precio_total_usd,
-    comision_motoconecta,
+    commission_rate_snapshot,
+    comision_devengada_usd,
+    comision_devengada_at,
+    commission_settlement_id,
     factura_url,
     proveedor_factura_storage_path,
     proveedor_factura_file_name,
@@ -811,6 +815,9 @@ class SupabaseService {
     checkout_group_id,
     discount_rules,
     confirmado_por,
+    aliado_experience_stars,
+    aliado_experience_comment,
+    aliado_experience_submitted_at,
     created_at,
     updated_at,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude ),
@@ -3528,6 +3535,141 @@ class SupabaseService {
     // Catálogo B2B (aliados): no listar productos sin inventario.
     q = q.gt('stock', 0);
     return q;
+  }
+
+  static const _commissionSettlementSelect = '''
+    id,
+    importador_id,
+    period_start,
+    period_end,
+    total_commission_usd,
+    line_count,
+    status,
+    invoice_reference,
+    issued_at,
+    paid_at,
+    notes,
+    created_at,
+    importador:profiles!commission_settlements_importador_id_fkey (
+      business_name,
+      rif
+    )
+  ''';
+
+  /// Tasa global MotoLink (fracción; 0.05 = 5 %).
+  static Future<double> fetchDefaultCommissionRate() async {
+    final row = await _client
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'default_commission_rate')
+        .maybeSingle();
+    if (row == null) return 0.05;
+    final v = row['value'];
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.05;
+  }
+
+  static Future<void> adminSetDefaultCommissionRate(double rate) async {
+    await _client.rpc(
+      'admin_set_default_commission_rate',
+      params: <String, dynamic>{'p_rate': rate},
+    );
+  }
+
+  static Future<void> adminSetImportadorCommissionRate({
+    required String importadorId,
+    double? rate,
+  }) async {
+    await _client.rpc(
+      'admin_set_importador_commission_rate',
+      params: <String, dynamic>{
+        'p_importador_id': importadorId,
+        'p_rate': rate,
+      },
+    );
+  }
+
+  /// Cortes de comisión (admin: todos; importador: solo los propios vía RLS).
+  static Future<List<CommissionSettlementModel>> fetchCommissionSettlements({
+    int limit = 80,
+  }) async {
+    final response = await _client
+        .from('commission_settlements')
+        .select(_commissionSettlementSelect)
+        .order('period_start', ascending: false)
+        .limit(limit);
+    final list = response as List<dynamic>;
+    return list
+        .map((e) => CommissionSettlementModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  static Future<List<CommissionSettlementLineModel>>
+      fetchCommissionSettlementLines(String settlementId) async {
+    final response = await _client
+        .from('transaction_requests')
+        .select('''
+          id,
+          precio_total_usd,
+          comision_devengada_usd,
+          comision_devengada_at,
+          checkout_group_id,
+          products ( name )
+        ''')
+        .eq('commission_settlement_id', settlementId)
+        .order('comision_devengada_at', ascending: true);
+    final list = response as List<dynamic>;
+    return list
+        .map((e) => CommissionSettlementLineModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  /// Genera cortes en borrador para la semana [weekStart] (lunes). Si es null, la RPC usa la semana anterior.
+  static Future<Map<String, dynamic>> adminGenerateCommissionSettlementsWeek({
+    DateTime? weekStart,
+  }) async {
+    final params = <String, dynamic>{};
+    if (weekStart != null) {
+      params['p_week_start'] =
+          '${weekStart.year}-${weekStart.month.toString().padLeft(2, '0')}-${weekStart.day.toString().padLeft(2, '0')}';
+    }
+    final raw = await _client.rpc(
+      'admin_generate_commission_settlements_week',
+      params: params,
+    );
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{};
+  }
+
+  static Future<void> adminIssueCommissionSettlement({
+    required String settlementId,
+    required String invoiceReference,
+  }) async {
+    await _client.rpc(
+      'admin_issue_commission_settlement',
+      params: <String, dynamic>{
+        'p_settlement_id': settlementId,
+        'p_invoice_reference': invoiceReference.trim(),
+      },
+    );
+  }
+
+  static Future<void> adminMarkCommissionSettlementPaid(String settlementId) async {
+    await _client.rpc(
+      'admin_mark_commission_settlement_paid',
+      params: <String, dynamic>{'p_settlement_id': settlementId},
+    );
+  }
+
+  static Future<void> adminCancelCommissionSettlement(String settlementId) async {
+    await _client.rpc(
+      'admin_cancel_commission_settlement',
+      params: <String, dynamic>{'p_settlement_id': settlementId},
+    );
   }
 }
 

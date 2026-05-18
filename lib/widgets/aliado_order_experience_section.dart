@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/aliado_experience_utils.dart';
+import 'aliado_order_experience_display.dart';
 
 /// A6: calificación 1-5 y comentario breve (solo con pedido entregado; una vez).
 class AliadoOrderExperienceSection extends StatefulWidget {
@@ -37,7 +40,9 @@ class _AliadoOrderExperienceSectionState
   @override
   void didUpdateWidget(covariant AliadoOrderExperienceSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.request.id != widget.request.id) {
+    if (oldWidget.request.id != widget.request.id ||
+        oldWidget.request.aliadoExperienceSubmittedAt !=
+            widget.request.aliadoExperienceSubmittedAt) {
       _estrellas = null;
       _commentCtrl.clear();
     }
@@ -89,12 +94,29 @@ class _AliadoOrderExperienceSectionState
       widget.onChanged();
     } catch (e) {
       if (!mounted) return;
+      final msg = _experienceErrorMessage(e);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(msg)),
       );
+      if (msg.contains('ya fue registrada')) {
+        widget.onChanged();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _experienceErrorMessage(Object e) {
+    final raw = e is PostgrestException ? e.message : e.toString();
+    if (raw.contains('No se puede registrar la valoración') ||
+        raw.contains('ya valorados')) {
+      return 'La valoración de este pedido ya fue registrada. '
+          'Actualizamos la ficha para mostrarla.';
+    }
+    if (raw.contains('Calificación inválida')) {
+      return 'Indique de 1 a 5 estrellas.';
+    }
+    return 'No se pudo enviar la valoración. Inténtelo de nuevo.';
   }
 
   @override
@@ -105,51 +127,16 @@ class _AliadoOrderExperienceSectionState
         r.canceladoPorAliado) {
       return const SizedBox.shrink();
     }
-    if (r.aliadoExperienceSubmittedAt != null) {
+    if (aliadoTieneValoracionRegistrada(r)) {
+      final scope = widget.bundleImportadorId != null &&
+              widget.bundleImportadorId!.trim().isNotEmpty
+          ? 'Valoración de este proveedor en el pedido'
+          : 'Valoración de este pedido';
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-          decoration: BoxDecoration(
-            color: Colors.purple.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.purple.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Tu valoración de la experiencia',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: List.generate(5, (i) {
-                  final n = (r.aliadoExperienceStars ?? 0) > i ? 1.0 : 0.0;
-                  return Icon(
-                    n > 0 ? Icons.star : Icons.star_border,
-                    size: 20,
-                    color: Colors.amber.shade800,
-                  );
-                }),
-              ),
-              if ((r.aliadoExperienceComment ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  r.aliadoExperienceComment!.trim(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: Colors.purple.shade900,
-                  ),
-                ),
-              ],
-            ],
-          ),
+        child: AliadoOrderExperienceRegisteredCard(
+          request: r,
+          scopeLabel: scope,
         ),
       );
     }
@@ -170,7 +157,8 @@ class _AliadoOrderExperienceSectionState
         ),
         const SizedBox(height: 4),
         Text(
-          'Calificá de 1 a 5 estrellas y, si querés, dejá un comentario breve.',
+          'Calificá de 1 a 5 estrellas y, si querés, dejá un comentario breve. '
+          'Al enviar, quedará registrada en este pedido y no podrá editarse.',
           style: TextStyle(
             fontSize: 11.5,
             color: Colors.grey.shade700,

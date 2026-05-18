@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/admin_active_orders_panel.dart';
 import '../widgets/admin_aliados_credit_panel.dart';
 import '../widgets/admin_closed_orders_panel.dart';
+import '../widgets/admin_commission_settlements_panel.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
 import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
@@ -162,6 +163,12 @@ class _MainShellState extends State<MainShell> {
             title: 'Reportes de encomiendas',
             child: const AdminEncomiendasReportPanel(),
           ),
+          _adminOrdersScaffold(
+            title: 'Comisiones MotoLink',
+            subtitle:
+                'Devengo al marcar Recibido · corte semanal y facturación por importador.',
+            child: const AdminCommissionSettlementsPanel(),
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.administrador,
@@ -206,6 +213,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.analytics_outlined),
               activeIcon: Icon(Icons.analytics),
               label: 'Reportes',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.payments_outlined),
+              activeIcon: Icon(Icons.payments),
+              label: 'Comisiones',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

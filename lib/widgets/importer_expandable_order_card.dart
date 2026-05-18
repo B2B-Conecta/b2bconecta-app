@@ -312,8 +312,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 ),
                               ),
                             for (var li = 0; li < lines.length; li++) ...[
-                              if (lines[li].status ==
-                                  TransactionRequestStatus.enTransito) ...[
+                              if (transportistaRecogidaAlmacenSectionVisible(
+                                lines[li],
+                              )) ...[
                                 const SizedBox(height: 12),
                                 Text(
                                   lines[li].etiquetaGestionLineaImportador(uid),
@@ -325,19 +326,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: Colors.teal.shade50.withOpacity(0.45),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.teal.shade100),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: TransportistaRecogidaAlmacenSection(
-                                      request: lines[li],
-                                      viewerRole: AppHomeRole.importador,
-                                    ),
-                                  ),
+                                TransportistaRecogidaAlmacenCard(
+                                  request: lines[li],
+                                  viewerRole: AppHomeRole.importador,
                                 ),
                               ],
                             ],
@@ -369,22 +360,13 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 viewerRole: AppHomeRole.importador,
                                 showHeading: false,
                               ),
-                              if (lines[li].status ==
-                                  TransactionRequestStatus.enTransito) ...[
+                              if (transportistaRecogidaAlmacenSectionVisible(
+                                lines[li],
+                              )) ...[
                                 const SizedBox(height: 12),
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: Colors.teal.shade50.withOpacity(0.45),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.teal.shade100),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: TransportistaRecogidaAlmacenSection(
-                                      request: lines[li],
-                                      viewerRole: AppHomeRole.importador,
-                                    ),
-                                  ),
+                                TransportistaRecogidaAlmacenCard(
+                                  request: lines[li],
+                                  viewerRole: AppHomeRole.importador,
                                 ),
                               ],
                             ],
@@ -410,21 +392,11 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             viewerRole: AppHomeRole.importador,
                             showHeading: true,
                           ),
-                          if (r.status == TransactionRequestStatus.enTransito) ...[
+                          if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
                             const SizedBox(height: 12),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.teal.shade50.withOpacity(0.45),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.teal.shade100),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: TransportistaRecogidaAlmacenSection(
-                                  request: r,
-                                  viewerRole: AppHomeRole.importador,
-                                ),
-                              ),
+                            TransportistaRecogidaAlmacenCard(
+                              request: r,
+                              viewerRole: AppHomeRole.importador,
                             ),
                           ],
                         ],

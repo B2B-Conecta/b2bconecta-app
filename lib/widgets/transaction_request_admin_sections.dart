@@ -1295,3 +1295,58 @@ class _TimelineRow extends StatelessWidget {
     );
   }
 }
+
+/// Comisión MotoLink (Minuta #7 C1): tasa, estimada y devengada al Recibido.
+class TransactionRequestCommissionSection extends StatelessWidget {
+  const TransactionRequestCommissionSection({
+    super.key,
+    required this.request,
+  });
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final pct = (r.commissionRateSnapshot * 100).toStringAsFixed(2);
+    final devengada = r.comisionDevengada;
+    final monto = devengada
+        ? (r.comisionDevengadaUsd ?? r.comisionEstimadaUsd)
+        : r.comisionEstimadaUsd;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Comisión MotoLink',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tasa $pct % · ${devengada ? 'Devengada' : 'Pendiente de recibir'}: '
+            'USD ${monto.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 12, height: 1.35),
+          ),
+          if (devengada && r.comisionDevengadaAt != null)
+            Text(
+              'Devengada: ${formatEsShortDateTime(r.comisionDevengadaAt)}',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            ),
+          if (r.commissionSettlementId != null)
+            Text(
+              'Incluida en corte ${r.commissionSettlementId!.substring(0, 8)}…',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            ),
+        ],
+      ),
+    );
+  }
+}

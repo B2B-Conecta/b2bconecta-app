@@ -110,6 +110,10 @@ class TransactionRequestModel {
     this.checkoutGroupId,
     this.confirmadoPor,
     this.discountRules,
+    this.commissionRateSnapshot = 0.05,
+    this.comisionDevengadaUsd,
+    this.comisionDevengadaAt,
+    this.commissionSettlementId,
   });
 
   final String id;
@@ -268,6 +272,21 @@ class TransactionRequestModel {
 
   /// Operador importador que aprueba pago / primera gestión auditada (`transaction_requests.confirmado_por`).
   final String? confirmadoPor;
+
+  /// Tasa MotoLink al checkout (fracción; 0.05 = 5 %).
+  final double commissionRateSnapshot;
+
+  /// Comisión devengada al marcar Recibido (Minuta #7 C1).
+  final double? comisionDevengadaUsd;
+  final DateTime? comisionDevengadaAt;
+  final String? commissionSettlementId;
+
+  /// Comisión estimada sobre el total (referencia antes del devengo).
+  double get comisionEstimadaUsd =>
+      (precioTotal * commissionRateSnapshot * 100).round() / 100;
+
+  bool get comisionDevengada =>
+      comisionDevengadaAt != null && (comisionDevengadaUsd ?? 0) > 0;
 
   /// Reglas comerciales snapshot JSON al checkout (p. ej. tramos por volumen).
   final Map<String, dynamic>? discountRules;
@@ -1219,6 +1238,19 @@ class TransactionRequestModel {
         if (dr is Map) return Map<String, dynamic>.from(dr);
         return null;
       }(),
+      commissionRateSnapshot: () {
+        final v = json['commission_rate_snapshot'];
+        if (v is num) return v.toDouble();
+        return double.tryParse(v?.toString() ?? '') ?? 0.05;
+      }(),
+      comisionDevengadaUsd: () {
+        final v = json['comision_devengada_usd'];
+        if (v == null) return null;
+        if (v is num) return v.toDouble();
+        return double.tryParse(v.toString());
+      }(),
+      comisionDevengadaAt: _parseDate(json['comision_devengada_at']),
+      commissionSettlementId: _nullableText(json['commission_settlement_id']),
     );
   }
 
@@ -1329,9 +1361,34 @@ String tituloCheckoutGrupoAliado(List<TransactionRequestModel> lines) {
   return '${lines.length} productos · un carrito';
 }
 
-/// Todas las filas comparten el mismo [TransactionRequestStatus] (un solo desplegable de seguimiento).
+/// Rango del ciclo logístico (alineado con [CourierTimelineWidget]).
+int motoconectaEnvioTimelineRank(String status) {
+  switch (status) {
+    case TransactionRequestStatus.pendiente:
+      return 0;
+    case TransactionRequestStatus.enPreparacion:
+      return 1;
+    case TransactionRequestStatus.pedidoListo:
+      return 2;
+    case TransactionRequestStatus.enTransito:
+    case TransactionRequestStatus.enviado:
+      return 3;
+    case TransactionRequestStatus.entregado:
+      return 4;
+    case TransactionRequestStatus.rechazado:
+      return -1;
+    default:
+      return 0;
+  }
+}
+
+/// Misma fase logística en todas las líneas → un solo timeline en la ficha.
+/// Trata `en_transito` y `enviado` como equivalentes para no duplicar bloques vacíos.
 bool checkoutGroupMismoEstadoEnvio(List<TransactionRequestModel> lines) {
   if (lines.length <= 1) return true;
-  final s0 = lines.first.status;
-  return lines.every((e) => e.status == s0);
+  if (lines.any((e) => e.status == TransactionRequestStatus.rechazado)) {
+    return lines.every((e) => e.status == TransactionRequestStatus.rechazado);
+  }
+  final rank0 = motoconectaEnvioTimelineRank(lines.first.status);
+  return lines.every((e) => motoconectaEnvioTimelineRank(e.status) == rank0);
 }

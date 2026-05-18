@@ -84,12 +84,20 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
     this.compact = true,
     this.viewer = PedidoDesgloseViewer.importador,
     this.showPrecioHelp = true,
+    this.sectionTitle,
+    this.showImporterGroupHeaders = true,
   });
 
   final List<TransactionRequestModel> lines;
   final bool compact;
   final PedidoDesgloseViewer viewer;
   final bool showPrecioHelp;
+
+  /// Si se define, sustituye el título por defecto.
+  final String? sectionTitle;
+
+  /// En carritos multi-importador, agrupa por nombre de proveedor.
+  final bool showImporterGroupHeaders;
 
   @override
   Widget build(BuildContext context) {
@@ -106,9 +114,10 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          viewer == PedidoDesgloseViewer.aliado
-              ? 'Productos de tu pedido'
-              : 'Productos del pedido',
+          sectionTitle ??
+              (viewer == PedidoDesgloseViewer.aliado
+                  ? 'Productos de tu pedido'
+                  : 'Productos del pedido'),
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: titleSize,
@@ -129,18 +138,20 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
         SizedBox(height: compact ? 8 : 10),
         for (var ci = 0; ci < chunks.length; ci++) ...[
           if (ci > 0) SizedBox(height: compact ? 14 : 16),
-          Text(
-            () {
-              final t = chunks[ci].first.ownerBusinessName?.trim();
-              return (t != null && t.isNotEmpty) ? t : 'Proveedor';
-            }(),
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: compact ? 11.5 : 12,
-              color: AppColors.brandBlue,
+          if (showImporterGroupHeaders && chunks.length > 1) ...[
+            Text(
+              () {
+                final t = chunks[ci].first.ownerBusinessName?.trim();
+                return (t != null && t.isNotEmpty) ? t : 'Proveedor';
+              }(),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: compact ? 11.5 : 12,
+                color: AppColors.brandBlue,
+              ),
             ),
-          ),
-          SizedBox(height: compact ? 6 : 8),
+            SizedBox(height: compact ? 6 : 8),
+          ],
           for (var li = 0; li < chunks[ci].length; li++) ...[
             if (li > 0) SizedBox(height: compact ? 8 : 10),
             _LineDesgloseBlock(

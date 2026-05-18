@@ -212,21 +212,15 @@ class _TransactionRequestDetailScreenState
               if (anyEnTransito) ...[
                 const SizedBox(height: 12),
                 TransactionRequestRouteMapSection(request: r),
+              ],
+              if (transportistaRecogidaAlmacenSectionVisible(r)) ...[
                 const SizedBox(height: 12),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.teal.shade50.withOpacity(0.45),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.teal.shade100),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: TransportistaRecogidaAlmacenSection(
-                      request: r,
-                      viewerRole: widget.homeRole,
-                      onUpdated: _reloadRequest,
-                    ),
-                  ),
+                TransportistaRecogidaAlmacenCard(
+                  request: r,
+                  viewerRole: widget.homeRole,
+                  onUpdated: _reloadRequest,
+                  padding: const EdgeInsets.all(14),
+                  borderRadius: 14,
                 ),
               ],
               if (widget.homeRole == AppHomeRole.administrador) ...[

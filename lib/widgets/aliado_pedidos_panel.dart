@@ -7,12 +7,15 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_order_grouping.dart';
 import '../utils/motolink_volume_discount.dart';
+import 'aliado_importador_factura_section.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import '../utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
+import 'aliado_confirmar_recepcion_section.dart';
 import 'aliado_order_experience_section.dart';
 import 'aliado_order_pago_section.dart';
+import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
 import 'order_motolink_thread_section.dart';
 import 'order_list_filter_bar.dart';
@@ -349,20 +352,46 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         );
   }
 
+  Widget _buildRecepcionLeading(
+    BuildContext context,
+    List<TransactionRequestModel> g,
+  ) {
+    final cg = g.first.checkoutGroupId?.trim();
+    final bloques = aliadoRecepcionBloquesDesdePedido(
+      lines: g,
+      lineaPuedeConfirmar: (r) => r.transportistaCompletoRecogidaAlmacen,
+      chunkPuedeConfirmar: _puedeConfirmarRecepcionImportador,
+      chunkEsperaRecogida: _algunaLineaEsperaRecogidaImportador,
+      busyKeyForChunk: (chunk) =>
+          _entregaBusyKeyForImportadorChunk(chunk, cg),
+      entregaBusyId: _entregaBusyId,
+      onConfirmarLinea: (r) => _confirmarEntrega(context, r),
+      onConfirmarChunk: (chunk) => _confirmarEntregaGrupoImportador(
+        context,
+        chunk: chunk,
+        checkoutGroupId: cg,
+      ),
+    );
+    return AliadoConfirmarRecepcionSection(bloques: bloques);
+  }
+
   Widget _orderCardFooter(
     BuildContext context,
     List<TransactionRequestModel> g,
   ) {
     final isMulti = g.length > 1;
-    final checkoutGroupId = g.first.checkoutGroupId?.trim();
 
     if (!isMulti) {
       final r = g.single;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AliadoImportadorFacturaSection(lines: [r], compact: true),
+          const SizedBox(height: 10),
           _PasarelaPagoMotoLinkCard(
             lineCount: 1,
+            importerName: r.ownerBusinessName,
+            montoRef: r.precioTotal,
             child: AliadoOrderPagoSection(
               request: r,
               profile: _profile,
@@ -385,74 +414,19 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       );
     }
 
-    final porImportador = groupCheckoutLinesByImportador(g);
-    final cgForBundle =
-        (checkoutGroupId != null && checkoutGroupId.isNotEmpty)
-            ? checkoutGroupId
-            : null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Text(
-            'Pago y recepción por importador. Mensajes con MotoLink: un hilo por proveedor en este carrito.',
-            style: TextStyle(
-              fontSize: 11.5,
-              color: Colors.grey.shade800,
-              height: 1.35,
-            ),
-          ),
-        ),
-        for (var bi = 0; bi < porImportador.length; bi++) ...[
-          _bloqueFooterImportador(
-            context,
-            porImportador[bi],
-            bundleCheckoutGroupId: cgForBundle,
-          ),
-          if (bi < porImportador.length - 1)
-            Divider(height: 32, thickness: 1, color: Colors.grey.shade300),
-        ],
-      ],
-    );
+    return const SizedBox.shrink();
   }
 
-  /// Una pasarela de pago y un comprobante para todas las líneas de este importador (sin plan de cuotas).
-  Widget _columnPagoUnificadoImportador(
-    List<TransactionRequestModel> chunk, {
-    required bool suppressExperienceParent,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AliadoOrderPagoSection(
-          request: chunk.first,
-          profile: _profile,
-          openCreditExposureSum: _openCreditExposureSum,
-          onChanged: _load,
-          pagoBundleLines: chunk,
-          suppressExperience: suppressExperienceParent,
-          suppressPrimaryTitle: true,
-          suppressNegotiationIntro: false,
-        ),
-      ],
-    );
-  }
-
-  Widget _bloqueFooterImportador(
+  Widget _multiImporterPanelContent(
     BuildContext context,
     List<TransactionRequestModel> chunk, {
+    required int importerIndex,
+    required int importerTotal,
     required String? bundleCheckoutGroupId,
   }) {
     final name = chunk.first.ownerBusinessName ?? 'Importador';
-    final subtotal =
-        chunk.fold<double>(0, (s, r) => s + r.precioTotal);
+    final subtotal = subtotalBloqueImportador(chunk);
     final disc = computeVolumeDiscountForLines(chunk);
-    final busyKey =
-        _entregaBusyKeyForImportadorChunk(chunk, bundleCheckoutGroupId);
-    final puede = _puedeConfirmarRecepcionImportador(chunk);
-    final esperaRecogida = _algunaLineaEsperaRecogidaImportador(chunk);
     final cg = chunk.first.checkoutGroupId?.trim() ?? '';
     final usePagoUnificado = chunk.length > 1 &&
         !chunk.any((TransactionRequestModel r) => r.hasAgreedCreditPlan) &&
@@ -462,25 +436,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          name,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: Colors.grey.shade900,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${chunk.length} línea(s) · Subtotal ${formatRefAmount(subtotal)} REF',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            color: Colors.grey.shade800,
-          ),
-        ),
         if (disc != null) ...[
-          const SizedBox(height: 6),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -499,68 +455,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ),
             ),
           ),
-        ],
-        const SizedBox(height: 8),
-        if (_lineasEnTransitoOCerrables(chunk).isNotEmpty) ...[
-          FilledButton.icon(
-            onPressed: (_entregaBusyId != null || !puede)
-                ? null
-                : () => _confirmarEntregaGrupoImportador(
-                      context,
-                      chunk: chunk,
-                      checkoutGroupId: bundleCheckoutGroupId,
-                    ),
-            icon: _entregaBusyId == busyKey
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.inventory_2_outlined, size: 20),
-            label: Text(
-              _entregaBusyId == busyKey
-                  ? 'Confirmando…'
-                  : 'Confirmar recepción en tu taller',
-            ),
-          ),
-          if (esperaRecogida) ...[
-            const SizedBox(height: 8),
-            Material(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline,
-                        size: 18, color: Colors.amber.shade900),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Podrá confirmar cuando el transportista haya marcado la recogida '
-                        'en almacén para los envíos en tránsito de este proveedor.',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          height: 1.35,
-                          color: Colors.amber.shade900,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
           const SizedBox(height: 10),
         ],
+        AliadoImportadorFacturaSection(lines: chunk, compact: true),
+        const SizedBox(height: 10),
         _PasarelaPagoMotoLinkCard(
           lineCount: chunk.length,
           singleComprobantePorProveedor: usePagoUnificado,
+          importerName: name,
+          pagoIndex: importerIndex,
+          pagoTotal: importerTotal,
+          montoRef: subtotal,
           child: usePagoUnificado
               ? _columnPagoUnificadoImportador(
                   chunk,
@@ -651,6 +556,28 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     );
   }
 
+  /// Una pasarela de pago y un comprobante para todas las líneas de este importador (sin plan de cuotas).
+  Widget _columnPagoUnificadoImportador(
+    List<TransactionRequestModel> chunk, {
+    required bool suppressExperienceParent,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AliadoOrderPagoSection(
+          request: chunk.first,
+          profile: _profile,
+          openCreditExposureSum: _openCreditExposureSum,
+          onChanged: _load,
+          pagoBundleLines: chunk,
+          suppressExperience: suppressExperienceParent,
+          suppressPrimaryTitle: true,
+          suppressNegotiationIntro: false,
+        ),
+      ],
+    );
+  }
+
   Widget _buildOrderCard(
     BuildContext context,
     List<TransactionRequestModel> g,
@@ -658,24 +585,33 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final expandKey = checkoutGroupExpandKey(g);
     final primary = g.first;
     final isMulti = g.length > 1;
+    final checkoutGroupId = g.first.checkoutGroupId?.trim();
+    final cgForBundle =
+        (checkoutGroupId != null && checkoutGroupId.isNotEmpty)
+            ? checkoutGroupId
+            : null;
+
     return AliadoExpandableOrderCard(
       request: primary,
       checkoutGroupLines: isMulti ? g : null,
       expanded: _expandedRequestId == expandKey,
       onToggle: () => _toggleExpand(expandKey),
       statusLabel: isMulti ? _labelGrupo(g) : _label(primary),
-      onConfirmarRecepcion: isMulti
-          ? null
-          : ((primary.status == TransactionRequestStatus.enTransito ||
-                  primary.status == TransactionRequestStatus.enviado)
-              ? () => _confirmarEntrega(context, primary)
-              : null),
-      confirmarRecepcionBusy: !isMulti && _entregaBusyId == primary.id,
+      expandedLeading: _buildRecepcionLeading(context, g),
       onCancelarSolicitudPendiente: _grupoPuedeCancelar(g)
           ? () => _cancelarGrupoPendiente(context, g)
           : null,
       cancelarSolicitudPendienteBusy: _cancelarBusyId == expandKey,
-      expandedFooter: _orderCardFooter(context, g),
+      expandedFooter: isMulti ? null : _orderCardFooter(context, g),
+      multiImporterPanelBuilder: isMulti
+          ? (ctx, chunk, idx, total) => _multiImporterPanelContent(
+                ctx,
+                chunk,
+                importerIndex: idx,
+                importerTotal: total,
+                bundleCheckoutGroupId: cgForBundle,
+              )
+          : null,
     );
   }
 
@@ -832,12 +768,20 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
   const _PasarelaPagoMotoLinkCard({
     required this.lineCount,
     this.singleComprobantePorProveedor = false,
+    this.importerName,
+    this.pagoIndex,
+    this.pagoTotal,
+    this.montoRef,
     required this.child,
   });
 
   final int lineCount;
   /// Varios ítems mismo importador: un archivo para todas las líneas (sin duplicar UI).
   final bool singleComprobantePorProveedor;
+  final String? importerName;
+  final int? pagoIndex;
+  final int? pagoTotal;
+  final double? montoRef;
   final Widget child;
 
   @override
@@ -866,21 +810,47 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Pasarela de pago MotoLink',
-                        style: TextStyle(
+                      Text(
+                        pagoIndex != null && pagoTotal != null && pagoTotal! > 1
+                            ? 'Su pago $pagoIndex de $pagoTotal'
+                            : 'Pasarela de pago MotoLink',
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
                           color: AppColors.textPrimary,
                         ),
                       ),
+                      if (importerName != null &&
+                          importerName!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          importerName!.trim(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ],
+                      if (montoRef != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Monto de este proveedor: ${formatRefAmount(montoRef!)} REF',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandBlue,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         singleComprobantePorProveedor
-                            ? 'Un comprobante por proveedor; el importador revisa aquí.'
+                            ? 'Un solo comprobante cubre todas las líneas de este proveedor; '
+                                'el importador lo revisa una vez.'
                             : lineCount > 1
-                                ? 'Plan de cuotas u otros casos: un registro por ítem.'
-                                : 'Método y comprobante según el estado de esta línea.',
+                                ? 'Registre el pago de cada línea de este proveedor.'
+                                : 'Método y comprobante para este proveedor.',
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.35,

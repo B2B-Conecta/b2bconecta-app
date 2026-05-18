@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'aliado_kyc_documents_section.dart';
+import 'importer_commission_settlements_section.dart';
 import 'aliado_solicitar_credito_sheet.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
@@ -836,6 +837,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               key: ValueKey<int>(_authSectionTick),
               profile: widget.initial,
             ),
+          ],
+          if (_persistedAsImportador && widget.initial != null) ...[
+            const SizedBox(height: 20),
+            const ImporterCommissionSettlementsSection(),
           ],
           if (_persistedAsAliado) ...[
             const SizedBox(height: 20),

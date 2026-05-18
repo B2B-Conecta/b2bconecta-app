@@ -8,6 +8,54 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 
+/// True cuando hay transportista asignado y la sección de recogida debe mostrarse.
+bool transportistaRecogidaAlmacenSectionVisible(
+  TransactionRequestModel request,
+) {
+  return request.status == TransactionRequestStatus.enTransito &&
+      request.hasAssignedTransportista;
+}
+
+/// Tarjeta teal de recogida en almacén; no ocupa espacio si aún no hay transportista.
+class TransportistaRecogidaAlmacenCard extends StatelessWidget {
+  const TransportistaRecogidaAlmacenCard({
+    super.key,
+    required this.request,
+    required this.viewerRole,
+    this.onUpdated,
+    this.padding = const EdgeInsets.all(12),
+    this.borderRadius = 12.0,
+  });
+
+  final TransactionRequestModel request;
+  final AppHomeRole viewerRole;
+  final VoidCallback? onUpdated;
+  final EdgeInsets padding;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!transportistaRecogidaAlmacenSectionVisible(request)) {
+      return const SizedBox.shrink();
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: Colors.teal.shade100),
+      ),
+      child: Padding(
+        padding: padding,
+        child: TransportistaRecogidaAlmacenSection(
+          request: request,
+          viewerRole: viewerRole,
+          onUpdated: onUpdated,
+        ),
+      ),
+    );
+  }
+}
+
 /// Fase en tránsito: recogida en almacén del importador (transportista confirma; resto solo lectura).
 class TransportistaRecogidaAlmacenSection extends StatefulWidget {
   const TransportistaRecogidaAlmacenSection({

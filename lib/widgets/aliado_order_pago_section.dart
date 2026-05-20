@@ -5,14 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/profile_model.dart';
-import '../models/payment_schedule_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/ves_amount_format.dart';
 import '../utils/app_date_format.dart';
 import 'aliado_order_experience_section.dart';
+import 'moroso_order_visual.dart';
 
 /// Método de pago y comprobante. El importador verifica la acreditación (negociación por chat).
 class AliadoOrderPagoSection extends StatefulWidget {
@@ -52,7 +51,6 @@ class AliadoOrderPagoSection extends StatefulWidget {
 class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   String? _metodoSeleccionado;
   bool _busy = false;
-  final Map<String, String> _metodoPorCuotaId = {};
 
   /// MotoConecta: Zelle, Pago Móvil, Binance, transferencia y efectivo (verificación por el importador).
   List<String> get _metodosPermitidos => PagoMetodo.valuesMotoconecta;
@@ -76,90 +74,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   @override
   void didUpdateWidget(covariant AliadoOrderPagoSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.request.id != widget.request.id) {
-      _metodoPorCuotaId.clear();
-    }
     if (oldWidget.request.id != widget.request.id ||
         oldWidget.profile?.primerosPedidosContadoEntregados !=
             widget.profile?.primerosPedidosContadoEntregados) {
       _syncMetodoSeleccionado();
-    }
-  }
-
-  List<String> get _metodosComprobanteCuota => PagoMetodo.valuesMotoconecta;
-
-  String _metodoParaCuota(String scheduleId) {
-    final m = _metodoPorCuotaId[scheduleId]?.trim();
-    final allowed = _metodosComprobanteCuota;
-    if (m != null && m.isNotEmpty && allowed.contains(m)) return m;
-    return allowed.isNotEmpty ? allowed.first : PagoMetodo.transferencia;
-  }
-
-  Future<void> _abrirComprobanteCuota(
-    BuildContext context,
-    PaymentScheduleModel c,
-  ) async {
-    final path = c.pagoComprobanteStoragePath?.trim();
-    if (path == null || path.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
-  Future<void> _subirComprobanteCuota(
-    BuildContext context,
-    PaymentScheduleModel c,
-  ) async {
-    if (c.id.isEmpty) return;
-    final metodo = _metodoParaCuota(c.id);
-    if (!_metodosComprobanteCuota.contains(metodo)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccione un método de pago para esta cuota.')),
-      );
-      return;
-    }
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final f = result.files.single;
-    final bytes = f.bytes;
-    final name = f.name.trim();
-    if (bytes == null || bytes.isEmpty || name.isEmpty) return;
-
-    setState(() => _busy = true);
-    try {
-      await SupabaseService.aliadoSubmitComprobantePagoCuota(
-        paymentScheduleId: c.id,
-        metodo: metodo,
-        bytes: bytes,
-        fileName: name,
-      );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comprobante de cuota enviado. El importador lo revisará.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      widget.onChanged();
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -302,6 +220,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (r.esPedidoMoroso) ...[
+          MorosoOrderDetailNotice(request: r, aliadoViewer: true, compact: true),
+          const SizedBox(height: 8),
+        ],
         if (!widget.suppressPrimaryTitle) ...[
           Text(
             referenciaHistorica ? 'Pago (referencia)' : 'Pago al importador',
@@ -312,75 +234,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
           ),
           const SizedBox(height: 4),
-        ],
-        if (r.hasAgreedCreditPlan) ...[
-          const SizedBox(height: 2),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            decoration: BoxDecoration(
-              color: AppColors.brandBlue.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.brandBlue.withOpacity(0.28)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  r.creditPlanType == 1
-                      ? 'Pago al contado acordado con el importador (1 cuota).'
-                      : 'Plan de ${r.creditPlanType} cuotas acordado con el importador (venc. cada 15 días).',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.blueGrey.shade900,
-                    height: 1.3,
-                  ),
-                ),
-                if (r.creditPlanConfirmedAt != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Plan confirmado: ${formatEsShortDateTime(r.creditPlanConfirmedAt)}.',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.blueGrey.shade800,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-                if (r.saldoPendienteRealConPlan != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Saldo pendiente: ${formatRefAmount(r.saldoPendienteRealConPlan!)} REF (total menos cuotas verificadas por el importador).',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.indigo.shade900,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                ...r.paymentSchedule.map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Text(
-                      'Cuota ${e.installmentIndex}: ${_fmtMoney(e.amountUsd)} — '
-                      'vence ${_formatDueEs(e.dueOn)} · ${e.pagoAprobado ? 'Aprobada' : _etiquetaEstadoPago(e.pagoEstadoEfectivo)}'
-                      '${e.pagoSubmittedAt != null ? ' · registrada: ${formatEsShortDateTime(e.pagoSubmittedAt)}' : ''}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Colors.grey.shade800,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
         ],
         if (!referenciaHistorica && !widget.suppressNegotiationIntro)
           Text(
@@ -469,9 +322,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               label: const Text('Ver / descargar factura'),
             ),
         ],
-        if (referenciaHistorica &&
-            !r.hasAgreedCreditPlan &&
-            r.hasComprobantePago) ...[
+        if (referenciaHistorica && r.hasComprobantePago) ...[
           const SizedBox(height: 10),
           if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty) ...[
             Text(
@@ -495,133 +346,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               height: 1.25,
             ),
           ),
-        if (mostrarGestionPago && r.hasAgreedCreditPlan && r.hasFacturaAliado) ...[
-          if (!referenciaHistorica) ...[
-            const Text(
-              'Pago de cada cuota',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ...r.paymentSchedule.map((c) {
-              if (c.id.isEmpty) return const SizedBox.shrink();
-              final pe = c.pagoEstadoEfectivo;
-              final puede = _estadoPermiteDeclaracionPago(r) &&
-                  pe != PagoRevisionEstado.aprobado &&
-                  (pe == PagoRevisionEstado.pendiente ||
-                      pe == PagoRevisionEstado.enRevision ||
-                      pe == PagoRevisionEstado.rechazado);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Cuota ${c.installmentIndex} · vence ${_formatDueEs(c.dueOn)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          'Importe: ${_fmtMoney(c.amountUsd)} · ${_etiquetaEstadoPago(pe)}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
-                        ),
-                        if (c.pagoSubmittedAt != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Pago registrado: ${formatEsShortDateTime(c.pagoSubmittedAt)}',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontStyle: FontStyle.italic,
-                              color: Colors.blueGrey.shade800,
-                            ),
-                          ),
-                        ],
-                        if (c.hasPagoComprobante) ...[
-                          const SizedBox(height: 4),
-                          OutlinedButton.icon(
-                            onPressed: () => _abrirComprobanteCuota(context, c),
-                            icon: const Icon(Icons.receipt, size: 16),
-                            label: const Text('Ver comprobante de esta cuota'),
-                          ),
-                        ],
-                        if (c.pagoComprobanteRechazoNota != null &&
-                            c.pagoComprobanteRechazoNota!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Importador: ${c.pagoComprobanteRechazoNota}',
-                            style: TextStyle(
-                                fontSize: 10, color: Colors.red.shade800),
-                          ),
-                        ],
-                        if (puede) ...[
-                          const SizedBox(height: 8),
-                          DropdownButtonFormField<String>(
-                            value: _metodoParaCuota(c.id),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              labelText: 'Método',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: _metodosComprobanteCuota
-                                .map(
-                                  (m) => DropdownMenuItem(
-                                    value: m,
-                                    child: Text(PagoMetodo.labelEs(m)),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) {
-                              if (v != null) {
-                                setState(() => _metodoPorCuotaId[c.id] = v);
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _busy
-                                  ? null
-                                  : () => _subirComprobanteCuota(context, c),
-                              child: const Text('Subir comprobante (esta cuota)'),
-                            ),
-                          ),
-                        ],
-                        if (!puede && pe == PagoRevisionEstado.aprobado)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Pago de esta cuota confirmado por el importador.',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green.shade800,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        ] else if (mostrarGestionPago && !referenciaHistorica) ...[
+        if (mostrarGestionPago && !referenciaHistorica) ...[
           const SizedBox(height: 14),
           const Text(
             'Método de pago',
@@ -762,13 +487,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
       return 'Enviar nuevo comprobante';
     }
     return 'Adjuntar comprobante de pago';
-  }
-
-  static String _fmtMoney(double v) => '${formatRefAmount(v)} REF';
-
-  static String _formatDueEs(DateTime d) {
-    final l = d.isUtc ? d.toLocal() : d;
-    return '${l.day.toString().padLeft(2, '0')}/${l.month.toString().padLeft(2, '0')}/${l.year}';
   }
 
   static String _etiquetaEstadoPago(String pe) {

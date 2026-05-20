@@ -96,17 +96,19 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     TransactionRequestModel r,
     String next,
   ) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
     final ok = await advanceImporterOrderGroup(
       context,
       lines: [r],
       nextStatus: next,
     );
-    if (!ok || !context.mounted) return;
+    if (!mounted) return;
+    if (!ok) return;
     if (next == TransactionRequestStatus.enPreparacion) {
       MainShellTabController.goTo(1);
       MainShellTabController.notifyImporterPedidosReload();
     }
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger?.showSnackBar(
       SnackBar(
         content: Text(
           next == TransactionRequestStatus.enTransito
@@ -116,7 +118,20 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
         behavior: SnackBarBehavior.floating,
       ),
     );
-    await _load();
+    await _reloadAfterAdvance();
+  }
+
+  Future<void> _reloadAfterAdvance() async {
+    try {
+      final rows = await SupabaseService.fetchValidatedTransactionRequestsForProduct(
+        widget.productId,
+      );
+      if (!mounted) return;
+      setState(() => _rows = rows);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    }
   }
 
   @override

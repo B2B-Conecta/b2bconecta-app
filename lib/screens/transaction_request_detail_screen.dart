@@ -358,7 +358,9 @@ class _TransactionRequestDetailScreenState
     final statusSet = lines.map((e) => e.status).toSet();
     final estadoChip = isGroup && statusSet.length > 1
         ? 'Varios estados'
-        : r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado);
+        : (r.esPedidoMoroso
+            ? '${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)} · Moroso'
+            : r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado));
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,

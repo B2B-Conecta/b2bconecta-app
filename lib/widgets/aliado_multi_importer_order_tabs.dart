@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import '../utils/ves_amount_format.dart';
 import 'courier_timeline_widget.dart';
+import 'moroso_order_visual.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 
@@ -35,7 +36,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
         .map((c) => motoconectaEnvioTimelineRank(c.first.status))
         .toSet();
     final estadoMaestro = ranks.length <= 1
-        ? allLines.first.statusLabelEs(aliadoViewer: true)
+        ? orderListStatusLabel(allLines.first, aliadoViewer: true)
         : 'Avance distinto por proveedor';
 
     return Container(
@@ -108,7 +109,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Un solo pedido en MotoLink: destino y productos compartidos. '
-            'Use el selector de proveedor para ver envío y pago de cada uno.',
+            'Elija un proveedor abajo para ver su envío, factura y pago.',
             style: TextStyle(
               fontSize: 11,
               height: 1.35,
@@ -182,10 +183,9 @@ class _AliadoMultiImporterOrderTabsState extends State<AliadoMultiImporterOrderT
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeading(
-          title: 'Proveedores de este pedido',
+          title: 'Proveedor',
           subtitle:
-              'Seleccione un importador. El seguimiento del envío y el detalle '
-              'de factura/pago se actualizan para ese proveedor.',
+              'Toque un importador para ver envío, productos, factura y pago.',
         ),
         const SizedBox(height: 10),
         _ImporterChipRow(
@@ -193,42 +193,13 @@ class _AliadoMultiImporterOrderTabsState extends State<AliadoMultiImporterOrderT
           selectedIndex: idx,
           onSelected: (i) => setState(() => _selected = i),
         ),
-        const SizedBox(height: 16),
-        _SectionHeading(
-          title: 'Seguimiento del envío',
-          subtitle:
-              'Resumen de todos los proveedores; abajo, el detalle de fases del seleccionado.',
-        ),
-        const SizedBox(height: 10),
-        _AllImportersEnvioOverview(
-          porImportador: widget.porImportador,
-          selectedIndex: idx,
-          onSelect: (i) => setState(() => _selected = i),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
           switchInCurve: Curves.easeOut,
           switchOutCurve: Curves.easeIn,
-          child: _AliadoImporterShippingPanel(
-            key: ValueKey<String>('ship-$idx'),
-            chunk: chunk,
-            importerIndex: idx + 1,
-            importerTotal: n,
-          ),
-        ),
-        const SizedBox(height: 20),
-        _SectionHeading(
-          title: 'Detalle por proveedor',
-          subtitle: 'Contacto, productos, factura y pago del mismo proveedor.',
-        ),
-        const SizedBox(height: 10),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: _AliadoImporterDetailPanel(
-            key: ValueKey<String>('det-$idx'),
+          child: _AliadoImporterUnifiedPanel(
+            key: ValueKey<String>('imp-$idx'),
             chunk: chunk,
             importerIndex: idx + 1,
             importerTotal: n,
@@ -407,6 +378,17 @@ class _ImporterSelectorChip extends StatelessWidget {
                   color: _faseColor(fase),
                 ),
               ),
+              if (chunk.any((r) => r.esPedidoMoroso)) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Moroso',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.deepOrange.shade800,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -430,190 +412,9 @@ class _ImporterSelectorChip extends StatelessWidget {
   }
 }
 
-/// Vista rápida del estado logístico de cada importador del carrito.
-class _AllImportersEnvioOverview extends StatelessWidget {
-  const _AllImportersEnvioOverview({
-    required this.porImportador,
-    required this.selectedIndex,
-    required this.onSelect,
-  });
-
-  final List<List<TransactionRequestModel>> porImportador;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Avance por proveedor',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Colors.grey.shade800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(porImportador.length, (i) {
-              final chunk = porImportador[i];
-              final ref = chunk.first;
-              final selected = i == selectedIndex;
-              final envio = ref.statusLabelEs(aliadoViewer: true);
-              final name = ref.ownerBusinessName?.trim() ?? 'Importador ${i + 1}';
-              return Padding(
-                padding: EdgeInsets.only(right: i < porImportador.length - 1 ? 8 : 0),
-                child: Material(
-                  color: selected
-                      ? Colors.teal.shade50
-                      : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    onTap: () => onSelect(i),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: 148,
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: selected
-                              ? Colors.teal.shade400
-                              : Colors.grey.shade300,
-                          width: selected ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '${i + 1}.',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 11,
-                                  color: Colors.teal.shade800,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            envio,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              height: 1.25,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Timeline y recogida en almacén del proveedor activo.
-class _AliadoImporterShippingPanel extends StatelessWidget {
-  const _AliadoImporterShippingPanel({
-    super.key,
-    required this.chunk,
-    required this.importerIndex,
-    required this.importerTotal,
-  });
-
-  final List<TransactionRequestModel> chunk;
-  final int importerIndex;
-  final int importerTotal;
-
-  @override
-  Widget build(BuildContext context) {
-    final ref = chunk.first;
-    final name = ref.ownerBusinessName?.trim() ?? 'Importador';
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade200, width: 1.2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            decoration: BoxDecoration(
-              color: Colors.teal.shade50.withOpacity(0.5),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.local_shipping_outlined,
-                    size: 20, color: Colors.teal.shade800),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Proveedor $importerIndex de $importerTotal · $name',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: Colors.teal.shade900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CourierTimelineWidget(
-                  request: ref,
-                  compact: true,
-                  viewerRole: AppHomeRole.aliado,
-                  showHeading: false,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AliadoImporterDetailPanel extends StatelessWidget {
-  const _AliadoImporterDetailPanel({
+/// Envío, productos, factura y pago del proveedor seleccionado (un solo bloque).
+class _AliadoImporterUnifiedPanel extends StatelessWidget {
+  const _AliadoImporterUnifiedPanel({
     super.key,
     required this.chunk,
     required this.importerIndex,
@@ -632,6 +433,7 @@ class _AliadoImporterDetailPanel extends StatelessWidget {
     final name = ref.ownerBusinessName?.trim() ?? 'Importador';
     final fase = fasePagoBloqueImportador(chunk);
     final monto = subtotalBloqueImportador(chunk);
+    final envio = ref.statusLabelEs(aliadoViewer: true);
 
     return Container(
       width: double.infinity,
@@ -663,11 +465,20 @@ class _AliadoImporterDetailPanel extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${chunk.length} ${chunk.length == 1 ? "línea" : "líneas"} · '
-                  '${formatRefAmount(monto)} REF · ${fasePagoBloqueLabelEs(fase)}',
+                  '${formatRefAmount(monto)} REF · Envío: $envio',
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  fasePagoBloqueLabelEs(fase),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade700,
                   ),
                 ),
               ],
@@ -675,6 +486,19 @@ class _AliadoImporterDetailPanel extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: CourierTimelineWidget(
+              request: ref,
+              compact: true,
+              viewerRole: AppHomeRole.aliado,
+              showHeading: true,
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Divider(height: 20),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

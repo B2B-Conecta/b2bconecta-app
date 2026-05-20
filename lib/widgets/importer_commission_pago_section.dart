@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/commission_settlement_model.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_date_format.dart';
+import '../utils/commission_settlement_fiscal.dart';
 
 /// Importador: registrar comprobante de pago de comisión MotoLink por corte.
 class ImporterCommissionPagoSection extends StatefulWidget {
@@ -142,13 +143,19 @@ class _ImporterCommissionPagoSectionState
                   color: Colors.grey.shade900,
                 ),
               ),
-              if (ref != null && ref.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Factura: $ref · USD ${s.totalCommissionUsd.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 11, height: 1.3),
-                ),
-              ],
+              const SizedBox(height: 4),
+              Text(
+                ref != null && ref.isNotEmpty
+                    ? 'Factura: $ref · Monto a transferir: USD ${s.totalFacturaUsd.toStringAsFixed(2)} (IVA incl.)'
+                    : 'Monto a transferir: USD ${s.totalFacturaUsd.toStringAsFixed(2)} (IVA incl.)',
+                style: const TextStyle(fontSize: 11, height: 1.3),
+              ),
+              Text(
+                'Base comisión USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
+                'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} % '
+                'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+              ),
               const SizedBox(height: 6),
               Text(
                 s.pagoEstadoLabelEs,

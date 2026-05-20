@@ -23,7 +23,7 @@ Solo la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`
 2. Si la base ya existía con un esquema anterior MotoConecta: ejecuta **`upgrade_lat_lng_sku.sql`** (y revisa columnas nuevas manualmente si hace falta).
 3. Si la app falla con **`proveedor_factura_storage_path` does not exist**: ejecuta en SQL Editor **`upgrade_proveedor_factura.sql`** (solo añade las columnas de adjunto).
 4. Si el panel **Pedidos** del aliado muestra **PGRST202** / «`aliado_effective_open_exposure` not found»: ejecuta **`upgrade_aliado_effective_open_exposure.sql`** (RPC de suma de pedidos activos para el cupo en pantalla).
-5. Desde la raíz del repo, `supabase/seed.sql` — dos importadores, un aliado, un admin; **15 productos por importador**; pedidos `entregado` con comisión devengada y un **corte emitido** de demo (C1).
+5. Desde la raíz del repo, `supabase/seed.sql` — dos importadores, un aliado, un admin; **15 productos por importador** (sin pedidos ni cortes). Para vaciar pedidos/facturas/cortes y restaurar stock: `supabase/scripts/reset_operational_data.sql`.
 
 Contraseña de todos los usuarios seed: **`SeedPass123!`**
 

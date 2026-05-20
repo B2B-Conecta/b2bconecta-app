@@ -13,8 +13,10 @@ class MainShellTabController {
   static VoidCallback? _pedidosNotificationDeepLink;
   static VoidCallback? _importadorValidadosNotificationDeepLink;
   static VoidCallback? _adminActivosNotificationDeepLink;
+  static VoidCallback? _adminCerradosNotificationDeepLink;
   static int? _b2bProfileTabIndex;
   static bool _importerPedidosPreferNuevosFilter = false;
+  static bool _importerPedidosPreferCerradosFilter = false;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
   static String? _pendingCommissionSettlementId;
@@ -33,8 +35,10 @@ class MainShellTabController {
     _pedidosNotificationDeepLink = null;
     _importadorValidadosNotificationDeepLink = null;
     _adminActivosNotificationDeepLink = null;
+    _adminCerradosNotificationDeepLink = null;
     _b2bProfileTabIndex = null;
     _importerPedidosPreferNuevosFilter = false;
+    _importerPedidosPreferCerradosFilter = false;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
     _pendingCommissionSettlementId = null;
@@ -71,6 +75,17 @@ class MainShellTabController {
   static bool consumeImporterPedidosPreferNuevosFilter() {
     final v = _importerPedidosPreferNuevosFilter;
     _importerPedidosPreferNuevosFilter = false;
+    return v;
+  }
+
+  static void setPendingImporterPedidosPreferCerradosFilter() {
+    _importerPedidosPreferCerradosFilter = true;
+    _importerPedidosPreferNuevosFilter = false;
+  }
+
+  static bool consumeImporterPedidosPreferCerradosFilter() {
+    final v = _importerPedidosPreferCerradosFilter;
+    _importerPedidosPreferCerradosFilter = false;
     return v;
   }
 
@@ -116,6 +131,19 @@ class MainShellTabController {
     _goTo?.call(0);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminActivosNotificationDeepLink?.call();
+    });
+  }
+
+  static void registerAdminCerradosNotificationDeepLink(
+      VoidCallback? onNavigate) {
+    _adminCerradosNotificationDeepLink = onNavigate;
+  }
+
+  /// Admin: pestaña Pedidos cerrados (índice 1) + expande pedido moroso.
+  static void navigateToAdminCerradosForNotification() {
+    _goTo?.call(1);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminCerradosNotificationDeepLink?.call();
     });
   }
 

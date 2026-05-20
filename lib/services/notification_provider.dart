@@ -170,6 +170,20 @@ class NotificationProvider extends ChangeNotifier {
           return;
       }
     }
+    if (t0 == 'morosidad') {
+      switch (homeRole) {
+        case AppHomeRole.aliado:
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.importador:
+          MainShellTabController.setPendingImporterPedidosPreferCerradosFilter();
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.administrador:
+          MainShellTabController.navigateToAdminCerradosForNotification();
+          return;
+      }
+    }
     if (t0 == 'pago') {
       switch (homeRole) {
         case AppHomeRole.aliado:

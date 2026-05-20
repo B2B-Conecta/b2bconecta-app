@@ -363,10 +363,9 @@ class TransactionRequestModel {
   bool get tieneDocumentacionFacturaPago =>
       hasFacturaAliado || hasComprobantePago;
 
-  /// Pedido entregado, con factura MotoLink, y el pago aún no fue aprobado por MotoLink.
+  /// Pedido entregado y pago a MotoLink sin aprobar (aunque la factura siga generándose).
   bool get pagoMotolinkPendienteTrasEntrega {
     if (status != TransactionRequestStatus.entregado) return false;
-    if (!hasFacturaAliado) return false;
     final pe = pagoEstadoRevision?.trim();
     if (pe == PagoRevisionEstado.aprobado) return false;
     return true;
@@ -399,6 +398,9 @@ class TransactionRequestModel {
     return businessDaysElapsedAfterUtcDate(at.toUtc()) >= 3;
   }
 
+  /// Entregado con factura MotoLink y pago aún no aprobado.
+  bool get esPedidoMoroso => pagoMotolinkPendienteTrasEntrega;
+
   /// Total pedido en bolívares (solo presentación UI). Fuente de verdad: [precioTotal] en REF.
   double? get precioTotalBsUi =>
       tasaBcvSnapshot != null ? precioTotal * tasaBcvSnapshot! : null;
@@ -430,6 +432,14 @@ class TransactionRequestModel {
       return 'Recibido';
     }
     return TransactionRequestStatus.labelEs(status);
+  }
+
+  /// Etiqueta visible en listas y chips; incluye «Moroso» hasta aprobar el pago.
+  String statusLabelConMorosidad({bool aliadoViewer = false}) {
+    final base = statusLabelEs(aliadoViewer: aliadoViewer);
+    if (!esPedidoMoroso) return base;
+    if (base.contains('Moroso')) return base;
+    return '$base · Moroso';
   }
 
   /// Admin puede anular con motivo: aprobado o en curso, no entregado ni pendiente.

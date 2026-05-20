@@ -1,0 +1,9 @@
+-- =============================================================================
+-- DEPRECADO — usar en su lugar:
+--   supabase/scripts/reset_operational_data.sql
+-- =============================================================================
+-- El reset operativo elimina todos los pedidos, cortes, facturas (metadatos DB),
+-- devuelve stock descontado por checkout y restaura inventario canónico seed.
+--
+--   supabase db query --linked -f supabase/scripts/reset_operational_data.sql
+-- =============================================================================

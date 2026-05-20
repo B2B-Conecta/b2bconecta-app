@@ -7,6 +7,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
+import 'moroso_order_visual.dart';
 import 'order_motolink_thread_section.dart';
 import 'transaction_request_admin_sections.dart';
 
@@ -68,8 +69,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
         ? lines.any((x) => x.pedidoEntregadoYPagado)
         : r.pedidoEntregadoYPagado;
     final anyPagoPendienteTrasEntrega = isCheckoutGroup
-        ? lines.any((x) => x.pagoMotolinkPendienteTrasEntrega)
-        : r.pagoMotolinkPendienteTrasEntrega;
+        ? lines.any((x) => x.esPedidoMoroso)
+        : r.esPedidoMoroso;
     final anyPagoRiesgo = isCheckoutGroup
         ? lines.any((x) => x.pagoPendienteRiesgoCuentaTresDiasHabiles)
         : r.pagoPendienteRiesgoCuentaTresDiasHabiles;
@@ -133,15 +134,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Chip(
-                                label: Text(
-                                  statusLabel,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                              OrderStatusHeaderChips(
+                                statusLabel: statusLabel,
+                                showMoroso: anyPagoPendienteTrasEntrega,
                               ),
                             ],
                           ),
@@ -193,49 +188,37 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             ),
                           ] else if (anyPagoPendienteTrasEntrega) ...[
                             const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.deepOrange.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.deepOrange.shade200,
-                                ),
-                              ),
-                              child: Text(
-                                isCheckoutGroup
-                                    ? 'Pago pendiente: revisa comprobante por línea al expandir.'
-                                    : 'Pago pendiente: falta aprobar comprobante en MotoLink.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.deepOrange.shade900,
-                                ),
-                              ),
+                            MorosoOrderCardNotice(
+                              request: isCheckoutGroup
+                                  ? lines.firstWhere(
+                                      (x) => x.esPedidoMoroso,
+                                      orElse: () => r,
+                                    )
+                                  : r,
+                              expanded: expanded,
+                              riskWarningChild: anyPagoRiesgo
+                                  ? Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.red.shade200,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '>3 días hábiles sin pago aprobado: posible restricción de nuevos pedidos.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          height: 1.3,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red.shade900,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
-                            if (anyPagoRiesgo) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.shade200),
-                                ),
-                                child: Text(
-                                  '>3 días hábiles sin pago aprobado: posible restricción de nuevos pedidos.',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.red.shade900,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ],
                       ),
@@ -404,24 +387,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 l.status !=
                                     TransactionRequestStatus.rechazado,
                           ),
-                          allowManageCreditPlan: lines.any(
-                            (l) =>
-                                l.status !=
-                                    TransactionRequestStatus.entregado &&
-                                l.status !=
-                                    TransactionRequestStatus.rechazado,
-                          ),
-                          orderPrecioTotalUsd: isCheckoutGroup
-                              ? lines.fold<double>(
-                                  0,
-                                  (s, l) => s + l.precioTotal,
-                                )
-                              : r.precioTotal,
-                          creditPlanRescheduleLocked: isCheckoutGroup
-                              ? lines.every(
-                                  (l) => l.creditPlanLockedForAdminReschedule,
-                                )
-                              : r.creditPlanLockedForAdminReschedule,
                           onThreadChanged: onThreadChanged,
                         ),
                         if (expandedFooter != null) ...[

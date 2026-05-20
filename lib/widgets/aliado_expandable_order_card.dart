@@ -12,6 +12,7 @@ import 'aliado_multi_importer_order_tabs.dart';
 import 'aliado_order_experience_display.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
+import 'moroso_order_visual.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
@@ -143,15 +144,11 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Chip(
-                                label: Text(
-                                  statusLabel,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                              OrderStatusHeaderChips(
+                                statusLabel: statusLabel,
+                                showMoroso: isCheckoutGroup
+                                    ? lines.any((x) => x.esPedidoMoroso)
+                                    : r.esPedidoMoroso,
                               ),
                             ],
                           ),
@@ -249,47 +246,35 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ] else if (!isCheckoutGroup && r.pagoMotolinkPendienteTrasEntrega) ...[
+                          ] else if (!isCheckoutGroup && r.esPedidoMoroso) ...[
                             const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.amber.shade300),
-                              ),
-                              child: Text(
-                                'Pago pendiente de revisión MotoLink.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.3,
-                                  color: Colors.amber.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                            MorosoOrderCardNotice(
+                              request: r,
+                              expanded: expanded,
+                              aliadoViewer: true,
+                              riskWarningChild: r.pagoPendienteRiesgoCuentaTresDiasHabiles
+                                  ? Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.red.shade200,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '>3 días hábiles sin pago: posible restricción de nuevos pedidos.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          height: 1.3,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red.shade900,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
-                            if (r.pagoPendienteRiesgoCuentaTresDiasHabiles) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.shade200),
-                                ),
-                                child: Text(
-                                  '>3 días hábiles sin pago: posible restricción de nuevos pedidos.',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.red.shade900,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                           if (!isCheckoutGroup &&
                               !expanded &&
@@ -384,6 +369,18 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           ),
                         ),
                         if (expandedLeading != null) expandedLeading!,
+                        if (isCheckoutGroup &&
+                            lines.any((x) => x.esPedidoMoroso)) ...[
+                          const SizedBox(height: 8),
+                          MorosoOrderCardNotice(
+                            request: lines.firstWhere(
+                              (x) => x.esPedidoMoroso,
+                              orElse: () => lines.first,
+                            ),
+                            expanded: true,
+                            aliadoViewer: true,
+                          ),
+                        ],
                         if (isCheckoutGroup) ...[
                           if (useMultiImporterTabs) ...[
                             AliadoPedidoMaestroHeader(

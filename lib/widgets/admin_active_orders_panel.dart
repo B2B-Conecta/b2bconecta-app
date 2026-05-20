@@ -8,8 +8,11 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/admin_order_panel_utils.dart';
+import '../utils/aliado_order_grouping.dart';
 import '../utils/notification_related_order_match.dart';
 import '../utils/transaction_request_filter_utils.dart';
+import 'admin_checkout_group_expanded_section.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_motolink_anula_pedido_dialog.dart';
 import 'admin_order_pre_transit_section.dart';
@@ -109,10 +112,11 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     try {
       final rows = await SupabaseService.fetchActiveTransactionRequestsForAdmin();
       if (!mounted) return;
+      final prevExpanded = _expandedRequestId;
       setState(() {
         _rows = rows;
         _loading = false;
-        _expandedRequestId = null;
+        _expandedRequestId = prevExpanded;
       });
       _tryExpandFromPendingNotification();
       unawaited(_runPendingMotolinkAutoInvoices(rows));
@@ -165,7 +169,8 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
     );
   }
 
-  String _statusLabel(TransactionRequestModel r) => r.statusLabelEs();
+  List<List<TransactionRequestModel>> get _displayGroups =>
+      groupAdminOrdersForDisplay(_filtered);
 
   void _toggleExpand(String id) {
     setState(() {
@@ -214,8 +219,19 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
 
   Widget _buildAdminExpandedFooter(
     BuildContext context,
-    TransactionRequestModel r,
+    List<TransactionRequestModel> group,
   ) {
+    if (group.length > 1) {
+      return AdminCheckoutGroupExpandedSection(
+        lines: group,
+        onRefresh: _load,
+        onMarcarEnTransito: (r) => _marcarEnTransito(context, r),
+        onAnularMotolink: (r) => _anularPedidoPorMotolink(context, r),
+        anularBusyId: _anularMotolinkBusyId,
+      );
+    }
+
+    final r = group.single;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -355,7 +371,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
       );
     }
 
-    final filtered = _filtered;
+    final groups = _displayGroups;
     return Stack(
       children: [
         Positioned.fill(
@@ -371,7 +387,7 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
               onStatusChanged: (s) => setState(() => _statusFilter = s),
             ),
             Expanded(
-              child: filtered.isEmpty
+              child: groups.isEmpty
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
@@ -397,16 +413,19 @@ class _AdminActiveOrdersPanelState extends State<AdminActiveOrdersPanel> {
                       child: ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        itemCount: filtered.length,
+                        itemCount: groups.length,
                         itemBuilder: (context, i) {
-                          final r = filtered[i];
+                          final g = groups[i];
+                          final primary = g.first;
+                          final expandKey = checkoutGroupExpandKey(g);
                           return AdminExpandableOrderCard(
-                            request: r,
-                            expanded: _expandedRequestId == r.id,
-                            onToggle: () => _toggleExpand(r.id),
-                            statusLabel: _statusLabel(r),
+                            request: primary,
+                            checkoutGroupLines: g.length > 1 ? g : null,
+                            expanded: _expandedRequestId == expandKey,
+                            onToggle: () => _toggleExpand(expandKey),
+                            statusLabel: adminCheckoutGroupStatusLabel(g),
                             expandedFooter:
-                                _buildAdminExpandedFooter(context, r),
+                                _buildAdminExpandedFooter(context, g),
                             onRequestMutated: _load,
                           );
                         },

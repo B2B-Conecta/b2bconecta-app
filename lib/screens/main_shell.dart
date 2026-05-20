@@ -59,6 +59,13 @@ class _MainShellState extends State<MainShell> {
         widget.homeRole == AppHomeRole.aliado) {
       MainShellTabController.registerB2BProfileTabIndex(2);
     }
+    unawaited(_ensureDailyTasaBcvNotification());
+  }
+
+  Future<void> _ensureDailyTasaBcvNotification() async {
+    try {
+      await SupabaseService.runDailyTasaBcvNotifyIfDue();
+    } catch (_) {}
   }
 
   @override

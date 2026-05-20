@@ -14,6 +14,7 @@ import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
+import '../models/admin_aliado_morosidad_flag.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
@@ -22,7 +23,7 @@ import '../models/transaction_request_message_model.dart';
 import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
-import '../utils/app_date_format.dart';
+import 'bcv_reference_rate_service.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/haversine.dart';
 import '../config/motolink_ally_invoice_constants.dart';
@@ -815,9 +816,6 @@ class SupabaseService {
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
-    credit_plan_type,
-    credit_plan_confirmed_at,
-    credit_monto_bloqueado,
     transit_eta_days,
     transit_eta_hours,
     transit_eta_set_at,
@@ -832,21 +830,7 @@ class SupabaseService {
     factura_aliado_submitted_at,
     created_at,
     updated_at,
-    payment_schedule (
-      id,
-      transaction_request_id,
-      installment_index,
-      amount_usd,
-      due_on,
-      pago_metodo,
-      pago_comprobante_storage_path,
-      pago_comprobante_file_name,
-      pago_submitted_at,
-      pago_estado_revision,
-      pago_comprobante_rechazo_nota,
-      pago_aprobado_at
-    ),
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, credit_limit ),
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status ),
     importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status )
   ''';
 
@@ -1083,18 +1067,23 @@ class SupabaseService {
     );
   }
 
-  /// Admin: aliados con pedido moroso (entregado, factura MotoLink, pago sin aprobar).
-  static Future<Map<String, bool>> adminAliadosPedidosMorososFlags() async {
+  /// Admin: aliados con pedido moroso y estado de suspensión por morosidad.
+  static Future<Map<String, AdminAliadoMorosidadFlag>> adminAliadosPedidosMorososFlags() async {
     final res = await _client.rpc('admin_aliados_pedidos_morosos_flags');
     final list = res as List<dynamic>;
-    final map = <String, bool>{};
+    final map = <String, AdminAliadoMorosidadFlag>{};
     for (final row in list) {
       final m = Map<String, dynamic>.from(row as Map);
       final id = m['aliado_id']?.toString();
+      if (id == null || id.isEmpty) continue;
       final mor = m['tiene_morosos'];
-      if (id != null && id.isNotEmpty) {
-        map[id] = mor is bool ? mor : mor?.toString().toLowerCase() == 'true';
-      }
+      final susp = m['pedidos_suspendidos_morosidad'];
+      map[id] = AdminAliadoMorosidadFlag(
+        tieneMorosos: mor is bool ? mor : mor?.toString().toLowerCase() == 'true',
+        pedidosSuspendidosMorosidad: susp is bool
+            ? susp
+            : susp?.toString().toLowerCase() == 'true',
+      );
     }
     return map;
   }
@@ -1461,24 +1450,75 @@ class SupabaseService {
 
   /// Tasa BCV configurada (solo lectura; usar [TransactionRequestModel.tasaBcvSnapshot] por pedido).
   static Future<double?> fetchGlobalTasaBcv() async {
+    final rec = await fetchGlobalTasaBcvRecord();
+    return rec?.tasa;
+  }
+
+  static Future<({double tasa, DateTime updatedAt})?> fetchGlobalTasaBcvRecord() async {
     try {
       final row = await _client
           .from('app_global_config')
-          .select('value_numeric')
+          .select('value_numeric, updated_at')
           .eq('key', 'tasa_bcv')
           .maybeSingle();
       if (row == null) return null;
       final m = Map<String, dynamic>.from(row);
       final v = m['value_numeric'];
-      if (v is num) return v.toDouble();
-      return double.tryParse(v?.toString() ?? '');
+      double? tasa;
+      if (v is num) {
+        tasa = v.toDouble();
+      } else {
+        tasa = double.tryParse(v?.toString() ?? '');
+      }
+      if (tasa == null || tasa <= 0) return null;
+      final rawAt = m['updated_at']?.toString();
+      final updatedAt = rawAt != null ? DateTime.tryParse(rawAt) : null;
+      if (updatedAt == null) return (tasa: tasa, updatedAt: DateTime.now());
+      return (tasa: tasa, updatedAt: updatedAt);
     } catch (_) {
       return null;
     }
   }
 
+  static bool globalTasaBcvNeedsDailySync(DateTime? updatedAt) {
+    if (updatedAt == null) return true;
+    final now = DateTime.now();
+    final local = updatedAt.toLocal();
+    return local.year != now.year ||
+        local.month != now.month ||
+        local.day != now.day;
+  }
+
   static Future<void> adminSetTasaBcv(double tasa) async {
     await _client.rpc('admin_set_tasa_bcv', params: {'p_tasa': tasa});
+  }
+
+  /// Si aún no se notificó hoy (Caracas), avisa a todos los usuarios con la tasa guardada.
+  static Future<int> runDailyTasaBcvNotifyIfDue() async {
+    try {
+      final res = await _client.rpc('run_daily_tasa_bcv_notify');
+      if (res is num) return res.toInt();
+      return int.tryParse(res?.toString() ?? '') ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Sincroniza la tasa BCV global desde referencia pública (bcv.today). Devuelve la tasa guardada.
+  static Future<double?> syncGlobalTasaBcvFromReference() async {
+    final quote = await BcvReferenceRateService.fetchPublicBcvUsdRate();
+    if (quote == null) return null;
+    await adminSetTasaBcv(quote.vesPerUsd);
+    return quote.vesPerUsd;
+  }
+
+  /// Tasa BCV para facturas y conversiones: DB → referencia automática → 1.0.
+  static Future<double> resolveTasaBcvEmision() async {
+    final saved = await fetchGlobalTasaBcv();
+    if (saved != null && saved > 1.01) return saved;
+    final synced = await syncGlobalTasaBcvFromReference();
+    if (synced != null && synced > 0) return synced;
+    return saved ?? 1.0;
   }
 
   static Future<void> importerAdvanceSubOrder({
@@ -1984,12 +2024,6 @@ class SupabaseService {
     if (!lines.every((r) => r.aliadoId == uid)) {
       throw StateError('No autorizado para alguna de las líneas.');
     }
-    if (lines.any((r) => r.hasAgreedCreditPlan)) {
-      throw StateError(
-        'Este bloque tiene plan de cuotas: gestione el comprobante por línea o por cuota.',
-      );
-    }
-
     final ext = _profileDocExtension(fileName);
     if (!_isAllowedProfileDocExtension(ext)) {
       throw ArgumentError('Formato no permitido. Use imagen o PDF.');
@@ -2787,175 +2821,6 @@ class SupabaseService {
   }
 
   /// Importador: acuerda 1–3 cuotas cuya suma = total del pedido; notifica en el chat.
-  static Future<void> importerConfirmOrderCreditPlan({
-    required String transactionRequestId,
-    required List<double> amountsUsd,
-    required bool montosPersonalizados,
-  }) async {
-    if (amountsUsd.isEmpty || amountsUsd.length > 3) {
-      throw ArgumentError('Debe indicar 1, 2 o 3 importes de cuota.');
-    }
-    final n = amountsUsd.length;
-    var suma = 0.0;
-    for (final a in amountsUsd) {
-      suma += a;
-    }
-    await _client.rpc(
-      'importer_confirm_order_credit_plan',
-      params: <String, dynamic>{
-        'p_request_id': transactionRequestId,
-        'p_amounts_usd': amountsUsd,
-      },
-    );
-    DateTime? confirmadoEn;
-    final trRow = await _client
-        .from('transaction_requests')
-        .select('credit_plan_confirmed_at')
-        .eq('id', transactionRequestId)
-        .maybeSingle();
-    if (trRow != null) {
-      final raw = Map<String, dynamic>.from(trRow)['credit_plan_confirmed_at'];
-      if (raw is String) {
-        confirmadoEn = DateTime.tryParse(raw);
-      }
-    }
-    final atStr = formatEsShortDateTime(confirmadoEn);
-    final w = StringBuffer();
-    if (n == 1) {
-      w.write(
-        'Acordamos 1 cuota (contado) por ${suma.toStringAsFixed(2)} REF. ',
-      );
-    } else {
-      w.write(
-        'Acordamos $n cuotas (cada 15 días) por un total de '
-        '${suma.toStringAsFixed(2)} REF. ',
-      );
-    }
-    if (montosPersonalizados) {
-      w.write('Desglose personalizado. ');
-    }
-    w.write(
-      'Confirmado: $atStr. Revise la sección Pago del pedido para vencimientos y comprobantes.',
-    );
-    await insertTransactionRequestMessageAsImportador(
-      transactionRequestId: transactionRequestId,
-      body: w.toString(),
-    );
-  }
-
-  /// @deprecated Use [importerConfirmOrderCreditPlan]. Conservado por compatibilidad interna.
-  static Future<void> confirmOrderCreditPlan({
-    required String transactionRequestId,
-    required List<double> amountsUsd,
-    required bool montosPersonalizados,
-  }) =>
-      importerConfirmOrderCreditPlan(
-        transactionRequestId: transactionRequestId,
-        amountsUsd: amountsUsd,
-        montosPersonalizados: montosPersonalizados,
-      );
-
-  /// Sólo total del pedido (hilo de chat / cupo de cuotas).
-  static Future<double?> fetchTransactionRequestPrecioTotal(
-    String transactionRequestId,
-  ) async {
-    final id = transactionRequestId.trim();
-    if (id.isEmpty) return null;
-    final row = await _client
-        .from('transaction_requests')
-        .select('precio_total_usd')
-        .eq('id', id)
-        .maybeSingle();
-    if (row == null) return null;
-    final pt = Map<String, dynamic>.from(row)['precio_total_usd'];
-    if (pt is num) return pt.toDouble();
-    return double.tryParse(pt?.toString() ?? '');
-  }
-
-  /// Comprobante asociado a una fila de [payment_schedule].
-  static Future<void> aliadoSubmitComprobantePagoCuota({
-    required String paymentScheduleId,
-    required String metodo,
-    required Uint8List bytes,
-    required String fileName,
-  }) async {
-    final uid = _currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-
-    final ext = _profileDocExtension(fileName);
-    if (!_isAllowedProfileDocExtension(ext)) {
-      throw ArgumentError('Formato no permitido. Use imagen o PDF.');
-    }
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
-    if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
-
-    final row0 = await _client
-        .from('payment_schedule')
-        .select('transaction_request_id, pago_comprobante_storage_path')
-        .eq('id', paymentScheduleId)
-        .maybeSingle();
-    if (row0 == null) throw StateError('Cuota no encontrada.');
-    final m0 = Map<String, dynamic>.from(row0);
-    final trid = m0['transaction_request_id']?.toString() ?? '';
-    if (trid.isEmpty) throw StateError('Pedido de cuota no válido.');
-    final oldPath = m0['pago_comprobante_storage_path']?.toString().trim();
-
-    final stamp = DateTime.now().microsecondsSinceEpoch;
-    final path = '$trid/cuota_${paymentScheduleId}_${stamp}_$safeBase';
-    if (oldPath != null && oldPath.isNotEmpty) {
-      try {
-        await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
-      } catch (_) {}
-    }
-
-    final contentType = _mimeForProfileDocExtension(ext);
-    await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            contentType: contentType,
-            upsert: true,
-          ),
-        );
-    try {
-      await _client.rpc(
-        'aliado_registra_comprobante_pago_cuota',
-        params: <String, dynamic>{
-          'p_schedule_id': paymentScheduleId,
-          'p_metodo': metodo,
-          'p_storage_path': path,
-          'p_file_name': fileName.trim(),
-        },
-      );
-    } catch (e) {
-      try {
-        await _client.storage.from(_orderPaymentProofsBucket).remove([path]);
-      } catch (_) {}
-      rethrow;
-    }
-  }
-
-  static Future<void> adminAprobarPagoAliadoCuota(String paymentScheduleId) async {
-    await _client.rpc(
-      'admin_aprobar_pago_aliado_cuota',
-      params: <String, dynamic>{'p_schedule_id': paymentScheduleId},
-    );
-  }
-
-  static Future<void> adminRechazarComprobantePagoCuota({
-    required String paymentScheduleId,
-    required String nota,
-  }) async {
-    await _client.rpc(
-      'admin_rechazar_comprobante_pago_cuota',
-      params: <String, dynamic>{
-        'p_schedule_id': paymentScheduleId,
-        'p_nota': nota.trim(),
-      },
-    );
-  }
-
   /// Cierra el pedido (aliado): `en_transito` → `entregado` (RPC en base de datos).
   static Future<void> aliadoMarcarPedidoEntregado(String transactionRequestId) async {
     await _client.rpc(
@@ -3387,7 +3252,7 @@ class SupabaseService {
       if (imp is Map) impMap = Map<String, dynamic>.from(imp);
     }
 
-    final tasa = await fetchGlobalTasaBcv() ?? 1.0;
+    final tasa = await resolveTasaBcvEmision();
     final ref = settlement.invoiceReference?.trim();
     final safeRef = (ref != null && ref.isNotEmpty)
         ? ref.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')

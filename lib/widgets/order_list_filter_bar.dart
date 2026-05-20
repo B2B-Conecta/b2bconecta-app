@@ -23,6 +23,8 @@ class OrderListFilterBar extends StatefulWidget {
     this.statusOptions,
     this.selectedStatus,
     this.onStatusChanged,
+    this.morosoOnly = false,
+    this.onMorosoOnlyChanged,
   });
 
   final TextEditingController searchController;
@@ -31,6 +33,8 @@ class OrderListFilterBar extends StatefulWidget {
   final List<OrderStatusFilterOption>? statusOptions;
   final String? selectedStatus;
   final ValueChanged<String?>? onStatusChanged;
+  final bool morosoOnly;
+  final ValueChanged<bool>? onMorosoOnlyChanged;
 
   @override
   State<OrderListFilterBar> createState() => _OrderListFilterBarState();
@@ -64,6 +68,8 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
       widget.statusOptions != null &&
       widget.statusOptions!.isNotEmpty &&
       widget.onStatusChanged != null;
+
+  bool get _hasMorosoFilter => widget.onMorosoOnlyChanged != null;
 
   @override
   Widget build(BuildContext context) {
@@ -112,35 +118,55 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
               isDense: true,
             ),
           ),
-          if (_hasStatusFilter) ...[
+          if (_hasStatusFilter || _hasMorosoFilter) ...[
             const SizedBox(height: 10),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  FilterChip(
-                    label: const Text('Todos'),
-                    selected: widget.selectedStatus == null,
-                    onSelected: (_) => widget.onStatusChanged!(null),
-                    visualDensity: VisualDensity.compact,
-                    selectedColor: AppColors.brandBlue.withOpacity(0.2),
-                    checkmarkColor: AppColors.brandBlue,
-                  ),
-                  const SizedBox(width: 6),
-                  ...widget.statusOptions!.map(
-                    (o) => Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: FilterChip(
-                        label:
-                            Text(o.label, style: const TextStyle(fontSize: 12)),
-                        selected: widget.selectedStatus == o.status,
-                        onSelected: (_) => widget.onStatusChanged!(o.status),
-                        visualDensity: VisualDensity.compact,
-                        selectedColor: AppColors.brandBlue.withOpacity(0.2),
-                        checkmarkColor: AppColors.brandBlue,
+                  if (_hasStatusFilter) ...[
+                    FilterChip(
+                      label: const Text('Todos'),
+                      selected: widget.selectedStatus == null,
+                      onSelected: (_) => widget.onStatusChanged!(null),
+                      visualDensity: VisualDensity.compact,
+                      selectedColor: AppColors.brandBlue.withOpacity(0.2),
+                      checkmarkColor: AppColors.brandBlue,
+                    ),
+                    const SizedBox(width: 6),
+                    ...widget.statusOptions!.map(
+                      (o) => Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: FilterChip(
+                          label: Text(o.label,
+                              style: const TextStyle(fontSize: 12)),
+                          selected: widget.selectedStatus == o.status,
+                          onSelected: (_) => widget.onStatusChanged!(o.status),
+                          visualDensity: VisualDensity.compact,
+                          selectedColor: AppColors.brandBlue.withOpacity(0.2),
+                          checkmarkColor: AppColors.brandBlue,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
+                  if (_hasMorosoFilter) ...[
+                    if (_hasStatusFilter) const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Morosos'),
+                      selected: widget.morosoOnly,
+                      onSelected: (v) => widget.onMorosoOnlyChanged!(v),
+                      visualDensity: VisualDensity.compact,
+                      selectedColor: Colors.red.shade100,
+                      checkmarkColor: Colors.red.shade800,
+                      avatar: Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: widget.morosoOnly
+                            ? Colors.red.shade800
+                            : Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

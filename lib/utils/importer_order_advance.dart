@@ -13,10 +13,12 @@ Future<bool> advanceImporterOrderGroup(
 }) async {
   if (lines.isEmpty) return false;
 
+  final messenger = ScaffoldMessenger.maybeOf(context);
+
   if (nextStatus == TransactionRequestStatus.enTransito) {
     for (final r in lines) {
       if (!r.hasProveedorFactura) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(
             content: Text(
               'Adjunte la factura del proveedor antes de marcar «En tránsito».',
@@ -28,7 +30,8 @@ Future<bool> advanceImporterOrderGroup(
     }
 
     final eta = await showImporterTransitEtaDialog(context);
-    if (eta == null || !context.mounted) return false;
+    if (eta == null) return false;
+    if (!context.mounted) return false;
 
     try {
       for (final r in lines) {
@@ -41,7 +44,7 @@ Future<bool> advanceImporterOrderGroup(
       return true;
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
       }
@@ -60,7 +63,7 @@ Future<bool> advanceImporterOrderGroup(
     return true;
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger?.showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
     }

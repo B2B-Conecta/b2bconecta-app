@@ -8,6 +8,8 @@ import '../models/catalog_filters.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/commission_settlement_fiscal.dart';
+import 'admin_tasa_bcv_card.dart';
 import 'commission_settlement_lines_section.dart';
 import 'main_shell_tab.dart';
 
@@ -91,27 +93,52 @@ class _AdminCommissionSettlementsPanelState
     await _generateForWeek(prevWeek, label: 'semana anterior');
   }
 
-  /// Solo QA: pedidos devengados en la semana en curso (quitar antes de prod).
+  /// Semana en curso (lunes–domingo según fecha del servidor).
   Future<void> _generateCurrentWeek() async {
-    await _generateForWeek(_mondayOfWeek(DateTime.now()), label: 'semana actual');
+    setState(() => _busy = true);
+    try {
+      final result =
+          await SupabaseService.adminGenerateCommissionSettlementsCurrentWeek();
+      if (!mounted) return;
+      _showGenerateResult(result, label: 'semana actual');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _showGenerateResult(
     Map<String, dynamic> result, {
     required String label,
   }) {
-    final n = (result['created_count'] as num?)?.toInt() ?? 0;
+    final created = (result['created_count'] as num?)?.toInt() ?? 0;
+    final merged = (result['merged_count'] as num?)?.toInt() ?? 0;
+    final pending = (result['pending_lines_before'] as num?)?.toInt() ?? 0;
     final ws = result['week_start']?.toString();
     final we = result['week_end']?.toString();
     final period = (ws != null && we != null) ? ' ($ws → $we)' : '';
+    String msg;
+    if (created > 0 || merged > 0) {
+      final parts = <String>[];
+      if (created > 0) parts.add('$created corte(s) nuevo(s)');
+      if (merged > 0) parts.add('$merged actualizado(s) en borrador');
+      msg = '${parts.join(' · ')} ($label$period).';
+    } else if (pending > 0) {
+      msg =
+          'Hay $pending línea(s) devengada(s) en el periodo pero no se pudo '
+          'asignar (revise importador y estado del corte).';
+    } else {
+      msg =
+          'Sin líneas devengadas sin corte para $label$period. '
+          'Confirme que los pedidos estén Recibido y con comisión registrada.';
+    }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          n > 0
-              ? 'Se generaron $n corte(s) en borrador ($label$period).'
-              : 'Sin líneas devengadas pendientes para $label$period.',
-        ),
-      ),
+      SnackBar(content: Text(msg)),
     );
   }
 
@@ -510,7 +537,8 @@ class _AdminCommissionSettlementsPanelState
       builder: (ctx) => AlertDialog(
         title: const Text('Marcar como pagado (sin comprobante)'),
         content: Text(
-          '¿Confirma el cobro de USD ${s.totalCommissionUsd.toStringAsFixed(2)} '
+          '¿Confirma el cobro de USD ${s.totalFacturaUsd.toStringAsFixed(2)} '
+          '(comisión + IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %) '
           'de ${s.importadorBusinessName ?? s.importadorId} sin comprobante en la plataforma?',
         ),
         actions: [
@@ -587,13 +615,15 @@ class _AdminCommissionSettlementsPanelState
       final lines = await SupabaseService.fetchCommissionSettlementLines(s.id);
       final buf = StringBuffer()
         ..writeln(
-          'periodo,importador,factura,estado,total_usd,lineas,pedido,producto,venta_usd,comision_usd',
+          'periodo,importador,factura,estado,base_comision_usd,iva_usd,total_factura_usd,'
+          'lineas,pedido,producto,venta_usd,comision_usd',
         );
       for (final l in lines) {
         buf.writeln(
           '"${s.periodLabelEs}","${s.importadorBusinessName ?? ''}",'
           '"${s.invoiceReference ?? ''}","${s.status}",'
-          '${s.totalCommissionUsd},${s.lineCount},'
+          '${s.baseImponibleComisionUsd},${s.ivaComisionUsd},${s.totalFacturaUsd},'
+          '${s.lineCount},'
           '"${l.requestId}","${(l.productName ?? '').replaceAll('"', "'")}",'
           '${l.precioTotalUsd},${l.comisionDevengadaUsd}',
         );
@@ -656,8 +686,12 @@ class _AdminCommissionSettlementsPanelState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
             children: [
-              if (_rows.isNotEmpty) _CommissionSummaryCard(rows: _rows),
-              if (_rows.isNotEmpty) const SizedBox(height: 12),
+              const AdminTasaBcvCard(),
+              if (_rows.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _CommissionSummaryCard(rows: _rows),
+              ],
+              const SizedBox(height: 12),
               _ConfigCard(
                 defaultRatePct: _defaultRate * 100,
                 onEditRate: _busy ? null : _editDefaultRate,
@@ -742,14 +776,26 @@ class _AdminCommissionSettlementsPanelState
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'USD ${s.totalCommissionUsd.toStringAsFixed(2)} · ${s.lineCount} línea(s)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                Flexible(
+                  child: Text(
+                    'Total a pagar: USD ${s.totalFacturaUsd.toStringAsFixed(2)} (IVA incl.) · '
+                    '${s.lineCount} pedido(s)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Base comisión: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
+                'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
+                'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+              ),
             ),
             if (s.invoiceReference != null && s.invoiceReference!.isNotEmpty)
               Padding(
@@ -884,12 +930,12 @@ class _CommissionSummaryCard extends StatelessWidget {
       if (s.isBorrador) borrador++;
       if (s.isEmitido) {
         emitido++;
-        usdEmitido += s.totalCommissionUsd;
+        usdEmitido += s.totalFacturaUsd;
         if (s.pagoEnRevision) enRevision++;
       }
       if (s.isPagado) {
         pagado++;
-        usdPagado += s.totalCommissionUsd;
+        usdPagado += s.totalFacturaUsd;
       }
     }
 
@@ -918,8 +964,8 @@ class _CommissionSummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'USD pendiente de cobro (emitido): ${usdEmitido.toStringAsFixed(2)} · '
-              'USD cobrado (pagado): ${usdPagado.toStringAsFixed(2)}',
+              'USD pendiente de cobro (emitido, con IVA): ${usdEmitido.toStringAsFixed(2)} · '
+              'USD cobrado (pagado, con IVA): ${usdPagado.toStringAsFixed(2)}',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
             ),
           ],
@@ -982,6 +1028,9 @@ class _ConfigCard extends StatelessWidget {
               'La comisión se devenga cuando el aliado marca Recibido. '
               'Tasa global actual: ${defaultRatePct.toStringAsFixed(2)} % '
               '(cada importador puede tener tasa propia). '
+              'El cobro fiscal es la comisión (base imponible) más IVA '
+              '${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %; '
+              'el volumen de ventas del importador figura solo como detalle informativo. '
               'Los lunes 07:00 UTC se genera el corte de la semana anterior. '
               'Al emitir, la referencia es automática y se genera el PDF de factura de comisión.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade800, height: 1.35),

@@ -19,6 +19,7 @@ import 'aliado_order_pago_section.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
 import 'order_motolink_thread_section.dart';
+import 'moroso_order_visual.dart';
 import 'order_list_filter_bar.dart';
 
 /// Pedidos en curso y cerrados del aliado (pestaña Pedidos).
@@ -37,6 +38,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
+  bool _morosoOnly = false;
   String? _entregaBusyId;
   String? _cancelarBusyId;
 
@@ -122,7 +124,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   void _clearFilters() {
     _searchCtrl.clear();
-    setState(() => _statusFilter = null);
+    setState(() {
+      _statusFilter = null;
+      _morosoOnly = false;
+    });
   }
 
   List<TransactionRequestModel> get _filtered {
@@ -130,6 +135,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       _rows,
       searchQuery: _searchCtrl.text,
       statusFilter: _statusFilter,
+      morosoOnly: _morosoOnly,
     );
   }
 
@@ -319,7 +325,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   }
 
   String _label(TransactionRequestModel r) =>
-      r.statusLabelEs(aliadoViewer: true);
+      orderListStatusLabel(r, aliadoViewer: true);
 
   String _labelGrupo(List<TransactionRequestModel> g) {
     if (g.isEmpty) return '';
@@ -391,7 +397,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             allowReplyAsAliado: _esEnCurso(r.status),
             allowReplyAsAdmin: false,
             onThreadChanged: _load,
-            orderPrecioTotalUsd: r.precioTotal,
           ),
         ],
       );
@@ -412,7 +417,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final disc = computeVolumeDiscountForLines(chunk);
     final cg = chunk.first.checkoutGroupId?.trim() ?? '';
     final usePagoUnificado = chunk.length > 1 &&
-        !chunk.any((TransactionRequestModel r) => r.hasAgreedCreditPlan) &&
         cg.isNotEmpty &&
         chunk.every((TransactionRequestModel r) => r.checkoutGroupId?.trim() == cg);
 
@@ -508,10 +512,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 chunk.any((l) => _esEnCurso(l.status)),
             allowReplyAsAdmin: false,
             onThreadChanged: _load,
-            orderPrecioTotalUsd: chunk.fold<double>(
-              0,
-              (a, r) => a + r.precioTotal,
-            ),
             suppressBuiltinTitle: true,
           ),
         ] else ...[
@@ -521,7 +521,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             allowReplyAsAliado: _esEnCurso(chunk.single.status),
             allowReplyAsAdmin: false,
             onThreadChanged: _load,
-            orderPrecioTotalUsd: chunk.single.precioTotal,
           ),
         ],
         if (bundleCheckoutGroupId != null)
@@ -676,6 +675,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 statusOptions: _statusOptions,
                 selectedStatus: _statusFilter,
                 onStatusChanged: (s) => setState(() => _statusFilter = s),
+                morosoOnly: _morosoOnly,
+                onMorosoOnlyChanged: (v) => setState(() => _morosoOnly = v),
               ),
               Expanded(
                 child: filtered.isEmpty

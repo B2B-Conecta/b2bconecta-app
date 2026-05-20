@@ -316,6 +316,14 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon = Icons.account_balance_outlined;
         bg = Colors.teal.shade700;
         break;
+      case 'morosidad':
+        icon = Icons.warning_amber_rounded;
+        bg = Colors.deepOrange.shade700;
+        break;
+      case 'tasa_bcv':
+        icon = Icons.currency_exchange;
+        bg = AppColors.brandBlue;
+        break;
       case 'pago':
         icon = Icons.payments_outlined;
         bg = Colors.red.shade700;

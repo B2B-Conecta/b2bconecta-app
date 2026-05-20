@@ -18,10 +18,14 @@ abstract final class TransactionRequestFilterUtils {
     List<TransactionRequestModel> rows, {
     required String searchQuery,
     String? statusFilter,
+    bool morosoOnly = false,
   }) {
     var list = rows.where((r) => matchesSearch(r, searchQuery)).toList();
     if (statusFilter != null && statusFilter.isNotEmpty) {
       list = list.where((r) => r.status == statusFilter).toList();
+    }
+    if (morosoOnly) {
+      list = list.where((r) => r.esPedidoMoroso).toList();
     }
     return list;
   }

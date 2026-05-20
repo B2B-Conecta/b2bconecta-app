@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/commission_settlement_model.dart';
 import '../services/supabase_service.dart';
+import '../utils/commission_settlement_fiscal.dart';
 
-/// Detalle de pedidos incluidos en un corte de comisión (admin e importador).
+/// Detalle informativo de ventas incluidas en un corte (admin e importador).
 class CommissionSettlementLinesSection extends StatefulWidget {
   const CommissionSettlementLinesSection({
     super.key,
@@ -51,18 +52,40 @@ class _CommissionSettlementLinesSectionState
             style: TextStyle(fontSize: 12),
           );
         }
+        final totalVentas =
+            CommissionSettlementFiscal.totalVentasInformativoUsd(lines);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Pedidos del corte (${lines.length})',
+              'Detalle informativo de ventas (no comercial)',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Colors.grey.shade800,
               ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Monto total vendido en el período (referencia): '
+              'USD ${totalVentas.toStringAsFixed(2)}. '
+              'No forma parte del total a pagar de la factura de comisión.',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                height: 1.35,
+              ),
+            ),
             const SizedBox(height: 6),
+            Text(
+              'Pedidos incluidos (${lines.length})',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 4),
             ...lines.map(
               (l) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),

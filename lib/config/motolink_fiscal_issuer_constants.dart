@@ -8,4 +8,7 @@ abstract final class MotolinkFiscalIssuerConstants {
   static const email = 'motolinkc.a@gmail.com';
   static const codigoOperacion = '000110';
   static const codigoOrigen = '000001324';
+
+  /// IVA sobre factura de comisión de intermediación (importador).
+  static const commissionIvaPct = 16.0;
 }

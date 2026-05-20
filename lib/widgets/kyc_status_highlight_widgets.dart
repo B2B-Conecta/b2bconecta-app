@@ -198,41 +198,94 @@ class KycAliadoGlobalStatusHighlight extends StatelessWidget {
     required IconData icon,
     required bool emphasized,
   }) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor, width: emphasized ? 1.5 : 1.1),
-        boxShadow: emphasized
-            ? [
-                BoxShadow(
-                  color: foregroundColor.withOpacity(0.15),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: foregroundColor),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: emphasized ? 13.5 : 13,
-                  fontWeight: FontWeight.w800,
-                  height: 1.25,
-                  color: foregroundColor,
+    return SizedBox(
+      width: double.infinity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor, width: emphasized ? 1.5 : 1.1),
+          boxShadow: emphasized
+              ? [
+                  BoxShadow(
+                    color: foregroundColor.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 22, color: foregroundColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: emphasized ? 13.5 : 13,
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
+                    color: foregroundColor,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// Chip compacto para cabeceras en filas estrechas (sin [Expanded] interno).
+class KycCompactStatusChip extends StatelessWidget {
+  const KycCompactStatusChip({super.key, required this.kycStatus});
+
+  final String? kycStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = kycStatus?.trim();
+    final (bg, fg, border) = switch (s) {
+      KycStatus.aprobado => (
+          const Color(0xFFE8F5E9),
+          const Color(0xFF1B5E20),
+          const Color(0xFF66BB6A),
+        ),
+      KycStatus.rechazado => (
+          const Color(0xFFFFEBEE),
+          const Color(0xFFB71C1C),
+          const Color(0xFFE57373),
+        ),
+      KycStatus.enRevision => (
+          const Color(0xFFFFF3E0),
+          const Color(0xFFE65100),
+          const Color(0xFFFFB74D),
+        ),
+      _ => (
+          AppColors.brandBlueContainer,
+          AppColors.brandBlue,
+          AppColors.brandBlue.withOpacity(0.38),
+        ),
+    };
+    return Chip(
+      label: Text(
+        KycStatus.labelEs(s),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+      backgroundColor: bg,
+      side: BorderSide(color: border),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: EdgeInsets.zero,
     );
   }
 }

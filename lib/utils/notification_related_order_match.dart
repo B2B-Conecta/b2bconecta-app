@@ -13,18 +13,11 @@ bool transactionRequestMatchesNotificationRelatedId(
   return cg != null && cg.isNotEmpty && cg == needle;
 }
 
-/// Admin: expande por `transaction_requests.id`.
+/// Admin: clave de expansión alineada con agrupación por carrito.
 String? adminExpandRequestIdForNotification(
   List<TransactionRequestModel> rows,
   String relatedId,
-) {
-  for (final r in rows) {
-    if (transactionRequestMatchesNotificationRelatedId(r, relatedId)) {
-      return r.id;
-    }
-  }
-  return null;
-}
+) => orderExpandKeyForNotification(rows, relatedId);
 
 /// Aliado / importador: clave de expansión de tarjeta (grupo o línea).
 String? orderExpandKeyForNotification(

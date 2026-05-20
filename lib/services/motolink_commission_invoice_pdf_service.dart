@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../config/motolink_fiscal_issuer_constants.dart';
 import '../models/commission_settlement_model.dart';
+import '../utils/commission_settlement_fiscal.dart';
 import '../utils/ves_amount_format.dart';
 
 /// Genera PDF de factura de comisión MotoLink → importador (corte semanal C1).
@@ -47,8 +48,16 @@ class MotolinkCommissionInvoicePdfService {
         dirParts.isEmpty ? '—' : dirParts.join(', ');
     final impTel = importadorPhone?.trim() ?? '—';
 
-    final totalUsd = settlement.totalCommissionUsd;
+    final baseUsd = settlement.baseImponibleComisionUsd;
+    final ivaUsd = settlement.ivaComisionUsd;
+    final totalUsd = settlement.totalFacturaUsd;
+    final baseBs = baseUsd * tasaBcvEmision;
+    final ivaBs = ivaUsd * tasaBcvEmision;
     final totalBs = totalUsd * tasaBcvEmision;
+    final ivaPct = CommissionSettlementFiscal.ivaPct;
+    final serviceDesc =
+        'Servicio de intermediación digital y uso de plataforma tecnológica '
+        'MotoLink, según corte de cuenta referencia $ref';
 
     doc.addPage(
       pw.MultiPage(
@@ -62,9 +71,10 @@ class MotolinkCommissionInvoicePdfService {
               pw.Container(height: 0.5, color: PdfColors.grey500),
               pw.SizedBox(height: 6),
               pw.Text(
-                'Documento de cobro por intermediación B2B (comisión MotoLink). '
-                'Sujeto a validación fiscal con su contador. '
-                'Tasa BCV referencia: ${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}.',
+                'Documento fiscal por intermediación B2B (comisión MotoLink + IVA). '
+                'Sujeto a validación con su contador. '
+                'Tasa BCV referencia emisión: '
+                '${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}.',
                 style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
               ),
             ],
@@ -141,8 +151,9 @@ class MotolinkCommissionInvoicePdfService {
                     style: const pw.TextStyle(fontSize: 9),
                   ),
                   pw.Text(
-                    '${settlement.lineCount} línea(s) de pedido',
-                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                    'Tasa BCV (fecha de emisión): '
+                    '${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}',
+                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
                   ),
                 ],
               ),
@@ -163,7 +174,7 @@ class MotolinkCommissionInvoicePdfService {
           _fieldRow('Domicilio fiscal', impDir),
           pw.SizedBox(height: 10),
           pw.Text(
-            'Detalle de comisiones devengadas (pedidos marcados como Recibido)',
+            'Concepto facturado (servicio de intermediación)',
             style: pw.TextStyle(
               fontSize: 9,
               fontWeight: pw.FontWeight.bold,
@@ -171,26 +182,15 @@ class MotolinkCommissionInvoicePdfService {
           ),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headers: const [
-              'Pedido',
-              'Descripción',
-              'Venta USD',
-              'Comisión USD',
+            headers: const ['Cant', 'Descripción', 'P.U. REF', 'Monto REF'],
+            data: [
+              [
+                '1',
+                serviceDesc,
+                _fmtRef(baseUsd),
+                _fmtRef(baseUsd),
+              ],
             ],
-            data: lines.map((l) {
-              final pid = l.requestId.length >= 8
-                  ? l.requestId.substring(0, 8)
-                  : l.requestId;
-              final desc = l.productName?.trim().isNotEmpty == true
-                  ? l.productName!.trim()
-                  : 'Línea de pedido';
-              return [
-                pid,
-                desc,
-                _fmtUsd(l.precioTotalUsd),
-                _fmtUsd(l.comisionDevengadaUsd),
-              ];
-            }).toList(),
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,
               fontSize: 8,
@@ -203,10 +203,21 @@ class MotolinkCommissionInvoicePdfService {
           ),
           pw.SizedBox(height: 12),
           pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.end,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
+              pw.Expanded(
+                child: pw.Text(
+                  'Montos en REF (divisa de referencia). Contravalor en bolívares '
+                  'según tasa oficial BCV del día de emisión '
+                  '(${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)}). '
+                  'IVA ${formatVesAmount(ivaPct, fractionDigits: 2)} % sobre la base imponible de comisión.',
+                  style: const pw.TextStyle(fontSize: 7, lineSpacing: 1.2),
+                ),
+              ),
+              pw.SizedBox(width: 12),
               pw.Container(
-                width: 220,
+                width: 240,
                 padding: const pw.EdgeInsets.all(8),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: PdfColors.grey400),
@@ -215,10 +226,25 @@ class MotolinkCommissionInvoicePdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
-                    _totRow('Total comisión USD', _fmtUsd(totalUsd), bold: true),
+                    _totRow('Subtotal / Base imponible REF', _fmtRef(baseUsd)),
                     _totRow(
-                      'Referencia Bs (× ${formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4)})',
-                      formatBsLabel(totalBs),
+                      'Subtotal / Base imponible Bs',
+                      _fmtBs(baseBs),
+                    ),
+                    _totRow(
+                      'IVA (${formatVesAmount(ivaPct, fractionDigits: 2)}%) REF',
+                      _fmtRef(ivaUsd),
+                    ),
+                    _totRow('IVA Bs', _fmtBs(ivaBs)),
+                    _totRow(
+                      'Total general de la factura REF',
+                      _fmtRef(totalUsd),
+                      bold: true,
+                    ),
+                    _totRow(
+                      'Total general de la factura Bs',
+                      _fmtBs(totalBs),
+                      bold: true,
                     ),
                   ],
                 ),
@@ -245,7 +271,9 @@ class MotolinkCommissionInvoicePdfService {
     return doc.save();
   }
 
-  static String _fmtUsd(double v) => 'USD ${formatRefAmount(v)}';
+  static String _fmtRef(double v) => 'REF ${formatRefAmount(v)}';
+
+  static String _fmtBs(double v) => formatBsLabel(v);
 
   static pw.Widget _fieldRow(String k, String v) {
     return pw.Padding(
@@ -276,20 +304,23 @@ class MotolinkCommissionInvoicePdfService {
       padding: const pw.EdgeInsets.only(bottom: 3),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Expanded(
+            flex: 3,
             child: pw.Text(
               k,
               style: pw.TextStyle(
-                fontSize: 8,
+                fontSize: 7,
                 fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
               ),
             ),
           ),
+          pw.SizedBox(width: 4),
           pw.Text(
             v,
             style: pw.TextStyle(
-              fontSize: 8,
+              fontSize: 7,
               fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
             ),
           ),

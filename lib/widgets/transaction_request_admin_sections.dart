@@ -993,32 +993,6 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
       );
     }
 
-    // Comprobantes por cuota (plan acordado con importador).
-    if (r.hasAgreedCreditPlan) {
-      for (final c in r.paymentSchedule) {
-        if (!c.hasPagoComprobante) continue;
-        final path = c.pagoComprobanteStoragePath!.trim();
-        final name = c.pagoComprobanteFileName?.trim();
-        final label = (name != null && name.isNotEmpty)
-            ? 'Cuota ${c.installmentIndex} · comprobante · $name'
-            : 'Comprobante cuota ${c.installmentIndex} (plan de pago)';
-        chips.add(
-          OutlinedButton.icon(
-            onPressed: () => _launchSignedOrderDoc(
-              context,
-              () => SupabaseService.createSignedUrlForComprobantePago(path),
-            ),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        );
-      }
-    }
-
     if (chips.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -1036,10 +1010,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          r.hasAgreedCreditPlan
-              ? 'Archivos del pedido, incluidos comprobantes por cuota que haya subido el aliado. '
-                  'Misma referencia que en «Factura y pago — revisión de cuota». Enlace temporal al abrir.'
-              : 'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
+          'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
           style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
         ),
         const SizedBox(height: 10),

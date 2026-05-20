@@ -38,6 +38,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
   _ImporterQuickFilter _quickFilter = _ImporterQuickFilter.nuevos;
+  bool _morosoOnly = false;
 
   @override
   void initState() {
@@ -63,7 +64,12 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   }
 
   void _onNotificationPedidosDeepLink() {
-    if (MainShellTabController.consumeImporterPedidosPreferNuevosFilter()) {
+    if (MainShellTabController.consumeImporterPedidosPreferCerradosFilter()) {
+      setState(() {
+        _quickFilter = _ImporterQuickFilter.cerrados;
+        _morosoOnly = true;
+      });
+    } else if (MainShellTabController.consumeImporterPedidosPreferNuevosFilter()) {
       setState(() => _quickFilter = _ImporterQuickFilter.nuevos);
     }
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
@@ -90,11 +96,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String? _expandKeyForPendingId(String id) =>
       orderExpandKeyForNotification(_rows, id);
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final rows =
           await SupabaseService.fetchUnifiedTransactionRequestsForImporter();
@@ -115,7 +123,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
   void _clearFilters() {
     _searchCtrl.clear();
-    setState(() => _quickFilter = _ImporterQuickFilter.nuevos);
+    setState(() {
+      _quickFilter = _ImporterQuickFilter.nuevos;
+      _morosoOnly = false;
+    });
   }
 
   bool _matchesQuickFilter(TransactionRequestModel r) {
@@ -139,6 +150,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       _rows,
       searchQuery: _searchCtrl.text,
       statusFilter: null,
+      morosoOnly: _morosoOnly,
     );
     return searched.where(_matchesQuickFilter).toList();
   }
@@ -175,6 +187,24 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           ),
           chip('En proceso', _ImporterQuickFilter.enProceso),
           chip('Despachados · cerrados', _ImporterQuickFilter.cerrados),
+          if (_quickFilter == _ImporterQuickFilter.cerrados)
+            FilterChip(
+              label: const Text('Morosos'),
+              selected: _morosoOnly,
+              onSelected: (v) => setState(() => _morosoOnly = v),
+              selectedColor: Colors.red.shade100,
+              checkmarkColor: Colors.red.shade800,
+              labelStyle: TextStyle(
+                fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 12.5,
+                color: _morosoOnly ? Colors.red.shade900 : AppColors.textPrimary,
+              ),
+              avatar: Icon(
+                Icons.warning_amber_rounded,
+                size: 16,
+                color: _morosoOnly ? Colors.red.shade800 : Colors.grey.shade600,
+              ),
+            ),
         ],
       ),
     );
@@ -219,13 +249,15 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     List<TransactionRequestModel> g,
     String next,
   ) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
     final ok = await advanceImporterOrderGroup(
       context,
       lines: g,
       nextStatus: next,
     );
-    if (!ok || !context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    if (!ok) return;
+    messenger?.showSnackBar(
       SnackBar(
         content: Text(
           next == TransactionRequestStatus.enTransito
@@ -235,7 +267,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-    await _load();
+    await _load(silent: true);
   }
 
   @override

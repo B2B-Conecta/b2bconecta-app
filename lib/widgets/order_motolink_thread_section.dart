@@ -18,10 +18,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     required this.allowReplyAsAliado,
     required this.allowReplyAsAdmin,
     this.allowReplyAsImportador = false,
-    this.allowManageCreditPlan = false,
     this.onThreadChanged,
-    this.orderPrecioTotalUsd,
-    this.creditPlanRescheduleLocked = false,
     this.suppressBuiltinTitle = false,
     /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
     this.mergedThreadRequestIds,
@@ -32,23 +29,14 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   final bool allowReplyAsAdmin;
   final bool allowReplyAsImportador;
 
-  /// Importador: acuerda plan de cuotas con el aliado (antes solo admin MotoLink).
-  final bool allowManageCreditPlan;
-
   /// Varios ids de `transaction_requests` (mismo importador en un carrito): se listan mensajes juntos.
   final List<String>? mergedThreadRequestIds;
 
-  /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido (cuotas, pago).
+  /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido.
   final VoidCallback? onThreadChanged;
-
-  /// Total del pedido para validar la suma de las cuotas (p. ej. [TransactionRequestModel.precioTotal]).
-  final double? orderPrecioTotalUsd;
 
   /// Cuando el padre ya mostró el título de sección (p. ej. carrito multi‑línea).
   final bool suppressBuiltinTitle;
-
-  /// Si el plan ya no puede redefinirse (p. ej. cuota 1 con comprobante).
-  final bool creditPlanRescheduleLocked;
 
   @override
   State<OrderMotolinkThreadSection> createState() =>
@@ -56,13 +44,10 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 }
 
 class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection> {
-  bool get _canManageCreditPlan => widget.allowManageCreditPlan;
-
   final _ctrl = TextEditingController();
   List<TransactionRequestMessageModel> _items = [];
   bool _loading = true;
   bool _sending = false;
-  bool _savingPlan = false;
   String? _error;
   final List<RealtimeChannel> _messageChannels = [];
 
@@ -198,242 +183,6 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     }
   }
 
-  List<double> _splitEqualCents(int n, double total) {
-    if (n <= 0) return const [];
-    final cents = (total * 100).round();
-    final per = cents ~/ n;
-    final rem = cents - per * n;
-    return List<double>.generate(
-      n,
-      (i) => (per + (i < rem ? 1 : 0)) / 100.0,
-    );
-  }
-
-  bool _montoCerca(double a, double b) => (a - b).abs() < 0.02;
-
-  Future<void> _openPlanModal() async {
-    if (_savingPlan) return;
-    var orderTotal = widget.orderPrecioTotalUsd;
-    orderTotal ??= await SupabaseService.fetchTransactionRequestPrecioTotal(
-        widget.transactionRequestId,
-      );
-    if (orderTotal == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo leer el total del pedido.')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    final tPedido = orderTotal;
-
-    int nCuotas = 1;
-    final controllers = <TextEditingController>[];
-
-    void setControllers() {
-      for (final c in controllers) {
-        c.dispose();
-      }
-      controllers.clear();
-      for (final a in _splitEqualCents(nCuotas, tPedido)) {
-        controllers.add(TextEditingController(text: a.toStringAsFixed(2)));
-      }
-    }
-
-    setControllers();
-
-    if (!mounted) return;
-    final aceptar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModal) {
-            return AlertDialog(
-              title: const Text('Ajustar plan de cuotas'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Vencimientos: cada 15 días a partir de hoy (zona Caracas). '
-                      'Suma de cuotas debe ser ${tPedido.toStringAsFixed(2)} REF.',
-                      style: const TextStyle(fontSize: 13, height: 1.3),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Total pedido: ${tPedido.toStringAsFixed(2)} REF',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: AppColors.brandBlue.withOpacity(0.95),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    RadioListTile<int>(
-                      value: 1,
-                      groupValue: nCuotas,
-                      onChanged: (v) {
-                        if (v == null) return;
-                        nCuotas = v;
-                        setControllers();
-                        setModal(() {});
-                      },
-                      title: const Text('1 cuota (contado)'),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    RadioListTile<int>(
-                      value: 2,
-                      groupValue: nCuotas,
-                      onChanged: (v) {
-                        if (v == null) return;
-                        nCuotas = v;
-                        setControllers();
-                        setModal(() {});
-                      },
-                      title: const Text('2 cuotas (cada 15 días)'),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    RadioListTile<int>(
-                      value: 3,
-                      groupValue: nCuotas,
-                      onChanged: (v) {
-                        if (v == null) return;
-                        nCuotas = v;
-                        setControllers();
-                        setModal(() {});
-                      },
-                      title: const Text('3 cuotas (cada 15 días, máx. 45 días)'),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(height: 8),
-                    for (var i = 0; i < controllers.length; i++) ...[
-                      TextField(
-                        key: ObjectKey(controllers[i]),
-                        controller: controllers[i],
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Cuota ${i + 1} (REF)',
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    var suma = 0.0;
-                    for (final c in controllers) {
-                      final t = c.text.trim().replaceAll(',', '.');
-                      final x = double.tryParse(t);
-                      if (x == null || x < 0) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                            content: Text('Revise que cada monto sea un número válido.'),
-                          ),
-                        );
-                        return;
-                      }
-                      suma += x;
-                    }
-                    if (!_montoCerca(suma, tPedido)) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'La suma (${suma.toStringAsFixed(2)} REF) debe coincidir con el total (${tPedido.toStringAsFixed(2)} REF).',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.of(ctx).pop(true);
-                  },
-                  child: const Text('Validar y confirmar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (aceptar != true) {
-      for (final c in controllers) {
-        c.dispose();
-      }
-      return;
-    }
-    final eq = _splitEqualCents(nCuotas, tPedido);
-    final amounts = <double>[];
-    var personalizado = false;
-    for (var i = 0; i < nCuotas; i++) {
-      final t = controllers[i].text.trim().replaceAll(',', '.');
-      final x = double.tryParse(t);
-      if (x == null) {
-        for (final c in controllers) {
-          c.dispose();
-        }
-        return;
-      }
-      amounts.add(x);
-      if (i < eq.length && !_montoCerca(x, eq[i])) {
-        personalizado = true;
-      }
-    }
-    for (final c in controllers) {
-      c.dispose();
-    }
-
-    if (!mounted) return;
-    setState(() => _savingPlan = true);
-    try {
-      await SupabaseService.importerConfirmOrderCreditPlan(
-        transactionRequestId: widget.transactionRequestId,
-        amountsUsd: amounts,
-        montosPersonalizados: personalizado,
-      );
-      if (!mounted) return;
-      await _load();
-      widget.onThreadChanged?.call();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Plan de cuotas registrado. El aliado lo verá en Pago y en este chat.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      final s = e.toString();
-      var friendly = s;
-      if (s.contains('MONTOS_NO_COINCIDEN')) {
-        friendly = 'La suma de las cuotas no coincide con el total; verifique e intente de nuevo.';
-      } else if (s.contains('PLAN_CUOTAS_BLOQUEADO')) {
-        friendly =
-            'El plan no puede cambiarse: la primera cuota ya tiene comprobante o registro de pago.';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo registrar el plan: $friendly')),
-      );
-    } finally {
-      if (mounted) setState(() => _savingPlan = false);
-    }
-  }
-
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _sending) return;
@@ -476,68 +225,30 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
         widget.allowReplyAsImportador;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.suppressBuiltinTitle)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (_canManageCreditPlan)
-                IconButton(
-                  tooltip: widget.creditPlanRescheduleLocked
-                      ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
-                      : 'Ajustar plan de cuotas',
-                  onPressed: _loading ||
-                          _savingPlan ||
-                          widget.creditPlanRescheduleLocked
-                      ? null
-                      : _openPlanModal,
-                  icon: const Icon(Icons.payments_outlined, size: 22),
-                  visualDensity: VisualDensity.compact,
-                ),
-              IconButton(
-                tooltip: 'Actualizar',
-                onPressed: _loading || _savingPlan ? null : _load,
-                icon: const Icon(Icons.refresh, size: 20),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          )
-        else
-          Row(
-            children: [
-              Expanded(
+        Row(
+          children: [
+            if (!widget.suppressBuiltinTitle)
+              const Expanded(
                 child: Text(
                   'Chat del pedido',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ),
-              if (_canManageCreditPlan) ...[
-                IconButton(
-                  tooltip: widget.creditPlanRescheduleLocked
-                      ? 'No se puede modificar: la primera cuota ya tiene comprobante o registro de pago.'
-                      : 'Ajustar plan de cuotas',
-                  onPressed: _loading ||
-                          _savingPlan ||
-                          widget.creditPlanRescheduleLocked
-                      ? null
-                      : _openPlanModal,
-                  icon: const Icon(Icons.payments_outlined, size: 22),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-              IconButton(
-                tooltip: 'Actualizar',
-                onPressed: _loading || _savingPlan ? null : _load,
-                icon: const Icon(Icons.refresh, size: 20),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
+            IconButton(
+              tooltip: 'Actualizar',
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh, size: 20),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
         const SizedBox(height: 4),
         Text(
           'Aliado e importador coordinan aquí. MotoLink puede leer el hilo en tiempo real.',

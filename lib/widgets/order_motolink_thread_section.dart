@@ -251,7 +251,8 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
         ),
         const SizedBox(height: 4),
         Text(
-          'Aliado e importador coordinan aquí. MotoLink puede leer el hilo en tiempo real.',
+          'Desde que el pedido está pendiente, aliado e importador pueden escribir aquí '
+          '(coordinación de cantidad, plazos y logística). MotoLink puede leer el hilo en tiempo real.',
           style: TextStyle(fontSize: 11, height: 1.3, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 4),

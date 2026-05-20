@@ -16,6 +16,7 @@ import 'aliado_expandable_order_card.dart';
 import 'aliado_confirmar_recepcion_section.dart';
 import 'aliado_order_experience_section.dart';
 import 'aliado_order_pago_section.dart';
+import 'aliado_qty_adjustment_actions.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
 import 'order_motolink_thread_section.dart';
@@ -376,6 +377,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (r.qtyAdjustmentPendienteAliado) ...[
+            AliadoQtyAdjustmentActions(request: r, onChanged: _load),
+            const SizedBox(height: 12),
+          ],
           AliadoImportadorFacturaSection(lines: [r], compact: true),
           const SizedBox(height: 10),
           _PasarelaPagoMotoLinkCard(
@@ -491,6 +496,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 ),
         ),
         const SizedBox(height: 14),
+        if (chunk.any((l) => l.qtyAdjustmentPendienteAliado)) ...[
+          for (final line in chunk.where((l) => l.qtyAdjustmentPendienteAliado))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: AliadoQtyAdjustmentActions(
+                key: ValueKey<String>('qty-adj-${line.id}'),
+                request: line,
+                onChanged: _load,
+              ),
+            ),
+        ],
         if (chunk.length > 1) ...[
           Text(
             'Mensajes con MotoLink — un hilo por proveedor en este carrito.',

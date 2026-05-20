@@ -33,13 +33,16 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   });
 
   final TransactionRequestModel request;
+
   /// Varias filas del mismo carrito (mismo `checkout_group_id`). Si es una sola fila, dejar null.
   final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
   final VoidCallback onToggle;
   final String statusLabel;
+
   /// Contenido al inicio de la ficha expandida (p. ej. confirmar recepción).
   final Widget? expandedLeading;
+
   /// Solo aplica mientras [TransactionRequestModel.status] es pendiente.
   final VoidCallback? onCancelarSolicitudPendiente;
   final bool cancelarSolicitudPendienteBusy;
@@ -60,17 +63,17 @@ class AliadoExpandableOrderCard extends StatelessWidget {
         : <TransactionRequestModel>[request];
     final isCheckoutGroup = lines.length > 1;
     final r = request;
-    final distinctImporterIds = lines
-        .map((e) => e.ownerId.trim())
-        .where((s) => s.isNotEmpty)
-        .toSet();
+    final distinctImporterIds =
+        lines.map((e) => e.ownerId.trim()).where((s) => s.isNotEmpty).toSet();
+
     /// Mismo almacén en todas las líneas: un solo bloque de contacto B2B.
     final consolidarDatosImportador =
         isCheckoutGroup && distinctImporterIds.length <= 1;
     final useMultiImporterTabs =
         isCheckoutGroup && multiImporterPanelBuilder != null;
-    final porImportador =
-        useMultiImporterTabs ? groupCheckoutLinesByImportador(lines) : const <List<TransactionRequestModel>>[];
+    final porImportador = useMultiImporterTabs
+        ? groupCheckoutLinesByImportador(lines)
+        : const <List<TransactionRequestModel>>[];
     final String tracking;
     final bool showHeadline;
     if (isCheckoutGroup) {
@@ -79,6 +82,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           ? TransactionRequestStatus.aliadoTrackingHeadline(
               lines.first.status,
               canceladoPorAliado: lines.first.canceladoPorAliado,
+              canceladoPorImportador: lines.first.canceladoPorImportador,
               anuladoPorMotolink: lines.first.anuladoPorMotolink,
             )
           : 'Varias líneas en distinto estado';
@@ -87,6 +91,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       tracking = TransactionRequestStatus.aliadoTrackingHeadline(
         r.status,
         canceladoPorAliado: r.canceladoPorAliado,
+        canceladoPorImportador: r.canceladoPorImportador,
         anuladoPorMotolink: r.anuladoPorMotolink,
       );
       showHeadline = tracking.isNotEmpty && tracking != '—';
@@ -118,11 +123,15 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 fontWeight: FontWeight.w800,
                                 fontSize: 11,
                                 color: isCheckoutGroup &&
-                                        !lines.every((x) => x.status == lines.first.status)
+                                        !lines.every((x) =>
+                                            x.status == lines.first.status)
                                     ? AppColors.brandBlue
-                                    : r.status == TransactionRequestStatus.rechazado
+                                    : r.status ==
+                                            TransactionRequestStatus.rechazado
                                         ? Colors.red.shade800
-                                        : r.status == TransactionRequestStatus.entregado
+                                        : r.status ==
+                                                TransactionRequestStatus
+                                                    .entregado
                                             ? Colors.green.shade800
                                             : AppColors.brandBlue,
                               ),
@@ -158,7 +167,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             const SizedBox(height: 6),
                             _MultiImporterPagoResumenChip(lines: lines),
                           ],
-                          if (lineasEntregadasParaValorar(lines).isNotEmpty) ...[
+                          if (lineasEntregadasParaValorar(lines)
+                              .isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Wrap(
                               spacing: 6,
@@ -228,7 +238,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.green.shade200),
+                                border:
+                                    Border.all(color: Colors.green.shade200),
                               ),
                               child: Text(
                                 'Entregado y pagado.',
@@ -246,7 +257,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               request: r,
                               expanded: expanded,
                               aliadoViewer: true,
-                              riskWarningChild: r.pagoPendienteRiesgoCuentaTresDiasHabiles
+                              riskWarningChild: r
+                                      .pagoPendienteRiesgoCuentaTresDiasHabiles
                                   ? Container(
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(8),
@@ -288,13 +300,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-            ),
+          ),
           if (onCancelarSolicitudPendiente != null &&
               (!isCheckoutGroup
                   ? r.status == TransactionRequestStatus.pendiente
                   : lines.every(
-                      (l) =>
-                          l.status == TransactionRequestStatus.pendiente,
+                      (l) => l.status == TransactionRequestStatus.pendiente,
                     ))) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
@@ -413,7 +424,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                               ..._postTimelineBloquesAliado(
                                 lines: lines,
-                                consolidarDatosImportador: consolidarDatosImportador,
+                                consolidarDatosImportador:
+                                    consolidarDatosImportador,
                               ),
                             ] else ...[
                               const Text(
@@ -427,7 +439,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               const SizedBox(height: 8),
                               ..._postTimelineBloquesAliado(
                                 lines: lines,
-                                consolidarDatosImportador: consolidarDatosImportador,
+                                consolidarDatosImportador:
+                                    consolidarDatosImportador,
                                 timelinePorLinea: true,
                               ),
                             ],
@@ -455,7 +468,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             showHeading: true,
                           ),
                         ],
-                        if (!useMultiImporterTabs && expandedFooter != null) ...[
+                        if (!useMultiImporterTabs &&
+                            expandedFooter != null) ...[
                           const SizedBox(height: 12),
                           expandedFooter!,
                         ],
@@ -561,14 +575,15 @@ String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
     '$imp ${imp == 1 ? "importador" : "importadores"} · $uds uds · '
     '${formatRefAmount(totalRef)} REF',
   );
-  final bsVals = lines.map((r) => r.precioTotalBsUi).whereType<double>().toList();
+  final bsVals =
+      lines.map((r) => r.precioTotalBsUi).whereType<double>().toList();
   if (bsVals.length == lines.length && bsVals.isNotEmpty) {
     final sumBs = bsVals.fold<double>(0, (a, b) => a + b);
     buf.write(' · ~${formatVesAmount(sumBs)} Bs');
   }
   if (lines.any(
-        (r) => r.discountRules != null && r.discountRules!.isNotEmpty,
-      )) {
+    (r) => r.discountRules != null && r.discountRules!.isNotEmpty,
+  )) {
     buf.write(' · descuentos volumen en ficha');
   }
   return buf.toString();

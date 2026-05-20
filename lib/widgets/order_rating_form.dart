@@ -126,6 +126,16 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
         ),
         if (hasOptional && _estrellas != null) ...[
           const SizedBox(height: 8),
+          Text(
+            'Preguntas opcionales de feedback (${q.scaleMin}–${q.scaleMax}): '
+            '${q.questions.map((e) => e.textEs).join(' · ')}',
+            style: TextStyle(
+              fontSize: 10.5,
+              color: Colors.grey.shade700,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 6),
           Material(
             color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(10),
@@ -234,11 +244,10 @@ class _OptionalQuestionRow extends StatelessWidget {
             final sel = value == n;
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: i < scaleMax - scaleMin ? 4 : 0),
+                padding:
+                    EdgeInsets.only(right: i < scaleMax - scaleMin ? 4 : 0),
                 child: OutlinedButton(
-                  onPressed: enabled
-                      ? () => onChanged(sel ? null : n)
-                      : null,
+                  onPressed: enabled ? () => onChanged(sel ? null : n) : null,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     backgroundColor:
@@ -289,7 +298,8 @@ class OrderRatingAnswersReadOnly extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 4),
           child: Text(
             '${q.textEs} · $n/${questionnaire.scaleMax}',
-            style: TextStyle(fontSize: 10.5, color: Colors.grey.shade800, height: 1.3),
+            style: TextStyle(
+                fontSize: 10.5, color: Colors.grey.shade800, height: 1.3),
           ),
         ),
       );
@@ -368,7 +378,8 @@ class OrderRatingReceivedCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               comment.trim(),
-              style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade900),
+              style: TextStyle(
+                  fontSize: 12, height: 1.35, color: Colors.grey.shade900),
             ),
           ],
           if (questionnaire != null) ...[

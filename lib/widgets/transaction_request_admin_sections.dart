@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import 'order_commission_summary.dart';
 import 'transaction_request_counterparty_profile_section.dart';
+
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
   Future<String> Function() signed,
@@ -207,9 +208,7 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
             color: at != null ? Colors.purple.shade50 : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: at != null
-                  ? Colors.purple.shade200
-                  : Colors.grey.shade300,
+              color: at != null ? Colors.purple.shade200 : Colors.grey.shade300,
             ),
           ),
           child: at == null
@@ -545,7 +544,8 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
+          style: TextStyle(
+              fontSize: 11, color: Colors.grey.shade700, height: 1.25),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -609,19 +609,23 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     value: formatEsShortDateTime(r.createdAt),
                     isDone: r.createdAt != null,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: r.anuladoPorMotolink
                         ? 'Anulado por MotoLink (post-aprobación)'
-                        : (r.canceladoPorAliado
-                            ? 'Cancelado por el aliado'
-                            : 'Rechazado (MotoLink)'),
+                        : (r.canceladoPorImportador
+                            ? 'Cancelado por proveedor (importador)'
+                            : (r.canceladoPorAliado
+                                ? 'Cancelado por el aliado'
+                                : 'Rechazado (MotoLink)')),
                     value: formatEsShortDateTime(r.atRechazado),
                     isDone: r.atRechazado != null,
                     highlight: true,
                   ),
                   if (r.anuladoPorMotolink &&
-                      (r.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                      (r.motolinkAnulacionMotivo?.trim().isNotEmpty ??
+                          false)) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Motivo (MotoLink): ${r.motolinkAnulacionMotivo!.trim()}',
@@ -631,8 +635,21 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                         color: Colors.blueGrey.shade900,
                       ),
                     ),
+                  ] else if (r.canceladoPorImportador &&
+                      (r.importadorCancelacionMotivo?.trim().isNotEmpty ??
+                          false)) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Motivo (proveedor): ${r.importadorCancelacionMotivo!.trim()}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: Colors.blueGrey.shade900,
+                      ),
+                    ),
                   ] else if (r.canceladoPorAliado &&
-                      (r.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false)) ...[
+                      (r.aliadoCancelacionMotivo?.trim().isNotEmpty ??
+                          false)) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Motivo: ${r.aliadoCancelacionMotivo!.trim()}',
@@ -649,46 +666,54 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     value: formatEsShortDateTime(r.createdAt),
                     isDone: r.createdAt != null,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'Aprobado por MotoLink',
                     value: formatEsShortDateTime(r.atAprobadoAdmin),
                     isDone: r.atAprobadoAdmin != null,
-                    mutedIfEmpty: r.status == TransactionRequestStatus.pendiente,
+                    mutedIfEmpty:
+                        r.status == TransactionRequestStatus.pendiente,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'En preparación (importador)',
                     value: _prepValue(r),
                     isDone: r.atEnPreparacion != null,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'Pedido listo para recolección (importador)',
                     value: formatEsShortDateTime(r.atPedidoListo),
                     isDone: r.atPedidoListo != null,
                     highlight: r.status == TransactionRequestStatus.pedidoListo,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'Factura MotoLink al aliado',
                     value: _facturaAliadoTimeline(r),
                     isDone: r.hasFacturaAliado,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'Respaldo cobro en efectivo',
                     value: _efectivoRespaldoTimeline(r),
                     isDone: r.hasEfectivoRespaldo,
                     mutedIfEmpty: true,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'En tránsito (MotoLink)',
                     value: _transitoValue(r),
                     isDone: r.atEnTransito != null,
                   ),
-                  Divider(height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                  Divider(
+                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
                     label: 'Entregado',
                     value: _entregadoTimeline(r),

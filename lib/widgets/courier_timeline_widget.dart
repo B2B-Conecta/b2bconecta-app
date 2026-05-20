@@ -129,6 +129,7 @@ class CourierTimelineWidget extends StatelessWidget {
     required this.request,
     this.compact = false,
     this.viewerRole,
+
     /// En listados con varias líneas, mostrar el título solo en la primera instancia del widget.
     this.showHeading = true,
   });
@@ -256,7 +257,8 @@ class CourierTimelineWidget extends StatelessWidget {
             ],
           ),
           child: Padding(
-            padding: EdgeInsets.fromLTRB(compact ? 10 : 14, compact ? 10 : 14, compact ? 10 : 14, compact ? 10 : 14),
+            padding: EdgeInsets.fromLTRB(compact ? 10 : 14, compact ? 10 : 14,
+                compact ? 10 : 14, compact ? 10 : 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -271,7 +273,10 @@ class CourierTimelineWidget extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (i > 0) Divider(height: compact ? 12 : 16, color: Colors.grey.shade200),
+                      if (i > 0)
+                        Divider(
+                            height: compact ? 12 : 16,
+                            color: Colors.grey.shade200),
                       _StepRow(
                         step: s,
                         compact: compact,
@@ -289,7 +294,9 @@ class CourierTimelineWidget extends StatelessWidget {
 
   Widget _rejectedCard(TransactionRequestModel r, {required bool showHeading}) {
     final cancel = r.canceladoPorAliado;
+    final cancelImp = r.canceladoPorImportador;
     final m = r.aliadoCancelacionMotivo;
+    final mImp = r.importadorCancelacionMotivo;
     final mAnula = r.motolinkAnulacionMotivo;
     final anulM = r.anuladoPorMotolink;
     return Column(
@@ -324,11 +331,14 @@ class CourierTimelineWidget extends StatelessWidget {
                         anulM
                             ? 'Pedido anulado por MotoLink · '
                                 '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
-                            : (cancel
-                                ? 'Solicitud cancelada · '
+                            : (cancelImp
+                                ? 'Pedido cancelado por proveedor · '
                                     '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
-                                : 'Pedido rechazado · '
-                                    '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'),
+                                : (cancel
+                                    ? 'Solicitud cancelada · '
+                                        '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
+                                    : 'Pedido rechazado · '
+                                        '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}')),
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
@@ -342,6 +352,18 @@ class CourierTimelineWidget extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     'Motivo (MotoLink): $mAnula',
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      color: Colors.red.shade900,
+                    ),
+                  ),
+                ] else if (cancelImp &&
+                    mImp != null &&
+                    mImp.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Motivo (proveedor): $mImp',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.3,

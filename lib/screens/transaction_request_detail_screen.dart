@@ -50,7 +50,8 @@ class _TransactionRequestDetailScreenState
   }
 
   Future<_DetailLoad?> _loadDetail() async {
-    final lines = await SupabaseService.fetchCheckoutGroupLinesForTransactionRequest(
+    final lines =
+        await SupabaseService.fetchCheckoutGroupLinesForTransactionRequest(
       widget.requestId,
     );
     if (lines.isEmpty) return null;
@@ -82,7 +83,8 @@ class _TransactionRequestDetailScreenState
             );
           }
           if (snapshot.hasError) {
-            return _stateText('No se pudo cargar el pedido.\n${snapshot.error}');
+            return _stateText(
+                'No se pudo cargar el pedido.\n${snapshot.error}');
           }
           final data = snapshot.data;
           if (data == null) {
@@ -93,8 +95,7 @@ class _TransactionRequestDetailScreenState
           final r = data.primary;
           final lines = data.lines;
           final isGroup = lines.length > 1;
-          final anyEntregadoPagado =
-              lines.any((x) => x.pedidoEntregadoYPagado);
+          final anyEntregadoPagado = lines.any((x) => x.pedidoEntregadoYPagado);
           final anyPagoPendienteTrasEntrega =
               lines.any((x) => x.pagoMotolinkPendienteTrasEntrega);
           final anyPagoRiesgo = lines.any(
@@ -120,10 +121,10 @@ class _TransactionRequestDetailScreenState
                 const SizedBox(height: 12),
               ],
               if (lines.any(
-                    (x) =>
-                        x.canceladoPorAliado &&
-                        (x.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false),
-                  )) ...[
+                (x) =>
+                    x.canceladoPorAliado &&
+                    (x.aliadoCancelacionMotivo?.trim().isNotEmpty ?? false),
+              )) ...[
                 _noteCard(
                   lines
                       .firstWhere(
@@ -140,10 +141,30 @@ class _TransactionRequestDetailScreenState
                 const SizedBox(height: 12),
               ],
               if (lines.any(
-                    (x) =>
-                        x.anuladoPorMotolink &&
-                        (x.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false),
-                  )) ...[
+                (x) =>
+                    x.canceladoPorImportador &&
+                    (x.importadorCancelacionMotivo?.trim().isNotEmpty ?? false),
+              )) ...[
+                _noteCard(
+                  lines
+                      .firstWhere(
+                        (x) =>
+                            x.canceladoPorImportador &&
+                            (x.importadorCancelacionMotivo?.trim().isNotEmpty ??
+                                false),
+                      )
+                      .importadorCancelacionMotivo!
+                      .trim(),
+                  title: 'Pedido cancelado por el proveedor',
+                  tone: _NoteCardTone.warning,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (lines.any(
+                (x) =>
+                    x.anuladoPorMotolink &&
+                    (x.motolinkAnulacionMotivo?.trim().isNotEmpty ?? false),
+              )) ...[
                 _noteCard(
                   lines
                       .firstWhere(
@@ -167,7 +188,8 @@ class _TransactionRequestDetailScreenState
                         lines: lines,
                         compact: false,
                       )
-                    : ImporterAliadoSolicitudSection(request: r, compact: false),
+                    : ImporterAliadoSolicitudSection(
+                        request: r, compact: false),
               ],
               if (widget.homeRole == AppHomeRole.aliado) ...[
                 const SizedBox(height: 12),
@@ -342,14 +364,16 @@ class _TransactionRequestDetailScreenState
     } else {
       title = r.tituloFichaPrincipalPedido;
     }
-    final totalRef =
-        isGroup ? lines.fold<double>(0, (a, e) => a + e.precioTotal) : r.precioTotal;
+    final totalRef = isGroup
+        ? lines.fold<double>(0, (a, e) => a + e.precioTotal)
+        : r.precioTotal;
     final statusSet = lines.map((e) => e.status).toSet();
     final estadoChip = isGroup && statusSet.length > 1
         ? 'Varios estados'
         : (r.esPedidoMoroso
             ? '${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)} · Moroso'
-            : r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado));
+            : r.statusLabelEs(
+                aliadoViewer: widget.homeRole == AppHomeRole.aliado));
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -400,8 +424,7 @@ class _TransactionRequestDetailScreenState
     TransactionRequestModel r,
     List<TransactionRequestModel> lines,
   ) {
-    final hasNota =
-        r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty;
+    final hasNota = r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty;
     final isGroup = lines.length > 1;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -445,8 +468,7 @@ class _TransactionRequestDetailScreenState
               request: r,
             ),
             const SizedBox(height: 14),
-            if (isGroup &&
-                checkoutGroupMismoEstadoEnvio(lines)) ...[
+            if (isGroup && checkoutGroupMismoEstadoEnvio(lines)) ...[
               ..._detailEtaBanners(lines),
               CourierTimelineWidget(
                 request: lines.first,
@@ -544,10 +566,7 @@ class _TransactionRequestDetailScreenState
       case AppHomeRole.administrador:
         final imp = line.ownerBusinessName?.trim();
         final p = line.productName?.trim();
-        if (p != null &&
-            p.isNotEmpty &&
-            imp != null &&
-            imp.isNotEmpty) {
+        if (p != null && p.isNotEmpty && imp != null && imp.isNotEmpty) {
           if (p.contains(imp)) return p;
           return '$p · $imp';
         }

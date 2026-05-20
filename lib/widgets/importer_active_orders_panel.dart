@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-
-
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -11,9 +9,11 @@ import '../utils/aliado_order_grouping.dart';
 import '../utils/notification_related_order_match.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
+import 'importer_cancelar_pedido_dialog.dart';
 import 'importer_order_invoice_section.dart';
 import 'importer_order_pago_verification_section.dart';
 import 'importer_order_rating_section.dart';
+import 'importer_notificar_ajuste_cantidad_dialog.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
@@ -37,6 +37,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   bool _loading = true;
   String? _error;
   String? _expandedRequestId;
+  String? _cancelBusyKey;
   late final TextEditingController _searchCtrl;
   _ImporterQuickFilter _quickFilter = _ImporterQuickFilter.nuevos;
   bool _morosoOnly = false;
@@ -59,7 +60,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   void dispose() {
     MainShellTabController.registerImporterPedidosReload(null);
     MainShellTabController.registerPedidosNotificationDeepLink(null);
-    MainShellTabController.registerImportadorValidadosNotificationDeepLink(null);
+    MainShellTabController.registerImportadorValidadosNotificationDeepLink(
+        null);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -70,7 +72,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         _quickFilter = _ImporterQuickFilter.cerrados;
         _morosoOnly = true;
       });
-    } else if (MainShellTabController.consumeImporterPedidosPreferNuevosFilter()) {
+    } else if (MainShellTabController
+        .consumeImporterPedidosPreferNuevosFilter()) {
       setState(() => _quickFilter = _ImporterQuickFilter.nuevos);
     }
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
@@ -156,8 +159,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     return searched.where(_matchesQuickFilter).toList();
   }
 
-  String _rowKey(TransactionRequestModel r) =>
-      r.id;
+  String _rowKey(TransactionRequestModel r) => r.id;
 
   Widget _quickFilterBar() {
     Widget chip(String label, _ImporterQuickFilter value) {
@@ -198,7 +200,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               labelStyle: TextStyle(
                 fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
                 fontSize: 12.5,
-                color: _morosoOnly ? Colors.red.shade900 : AppColors.textPrimary,
+                color:
+                    _morosoOnly ? Colors.red.shade900 : AppColors.textPrimary,
               ),
               avatar: Icon(
                 Icons.warning_amber_rounded,
@@ -271,6 +274,142 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     await _load(silent: true);
   }
 
+  bool _canCancelGroup(List<TransactionRequestModel> g) {
+    return g.every(
+      (r) =>
+          r.status == TransactionRequestStatus.pendiente ||
+          r.status == TransactionRequestStatus.enPreparacion ||
+          r.status == TransactionRequestStatus.pedidoListo,
+    );
+  }
+
+  bool _canNotifyQtyAdjustment(List<TransactionRequestModel> g) {
+    if (!g.every((r) => r.status == TransactionRequestStatus.pendiente)) {
+      return false;
+    }
+    if (g.any((r) => r.qtyAdjustmentPendienteAliado)) return false;
+    return g.any((r) => r.cantidad > 1);
+  }
+
+  int _requestedQtyForGroup(List<TransactionRequestModel> g) =>
+      g.fold<int>(0, (a, r) => a + r.cantidad);
+
+  Future<void> _cancelarGroupAsImporter(
+    BuildContext context,
+    List<TransactionRequestModel> g,
+    String key,
+  ) async {
+    if (_cancelBusyKey != null) return;
+    final draft = await showImporterCancelarPedidoDialog(
+      context,
+      productName:
+          g.length == 1 ? (g.first.productName ?? 'Pedido') : 'carrito',
+    );
+    if (draft == null) return;
+    if (!context.mounted) return;
+    setState(() => _cancelBusyKey = key);
+    try {
+      for (final r in g) {
+        await SupabaseService.importerCancelaPedidoEnGestion(
+          transactionRequestId: r.id,
+          motivo: draft,
+        );
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            g.length > 1
+                ? 'Se cancelaron ${g.length} líneas del carrito.'
+                : 'Pedido cancelado y notificado al aliado.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load(silent: true);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cancelar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelBusyKey = null);
+    }
+  }
+
+  Future<void> _notificarAjusteCantidad(
+    BuildContext context,
+    List<TransactionRequestModel> g,
+  ) async {
+    final requested = _requestedQtyForGroup(g);
+    final draft = await showImporterNotificarAjusteCantidadDialog(
+      context,
+      requestedQty: requested,
+    );
+    if (draft == null) return;
+    if (!context.mounted) return;
+
+    if (g.length == 1) {
+      try {
+        await SupabaseService.importerProponeAjusteCantidad(
+          transactionRequestId: g.single.id,
+          offeredQty: draft.availableQty,
+          note: draft.note,
+        );
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Propuesta enviada: el aliado debe aceptar o rechazar antes de avanzar el pedido.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        await _load(silent: true);
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo enviar la propuesta: $e')),
+        );
+      }
+      return;
+    }
+
+    final msg = StringBuffer()
+      ..write(
+        'Ajuste de disponibilidad (varias partidas): solicitaste $requested uds y '
+        'podemos ofrecer ${draft.availableQty} uds en total.',
+      );
+    if (draft.note.isNotEmpty) {
+      msg.write('\nDetalle del proveedor: ${draft.note}');
+    }
+    msg.write(
+      '\nConfirma por este chat cómo repartimos las unidades entre las partidas.',
+    );
+
+    try {
+      for (final r in g) {
+        await SupabaseService.insertTransactionRequestMessageAsImportador(
+          transactionRequestId: r.id,
+          body: msg.toString(),
+        );
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ajuste notificado al aliado por chat.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load(silent: true);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar el aviso: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _rows.isEmpty) {
@@ -341,7 +480,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,
-                                  child: const Text('Limpiar búsqueda y volver a Nuevos'),
+                                  child: const Text(
+                                      'Limpiar búsqueda y volver a Nuevos'),
                                 ),
                               ],
                             ),
@@ -358,13 +498,21 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                             final g = groups[i];
                             final primary = g.first;
                             final isBundle = g.length > 1;
-                            final next =
+                            final nextBase =
                                 TransactionRequestStatus.nextForImporter(
                               primary.status,
                             );
+                            final blockQtyAdj = g.any(
+                              (r) => r.qtyAdjustmentPendienteAliado,
+                            );
+                            final next = (nextBase != null && !blockQtyAdj)
+                                ? nextBase
+                                : null;
                             final headline = TransactionRequestStatus
                                 .importerOperationalHeadline(primary.status);
                             final rk = _displayGroupKey(g);
+                            final canCancel = _canCancelGroup(g);
+                            final canNotifyQty = _canNotifyQtyAdjustment(g);
                             return ImporterExpandableOrderCard(
                               request: primary,
                               checkoutGroupLines: isBundle ? g : null,
@@ -381,6 +529,19 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                   : null,
                               onAdvance: next != null
                                   ? () => _advanceGroup(context, g, next)
+                                  : null,
+                              canCancelByImporter: canCancel,
+                              cancelBusy: _cancelBusyKey == rk,
+                              onCancelByImporter: canCancel
+                                  ? () => _cancelarGroupAsImporter(
+                                        context,
+                                        g,
+                                        rk,
+                                      )
+                                  : null,
+                              canNotifyQtyAdjustment: canNotifyQty,
+                              onNotifyQtyAdjustment: canNotifyQty
+                                  ? () => _notificarAjusteCantidad(context, g)
                                   : null,
                               onThreadChanged: _load,
                               expandedFooter: Column(

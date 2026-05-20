@@ -78,6 +78,15 @@ abstract final class TransactionRequestStatus {
     enviado,
   ];
 
+  /// Estados donde aplica `admin_anula_pedido_por_motolink`: post primera gestión, no entregado.
+  static const List<String> adminAnulablePorMotolinkStatuses = [
+    aprobadoAdmin,
+    enPreparacion,
+    pedidoListo,
+    enTransito,
+    enviado,
+  ];
+
   /// Listado unificado importador: operación + cerrados (`rechazado`).
   static const List<String> importerOrdersUnifiedStatuses = [
     pendiente,
@@ -89,7 +98,7 @@ abstract final class TransactionRequestStatus {
     rechazado,
   ];
 
-  /// Admin: pedidos en curso (p. ej. anulación con motivo).
+  /// Admin: pedidos en curso (incluye `pendiente` en bandeja activa).
   static const List<String> adminOperationalActive =
       motoconectaAdminOperationalActive;
 
@@ -228,6 +237,7 @@ abstract final class TransactionRequestStatus {
   static String aliadoTrackingHeadline(
     String status, {
     bool canceladoPorAliado = false,
+    bool canceladoPorImportador = false,
     bool anuladoPorMotolink = false,
   }) {
     switch (status) {
@@ -244,7 +254,9 @@ abstract final class TransactionRequestStatus {
       case entregado:
         return 'Pedido completado';
       case rechazado:
-        return canceladoPorAliado ? 'Solicitud cancelada' : 'Pedido rechazado';
+        if (canceladoPorAliado) return 'Solicitud cancelada';
+        if (canceladoPorImportador) return 'Pedido cancelado por proveedor';
+        return 'Pedido rechazado';
       default:
         return '—';
     }

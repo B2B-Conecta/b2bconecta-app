@@ -15,6 +15,20 @@ Future<bool> advanceImporterOrderGroup(
 
   final messenger = ScaffoldMessenger.maybeOf(context);
 
+  for (final r in lines) {
+    if (r.qtyAdjustmentPendienteAliado) {
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Esperando respuesta del aliado sobre la propuesta de cantidad. '
+            'No puede avanzar el pedido hasta que la acepte o la rechace.',
+          ),
+        ),
+      );
+      return false;
+    }
+  }
+
   if (nextStatus == TransactionRequestStatus.enTransito) {
     for (final r in lines) {
       if (!r.hasProveedorFactura) {

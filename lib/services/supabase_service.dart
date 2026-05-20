@@ -796,6 +796,10 @@ class SupabaseService {
     comision_devengada_usd,
     comision_devengada_at,
     commission_settlement_id,
+    qty_adjustment_status,
+    qty_adjustment_offered,
+    qty_adjustment_note,
+    qty_adjustment_solicitada_snapshot,
     factura_url,
     proveedor_factura_storage_path,
     proveedor_factura_file_name,
@@ -812,8 +816,10 @@ class SupabaseService {
     destino_entrega_texto,
     destino_entrega_maps_url,
     checkout_group_id,
+    original_checkout_group_id,
     discount_rules,
     confirmado_por,
+    importador_cancelacion_motivo,
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
@@ -999,7 +1005,8 @@ class SupabaseService {
     final response = await _client
         .from('transaction_requests')
         .select(_trSelectForListWithSubs)
-        .inFilter('status', TransactionRequestStatus.adminBandejaUnifiedStatuses)
+        .inFilter(
+            'status', TransactionRequestStatus.adminBandejaUnifiedStatuses)
         .order('updated_at', ascending: false);
 
     final list = response as List<dynamic>;
@@ -2673,6 +2680,54 @@ class SupabaseService {
     }
     await _client.rpc(
       'aliado_cancela_pedido_pendiente',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_motivo': t,
+      },
+    );
+  }
+
+  /// Importador: propone menor cantidad mientras el pedido está `pendiente` (aliado debe aceptar/rechazar).
+  static Future<void> importerProponeAjusteCantidad({
+    required String transactionRequestId,
+    required int offeredQty,
+    String note = '',
+  }) async {
+    await _client.rpc(
+      'importer_propone_ajuste_cantidad',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_offered_qty': offeredQty,
+        'p_note': note.trim(),
+      },
+    );
+  }
+
+  /// Aliado: responde a la propuesta formal de cantidad del importador.
+  static Future<void> aliadoRespondeAjusteCantidad({
+    required String transactionRequestId,
+    required bool aceptar,
+  }) async {
+    await _client.rpc(
+      'aliado_responde_ajuste_cantidad',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_aceptar': aceptar,
+      },
+    );
+  }
+
+  /// Importador: cancela pedido en gestión (pendiente / en preparación / listo), con motivo.
+  static Future<void> importerCancelaPedidoEnGestion({
+    required String transactionRequestId,
+    required String motivo,
+  }) async {
+    final t = motivo.trim();
+    if (t.length < 3) {
+      throw ArgumentError('Indique un motivo de al menos 3 caracteres.');
+    }
+    await _client.rpc(
+      'importer_cancela_pedido_en_gestion',
       params: <String, dynamic>{
         'p_request_id': transactionRequestId,
         'p_motivo': t,

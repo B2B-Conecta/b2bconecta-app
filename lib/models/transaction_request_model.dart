@@ -1,5 +1,6 @@
 import 'motolink_ally_document_emission_model.dart';
 import 'order_item_model.dart';
+import 'qty_adjustment_status.dart';
 import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
@@ -22,6 +23,8 @@ class TransactionRequestModel {
     this.notasAdmin,
     this.canceladoPorAliado = false,
     this.aliadoCancelacionMotivo,
+    this.canceladoPorImportador = false,
+    this.importadorCancelacionMotivo,
     this.anuladoPorMotolink = false,
     this.motolinkAnulacionMotivo,
     this.createdAt,
@@ -86,15 +89,21 @@ class TransactionRequestModel {
     this.aliadoExperienceSubmittedAt,
     this.tasaBcvSnapshot,
     this.importerViewOrderItems = const <OrderItemModel>[],
-    this.motolinkAllyDocumentEmissions = const <MotolinkAllyDocumentEmissionModel>[],
+    this.motolinkAllyDocumentEmissions =
+        const <MotolinkAllyDocumentEmissionModel>[],
     this.facturaUrl,
     this.checkoutGroupId,
+    this.originalCheckoutGroupId,
     this.confirmadoPor,
     this.discountRules,
     this.commissionRateSnapshot = 0.05,
     this.comisionDevengadaUsd,
     this.comisionDevengadaAt,
     this.commissionSettlementId,
+    this.qtyAdjustmentStatus,
+    this.qtyAdjustmentOffered,
+    this.qtyAdjustmentNote,
+    this.qtyAdjustmentSolicitadaSnapshot,
   });
 
   final String id;
@@ -116,6 +125,8 @@ class TransactionRequestModel {
   final String? notasAdmin;
   final bool canceladoPorAliado;
   final String? aliadoCancelacionMotivo;
+  final bool canceladoPorImportador;
+  final String? importadorCancelacionMotivo;
   final bool anuladoPorMotolink;
   final String? motolinkAnulacionMotivo;
   final DateTime? createdAt;
@@ -131,6 +142,7 @@ class TransactionRequestModel {
   final String? aliadoBusinessName;
   final String? aliadoRif;
   final String? aliadoPhone;
+
   /// Ubicación fiscal del aliado (desde `profiles` al listar el pedido).
   final String? aliadoEstado;
   final String? aliadoCiudad;
@@ -213,6 +225,9 @@ class TransactionRequestModel {
   /// Varios ítems del mismo carrito comparten este UUID (`transaction_requests.checkout_group_id`).
   final String? checkoutGroupId;
 
+  /// Conservado si la línea se desvinculó del carrito al cancelar/rechazar (`checkout_group_id` pasa a null).
+  final String? originalCheckoutGroupId;
+
   /// Operador importador que aprueba pago / primera gestión auditada (`transaction_requests.confirmado_por`).
   final String? confirmadoPor;
 
@@ -223,6 +238,15 @@ class TransactionRequestModel {
   final double? comisionDevengadaUsd;
   final DateTime? comisionDevengadaAt;
   final String? commissionSettlementId;
+
+  /// Propuesta formal de menos unidades (`pendiente_aliado` hasta respuesta del aliado).
+  final String? qtyAdjustmentStatus;
+  final int? qtyAdjustmentOffered;
+  final String? qtyAdjustmentNote;
+  final int? qtyAdjustmentSolicitadaSnapshot;
+
+  bool get qtyAdjustmentPendienteAliado =>
+      qtyAdjustmentStatus == QtyAdjustmentStatus.pendienteAliado;
 
   /// Comisión estimada sobre el total (referencia antes del devengo).
   double get comisionEstimadaUsd =>
@@ -235,8 +259,9 @@ class TransactionRequestModel {
   final Map<String, dynamic>? discountRules;
 
   /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
-  List<MotolinkAllyDocumentEmissionModel> get motolinkAllyInvoicesDescargables =>
-      motolinkAllyDocumentEmissions.where((e) => e.isFinalized).toList();
+  List<MotolinkAllyDocumentEmissionModel>
+      get motolinkAllyInvoicesDescargables =>
+          motolinkAllyDocumentEmissions.where((e) => e.isFinalized).toList();
 
   /// Pedido con más de una hoja fiscal MotoLink (límite de ítems SENIAT).
   bool get hasMultiFragmentMotolinkAllyDocs =>
@@ -251,8 +276,7 @@ class TransactionRequestModel {
   int get _etaHoursCoalesced => transitEtaHours ?? 0;
 
   /// Hay al menos un día o una hora de ETA registrada.
-  bool get hasTransitEta =>
-      _etaDaysCoalesced > 0 || _etaHoursCoalesced > 0;
+  bool get hasTransitEta => _etaDaysCoalesced > 0 || _etaHoursCoalesced > 0;
 
   bool get hasAdminRutaMapsUrl =>
       adminRutaMapsUrl != null && adminRutaMapsUrl!.trim().isNotEmpty;
@@ -345,9 +369,13 @@ class TransactionRequestModel {
   /// Distingue rechazo inicial, anulación MotoLink (post-aprobación) y cancelación por aliado.
   String statusLabelEs({bool aliadoViewer = false}) {
     if (status == TransactionRequestStatus.rechazado && canceladoPorAliado) {
+      return aliadoViewer ? 'Cancelada por usted' : 'Cancelada por el aliado';
+    }
+    if (status == TransactionRequestStatus.rechazado &&
+        canceladoPorImportador) {
       return aliadoViewer
-          ? 'Cancelada por usted'
-          : 'Cancelada por el aliado';
+          ? 'Cancelada por proveedor'
+          : 'Cancelada por el importador';
     }
     if (status == TransactionRequestStatus.rechazado && anuladoPorMotolink) {
       return 'Anulada por MotoLink';
@@ -366,9 +394,10 @@ class TransactionRequestModel {
     return '$base · Moroso';
   }
 
-  /// Admin puede anular con motivo: aprobado o en curso, no entregado ni pendiente.
+  /// Admin puede anular con motivo: alineado a `admin_anula_pedido_por_motolink` (no pendiente ni entregado).
   bool get motolinkPuedeAnularComoAdmin {
-    return TransactionRequestStatus.adminOperationalActive.contains(status);
+    return TransactionRequestStatus.adminAnulablePorMotolinkStatuses
+        .contains(status);
   }
 
   /// Ubicación fiscal del importador (recolección), desde el perfil del owner.
@@ -577,7 +606,8 @@ class TransactionRequestModel {
   /// Mensaje corto para el aliado en fases donde puede declarar o gestionar el pago.
   String? get aliadoPagoEstadoResumenEs {
     if (status == TransactionRequestStatus.rechazado) return null;
-    if (!TransactionRequestStatus.aliadoDeclaracionPagoMultietapa.contains(status)) {
+    if (!TransactionRequestStatus.aliadoDeclaracionPagoMultietapa
+        .contains(status)) {
       return null;
     }
     if (status == TransactionRequestStatus.entregado) {
@@ -686,12 +716,10 @@ class TransactionRequestModel {
       precioUnitarioAliado = unitFallback;
     }
 
-    if ((productName == null || productName.isEmpty) &&
-        importadorRaw is Map) {
+    if ((productName == null || productName.isEmpty) && importadorRaw is Map) {
       final im = Map<String, dynamic>.from(importadorRaw);
       final bn = im['business_name']?.toString().trim();
-      productName =
-          (bn != null && bn.isNotEmpty) ? 'Pedido · $bn' : 'Pedido';
+      productName = (bn != null && bn.isNotEmpty) ? 'Pedido · $bn' : 'Pedido';
     }
 
     return TransactionRequestModel(
@@ -715,6 +743,10 @@ class TransactionRequestModel {
       notasAdmin: _nullableText(json['notas_admin']),
       canceladoPorAliado: json['cancelado_por_aliado'] == true,
       aliadoCancelacionMotivo: _nullableText(json['aliado_cancelacion_motivo']),
+      canceladoPorImportador:
+          _nullableText(json['importador_cancelacion_motivo']) != null,
+      importadorCancelacionMotivo:
+          _nullableText(json['importador_cancelacion_motivo']),
       anuladoPorMotolink: json['anulado_por_motolink'] == true,
       motolinkAnulacionMotivo: _nullableText(json['motolink_anulacion_motivo']),
       createdAt: json['created_at'] != null
@@ -757,17 +789,20 @@ class TransactionRequestModel {
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:
           _nullableText(json['proveedor_factura_file_name']),
-      proveedorFacturaSubmittedAt: _parseDate(json['proveedor_factura_submitted_at']),
+      proveedorFacturaSubmittedAt:
+          _parseDate(json['proveedor_factura_submitted_at']),
       transitEtaDays: _asNullableInt(json['transit_eta_days']),
       transitEtaHours: _asNullableInt(json['transit_eta_hours']),
       transitEtaSetAt: _parseDate(json['transit_eta_set_at']),
-      facturaAliadoStoragePath: _nullableText(json['factura_aliado_storage_path']),
+      facturaAliadoStoragePath:
+          _nullableText(json['factura_aliado_storage_path']),
       facturaAliadoFileName: _nullableText(json['factura_aliado_file_name']),
       facturaAliadoSubmittedAt: _parseDate(json['factura_aliado_submitted_at']),
       pagoMetodo: _nullableText(json['pago_metodo']),
       comprobantePagoStoragePath:
           _nullableText(json['comprobante_pago_storage_path']),
-      comprobantePagoFileName: _nullableText(json['comprobante_pago_file_name']),
+      comprobantePagoFileName:
+          _nullableText(json['comprobante_pago_file_name']),
       comprobantePagoSubmittedAt:
           _parseDate(json['comprobante_pago_submitted_at']),
       pagoEstadoRevision: _nullableText(json['pago_estado_revision']),
@@ -785,8 +820,7 @@ class TransactionRequestModel {
       destinoEntregaMapsUrl: _nullableText(json['destino_entrega_maps_url']),
       adminRutaMapsUrl: _nullableText(json['admin_ruta_maps_url']),
       documentTypePreference: _nullableText(json['document_type_preference']),
-      motolinkPendingAutoInvoice:
-          json['motolink_pending_auto_invoice'] == true,
+      motolinkPendingAutoInvoice: json['motolink_pending_auto_invoice'] == true,
       aliadoExperienceStars: _asNullableInt(json['aliado_experience_stars']),
       aliadoExperienceComment: _nullableText(json['aliado_experience_comment']),
       aliadoExperienceSubmittedAt:
@@ -800,6 +834,7 @@ class TransactionRequestModel {
       ),
       facturaUrl: _nullableText(json['factura_url']),
       checkoutGroupId: _nullableText(json['checkout_group_id']),
+      originalCheckoutGroupId: _nullableText(json['original_checkout_group_id']),
       confirmadoPor: _nullableText(json['confirmado_por']),
       discountRules: () {
         final dr = json['discount_rules'];
@@ -819,6 +854,11 @@ class TransactionRequestModel {
       }(),
       comisionDevengadaAt: _parseDate(json['comision_devengada_at']),
       commissionSettlementId: _nullableText(json['commission_settlement_id']),
+      qtyAdjustmentStatus: _nullableText(json['qty_adjustment_status']),
+      qtyAdjustmentOffered: _asNullableInt(json['qty_adjustment_offered']),
+      qtyAdjustmentNote: _nullableText(json['qty_adjustment_note']),
+      qtyAdjustmentSolicitadaSnapshot:
+          _asNullableInt(json['qty_adjustment_solicitada_snapshot']),
     );
   }
 

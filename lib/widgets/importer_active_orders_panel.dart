@@ -156,7 +156,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   }
 
   String _rowKey(TransactionRequestModel r) =>
-      r.importerSubOrderId != null ? '${r.id}::${r.importerSubOrderId}' : r.id;
+      r.id;
 
   Widget _quickFilterBar() {
     Widget chip(String label, _ImporterQuickFilter value) {

@@ -13,22 +13,6 @@ String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
   final pe = r.pagoEstadoRevisionEfectivo;
   final m = r.pagoMetodo?.trim();
   final efectivo = m == PagoMetodo.efectivo;
-  final credito = m == PagoMetodo.creditoSistema;
-
-  if (credito) {
-    switch (pe) {
-      case PagoRevisionEstado.pendiente:
-        return 'Pendiente de solicitud de crédito del aliado';
-      case PagoRevisionEstado.enRevision:
-        return 'Solicitud de crédito en revisión';
-      case PagoRevisionEstado.aprobado:
-        return 'Pago con crédito del sistema aprobado';
-      case PagoRevisionEstado.rechazado:
-        return 'Solicitud de crédito rechazada (aliado puede reintentar)';
-      default:
-        return pe;
-    }
-  }
 
   switch (pe) {
     case PagoRevisionEstado.pendiente:
@@ -51,7 +35,7 @@ String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
   }
 }
 
-/// Revisión del pago del aliado (comprobante / crédito / efectivo): ver archivo y aprobar o rechazar.
+/// Revisión del pago del aliado (comprobante / efectivo): ver archivo y aprobar o rechazar.
 /// Aplica en cualquier fase operativa con factura MotoLink al aliado; el RPC admite hasta `entregado`.
 class AdminPagoRevisionSection extends StatefulWidget {
   const AdminPagoRevisionSection({
@@ -126,25 +110,17 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
 
   Future<void> _rechazarPago(BuildContext context) async {
     final ctrl = TextEditingController();
-    final esCredito =
-        widget.request.pagoMetodo?.trim() == PagoMetodo.creditoSistema;
     try {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(
-            esCredito
-                ? 'Rechazar solicitud de crédito'
-                : 'Rechazar comprobante',
-          ),
+          title: const Text('Rechazar comprobante'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                esCredito
-                    ? 'Motivo opcional; el aliado puede reintentar.'
-                    : 'Motivo opcional; puede enviar otro comprobante.',
+                'Motivo opcional; puede enviar otro comprobante.',
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
               ),
               const SizedBox(height: 12),
@@ -181,11 +157,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
         );
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              esCredito ? 'Solicitud rechazada.' : 'Comprobante rechazado.',
-            ),
-          ),
+          const SnackBar(content: Text('Comprobante rechazado.')),
         );
         widget.onRefresh();
       } catch (e) {
@@ -318,11 +290,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(
-                        r.pagoMetodo?.trim() == PagoMetodo.creditoSistema
-                            ? 'Rechazar solicitud'
-                            : 'Rechazar comprobante',
-                      ),
+                    : const Text('Rechazar comprobante'),
               ),
             ],
           ),

@@ -128,15 +128,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
 
   Future<void> _generateMotoLinkPdf(BuildContext context) async {
     final r = widget.request;
-    final hasProv = r.isMasterOrder
-        ? (r.subOrders.isNotEmpty &&
-            r.subOrders.every(
-              (s) =>
-                  s.proveedorFacturaStoragePath != null &&
-                  s.proveedorFacturaStoragePath!.trim().isNotEmpty,
-            ))
-        : r.hasProveedorFactura;
-    if (!hasProv) return;
+    if (!r.hasProveedorFactura) return;
     final pref = r.documentTypePreference?.trim();
     if (pref == null || !DocumentTypePreference.values.contains(pref)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -254,58 +246,20 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         (r.hasMultiFragmentMotolinkAllyDocs ||
             (r.motolinkAllyInvoicesDescargables.isEmpty &&
                 motoTotalChunks > 1));
-    final allSubOrdersListo = r.isMasterOrder &&
-        r.subOrders.isNotEmpty &&
-        r.subOrders.every((s) => s.status == 'listo');
-    final hasProveedorFacturaOperativa = r.isMasterOrder
-        ? (r.subOrders.isNotEmpty &&
-            r.subOrders.every(
-              (s) =>
-                  s.proveedorFacturaStoragePath != null &&
-                  s.proveedorFacturaStoragePath!.trim().isNotEmpty,
-            ))
-        : r.hasProveedorFactura;
-    final missingSubInvoiceNames = r.isMasterOrder
-        ? r.subOrders
-            .where(
-              (s) =>
-                  s.proveedorFacturaStoragePath == null ||
-                  s.proveedorFacturaStoragePath!.trim().isEmpty,
-            )
-            .map((s) => s.importadorBusinessName?.trim())
-            .whereType<String>()
-            .where((e) => e.isNotEmpty)
-            .toList()
-        : const <String>[];
-    final masterReadyToTransit = r.isMasterOrder &&
-        hasProveedorFacturaOperativa &&
-        allSubOrdersListo;
-    final puedeTransito =
-        (st == TransactionRequestStatus.pedidoListo || masterReadyToTransit) &&
+    final hasProveedorFacturaOperativa = r.hasProveedorFactura;
+    final puedeTransito = st == TransactionRequestStatus.pedidoListo &&
         hasProveedorFacturaOperativa &&
         r.hasFacturaAliado;
 
     String? bloqueoTransito;
-    if (r.isMasterOrder && !allSubOrdersListo) {
-      bloqueoTransito =
-          'Todos los sub-pedidos deben estar en «Listo para despacho».';
-    } else if (st == TransactionRequestStatus.enPreparacion) {
+    if (st == TransactionRequestStatus.enPreparacion) {
       bloqueoTransito =
           'El importador debe marcar «Pedido listo» cuando la mercancía esté lista en despacho.';
     } else if (st == TransactionRequestStatus.aprobadoAdmin) {
       bloqueoTransito =
           'Falta que los importadores avancen a preparación/listo para habilitar el tránsito.';
     } else if (!hasProveedorFacturaOperativa) {
-      if (r.isMasterOrder && missingSubInvoiceNames.isNotEmpty) {
-        final shown = missingSubInvoiceNames.take(2).join(', ');
-        final tail = missingSubInvoiceNames.length > 2
-            ? ' +${missingSubInvoiceNames.length - 2}'
-            : '';
-        bloqueoTransito =
-            'Falta factura del proveedor en sub-pedidos: $shown$tail.';
-      } else {
-        bloqueoTransito = 'Falta factura del proveedor (importador).';
-      }
+      bloqueoTransito = 'Falta factura del proveedor (importador).';
     } else if (!r.hasFacturaAliado) {
       bloqueoTransito = 'Adjunte la factura oficial al aliado.';
     }
@@ -367,43 +321,16 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         ),
         const SizedBox(height: 4),
         if (hasProveedorFacturaOperativa)
-          (r.isMasterOrder
-              ? Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: r.subOrders
-                      .where((s) {
-                        final p = s.proveedorFacturaStoragePath?.trim();
-                        return p != null && p.isNotEmpty;
-                      })
-                      .map(
-                        (s) => OutlinedButton.icon(
-                          onPressed: () => _openUrl(
-                            context,
-                            () => SupabaseService.createSignedUrlForOrderInvoice(
-                              s.proveedorFacturaStoragePath!.trim(),
-                            ),
-                          ),
-                          icon: const Icon(Icons.open_in_new, size: 18),
-                          label: Text(
-                            s.importadorBusinessName?.trim().isNotEmpty == true
-                                ? 'Factura · ${s.importadorBusinessName}'
-                                : 'Factura · Importador',
-                          ),
-                        ),
-                      )
-                      .toList(),
-                )
-              : OutlinedButton.icon(
-                  onPressed: () => _openUrl(
-                    context,
-                    () => SupabaseService.createSignedUrlForOrderInvoice(
-                      r.proveedorFacturaStoragePath!.trim(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.open_in_new, size: 18),
-                  label: Text(r.proveedorFacturaFileName ?? 'Abrir factura'),
-                ))
+          OutlinedButton.icon(
+            onPressed: () => _openUrl(
+              context,
+              () => SupabaseService.createSignedUrlForOrderInvoice(
+                r.proveedorFacturaStoragePath!.trim(),
+              ),
+            ),
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: Text(r.proveedorFacturaFileName ?? 'Abrir factura'),
+          )
         else
           Text(
             'Factura del importador pendiente (su pestaña Pedidos).',

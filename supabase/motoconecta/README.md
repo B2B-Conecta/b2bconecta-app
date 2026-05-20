@@ -53,13 +53,17 @@ La app sube al bucket **`order-invoices`** (rutas `{transaction_request_id}/arch
 
 Si tu base es **MotoLink legacy** con `transaction_requests.owner_id`, revisa el comentario al inicio de `storage_order_invoices.sql` para extender las políticas.
 
-## Próximos pasos (Flutter, rama `version/MotoConecta`)
+## Operación B2B directa (C3)
+
+- Pedidos por línea `transaction_requests` + `checkout_group_id` (sin `sub_orders` ni transportista).
+- Ciclo importador: preparación → listo → tránsito → entregado; pago verificado por importador o MotoLink (admin).
+- Migración `20260606120000_minuta7_c3_admin_pago_rpc.sql`: `admin_aprobar_pago_aliado`, `admin_rechazar_comprobante_pago` (auditoría `confirmado_por`).
+- Morosidad, retiro de crédito/cuotas en plataforma: migraciones `20260601…`–`20260605…`.
+
+## Próximos pasos (Flutter)
 
 1. Enlazar `.env` al proyecto Supabase MotoConecta (URL + clave publicable); no commitear secretos.
-2. ~~Retirar rol **transportista**~~ (hecho en Flutter: sin `AppHomeRole.transportista`, paneles de asignación/ruta/recogida ni RPCs de despacho).
-3. **Chat:** suscripción Realtime a `transaction_request_messages`; pantalla de hilo por pedido.
-4. **Factura importador:** archivo en `order-invoices` + columnas `proveedor_factura_*` en `transaction_requests` (la app las actualiza vía Flutter).
-5. **Admin → Comisiones (C1):** cortes semanales, factura PDF `ML-COM-…`, revisión de pago del importador.
+2. Aplicar migraciones pendientes con `supabase db push` (incl. C3 admin pago y tasa BCV).
 
 ## Comisiones MotoLink (C1)
 

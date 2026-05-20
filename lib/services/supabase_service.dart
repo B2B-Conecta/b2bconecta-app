@@ -20,7 +20,6 @@ import '../models/profile_document_model.dart';
 import '../models/profile_model.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_message_model.dart';
-import '../models/sub_order_status.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import 'bcv_reference_rate_service.dart';
@@ -1404,7 +1403,7 @@ class SupabaseService {
     }
   }
 
-  /// Confirma carrito multi-importador (crea maestro + sub_orders + order_items + snapshot BCV).
+  /// Confirma carrito multi-importador (una fila `transaction_requests` por importador + snapshot BCV).
   static Future<String> checkoutMultiImportadorCart({
     required List<Map<String, dynamic>> lines,
     bool destinoEntregaUsaPerfil = true,
@@ -1521,63 +1520,6 @@ class SupabaseService {
     return saved ?? 1.0;
   }
 
-  static Future<void> importerAdvanceSubOrder({
-    required String subOrderId,
-    required String newSubStatus,
-  }) async {
-    await _client.rpc(
-      'importer_advance_sub_order',
-      params: <String, dynamic>{
-        'p_sub_order_id': subOrderId,
-        'p_new_status': newSubStatus,
-      },
-    );
-  }
-
-  static Future<void> adminMarcaSubOrderEnTransito({
-    required String subOrderId,
-    required int transitEtaDays,
-    required int transitEtaHours,
-  }) async {
-    await _client.rpc(
-      'admin_marca_sub_order_en_transito',
-      params: <String, dynamic>{
-        'p_sub_order_id': subOrderId,
-        'p_transit_eta_days': transitEtaDays,
-        'p_transit_eta_hours': transitEtaHours,
-      },
-    );
-  }
-
-  static Future<void> aliadoMarcaSubOrderEntregado(String subOrderId) async {
-    await _client.rpc(
-      'aliado_marca_sub_order_entregado',
-      params: {'p_sub_order_id': subOrderId},
-    );
-  }
-
-  /// Sin `sub_orders` en MotoConecta.
-  static Future<List<TransactionRequestModel>>
-      fetchActiveSubOrderSlicesForImporter() async {
-    return [];
-  }
-
-  static String? _subStatusFromImporterAdvance(String trNextStatus) {
-    switch (trNextStatus) {
-      case TransactionRequestStatus.enPreparacion:
-        return SubOrderStatus.preparando;
-      case TransactionRequestStatus.pedidoListo:
-        return SubOrderStatus.listo;
-      default:
-        return null;
-    }
-  }
-
-  static Future<List<TransactionRequestModel>>
-      fetchValidatedSubOrderSlicesForImporter() async {
-    return [];
-  }
-
   static Future<void> adminUpdateTransactionRequest({
     required String id,
     required String status,
@@ -1639,7 +1581,7 @@ class SupabaseService {
     final row = await _client
         .from('transaction_requests')
         .select(
-          'status, is_master_order, proveedor_factura_storage_path, pago_estado_revision',
+          'status, proveedor_factura_storage_path, pago_estado_revision',
         )
         .eq('id', transactionRequestId)
         .maybeSingle();
@@ -1647,43 +1589,18 @@ class SupabaseService {
     if (row == null) throw StateError('Pedido no encontrado.');
     final m = Map<String, dynamic>.from(row);
     final st = m['status']?.toString();
-    final isMaster = m['is_master_order'] == true;
     final stAllowed = st == TransactionRequestStatus.enPreparacion ||
-        st == TransactionRequestStatus.pedidoListo ||
-        (isMaster && st == TransactionRequestStatus.aprobadoAdmin);
+        st == TransactionRequestStatus.pedidoListo;
     if (!stAllowed) {
       throw StateError(
         'Solo aplica con el pedido en preparación o listo para recolección.',
       );
     }
-    if (isMaster) {
-      final rows = await _client
-          .from('sub_orders')
-          .select('id, proveedor_factura_storage_path')
-          .eq('parent_order_id', transactionRequestId);
-      final list = rows as List<dynamic>;
-      if (list.isEmpty) {
-        throw StateError(
-          'Pedido maestro sin sub-pedidos: no se puede emitir factura al aliado.',
-        );
-      }
-      final missing = list.where((e) {
-        if (e is! Map) return true;
-        final p = e['proveedor_factura_storage_path']?.toString().trim();
-        return p == null || p.isEmpty;
-      }).length;
-      if (missing > 0) {
-        throw StateError(
-          'Falta factura del proveedor en $missing sub-pedido(s).',
-        );
-      }
-    } else {
-      final prov = m['proveedor_factura_storage_path']?.toString().trim();
-      if (prov == null || prov.isEmpty) {
-        throw StateError(
-          'El importador debe haber adjuntado antes la factura del proveedor.',
-        );
-      }
+    final prov = m['proveedor_factura_storage_path']?.toString().trim();
+    if (prov == null || prov.isEmpty) {
+      throw StateError(
+        'El importador debe haber adjuntado antes la factura del proveedor.',
+      );
     }
     final pe = m['pago_estado_revision']?.toString().trim();
     if (pe == PagoRevisionEstado.enRevision) {
@@ -2396,102 +2313,13 @@ class SupabaseService {
 
   /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación
   /// y antes de que MotoLink confirme la factura oficial al aliado.
-  /// Con [subOrderId], actualiza el sub-pedido (pedido maestro).
   static Future<void> importerSubmitOrderInvoice({
     required String transactionRequestId,
     required Uint8List bytes,
     required String fileName,
-    String? subOrderId,
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
-
-    var sid = subOrderId?.trim();
-    if (sid == null || sid.isEmpty) {
-      // Fallback útil en detalle por ID maestro (sin _importer_sub_order_id en memoria).
-      final srow = await _client
-          .from('sub_orders')
-          .select('id')
-          .eq('parent_order_id', transactionRequestId)
-          .eq('importador_id', uid)
-          .eq('status', SubOrderStatus.preparando)
-          .maybeSingle();
-      if (srow != null) {
-        sid = srow['id']?.toString().trim();
-      }
-    }
-    if (sid != null && sid.isNotEmpty) {
-      final srow = await _client
-          .from('sub_orders')
-          .select(
-            'id, importador_id, status, proveedor_factura_storage_path, parent_order_id, transaction_requests!inner ( factura_aliado_storage_path )',
-          )
-          .eq('id', sid)
-          .maybeSingle();
-
-      if (srow == null) {
-        throw StateError('Sub-pedido no encontrado.');
-      }
-      final sm = Map<String, dynamic>.from(srow);
-      if (sm['importador_id']?.toString() != uid) {
-        throw StateError('No autorizado a adjuntar factura en este sub-pedido.');
-      }
-      if (sm['status']?.toString() != SubOrderStatus.preparando) {
-        throw StateError(
-          'Solo puede adjuntar la factura mientras el sub-pedido está en preparación.',
-        );
-      }
-      final tr = sm['transaction_requests'];
-      String? fa;
-      if (tr is Map) {
-        fa = tr['factura_aliado_storage_path']?.toString().trim();
-      }
-      if (fa != null && fa.isNotEmpty) {
-        throw StateError(
-          'MotoLink ya confirmó la factura al aliado; no puede reemplazar la factura del proveedor.',
-        );
-      }
-
-      final ext = _profileDocExtension(fileName);
-      if (!_isAllowedProfileDocExtension(ext)) {
-        throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
-      }
-
-      var safeBase =
-          fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
-      if (safeBase.isEmpty) {
-        safeBase = 'factura.$ext';
-      }
-
-      final stamp = DateTime.now().microsecondsSinceEpoch;
-      final path = '$transactionRequestId/sub_$sid/${stamp}_$safeBase';
-
-      final oldPath = sm['proveedor_factura_storage_path']?.toString().trim();
-      if (oldPath != null && oldPath.isNotEmpty) {
-        try {
-          await _client.storage.from(_orderInvoicesBucket).remove([oldPath]);
-        } catch (_) {}
-      }
-
-      final contentType = _mimeForProfileDocExtension(ext);
-      await _client.storage.from(_orderInvoicesBucket).uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(
-              contentType: contentType,
-              upsert: true,
-            ),
-          );
-
-      await _client.from('sub_orders').update({
-        'proveedor_factura_storage_path': path,
-        'proveedor_factura_file_name': fileName.trim(),
-        'proveedor_factura_submitted_at':
-            DateTime.now().toUtc().toIso8601String(),
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', sid);
-      return;
-    }
 
     final row = await _client
         .from('transaction_requests')
@@ -2894,39 +2722,11 @@ class SupabaseService {
     );
   }
 
-  /// Si falta en la vista (p. ej. ficha cargada solo por ID maestro), resuelve el
-  /// sub-pedido del importador actual para aplicar la misma transición.
-  static Future<String?> _resolveImporterSubOrderIdForAdvance({
-    required String parentOrderId,
-    required String newTransactionStatus,
-  }) async {
-    return null;
-  }
-
-  /// Avanza el estado del pedido (importador): pendiente → preparación → listo para despacho
-  /// → en tránsito (despacho).
-  /// Con [importerSubOrderId] (pedido maestro), actualiza el sub-pedido vía RPC.
+  /// Avanza el estado del pedido (importador): pendiente → preparación → listo para despacho.
   static Future<void> importerAdvanceTransactionRequest({
     required String id,
     required String newStatus,
-    String? importerSubOrderId,
   }) async {
-    var sid = importerSubOrderId?.trim();
-    if (sid == null || sid.isEmpty) {
-      sid = await _resolveImporterSubOrderIdForAdvance(
-        parentOrderId: id,
-        newTransactionStatus: newStatus,
-      );
-    }
-    if (sid != null && sid.isNotEmpty) {
-      final subSt = _subStatusFromImporterAdvance(newStatus);
-      if (subSt == null) {
-        throw StateError('Transición no aplicable al sub-pedido.');
-      }
-      await importerAdvanceSubOrder(subOrderId: sid, newSubStatus: subSt);
-      return;
-    }
-
     final rows = await _client.from('transaction_requests').update({
       'status': newStatus,
       'updated_at': DateTime.now().toUtc().toIso8601String(),

@@ -57,7 +57,6 @@ Future<bool> advanceImporterOrderGroup(
       await SupabaseService.importerAdvanceTransactionRequest(
         id: r.id,
         newStatus: nextStatus,
-        importerSubOrderId: r.importerSubOrderId,
       );
     }
     return true;

@@ -5,6 +5,7 @@ import '../models/transaction_request_model.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import '../utils/ves_amount_format.dart';
+import 'aliado_transit_eta_banner.dart';
 import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
 import 'importer_aliado_solicitud_section.dart';
@@ -486,11 +487,22 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: CourierTimelineWidget(
-              request: ref,
-              compact: true,
-              viewerRole: AppHomeRole.aliado,
-              showHeading: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AliadoTransitEtaBanner(
+                  request: ref,
+                  importerName: name,
+                ),
+                if (AliadoTransitEtaBanner.shouldShow(ref))
+                  const SizedBox(height: 10),
+                CourierTimelineWidget(
+                  request: ref,
+                  compact: true,
+                  viewerRole: AppHomeRole.aliado,
+                  showHeading: true,
+                ),
+              ],
             ),
           ),
           const Padding(

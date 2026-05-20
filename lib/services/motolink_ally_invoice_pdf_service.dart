@@ -30,48 +30,8 @@ class MotolinkAllyInvoicePdfLine {
 class MotolinkAllyInvoicePdfService {
   MotolinkAllyInvoicePdfService._();
 
-  /// Líneas de facturación en orden (order_items del maestro o línea única simple).
+  /// Líneas de facturación en orden (una fila `transaction_requests` por producto).
   static List<MotolinkAllyInvoicePdfLine> linesFromRequest(TransactionRequestModel r) {
-    if (r.isMasterOrder && r.subOrders.isNotEmpty) {
-      final out = <MotolinkAllyInvoicePdfLine>[];
-      for (final so in r.subOrders) {
-        final imp = so.importadorBusinessName?.trim();
-        for (final oi in so.orderItems) {
-          final name = oi.productName?.trim().isNotEmpty == true
-              ? oi.productName!.trim()
-              : 'Producto';
-          final sku = oi.productSku?.trim() ?? '';
-          final desc = imp != null && imp.isNotEmpty ? '$name · $imp' : name;
-          out.add(
-            MotolinkAllyInvoicePdfLine(
-              codigo: sku.isNotEmpty ? sku : '—',
-              descripcion: desc,
-              cantidad: oi.cantidad,
-              precioUnitarioRef: oi.precioUnitarioAliado,
-              montoRef: oi.precioLineTotal,
-            ),
-          );
-        }
-      }
-      if (out.isEmpty) {
-        for (final so in r.subOrders) {
-          if (so.montoSubtotal <= 0) continue;
-          final imp = so.importadorBusinessName?.trim();
-          out.add(
-            MotolinkAllyInvoicePdfLine(
-              codigo: '—',
-              descripcion: imp != null && imp.isNotEmpty
-                  ? 'Resumen almacén · $imp'
-                  : 'Resumen sub-pedido',
-              cantidad: 1,
-              precioUnitarioRef: so.montoSubtotal,
-              montoRef: so.montoSubtotal,
-            ),
-          );
-        }
-      }
-      if (out.isNotEmpty) return out;
-    }
     final pname = r.productName?.trim().isNotEmpty == true
         ? r.productName!.trim()
         : 'Producto';
@@ -449,16 +409,6 @@ class MotolinkAllyInvoicePdfService {
   static String _fmtBs(double v) => formatBsLabel(v);
 
   static List<String> _importerNamesOrdered(TransactionRequestModel r) {
-    if (r.isMasterOrder && r.subOrders.isNotEmpty) {
-      final names = <String>[];
-      final seen = <String>{};
-      for (final so in r.subOrders) {
-        final n = so.importadorBusinessName?.trim();
-        if (n == null || n.isEmpty) continue;
-        if (seen.add(n)) names.add(n);
-      }
-      return names;
-    }
     final o = r.ownerBusinessName?.trim();
     if (o != null && o.isNotEmpty) return [o];
     return const [];

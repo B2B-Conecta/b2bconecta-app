@@ -98,21 +98,6 @@ String _enPreparacionSubtitle(
     }
     return 'Preparación en su almacén (pedido del aliado vía MotoLink)';
   }
-  if (r.isMasterOrder && r.totalSubOrdersCount > 0) {
-    final done = r.subOrdersEnPreparacionOrMoreCount;
-    final total = r.totalSubOrdersCount;
-    final names = r.resumenImportadoresEnPreparacionOrMore;
-    if (done >= total) {
-      if (names != null && names.isNotEmpty) {
-        return 'Importadores: $done/$total marcaron En preparación · $names';
-      }
-      return 'Importadores: $done/$total marcaron En preparación';
-    }
-    if (names != null && names.isNotEmpty) {
-      return 'Importadores: $done/$total marcaron En preparación · $names · faltan ${total - done}';
-    }
-    return 'Importadores: $done/$total marcaron En preparación · faltan ${total - done}';
-  }
   final p = r.resumenProveedoresLineaTimeline;
   if (p != null && p.isNotEmpty) {
     return 'Importador: $p';
@@ -126,33 +111,14 @@ String _enCaminoRecogidaSubtitle(TransactionRequestModel r) {
   if (!enRuta) {
     return 'Avance cuando el importador marque «En tránsito» en Pedidos.';
   }
-  if (r.isMasterOrder && r.subOrders.isNotEmpty) {
-    final done = r.subOrdersListoOrMoreCount;
-    final total = r.subOrders.length;
-    if (done >= total) {
-      return 'Importadores en despacho · en camino hacia su taller';
-    }
-    return 'Importadores: $done/$total en tránsito · faltan ${total - done}';
+  final eta = r.transitEtaResumenEs;
+  if (eta != null && r.hasTransitEta) {
+    return 'Mercancía en camino · llegada estimada: $eta';
   }
   return 'El importador despachó la mercancía hacia su taller';
 }
 
 String _listoParaDespachoSubtitle(TransactionRequestModel r) {
-  if (r.isMasterOrder && r.totalSubOrdersCount > 0) {
-    final done = r.subOrdersListoOrMoreCount;
-    final total = r.totalSubOrdersCount;
-    final names = r.resumenImportadoresListoOrMore;
-    if (done >= total) {
-      if (names != null && names.isNotEmpty) {
-        return 'Importadores: $done/$total listos para recolección · $names';
-      }
-      return 'Importadores: $done/$total listos para recolección';
-    }
-    if (names != null && names.isNotEmpty) {
-      return 'Importadores: $done/$total listos para recolección · $names · faltan ${total - done}';
-    }
-    return 'Importadores: $done/$total listos para recolección · faltan ${total - done}';
-  }
   return 'Listo para despacho; adjunte factura si aún no lo hizo antes de marcar en tránsito.';
 }
 

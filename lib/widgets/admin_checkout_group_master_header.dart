@@ -4,7 +4,6 @@ import '../models/transaction_request_model.dart';
 import '../utils/admin_order_panel_utils.dart';
 import 'admin_checkout_group_commission_summary.dart';
 import 'admin_compact_party_card.dart';
-import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Cabecera unificada de un carrito admin: aliado, comisión, destino y partidas.
@@ -71,13 +70,6 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
           const SizedBox(height: 12),
           TransactionRequestAliadoExperienceAdminSection(request: expLine),
         ],
-        const SizedBox(height: 12),
-        TransactionRequestProductosDesgloseSection(
-          lines: lines,
-          viewer: PedidoDesgloseViewer.importador,
-          sectionTitle: 'Partidas del pedido',
-          showImporterGroupHeaders: true,
-        ),
       ],
     );
   }

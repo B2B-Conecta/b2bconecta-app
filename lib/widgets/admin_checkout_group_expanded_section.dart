@@ -13,6 +13,7 @@ import 'admin_order_pre_transit_section.dart';
 import 'admin_pago_revision_section.dart';
 import 'courier_timeline_widget.dart';
 import 'efectivo_respaldo_registrar.dart';
+import 'importer_aliado_solicitud_section.dart';
 import 'moroso_order_visual.dart';
 import 'order_motolink_thread_section.dart';
 
@@ -291,6 +292,15 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                 importerChunk: chunk,
               ),
             ],
+            const SizedBox(height: 10),
+            TransactionRequestProductosDesgloseSection(
+              lines: chunk,
+              compact: true,
+              viewer: PedidoDesgloseViewer.importador,
+              sectionTitle:
+                  total > 1 ? 'Productos de este proveedor' : 'Partidas del pedido',
+              showImporterGroupHeaders: false,
+            ),
             const SizedBox(height: 8),
             CourierTimelineWidget(
               request: anchor,

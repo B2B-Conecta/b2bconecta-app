@@ -12,6 +12,7 @@ import 'aliado_multi_importer_order_tabs.dart';
 import 'aliado_order_experience_display.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
+import 'aliado_transit_eta_banner.dart';
 import 'moroso_order_visual.dart';
 import 'transaction_request_admin_sections.dart';
 
@@ -170,9 +171,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ],
                             ),
                           ],
-                          if (!isCheckoutGroup &&
-                              !r.isMasterOrder &&
-                              r.productSku != null) ...[
+                          if (!isCheckoutGroup && r.productSku != null) ...[
                             const SizedBox(height: 2),
                             Text(
                               'SKU: ${r.productSku}',
@@ -186,14 +185,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           Text(
                             isCheckoutGroup
                                 ? _checkoutGroupResumen(lines)
-                                : (r.isMasterOrder
-                                    ? '${r.totalUnidadesAliado} uds · '
-                                        '${formatRefAmount(r.precioTotal)} REF'
-                                        '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}'
-                                        '${r.subOrders.length > 1 ? " · ${r.subOrders.length} importadores" : ""}'
-                                        '${(r.lineasProductoCount > 1 || r.subOrders.length > 1) ? " · ${r.lineasProductoCount} prod." : ""}'
-                                    : '${r.cantidad} uds · '
-                                        '${formatRefAmount(r.precioTotal)} REF'),
+                                : '${r.cantidad} uds · '
+                                    '${formatRefAmount(r.precioTotal)} REF'
+                                    '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,
@@ -276,19 +270,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                   : null,
                             ),
                           ],
-                          if (!isCheckoutGroup &&
-                              !expanded &&
-                              r.status == TransactionRequestStatus.enTransito &&
-                              r.hasTransitEta) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'Llegada ~${r.transitEtaResumenEs}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.brandBlue.withOpacity(0.95),
-                              ),
-                            ),
+                          if (!expanded) ...[
+                            const SizedBox(height: 6),
+                            if (isCheckoutGroup)
+                              ..._checkoutGroupEtaChips(lines)
+                            else
+                              AliadoTransitEtaChip(request: r),
                           ],
                         ],
                       ),
@@ -392,17 +379,16 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           TransactionRequestDestinoEntregaSection(
                             request: lines.first,
                           ),
-                          const SizedBox(height: 12),
-                          TransactionRequestProductosDesgloseSection(
-                            lines: lines,
-                            compact: true,
-                            viewer: PedidoDesgloseViewer.aliado,
-                            showPrecioHelp: false,
-                            sectionTitle: useMultiImporterTabs
-                                ? 'Resumen de productos (todos los proveedores)'
-                                : null,
-                            showImporterGroupHeaders: true,
-                          ),
+                          if (!useMultiImporterTabs) ...[
+                            const SizedBox(height: 12),
+                            TransactionRequestProductosDesgloseSection(
+                              lines: lines,
+                              compact: true,
+                              viewer: PedidoDesgloseViewer.aliado,
+                              showPrecioHelp: false,
+                              showImporterGroupHeaders: true,
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           if (useMultiImporterTabs) ...[
                             AliadoMultiImporterOrderTabs(
@@ -418,6 +404,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               const SizedBox(height: 12),
                             ],
                             if (checkoutGroupMismoEstadoEnvio(lines)) ...[
+                              ..._checkoutGroupEtaBanners(lines),
                               CourierTimelineWidget(
                                 request: lines.first,
                                 compact: true,
@@ -459,6 +446,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             showPrecioHelp: false,
                           ),
                           const SizedBox(height: 12),
+                          AliadoTransitEtaBanner(request: r),
+                          const SizedBox(height: 10),
                           CourierTimelineWidget(
                             request: r,
                             compact: true,
@@ -482,7 +471,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
 }
 
 /// Tras el timeline: contacto por importador (si no está unificado arriba) y bloques de recogida por línea en tránsito.
-/// Los productos no se repiten aquí (están en «Productos de tu pedido»).
+/// En carrito multi-importador los productos están en cada pestaña de proveedor.
 List<Widget> _postTimelineBloquesAliado({
   required List<TransactionRequestModel> lines,
   required bool consolidarDatosImportador,
@@ -499,6 +488,8 @@ List<Widget> _postTimelineBloquesAliado({
         out.add(TransactionRequestImporterContactSection(request: lines[i]));
         out.add(const SizedBox(height: 12));
       }
+      out.add(AliadoTransitEtaBanner(request: lines[i]));
+      out.add(const SizedBox(height: 8));
       out.add(
         CourierTimelineWidget(
           request: lines[i],
@@ -581,4 +572,52 @@ String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
     buf.write(' · descuentos volumen en ficha');
   }
   return buf.toString();
+}
+
+List<Widget> _checkoutGroupEtaChips(List<TransactionRequestModel> lines) {
+  final porImp = groupCheckoutLinesByImportador(lines);
+  final chips = <Widget>[];
+  for (final chunk in porImp) {
+    if (chunk.isEmpty) continue;
+    final ref = chunk.first;
+    if (!AliadoTransitEtaBanner.shouldShow(ref)) continue;
+    final name = ref.ownerBusinessName?.trim();
+    chips.add(
+      AliadoTransitEtaChip(
+        request: ref,
+        importerName: name,
+      ),
+    );
+  }
+  if (chips.isEmpty) return const [];
+  return [
+    Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: chips,
+    ),
+  ];
+}
+
+/// Banners ETA por proveedor (carrito expandido, mismo estado o varios).
+List<Widget> _checkoutGroupEtaBanners(List<TransactionRequestModel> lines) {
+  final porImp = groupCheckoutLinesByImportador(lines);
+  final out = <Widget>[];
+  for (final chunk in porImp) {
+    if (chunk.isEmpty) continue;
+    final ref = chunk.first;
+    if (!AliadoTransitEtaBanner.shouldShow(ref)) continue;
+    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
+    out.add(
+      AliadoTransitEtaBanner(
+        request: ref,
+        importerName: ref.ownerBusinessName,
+      ),
+    );
+  }
+  if (out.isEmpty) return const [];
+  return [
+    ...out,
+    const SizedBox(height: 12),
+  ];
 }

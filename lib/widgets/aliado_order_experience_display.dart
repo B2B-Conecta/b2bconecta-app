@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/rating_questionnaire_model.dart';
 import '../models/transaction_request_model.dart';
+import '../services/supabase_service.dart';
 import '../utils/aliado_experience_utils.dart';
 import '../utils/app_date_format.dart';
+import 'order_rating_form.dart';
 
 /// Estrellas 1–5 (solo lectura).
 class AliadoExperienceStarsRow extends StatelessWidget {
@@ -53,7 +56,8 @@ class AliadoOrderExperienceStatusChip extends StatelessWidget {
 
     if (pendiente) {
       return Chip(
-        avatar: Icon(Icons.star_outline, size: 16, color: Colors.orange.shade800),
+        avatar:
+            Icon(Icons.star_outline, size: 16, color: Colors.orange.shade800),
         label: const Text(
           'Valoración pendiente',
           style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
@@ -83,18 +87,89 @@ class AliadoOrderExperienceStatusChip extends StatelessWidget {
 }
 
 /// Bloque fijo cuando la valoración ya quedó registrada (no editable).
-class AliadoOrderExperienceRegisteredCard extends StatelessWidget {
+class AliadoOrderExperienceRegisteredCard extends StatefulWidget {
   const AliadoOrderExperienceRegisteredCard({
     super.key,
     required this.request,
     this.scopeLabel,
+    this.bundleCheckoutGroupId,
+    this.bundleImportadorId,
+    this.questionnaire,
   });
 
   final TransactionRequestModel request;
   final String? scopeLabel;
+  final String? bundleCheckoutGroupId;
+  final String? bundleImportadorId;
+  final RatingQuestionnaireModel? questionnaire;
+
+  @override
+  State<AliadoOrderExperienceRegisteredCard> createState() =>
+      _AliadoOrderExperienceRegisteredCardState();
+}
+
+class _AliadoOrderExperienceRegisteredCardState
+    extends State<AliadoOrderExperienceRegisteredCard> {
+  bool _loadingExtra = true;
+  RatingQuestionnaireModel _questionnaire = const RatingQuestionnaireModel(
+    version: 'bucket_v1',
+    questions: [],
+  );
+  Map<String, dynamic> _answers = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  @override
+  void didUpdateWidget(
+      covariant AliadoOrderExperienceRegisteredCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.request.id != widget.request.id ||
+        oldWidget.bundleCheckoutGroupId != widget.bundleCheckoutGroupId ||
+        oldWidget.bundleImportadorId != widget.bundleImportadorId) {
+      _bootstrap();
+    }
+  }
+
+  Future<void> _bootstrap() async {
+    setState(() => _loadingExtra = true);
+    try {
+      final qFuture = widget.questionnaire != null
+          ? Future<RatingQuestionnaireModel>.value(widget.questionnaire!)
+          : SupabaseService.fetchRatingQuestionnaire(
+              audience: 'aliado_rates_importer',
+            );
+      final aFuture = SupabaseService.fetchAliadoOrderRatingAnswers(
+        transactionRequestId: widget.request.id,
+        checkoutGroupId: widget.bundleCheckoutGroupId,
+        importadorId: widget.bundleImportadorId,
+      );
+      final results = await Future.wait([qFuture, aFuture]);
+      if (!mounted) return;
+      final q = results[0] as RatingQuestionnaireModel;
+      final ans = results[1] as Map<String, dynamic>?;
+      setState(() {
+        _questionnaire = q;
+        _answers = ans ?? const {};
+        _loadingExtra = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _questionnaire = widget.questionnaire ??
+            const RatingQuestionnaireModel(version: 'bucket_v1', questions: []);
+        _answers = const {};
+        _loadingExtra = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final request = widget.request;
     if (!aliadoTieneValoracionRegistrada(request)) {
       return const SizedBox.shrink();
     }
@@ -116,11 +191,12 @@ class AliadoOrderExperienceRegisteredCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.verified_outlined, size: 18, color: Colors.purple.shade800),
+              Icon(Icons.verified_outlined,
+                  size: 18, color: Colors.purple.shade800),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  scopeLabel ?? 'Valoración registrada',
+                  widget.scopeLabel ?? 'Valoración registrada',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
@@ -186,6 +262,33 @@ class AliadoOrderExperienceRegisteredCard extends StatelessWidget {
                 color: Colors.purple.shade900,
                 fontStyle: FontStyle.italic,
               ),
+            ),
+          ],
+          if (_loadingExtra) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.purple.shade700,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Cargando detalle opcional…',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ],
+          if (!_loadingExtra && _answers.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            OrderRatingAnswersReadOnly(
+              answers: _answers,
+              questionnaire: _questionnaire,
             ),
           ],
           const SizedBox(height: 6),

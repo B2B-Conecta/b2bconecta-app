@@ -17,7 +17,10 @@ import '../models/part_model.dart';
 import '../models/admin_aliado_morosidad_flag.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
+import '../models/admin_order_rating_row_model.dart';
+import '../models/importador_received_rating_model.dart';
 import '../models/profile_model.dart';
+import '../models/rating_questionnaire_model.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_message_model.dart';
 import '../models/transaction_request_model.dart';
@@ -90,8 +93,7 @@ class SupabaseService {
     if (notificationId.trim().isEmpty) return;
     await _client
         .from('notifications')
-        .update(<String, dynamic>{'is_read': true})
-        .eq('id', notificationId);
+        .update(<String, dynamic>{'is_read': true}).eq('id', notificationId);
   }
 
   /// Marca todas las notificaciones del usuario actual como leídas.
@@ -106,7 +108,8 @@ class SupabaseService {
   }
 
   /// Marca como leídas las notificaciones de chat/pedido con [related_id] = id de pedido.
-  static Future<void> markNotificationsReadForRelatedOrder(String transactionRequestId) async {
+  static Future<void> markNotificationsReadForRelatedOrder(
+      String transactionRequestId) async {
     final uid = _currentUserId;
     final rid = transactionRequestId.trim();
     if (uid == null || rid.isEmpty) return;
@@ -127,10 +130,8 @@ class SupabaseService {
     final uid = _currentUserId;
     if (uid == null) return;
     final days = olderThanDays < 1 ? 1 : olderThanDays;
-    final cutoff = DateTime.now()
-        .toUtc()
-        .subtract(Duration(days: days))
-        .toIso8601String();
+    final cutoff =
+        DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
 
     dynamic q = _client
         .from('notifications')
@@ -145,7 +146,8 @@ class SupabaseService {
   }
 
   /// Elimina notificaciones puntuales del usuario actual.
-  static Future<void> deleteNotificationsByIds(List<String> notificationIds) async {
+  static Future<void> deleteNotificationsByIds(
+      List<String> notificationIds) async {
     final uid = _currentUserId;
     if (uid == null) return;
     final ids = notificationIds
@@ -430,14 +432,13 @@ class SupabaseService {
   }
 
   /// URL firmada (1 h) para el logo en `profile-logos`.
-  static Future<String> createSignedUrlForProfileLogo(String storagePath) async {
+  static Future<String> createSignedUrlForProfileLogo(
+      String storagePath) async {
     final p = storagePath.trim();
     if (p.isEmpty) {
       throw ArgumentError('Ruta de logo vacía.');
     }
-    return _client.storage
-        .from(_profileLogosBucket)
-        .createSignedUrl(p, 3600);
+    return _client.storage.from(_profileLogosBucket).createSignedUrl(p, 3600);
   }
 
   /// Sube o reemplaza el logo del perfil y actualiza `profiles.logo_storage_path`.
@@ -540,9 +541,10 @@ class SupabaseService {
   }
 
   static String _catalogProfileSelect(CatalogFilters filters) {
+    const rep = 'rating_avg_received, rating_count_received';
     return _catalogNeedsProfileInner(filters)
-        ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude)'
-        : 'profiles(business_name, estado, ciudad, latitude, longitude)';
+        ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude, $rep)'
+        : 'profiles(business_name, estado, ciudad, latitude, longitude, $rep)';
   }
 
   /// Métricas del inventario del usuario actual (importador).
@@ -617,8 +619,9 @@ class SupabaseService {
       query = query.eq('is_active', true);
     }
 
-    final response =
-        await query.order('name', ascending: true).range(offset, offset + limit - 1);
+    final response = await query
+        .order('name', ascending: true)
+        .range(offset, offset + limit - 1);
     final list = response as List<dynamic>;
     return list
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
@@ -684,8 +687,7 @@ class SupabaseService {
 
     final idPart =
         (productId != null && productId.isNotEmpty) ? productId : 'nuevo';
-    final path =
-        '$uid/$idPart/${DateTime.now().microsecondsSinceEpoch}.$ext';
+    final path = '$uid/$idPart/${DateTime.now().microsecondsSinceEpoch}.$ext';
 
     final contentType = switch (ext) {
       'png' => 'image/png',
@@ -838,7 +840,8 @@ class SupabaseService {
   static String get _trSelectForListFlat => _trSelectMotoconecta;
 
   /// Solicitudes del aliado autenticado (todas).
-  static Future<List<TransactionRequestModel>> fetchMyTransactionRequests() async {
+  static Future<List<TransactionRequestModel>>
+      fetchMyTransactionRequests() async {
     final uid = _currentUserId;
     if (uid == null) return [];
 
@@ -850,8 +853,8 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -873,8 +876,8 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -950,8 +953,8 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -969,8 +972,8 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -985,8 +988,24 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  /// Admin: en curso + cerrados (una sola consulta para la bandeja unificada).
+  static Future<List<TransactionRequestModel>>
+      fetchUnifiedTransactionRequestsForAdmin() async {
+    final response = await _client
+        .from('transaction_requests')
+        .select(_trSelectForListWithSubs)
+        .inFilter('status', TransactionRequestStatus.adminBandejaUnifiedStatuses)
+        .order('updated_at', ascending: false);
+
+    final list = response as List<dynamic>;
+    return list
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -1032,8 +1051,8 @@ class SupabaseService {
         await query.order('created_at', ascending: false).limit(limit);
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            TransactionRequestModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => TransactionRequestModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -1042,8 +1061,8 @@ class SupabaseService {
     final response = await _client
         .from('profiles')
         .select()
-        .inFilter('role', ['aliado', 'importador'])
-        .order('business_name', ascending: true);
+        .inFilter('role', ['aliado', 'importador']).order('business_name',
+            ascending: true);
 
     final list = response as List<dynamic>;
     return list
@@ -1067,7 +1086,8 @@ class SupabaseService {
   }
 
   /// Admin: aliados con pedido moroso y estado de suspensión por morosidad.
-  static Future<Map<String, AdminAliadoMorosidadFlag>> adminAliadosPedidosMorososFlags() async {
+  static Future<Map<String, AdminAliadoMorosidadFlag>>
+      adminAliadosPedidosMorososFlags() async {
     final res = await _client.rpc('admin_aliados_pedidos_morosos_flags');
     final list = res as List<dynamic>;
     final map = <String, AdminAliadoMorosidadFlag>{};
@@ -1078,10 +1098,10 @@ class SupabaseService {
       final mor = m['tiene_morosos'];
       final susp = m['pedidos_suspendidos_morosidad'];
       map[id] = AdminAliadoMorosidadFlag(
-        tieneMorosos: mor is bool ? mor : mor?.toString().toLowerCase() == 'true',
-        pedidosSuspendidosMorosidad: susp is bool
-            ? susp
-            : susp?.toString().toLowerCase() == 'true',
+        tieneMorosos:
+            mor is bool ? mor : mor?.toString().toLowerCase() == 'true',
+        pedidosSuspendidosMorosidad:
+            susp is bool ? susp : susp?.toString().toLowerCase() == 'true',
       );
     }
     return map;
@@ -1143,8 +1163,8 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            ProfileDocumentModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => ProfileDocumentModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -1162,8 +1182,8 @@ class SupabaseService {
 
     final list = response as List<dynamic>;
     return list
-        .map((row) =>
-            ProfileDocumentModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map((row) => ProfileDocumentModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
         .toList();
   }
 
@@ -1205,11 +1225,11 @@ class SupabaseService {
         );
 
     try {
-    await _client.from('profile_documents').insert({
-      'profile_id': uid,
-      'doc_type': docType,
-      'storage_path': path,
-      'file_name': fileName,
+      await _client.from('profile_documents').insert({
+        'profile_id': uid,
+        'doc_type': docType,
+        'storage_path': path,
+        'file_name': fileName,
         'review_status': DocumentReviewStatus.pendiente,
         'is_current': true,
       });
@@ -1326,13 +1346,13 @@ class SupabaseService {
     // requisito para generar pedidos.
     final rif = profile.rif?.trim();
     if (rif == null || rif.isEmpty) {
-        throw KycVerificationException(
+      throw KycVerificationException(
         'Registre su RIF comercial en Mi perfil para solicitar pedidos.',
-        );
-      }
+      );
+    }
     final ks = profile.kycStatus?.trim();
-      if (ks == KycStatus.rechazado) {
-        throw KycVerificationException(
+    if (ks == KycStatus.rechazado) {
+      throw KycVerificationException(
         'Su documentación fue rechazada. Actualice los datos en su perfil antes de solicitar pedidos.',
       );
     }
@@ -1353,9 +1373,8 @@ class SupabaseService {
       throw StateError('No se encontró el producto para este importador.');
     }
     final stockRaw = Map<String, dynamic>.from(prodRes)['stock'];
-    final stock = stockRaw is int
-        ? stockRaw
-        : int.tryParse(stockRaw.toString()) ?? 0;
+    final stock =
+        stockRaw is int ? stockRaw : int.tryParse(stockRaw.toString()) ?? 0;
     if (cantidad > stock) {
       throw StockInsufficientException(
         'Stock insuficiente: hay $stock unidad(es) disponible(s). '
@@ -1391,9 +1410,13 @@ class SupabaseService {
         'cantidad': cantidad,
         'precio_total_usd': total,
       });
-      await _client.from('products').update({
-        'stock': stock - cantidad,
-      }).eq('id', productId).eq('owner_id', ownerId);
+      await _client
+          .from('products')
+          .update({
+            'stock': stock - cantidad,
+          })
+          .eq('id', productId)
+          .eq('owner_id', ownerId);
     } on PostgrestException catch (e) {
       final m = e.message.toLowerCase();
       if (m.contains('stock insuficiente')) {
@@ -1453,7 +1476,8 @@ class SupabaseService {
     return rec?.tasa;
   }
 
-  static Future<({double tasa, DateTime updatedAt})?> fetchGlobalTasaBcvRecord() async {
+  static Future<({double tasa, DateTime updatedAt})?>
+      fetchGlobalTasaBcvRecord() async {
     try {
       final row = await _client
           .from('app_global_config')
@@ -1537,28 +1561,32 @@ class SupabaseService {
   }
 
   /// URL firmada (1 h) para abrir una factura de pedido (`order-invoices`).
-  static Future<String> createSignedUrlForOrderInvoice(String storagePath) async {
+  static Future<String> createSignedUrlForOrderInvoice(
+      String storagePath) async {
     return _client.storage
         .from(_orderInvoicesBucket)
         .createSignedUrl(storagePath, 3600);
   }
 
   /// Factura oficial MotoLink al aliado (`order-ally-invoices`).
-  static Future<String> createSignedUrlForFacturaAliado(String storagePath) async {
+  static Future<String> createSignedUrlForFacturaAliado(
+      String storagePath) async {
     return _client.storage
         .from(_orderAllyInvoicesBucket)
         .createSignedUrl(storagePath, 3600);
   }
 
   /// Comprobante de pago del aliado (`order-payment-proofs`).
-  static Future<String> createSignedUrlForComprobantePago(String storagePath) async {
+  static Future<String> createSignedUrlForComprobantePago(
+      String storagePath) async {
     return _client.storage
         .from(_orderPaymentProofsBucket)
         .createSignedUrl(storagePath, 3600);
   }
 
   /// Respaldo fotográfico de cobro en efectivo (mismo bucket; prefijo `efectivo_respaldo_`).
-  static Future<String> createSignedUrlForEfectivoRespaldo(String storagePath) async {
+  static Future<String> createSignedUrlForEfectivoRespaldo(
+      String storagePath) async {
     return _client.storage
         .from(_orderPaymentProofsBucket)
         .createSignedUrl(storagePath, 3600);
@@ -1575,7 +1603,8 @@ class SupabaseService {
 
     final profile = await fetchMyProfile();
     if (profile?.role?.trim().toLowerCase() != 'administrador') {
-      throw StateError('Solo MotoLink puede adjuntar la factura oficial al aliado.');
+      throw StateError(
+          'Solo MotoLink puede adjuntar la factura oficial al aliado.');
     }
 
     final row = await _client
@@ -1609,7 +1638,8 @@ class SupabaseService {
       );
     }
     if (pe == PagoRevisionEstado.aprobado) {
-      throw StateError('El pago ya fue aprobado; no puede reemplazar la factura.');
+      throw StateError(
+          'El pago ya fue aprobado; no puede reemplazar la factura.');
     }
 
     final ext = _profileDocExtension(fileName);
@@ -1617,8 +1647,7 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) safeBase = 'factura_aliado.$ext';
 
     final stamp = DateTime.now().microsecondsSinceEpoch;
@@ -1630,12 +1659,15 @@ class SupabaseService {
         .eq('id', transactionRequestId)
         .maybeSingle();
     if (existing != null) {
-      final oldPath = Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
-          ?.toString()
-          .trim();
+      final oldPath =
+          Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
+              ?.toString()
+              .trim();
       if (oldPath != null && oldPath.isNotEmpty) {
         try {
-          await _client.storage.from(_orderAllyInvoicesBucket).remove([oldPath]);
+          await _client.storage
+              .from(_orderAllyInvoicesBucket)
+              .remove([oldPath]);
         } catch (_) {}
       }
     }
@@ -1721,8 +1753,7 @@ class SupabaseService {
     final r0 = await fetchTransactionRequestById(transactionRequestId);
     if (r0 == null) throw StateError('Pedido no encontrado.');
     final pref = r0.documentTypePreference?.trim();
-    if (pref == null ||
-        !DocumentTypePreference.values.contains(pref)) {
+    if (pref == null || !DocumentTypePreference.values.contains(pref)) {
       throw StateError(
         'El aliado no indicó tipo de documento (nota o factura) en el pedido.',
       );
@@ -1769,12 +1800,15 @@ class SupabaseService {
           .eq('id', transactionRequestId)
           .maybeSingle();
       if (existing != null) {
-        final oldPath = Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
-            ?.toString()
-            .trim();
+        final oldPath =
+            Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
+                ?.toString()
+                .trim();
         if (oldPath != null && oldPath.isNotEmpty) {
           try {
-            await _client.storage.from(_orderAllyInvoicesBucket).remove([oldPath]);
+            await _client.storage
+                .from(_orderAllyInvoicesBucket)
+                .remove([oldPath]);
           } catch (_) {}
         }
       }
@@ -1852,8 +1886,7 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use imagen o PDF.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
 
     final stamp = DateTime.now().microsecondsSinceEpoch;
@@ -1873,11 +1906,12 @@ class SupabaseService {
           'El pago ya fue confirmado; no puede modificar el comprobante.',
         );
       }
-      final oldPath =
-          m['comprobante_pago_storage_path']?.toString().trim();
+      final oldPath = m['comprobante_pago_storage_path']?.toString().trim();
       if (oldPath != null && oldPath.isNotEmpty) {
         try {
-          await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
+          await _client.storage
+              .from(_orderPaymentProofsBucket)
+              .remove([oldPath]);
         } catch (_) {}
       }
     }
@@ -1919,7 +1953,8 @@ class SupabaseService {
     required String fileName,
   }) async {
     if (lines.length < 2) {
-      throw ArgumentError('Se requieren al menos 2 líneas para el comprobante unificado.');
+      throw ArgumentError(
+          'Se requieren al menos 2 líneas para el comprobante unificado.');
     }
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -1946,8 +1981,7 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use imagen o PDF.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
 
     final rows = await _client
@@ -2061,13 +2095,11 @@ class SupabaseService {
     if (!_isAllowedProfileDocExtension(ext)) {
       throw ArgumentError('Formato no permitido. Use imagen o PDF.');
     }
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) safeBase = 'respaldo.$ext';
 
     final stamp = DateTime.now().microsecondsSinceEpoch;
-    final path =
-        '$transactionRequestId/efectivo_respaldo_${stamp}_$safeBase';
+    final path = '$transactionRequestId/efectivo_respaldo_${stamp}_$safeBase';
 
     final contentType = _mimeForProfileDocExtension(ext);
     await _client.storage.from(_orderPaymentProofsBucket).uploadBinary(
@@ -2153,8 +2185,7 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) {
       safeBase = 'factura.$ext';
     }
@@ -2250,8 +2281,7 @@ class SupabaseService {
           'en preparación o listas para despacho.',
         );
       }
-      final cg =
-          m['checkout_group_id']?.toString().trim();
+      final cg = m['checkout_group_id']?.toString().trim();
       if (cg == null || cg.isEmpty) {
         throw StateError(
           'Las líneas del carrito no comparten checkout; use adjuntar por pedido.',
@@ -2259,7 +2289,8 @@ class SupabaseService {
       }
       checkoutGroupId ??= cg;
       if (checkoutGroupId != cg) {
-        throw StateError('Las líneas no pertenecen al mismo carrito (checkout).');
+        throw StateError(
+            'Las líneas no pertenecen al mismo carrito (checkout).');
       }
     }
 
@@ -2268,20 +2299,19 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) {
       safeBase = 'factura.$ext';
     }
 
     final stamp = DateTime.now().microsecondsSinceEpoch;
-    final path =
-        'bundle_${checkoutGroupId!}/${stamp}_$safeBase';
+    // Ruta bajo id de línea ancla: políticas Storage exigen folder = transaction_requests.id
+    final anchorId = parsed.first['id']!.toString();
+    final path = '$anchorId/${stamp}_$safeBase';
 
     final oldPaths = <String>{};
     for (final m in parsed) {
-      final op =
-          m['proveedor_factura_storage_path']?.toString().trim();
+      final op = m['proveedor_factura_storage_path']?.toString().trim();
       if (op != null && op.isNotEmpty) {
         oldPaths.add(op);
       }
@@ -2341,7 +2371,8 @@ class SupabaseService {
         'Solo puede adjuntar la factura mientras el pedido está en preparación.',
       );
     }
-    final facturaAliadoPath = m['factura_aliado_storage_path']?.toString().trim();
+    final facturaAliadoPath =
+        m['factura_aliado_storage_path']?.toString().trim();
     if (facturaAliadoPath != null && facturaAliadoPath.isNotEmpty) {
       throw StateError(
         'MotoLink ya confirmó la factura del pedido; no puede reemplazar la factura del proveedor.',
@@ -2353,8 +2384,7 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) {
       safeBase = 'factura.$ext';
     }
@@ -2382,7 +2412,8 @@ class SupabaseService {
     await _client.from('transaction_requests').update({
       'proveedor_factura_storage_path': path,
       'proveedor_factura_file_name': fileName.trim(),
-      'proveedor_factura_submitted_at': DateTime.now().toUtc().toIso8601String(),
+      'proveedor_factura_submitted_at':
+          DateTime.now().toUtc().toIso8601String(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', transactionRequestId);
   }
@@ -2456,7 +2487,8 @@ class SupabaseService {
       if (uri == null ||
           !uri.hasScheme ||
           (uri.scheme != 'http' && uri.scheme != 'https')) {
-        throw ArgumentError('Use una URL http(s) válida o deje el campo vacío.');
+        throw ArgumentError(
+            'Use una URL http(s) válida o deje el campo vacío.');
       }
       stored = trimmed;
     }
@@ -2650,7 +2682,8 @@ class SupabaseService {
 
   /// Importador: acuerda 1–3 cuotas cuya suma = total del pedido; notifica en el chat.
   /// Cierra el pedido (aliado): `en_transito` → `entregado` (RPC en base de datos).
-  static Future<void> aliadoMarcarPedidoEntregado(String transactionRequestId) async {
+  static Future<void> aliadoMarcarPedidoEntregado(
+      String transactionRequestId) async {
     await _client.rpc(
       'aliado_marca_pedido_entregado',
       params: {'p_request_id': transactionRequestId},
@@ -2679,7 +2712,8 @@ class SupabaseService {
     required String checkoutGroupId,
     required String importadorId,
     required int stars,
-    String? comment,
+    required String comment,
+    Map<String, dynamic> answers = const {},
   }) async {
     await _client.rpc(
       'aliado_submit_order_experience_importador_grupo',
@@ -2687,7 +2721,8 @@ class SupabaseService {
         'p_checkout_group_id': checkoutGroupId,
         'p_importador_id': importadorId,
         'p_stars': stars,
-        'p_comment': comment?.trim() ?? '',
+        'p_comment': comment.trim(),
+        'p_answers': answers,
       },
     );
   }
@@ -2710,16 +2745,297 @@ class SupabaseService {
   static Future<void> aliadoSubmitOrderExperience({
     required String transactionRequestId,
     required int stars,
-    String? comment,
+    required String comment,
+    Map<String, dynamic> answers = const {},
   }) async {
     await _client.rpc(
       'aliado_submit_order_experience',
       params: <String, dynamic>{
         'p_request_id': transactionRequestId,
         'p_stars': stars,
-        'p_comment': comment?.trim() ?? '',
+        'p_comment': comment.trim(),
+        'p_answers': answers,
       },
     );
+  }
+
+  /// C4: cuestionario Bucket List (audiencia: aliado_rates_importer | importer_rates_aliado).
+  static Future<RatingQuestionnaireModel> fetchRatingQuestionnaire({
+    required String audience,
+  }) async {
+    final res = await _client.rpc(
+      'get_rating_questionnaire',
+      params: <String, dynamic>{'p_audience': audience},
+    );
+    if (res is Map) {
+      return RatingQuestionnaireModel.fromJson(Map<String, dynamic>.from(res));
+    }
+    return const RatingQuestionnaireModel(version: 'bucket_v1', questions: []);
+  }
+
+  /// C4: valoraciones recibidas por el importador (aliado anónimo en etiqueta).
+  static Future<List<ImportadorReceivedRatingModel>>
+      listImportadorReceivedRatings({
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_importador_received_ratings',
+      params: <String, dynamic>{
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => ImportadorReceivedRatingModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  /// C4: expediente admin — valoraciones con nombres reales (RPC `list_admin_order_ratings`).
+  static Future<List<AdminOrderRatingRowModel>> listAdminOrderRatings({
+    String? importadorId,
+    String? aliadoId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_order_ratings',
+      params: <String, dynamic>{
+        'p_importador_id': _nullableUuid(importadorId),
+        'p_aliado_id': _nullableUuid(aliadoId),
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AdminOrderRatingRowModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  static String? _nullableUuid(String? raw) {
+    final s = raw?.trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
+  }
+
+  /// C4: respuestas Bucket del aliado (RLS) para mostrar en «valoración registrada».
+  static Future<Map<String, dynamic>?> fetchAliadoOrderRatingAnswers({
+    required String transactionRequestId,
+    String? checkoutGroupId,
+    String? importadorId,
+  }) async {
+    final tr = transactionRequestId.trim();
+    if (tr.isEmpty) return null;
+
+    dynamic q = _client
+        .from('order_ratings')
+        .select('answers')
+        .eq('rater_role', 'aliado')
+        .eq('transaction_request_id', tr);
+    final row1 = await q.maybeSingle();
+    final a1 = _answersFromRow(row1);
+    if (a1 != null) return a1;
+
+    final cg = checkoutGroupId?.trim();
+    final imp = importadorId?.trim();
+    if (cg != null && cg.isNotEmpty && imp != null && imp.isNotEmpty) {
+      final row2 = await _client
+          .from('order_ratings')
+          .select('answers')
+          .eq('rater_role', 'aliado')
+          .eq('checkout_group_id', cg)
+          .eq('importador_id', imp)
+          .maybeSingle();
+      return _answersFromRow(row2);
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _answersFromRow(dynamic row) {
+    if (row is! Map) return null;
+    final m = Map<String, dynamic>.from(row);
+    final raw = m['answers'];
+    if (raw is! Map || raw.isEmpty) return null;
+    return Map<String, dynamic>.from(raw);
+  }
+
+  /// Texto compacto de `answers` para Excel (clave ordenadas `k:v; …`).
+  static String formatOrderRatingAnswersForExportCell(
+      Map<String, dynamic> raw) {
+    if (raw.isEmpty) return '';
+    final keys = raw.keys.map((e) => e.toString()).toList()..sort();
+    final parts = <String>[];
+    for (final k in keys) {
+      parts.add('$k:${raw[k]}');
+    }
+    return parts.join('; ');
+  }
+
+  /// C4: mapa `transaction_request.id` → resumen de respuestas Bucket (export encomiendas).
+  static Future<Map<String, String>>
+      fetchAliadoOrderRatingAnswerSummariesForExport(
+    List<TransactionRequestModel> rows,
+  ) async {
+    final out = <String, String>{};
+    if (rows.isEmpty) return out;
+
+    const chunk = 120;
+    final rated =
+        rows.where((r) => r.aliadoExperienceSubmittedAt != null).toList();
+    if (rated.isEmpty) return out;
+
+    for (var i = 0; i < rated.length; i += chunk) {
+      final slice = rated.sublist(
+        i,
+        i + chunk > rated.length ? rated.length : i + chunk,
+      );
+      final ids = slice.map((r) => r.id).where((e) => e.isNotEmpty).toList();
+      if (ids.isEmpty) continue;
+
+      final res = await _client
+          .from('order_ratings')
+          .select(
+            'transaction_request_id, checkout_group_id, importador_id, aliado_id, answers',
+          )
+          .eq('rater_role', 'aliado')
+          .inFilter('transaction_request_id', ids);
+
+      for (final e in res as List<dynamic>) {
+        if (e is! Map) continue;
+        final m = Map<String, dynamic>.from(e);
+        final tid = m['transaction_request_id']?.toString();
+        if (tid == null || tid.isEmpty) continue;
+        final cell = formatOrderRatingAnswersForExportCell(
+          m['answers'] is Map
+              ? Map<String, dynamic>.from(m['answers'] as Map)
+              : const {},
+        );
+        if (cell.isNotEmpty) out[tid] = cell;
+      }
+    }
+
+    final stillMissing = rated
+        .where(
+          (r) =>
+              r.checkoutGroupId != null &&
+              r.checkoutGroupId!.trim().isNotEmpty &&
+              !out.containsKey(r.id),
+        )
+        .toList();
+    if (stillMissing.isEmpty) return out;
+
+    final cgs =
+        stillMissing.map((r) => r.checkoutGroupId!.trim()).toSet().toList();
+
+    for (var i = 0; i < cgs.length; i += chunk) {
+      final cgSlice = cgs.sublist(
+        i,
+        i + chunk > cgs.length ? cgs.length : i + chunk,
+      );
+      final res2 = await _client
+          .from('order_ratings')
+          .select(
+            'transaction_request_id, checkout_group_id, importador_id, aliado_id, answers',
+          )
+          .eq('rater_role', 'aliado')
+          .inFilter('checkout_group_id', cgSlice);
+
+      for (final e in res2 as List<dynamic>) {
+        if (e is! Map) continue;
+        final m = Map<String, dynamic>.from(e);
+        final cg = (m['checkout_group_id']?.toString() ?? '').trim();
+        final imp = (m['importador_id']?.toString() ?? '').trim();
+        final al = (m['aliado_id']?.toString() ?? '').trim();
+        if (cg.isEmpty || imp.isEmpty || al.isEmpty) {
+          continue;
+        }
+        final cell = formatOrderRatingAnswersForExportCell(
+          m['answers'] is Map
+              ? Map<String, dynamic>.from(m['answers'] as Map)
+              : const {},
+        );
+        if (cell.isEmpty) continue;
+        for (final r in stillMissing) {
+          if (out.containsKey(r.id)) continue;
+          final rcg = r.checkoutGroupId?.trim();
+          if (rcg != cg) continue;
+          if (r.ownerId.trim() != imp) continue;
+          if (r.aliadoId.trim() != al) continue;
+          out[r.id] = cell;
+        }
+      }
+    }
+
+    return out;
+  }
+
+  static Future<void> importerSubmitOrderRating({
+    required String transactionRequestId,
+    required int stars,
+    required String comment,
+    Map<String, dynamic> answers = const {},
+  }) async {
+    await _client.rpc(
+      'importer_submit_order_rating',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_stars': stars,
+        'p_comment': comment.trim(),
+        'p_answers': answers,
+      },
+    );
+  }
+
+  static Future<void> importerSubmitOrderRatingGrupo({
+    required String checkoutGroupId,
+    required String aliadoId,
+    required int stars,
+    required String comment,
+    Map<String, dynamic> answers = const {},
+  }) async {
+    await _client.rpc(
+      'importer_submit_order_rating_importador_grupo',
+      params: <String, dynamic>{
+        'p_checkout_group_id': checkoutGroupId,
+        'p_aliado_id': aliadoId,
+        'p_stars': stars,
+        'p_comment': comment.trim(),
+        'p_answers': answers,
+      },
+    );
+  }
+
+  /// True si el importador ya envió valoración mutua para este par en el carrito/línea.
+  static Future<bool> importerHasRatedAliado({
+    String? checkoutGroupId,
+    String? transactionRequestId,
+    required String aliadoId,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) return false;
+    final cg = checkoutGroupId?.trim();
+    dynamic q = _client
+        .from('order_ratings')
+        .select('id')
+        .eq('rater_role', 'importador')
+        .eq('importador_id', uid)
+        .eq('aliado_id', aliadoId.trim());
+    if (cg != null && cg.isNotEmpty) {
+      q = q.eq('checkout_group_id', cg);
+    } else if (transactionRequestId != null &&
+        transactionRequestId.isNotEmpty) {
+      q = q.eq('transaction_request_id', transactionRequestId);
+    } else {
+      return false;
+    }
+    final row = await q.maybeSingle();
+    return row != null;
   }
 
   /// Avanza el estado del pedido (importador): pendiente → preparación → listo para despacho.
@@ -2727,10 +3043,14 @@ class SupabaseService {
     required String id,
     required String newStatus,
   }) async {
-    final rows = await _client.from('transaction_requests').update({
-      'status': newStatus,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', id).select('id');
+    final rows = await _client
+        .from('transaction_requests')
+        .update({
+          'status': newStatus,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', id)
+        .select('id');
     final list = rows as List<dynamic>?;
     if (list == null || list.isEmpty) {
       throw StateError(
@@ -2785,13 +3105,27 @@ class SupabaseService {
       return withDist.sublist(offset, end);
     }
 
-    final response = await query
-        .order('id', ascending: true)
-        .range(offset, offset + limit - 1);
+    final response = await query.limit(800);
     final list = response as List<dynamic>;
-    return list
+    final parts = list
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
-        .toList();
+        .toList()
+      ..sort((a, b) {
+        final ra = a.ownerRatingAvg;
+        final rb = b.ownerRatingAvg;
+        if (ra != null && rb != null) {
+          final c = rb.compareTo(ra);
+          if (c != 0) return c;
+        } else if (ra != null) {
+          return -1;
+        } else if (rb != null) {
+          return 1;
+        }
+        return a.id.compareTo(b.id);
+      });
+    if (offset >= parts.length) return [];
+    final end = (offset + limit).clamp(0, parts.length);
+    return parts.sublist(offset, end);
   }
 
   /// Evita que `%` y `_` del usuario actúen como comodines en `ilike`.
@@ -2854,7 +3188,7 @@ class SupabaseService {
             'name.ilike.$pat,owner_id.in.($inList)',
           );
         } else {
-      q = q.ilike('name', '%$safe%');
+          q = q.ilike('name', '%$safe%');
         }
       }
     }
@@ -3038,15 +3372,11 @@ class SupabaseService {
     }
 
     Map<String, dynamic>? impMap;
-    final row = await _client
-        .from('commission_settlements')
-        .select('''
+    final row = await _client.from('commission_settlements').select('''
           importador:profiles!commission_settlements_importador_id_fkey (
             direccion, estado, ciudad, phone
           )
-        ''')
-        .eq('id', settlement.id)
-        .maybeSingle();
+        ''').eq('id', settlement.id).maybeSingle();
     if (row != null) {
       final imp = row['importador'];
       if (imp is Map) impMap = Map<String, dynamic>.from(imp);
@@ -3079,7 +3409,9 @@ class SupabaseService {
       importadorPhone: impMap?['phone']?.toString(),
     );
 
-    await _client.storage.from(_commissionSettlementInvoicesBucket).uploadBinary(
+    await _client.storage
+        .from(_commissionSettlementInvoicesBucket)
+        .uploadBinary(
           path,
           bytes,
           fileOptions: const FileOptions(
@@ -3100,7 +3432,8 @@ class SupabaseService {
 
   /// Vista previa del siguiente Nº de factura de comisión (sin consumir secuencia).
   static Future<String> peekCommissionInvoiceReference() async {
-    final raw = await _client.rpc('motoconecta_peek_commission_invoice_reference');
+    final raw =
+        await _client.rpc('motoconecta_peek_commission_invoice_reference');
     return raw?.toString().trim() ?? '';
   }
 
@@ -3135,8 +3468,7 @@ class SupabaseService {
       throw ArgumentError('Formato no permitido. Use imagen o PDF.');
     }
 
-    var safeBase =
-        fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
+    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
     if (safeBase.isEmpty) safeBase = 'comprobante.$ext';
 
     final stamp = DateTime.now().microsecondsSinceEpoch;
@@ -3160,7 +3492,9 @@ class SupabaseService {
       final oldPath = m['pago_comprobante_storage_path']?.toString().trim();
       if (oldPath != null && oldPath.isNotEmpty) {
         try {
-          await _client.storage.from(_orderPaymentProofsBucket).remove([oldPath]);
+          await _client.storage
+              .from(_orderPaymentProofsBucket)
+              .remove([oldPath]);
         } catch (_) {}
       }
     }
@@ -3214,14 +3548,16 @@ class SupabaseService {
     );
   }
 
-  static Future<void> adminMarkCommissionSettlementPaid(String settlementId) async {
+  static Future<void> adminMarkCommissionSettlementPaid(
+      String settlementId) async {
     await _client.rpc(
       'admin_mark_commission_settlement_paid',
       params: <String, dynamic>{'p_settlement_id': settlementId},
     );
   }
 
-  static Future<void> adminCancelCommissionSettlement(String settlementId) async {
+  static Future<void> adminCancelCommissionSettlement(
+      String settlementId) async {
     await _client.rpc(
       'admin_cancel_commission_settlement',
       params: <String, dynamic>{'p_settlement_id': settlementId},

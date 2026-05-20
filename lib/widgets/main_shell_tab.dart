@@ -12,8 +12,8 @@ class MainShellTabController {
   static String? _pendingNotificationRelatedId;
   static VoidCallback? _pedidosNotificationDeepLink;
   static VoidCallback? _importadorValidadosNotificationDeepLink;
-  static VoidCallback? _adminActivosNotificationDeepLink;
-  static VoidCallback? _adminCerradosNotificationDeepLink;
+  static VoidCallback? _adminPedidosBandejaNotificationHandler;
+  static AdminPedidosNotificationScope? _pendingAdminPedidosScope;
   static int? _b2bProfileTabIndex;
   static bool _importerPedidosPreferNuevosFilter = false;
   static bool _importerPedidosPreferCerradosFilter = false;
@@ -34,8 +34,8 @@ class MainShellTabController {
     _pendingNotificationRelatedId = null;
     _pedidosNotificationDeepLink = null;
     _importadorValidadosNotificationDeepLink = null;
-    _adminActivosNotificationDeepLink = null;
-    _adminCerradosNotificationDeepLink = null;
+    _adminPedidosBandejaNotificationHandler = null;
+    _pendingAdminPedidosScope = null;
     _b2bProfileTabIndex = null;
     _importerPedidosPreferNuevosFilter = false;
     _importerPedidosPreferCerradosFilter = false;
@@ -64,7 +64,8 @@ class MainShellTabController {
   static void notifyImporterPedidosReload() => _refreshImporterPedidos?.call();
 
   /// Importador y aliado (3 pestañas): Perfil = 2.
-  static void registerB2BProfileTabIndex(int index) => _b2bProfileTabIndex = index;
+  static void registerB2BProfileTabIndex(int index) =>
+      _b2bProfileTabIndex = index;
 
   static int get _resolvedB2BProfileTabIndex => _b2bProfileTabIndex ?? 2;
 
@@ -112,10 +113,28 @@ class MainShellTabController {
     });
   }
 
-  /// [AdminActiveOrdersPanel] expande el pedido del chat tras deep link.
-  static void registerAdminActivosNotificationDeepLink(
+  /// [AdminOrdersPanel] — scope + recarga + expand al abrir desde notificación.
+  static void registerAdminPedidosBandejaNotificationHandler(
       VoidCallback? onNavigate) {
-    _adminActivosNotificationDeepLink = onNavigate;
+    _adminPedidosBandejaNotificationHandler = onNavigate;
+  }
+
+  /// Admin: pestaña Pedidos unificada (índice 0) + manejo de notificación in-app.
+  static void navigateToAdminActivosForNotification() {
+    _pendingAdminPedidosScope = AdminPedidosNotificationScope.enCurso;
+    _goTo?.call(0);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminPedidosBandejaNotificationHandler?.call();
+    });
+  }
+
+  /// Admin: misma pestaña Pedidos (índice 0), vista «Cerrados» + expand moroso.
+  static void navigateToAdminCerradosForNotification() {
+    _pendingAdminPedidosScope = AdminPedidosNotificationScope.cerrados;
+    _goTo?.call(0);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminPedidosBandejaNotificationHandler?.call();
+    });
   }
 
   /// Pestaña Pedidos (índice 1) + expande pedido vinculado a la notificación [mensaje].
@@ -126,25 +145,11 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Activos (índice 0) + expande el pedido del chat.
-  static void navigateToAdminActivosForNotification() {
-    _goTo?.call(0);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _adminActivosNotificationDeepLink?.call();
-    });
-  }
-
-  static void registerAdminCerradosNotificationDeepLink(
-      VoidCallback? onNavigate) {
-    _adminCerradosNotificationDeepLink = onNavigate;
-  }
-
-  /// Admin: pestaña Pedidos cerrados (índice 1) + expande pedido moroso.
-  static void navigateToAdminCerradosForNotification() {
-    _goTo?.call(1);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _adminCerradosNotificationDeepLink?.call();
-    });
+  /// Lee y limpia el alcance de bandeja pendiente (notificación admin).
+  static AdminPedidosNotificationScope? consumePendingAdminPedidosScope() {
+    final v = _pendingAdminPedidosScope;
+    _pendingAdminPedidosScope = null;
+    return v;
   }
 
   /// [ProfileB2BForm] (aliado) ancla la sección de documentación para deep links.
@@ -211,8 +216,7 @@ class MainShellTabController {
 
   static void setPendingCommissionSettlementId(String? id) {
     final s = id?.trim();
-    _pendingCommissionSettlementId =
-        (s == null || s.isEmpty) ? null : s;
+    _pendingCommissionSettlementId = (s == null || s.isEmpty) ? null : s;
   }
 
   static String? peekPendingCommissionSettlementId() {
@@ -274,4 +278,10 @@ class MainShellTabController {
     _pendingKycProfileId = null;
     return v;
   }
+}
+
+/// Alcance de la bandeja admin al abrir desde una notificación in-app.
+enum AdminPedidosNotificationScope {
+  enCurso,
+  cerrados,
 }

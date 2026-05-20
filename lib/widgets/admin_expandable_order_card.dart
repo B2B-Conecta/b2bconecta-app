@@ -8,6 +8,7 @@ import '../utils/admin_order_panel_utils.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
+import 'order_commission_summary.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
@@ -208,7 +209,9 @@ class AdminExpandableOrderCard extends StatelessWidget {
                   else ...[
                     TransactionRequestPartiesContactSection(request: r),
                     const SizedBox(height: 12),
-                    TransactionRequestCommissionSection(request: r),
+                    OrderCommissionSummary(
+                      lines: orderLinesEligibleForCommission([r]),
+                    ),
                     const SizedBox(height: 12),
                     TransactionRequestDestinoEntregaSection(request: r),
                     const SizedBox(height: 12),

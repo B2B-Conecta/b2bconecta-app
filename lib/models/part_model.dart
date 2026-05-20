@@ -21,6 +21,8 @@ class PartModel {
     this.ownerLatitude,
     this.ownerLongitude,
     this.distanceKmFromReference,
+    this.ownerRatingAvg,
+    this.ownerRatingCount,
   });
 
   final String id;
@@ -59,6 +61,10 @@ class PartModel {
   /// Distancia al punto de referencia del aliado (GPS); la calcula el cliente al ordenar.
   final double? distanceKmFromReference;
 
+  /// Reputación del importador (`profiles.rating_avg_received`).
+  final double? ownerRatingAvg;
+  final int? ownerRatingCount;
+
   /// Precio unitario final MotoLink (mayorista + comisión broker).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
@@ -77,6 +83,7 @@ class PartModel {
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
     final loc = _ownerLocationFromProfiles(json['profiles']);
     final ownerLatLng = _ownerLatLngFromProfiles(json['profiles']);
+    final rep = _ownerReputationFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
     final isActive = isActiveRaw is bool
@@ -91,6 +98,8 @@ class PartModel {
       ownerCiudad: loc.$2,
       ownerLatitude: ownerLatLng.$1,
       ownerLongitude: ownerLatLng.$2,
+      ownerRatingAvg: rep.$1,
+      ownerRatingCount: rep.$2,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
@@ -122,6 +131,8 @@ class PartModel {
     double? ownerLatitude,
     double? ownerLongitude,
     double? distanceKmFromReference,
+    double? ownerRatingAvg,
+    int? ownerRatingCount,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -142,7 +153,37 @@ class PartModel {
       ownerLongitude: ownerLongitude ?? this.ownerLongitude,
       distanceKmFromReference:
           distanceKmFromReference ?? this.distanceKmFromReference,
+      ownerRatingAvg: ownerRatingAvg ?? this.ownerRatingAvg,
+      ownerRatingCount: ownerRatingCount ?? this.ownerRatingCount,
     );
+  }
+
+  static (double?, int?) _ownerReputationFromProfiles(dynamic profiles) {
+    if (profiles == null) return (null, null);
+    Map<String, dynamic>? m;
+    if (profiles is Map) {
+      m = Map<String, dynamic>.from(profiles);
+    } else if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+      m = Map<String, dynamic>.from(profiles.first as Map);
+    }
+    if (m == null) return (null, null);
+    double? avg;
+    final a = m['rating_avg_received'];
+    if (a is num) {
+      avg = a.toDouble();
+    } else {
+      avg = double.tryParse(a?.toString() ?? '');
+    }
+    int? cnt;
+    final c = m['rating_count_received'];
+    if (c is int) {
+      cnt = c;
+    } else if (c is num) {
+      cnt = c.toInt();
+    } else {
+      cnt = int.tryParse(c?.toString() ?? '');
+    }
+    return (avg, cnt);
   }
 
   static String? _nullableUuid(dynamic v) {

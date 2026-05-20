@@ -16,6 +16,7 @@ class EncomiendasReportExcelService {
   static Uint8List buildReportBytes(
     List<TransactionRequestModel> rows, {
     String sheetTitle = 'Encomiendas',
+    Map<String, String> aliadoBucketAnswersByRequestId = const {},
   }) {
     final excel = Excel.createExcel();
     excel.delete('Sheet1');
@@ -37,6 +38,7 @@ class EncomiendasReportExcelService {
       'Estrellas',
       'Comentario aliado',
       'Fecha valoración',
+      'Cuestionario aliado (Bucket)',
     ];
     for (var c = 0; c < headers.length; c++) {
       sheet
@@ -69,12 +71,15 @@ class EncomiendasReportExcelService {
         r.aliadoExperienceStars ?? '',
         r.aliadoExperienceComment ?? '',
         formatEsShortDateTime(r.aliadoExperienceSubmittedAt),
+        aliadoBucketAnswersByRequestId[r.id] ?? '',
       ];
       for (var c = 0; c < vals.length; c++) {
         final v = vals[c];
         sheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: rowIndex))
-            .value = v == null || v == ''
+            .cell(
+                CellIndex.indexByColumnRow(columnIndex: c, rowIndex: rowIndex))
+            .value = v == null ||
+                v == ''
             ? TextCellValue('')
             : TextCellValue(v.toString());
       }

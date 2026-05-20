@@ -11,6 +11,7 @@ import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'profile_kyc_documents_section.dart';
 import 'importer_commission_settlements_section.dart';
+import 'importer_reputation_panel.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
 
@@ -600,6 +601,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           if (_persistedAsImportador && widget.initial != null) ...[
             const SizedBox(height: 20),
             const ImporterCommissionSettlementsSection(),
+            const SizedBox(height: 20),
+            ImporterReputationPanel(
+              profile: widget.initial!,
+              onProfileRefresh: widget.onRelatedDataChanged,
+            ),
           ],
           if (_persistedAsAliado || _persistedAsImportador) ...[
             const SizedBox(height: 20),

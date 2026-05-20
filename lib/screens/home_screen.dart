@@ -30,21 +30,6 @@ const _kCategorySearchTokens = <String, String?>{
   'Eléctrico': 'eléctric',
 };
 
-bool _longDistancePart(PartModel part, ProfileModel profile) {
-  final km = part.distanceKmFromReference;
-  if (km != null && km >= 120) return true;
-  final ae = profile.estado?.trim().toLowerCase();
-  final oe = part.ownerEstado?.trim().toLowerCase();
-  if (ae != null &&
-      ae.isNotEmpty &&
-      oe != null &&
-      oe.isNotEmpty &&
-      ae != oe) {
-    return true;
-  }
-  return false;
-}
-
 String _distanceChipLabel(PartModel part) {
   final km = part.distanceKmFromReference;
   if (km == null) return 'Distancia no disponible';
@@ -916,11 +901,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisCount: _kCrossAxisCount,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          // Altura más compacta; en cercanía conservamos un poco más de espacio.
+                          // cross / main = ancho / alto del hijo. Menor ratio = celdas más altas
+                          // (evita overflow al mostrar importador, ubicación, rating y precio).
                           childAspectRatio:
                               _activeFilters.sortByDistanceFromReference
-                                  ? 0.60
-                                  : 0.62,
+                                  ? 0.54
+                                  : 0.56,
                         ),
                         itemCount: parts.length,
                         itemBuilder: (context, index) {
@@ -1013,7 +999,7 @@ class _ProductGridCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AspectRatio(
-                  aspectRatio: compactDistanceMode ? 1.25 : 1,
+                  aspectRatio: compactDistanceMode ? 1.25 : 1.05,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Hero(
@@ -1053,6 +1039,28 @@ class _ProductGridCard extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       color: Colors.grey.shade600,
                     ),
+                  ),
+                ],
+                if (part.ownerRatingAvg != null &&
+                    (part.ownerRatingCount ?? 0) > 0) ...[
+                  SizedBox(height: compactDistanceMode ? 2 : 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.star,
+                        size: compactDistanceMode ? 12 : 13,
+                        color: Colors.amber.shade800,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
+                        style: TextStyle(
+                          fontSize: compactDistanceMode ? 9.5 : 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
                 if (showDistanceChips) ...[

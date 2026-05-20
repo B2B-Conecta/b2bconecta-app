@@ -24,6 +24,10 @@ class ProfileModel {
     this.latitude,
     this.longitude,
     this.locationUpdatedAt,
+    this.ratingAvgReceived,
+    this.ratingCountReceived,
+    this.ratingAsPayerAvg,
+    this.ratingAsPayerCount,
   });
 
   final String id;
@@ -71,6 +75,14 @@ class ProfileModel {
   final double? latitude;
   final double? longitude;
   final DateTime? locationUpdatedAt;
+
+  /// Promedio 1–5 como proveedor (valoraciones de aliados).
+  final double? ratingAvgReceived;
+  final int? ratingCountReceived;
+
+  /// Promedio 1–5 como pagador (valoraciones de importadores; v2 crédito).
+  final double? ratingAsPayerAvg;
+  final int? ratingAsPayerCount;
 
   /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
@@ -188,7 +200,18 @@ class ProfileModel {
       locationUpdatedAt: json['location_updated_at'] != null
           ? DateTime.tryParse(json['location_updated_at'].toString())
           : null,
+      ratingAvgReceived: _asDoubleNullable(json['rating_avg_received']),
+      ratingCountReceived: _asIntNullable(json['rating_count_received']),
+      ratingAsPayerAvg: _asDoubleNullable(json['rating_as_payer_avg']),
+      ratingAsPayerCount: _asIntNullable(json['rating_as_payer_count']),
     );
+  }
+
+  static int? _asIntNullable(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
   }
 
   static double? _asDoubleNullable(dynamic v) {

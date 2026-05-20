@@ -7,7 +7,7 @@ import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/admin_order_panel_utils.dart';
 import '../utils/aliado_order_grouping.dart';
-import 'admin_checkout_group_commission_summary.dart';
+import 'order_commission_summary.dart';
 import 'admin_compact_party_card.dart';
 import 'admin_order_pre_transit_section.dart';
 import 'admin_pago_revision_section.dart';
@@ -96,7 +96,7 @@ class _AdminCheckoutGroupExpandedSectionState
           allLines: widget.lines,
           index: idx + 1,
           total: chunks.length,
-          showImporterCommission: chunks.length > 1,
+          showImporterCommission: true,
           onRefresh: widget.onRefresh,
           onMarcarEnTransito: widget.onMarcarEnTransito,
           onAnularMotolink: widget.onAnularMotolink,

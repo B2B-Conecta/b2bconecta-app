@@ -81,7 +81,8 @@ class _AdminEncomiendasReportPanelState
       _error = null;
     });
     try {
-      final statuses = _statusSelection.isEmpty ? null : _statusSelection.toList();
+      final statuses =
+          _statusSelection.isEmpty ? null : _statusSelection.toList();
       final rows = await SupabaseService.fetchTransactionRequestsForAdminReport(
         createdFromLocal: _desde,
         createdToLocal: _hasta,
@@ -141,8 +142,7 @@ class _AdminEncomiendasReportPanelState
     if (_soloPagosAprobados) {
       list = list
           .where(
-            (r) =>
-                r.pagoEstadoRevision?.trim() == 'aprobado',
+            (r) => r.pagoEstadoRevision?.trim() == 'aprobado',
           )
           .toList();
     }
@@ -210,7 +210,14 @@ class _AdminEncomiendasReportPanelState
       return;
     }
     try {
-      final bytes = EncomiendasReportExcelService.buildReportBytes(_filtered);
+      final bucket =
+          await SupabaseService.fetchAliadoOrderRatingAnswerSummariesForExport(
+        _filtered,
+      );
+      final bytes = EncomiendasReportExcelService.buildReportBytes(
+        _filtered,
+        aliadoBucketAnswersByRequestId: bucket,
+      );
       final stamp = DateTime.now().toIso8601String().split('T').first;
       await FileSaver.instance.saveFile(
         name: 'motolink_encomiendas_$stamp',
@@ -244,10 +251,12 @@ class _AdminEncomiendasReportPanelState
     final totalUsd = list.fold<double>(0, (s, r) => s + r.precioTotal);
     final conFactura = list.where((r) => r.hasFacturaAliado).length;
     final prefNota = list
-        .where((r) => r.documentTypePreference == DocumentTypePreference.notaEntrega)
+        .where((r) =>
+            r.documentTypePreference == DocumentTypePreference.notaEntrega)
         .length;
     final prefFiscal = list
-        .where((r) => r.documentTypePreference == DocumentTypePreference.facturaFiscal)
+        .where((r) =>
+            r.documentTypePreference == DocumentTypePreference.facturaFiscal)
         .length;
     final prefPend = list
         .where(
@@ -256,13 +265,17 @@ class _AdminEncomiendasReportPanelState
               r.documentTypePreference!.trim().isEmpty,
         )
         .length;
-    final valorados = list.where((r) => r.aliadoExperienceSubmittedAt != null).toList();
+    final valorados =
+        list.where((r) => r.aliadoExperienceSubmittedAt != null).toList();
     double? avgStars;
     if (valorados.isNotEmpty) {
-      final sum = valorados.fold<int>(0, (s, r) => s + (r.aliadoExperienceStars ?? 0));
+      final sum =
+          valorados.fold<int>(0, (s, r) => s + (r.aliadoExperienceStars ?? 0));
       avgStars = sum / valorados.length;
     }
-    final entregados = list.where((r) => r.status == TransactionRequestStatus.entregado).length;
+    final entregados = list
+        .where((r) => r.status == TransactionRequestStatus.entregado)
+        .length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,7 +497,8 @@ class _AdminEncomiendasReportPanelState
                   spacing: 6,
                   runSpacing: 4,
                   children: [
-                    for (final s in TransactionRequestStatus.valuesForReportFilter)
+                    for (final s
+                        in TransactionRequestStatus.valuesForReportFilter)
                       FilterChip(
                         label: Text(TransactionRequestStatus.labelEs(s)),
                         selected: _statusSelection.contains(s),
@@ -577,7 +591,8 @@ class _AdminEncomiendasReportPanelState
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Solo pedidos con valoración del aliado'),
+                      title:
+                          const Text('Solo pedidos con valoración del aliado'),
                       value: _soloConValoracion,
                       onChanged: (v) {
                         setState(() => _soloConValoracion = v);
@@ -624,10 +639,13 @@ class _AdminEncomiendasReportPanelState
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.refresh, size: 20),
-                        label: Text(_loading ? 'Cargando…' : 'Aplicar fechas (servidor)'),
+                        label: Text(_loading
+                            ? 'Cargando…'
+                            : 'Aplicar fechas (servidor)'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -678,7 +696,9 @@ class _AdminEncomiendasReportPanelState
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Text(
-                        _loading ? 'Cargando…' : 'Ajuste filtros o amplíe el rango de fechas.',
+                        _loading
+                            ? 'Cargando…'
+                            : 'Ajuste filtros o amplíe el rango de fechas.',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),

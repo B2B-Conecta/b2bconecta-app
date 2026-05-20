@@ -60,10 +60,21 @@ Si tu base es **MotoLink legacy** con `transaction_requests.owner_id`, revisa el
 - Migración `20260606120000_minuta7_c3_admin_pago_rpc.sql`: `admin_aprobar_pago_aliado`, `admin_rechazar_comprobante_pago` (auditoría `confirmado_por`).
 - Morosidad, retiro de crédito/cuotas en plataforma: migraciones `20260601…`–`20260605…`.
 
+## Valoraciones y reputación (C4)
+
+Migración `20260607120000_minuta7_c4_order_ratings.sql`:
+
+- Tabla `order_ratings` (Bucket List opcional en `answers` jsonb; estrellas + comentario obligatorios).
+- Valoración **por importador** en carrito (`checkout_group_id` + `importador_id`).
+- Mutua: aliado → importador (legacy `aliado_experience_*` sincronizado) e importador → aliado.
+- Agregados en `profiles`: `rating_avg_received`, `rating_count_received`, `rating_as_payer_*`.
+- RPC: `get_rating_questionnaire`, `list_importador_received_ratings` (aliado anónimo por ciudad), `list_admin_order_ratings`.
+- Catálogo aliado: orden por reputación del importador cuando no hay orden por distancia.
+
 ## Próximos pasos (Flutter)
 
 1. Enlazar `.env` al proyecto Supabase MotoConecta (URL + clave publicable); no commitear secretos.
-2. Aplicar migraciones pendientes con `supabase db push` (incl. C3 admin pago y tasa BCV).
+2. Aplicar migraciones pendientes con `supabase db push` (incl. C3 admin pago, C4 ratings y tasa BCV).
 
 ## Comisiones MotoLink (C1)
 

@@ -9,6 +9,7 @@ import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'moroso_order_visual.dart';
 import 'order_motolink_thread_section.dart';
+import 'order_commission_summary.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para importador: resumen, acción rápida, detalle con aliado y fechas.
@@ -287,12 +288,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           compact: true,
                           viewer: PedidoDesgloseViewer.importador,
                         ),
-                        for (final line in lines)
-                          if (line.status != TransactionRequestStatus.pendiente &&
-                              line.status != TransactionRequestStatus.rechazado) ...[
-                            const SizedBox(height: 10),
-                            TransactionRequestCommissionSection(request: line),
-                          ],
+                        OrderCommissionSummary(
+                          lines: orderLinesEligibleForCommission(lines),
+                        ),
                         const SizedBox(height: 12),
                         if (isCheckoutGroup) ...[
                           if (checkoutGroupMismoEstadoEnvio(lines)) ...[
@@ -302,19 +300,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               viewerRole: AppHomeRole.importador,
                               showHeading: true,
                             ),
-                            if (lines.length > 1)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  'Ítems en este flujo: '
-                                  '${tituloCheckoutGrupoImportador(lines, uid)}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    height: 1.35,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ),
                           ] else ...[
                             const Text(
                               'Seguimiento del envío',

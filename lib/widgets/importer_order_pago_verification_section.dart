@@ -162,10 +162,7 @@ class _ImporterOrderPagoVerificationSectionState
   }
 
   Widget _buildBundle(BuildContext context) {
-    final uid = SupabaseService.currentUserId ?? '';
     final ref = _comprobanteRefParaAbrir();
-    final resumen =
-        _lines.map((e) => e.etiquetaProductoImportador(uid)).join(' · ');
 
     final pathsDistintos = _lines
         .map((e) => e.comprobantePagoStoragePath?.trim() ?? '')
@@ -204,39 +201,6 @@ class _ImporterOrderPagoVerificationSectionState
             ),
           ),
           const SizedBox(height: 6),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.blueGrey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blueGrey.shade100),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${_lines.length} ítems en este pedido',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.blueGrey.shade900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    resumen,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      height: 1.35,
-                      color: Colors.blueGrey.shade800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
           if (pathsDistintos > 1)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

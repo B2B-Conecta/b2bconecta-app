@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/transaction_request_model.dart';
 import '../utils/admin_order_panel_utils.dart';
-import 'admin_checkout_group_commission_summary.dart';
 import 'admin_compact_party_card.dart';
 import 'transaction_request_admin_sections.dart';
 
-/// Cabecera unificada de un carrito admin: aliado, comisión, destino y partidas.
+/// Cabecera unificada de un carrito admin: aliado, destino (comisión en panel por proveedor).
 class AdminCheckoutGroupMasterHeader extends StatelessWidget {
   const AdminCheckoutGroupMasterHeader({
     super.key,
@@ -62,8 +61,6 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
           logoStoragePath: r.aliadoLogoStoragePath,
           kycStatus: r.aliadoKycStatus,
         ),
-        const SizedBox(height: 10),
-        AdminCheckoutGroupCommissionSummary(lines: lines),
         const SizedBox(height: 12),
         TransactionRequestDestinoEntregaSection(request: r),
         if (expLine != null) ...[

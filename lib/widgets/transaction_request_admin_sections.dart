@@ -9,6 +9,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'order_commission_summary.dart';
 import 'transaction_request_counterparty_profile_section.dart';
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
@@ -818,7 +819,8 @@ class _TimelineRow extends StatelessWidget {
   }
 }
 
-/// Comisión MotoLink (Minuta #7 C1): tasa, estimada y devengada al Recibido.
+/// Comisión MotoLink (Minuta #7 C1). Delega en [OrderCommissionSummary].
+@Deprecated('Use OrderCommissionSummary directly')
 class TransactionRequestCommissionSection extends StatelessWidget {
   const TransactionRequestCommissionSection({
     super.key,
@@ -829,46 +831,8 @@ class TransactionRequestCommissionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = request;
-    final pct = (r.commissionRateSnapshot * 100).toStringAsFixed(2);
-    final devengada = r.comisionDevengada;
-    final monto = devengada
-        ? (r.comisionDevengadaUsd ?? r.comisionEstimadaUsd)
-        : r.comisionEstimadaUsd;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.teal.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Comisión MotoLink',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tasa $pct % · ${devengada ? 'Devengada' : 'Pendiente de recibir'}: '
-            'USD ${monto.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 12, height: 1.35),
-          ),
-          if (devengada && r.comisionDevengadaAt != null)
-            Text(
-              'Devengada: ${formatEsShortDateTime(r.comisionDevengadaAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-            ),
-          if (r.commissionSettlementId != null)
-            Text(
-              'Incluida en corte ${r.commissionSettlementId!.substring(0, 8)}…',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-            ),
-        ],
-      ),
+    return OrderCommissionSummary(
+      lines: orderLinesEligibleForCommission([request]),
     );
   }
 }

@@ -13,6 +13,7 @@ import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
 import 'importer_order_invoice_section.dart';
 import 'importer_order_pago_verification_section.dart';
+import 'importer_order_rating_section.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
@@ -405,6 +406,19 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                       request: g.first,
                                       invoiceBundleLines: g,
                                       onChanged: _load,
+                                    ),
+                                  ],
+                                  if (primary.status ==
+                                      TransactionRequestStatus.entregado) ...[
+                                    const SizedBox(height: 12),
+                                    ImporterOrderRatingSection(
+                                      request: primary,
+                                      onChanged: _load,
+                                      bundleCheckoutGroupId: isBundle
+                                          ? primary.checkoutGroupId
+                                          : null,
+                                      bundleAliadoId:
+                                          isBundle ? primary.aliadoId : null,
                                     ),
                                   ],
                                 ],

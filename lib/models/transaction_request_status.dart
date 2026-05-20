@@ -99,6 +99,18 @@ abstract final class TransactionRequestStatus {
     rechazado,
   ];
 
+  /// Admin: bandeja unificada (operativos en curso + cerrados).
+  static List<String> get adminBandejaUnifiedStatuses => [
+        ...motoconectaAdminOperationalActive,
+        ...adminClosedOrders,
+      ];
+
+  static bool isAdminBandejaOperational(String status) =>
+      motoconectaAdminOperationalActive.contains(status);
+
+  static bool isAdminBandejaClosed(String status) =>
+      adminClosedOrders.contains(status);
+
   /// Chips de filtro en reportes admin (servidor).
   static const List<String> valuesForReportFilter = [
     pendiente,
@@ -232,9 +244,7 @@ abstract final class TransactionRequestStatus {
       case entregado:
         return 'Pedido completado';
       case rechazado:
-        return canceladoPorAliado
-            ? 'Solicitud cancelada'
-            : 'Pedido rechazado';
+        return canceladoPorAliado ? 'Solicitud cancelada' : 'Pedido rechazado';
       default:
         return '—';
     }

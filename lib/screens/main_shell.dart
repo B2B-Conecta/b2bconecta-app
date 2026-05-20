@@ -7,10 +7,10 @@ import '../models/profile_model.dart';
 import '../services/notification_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/admin_active_orders_panel.dart';
-import '../widgets/admin_closed_orders_panel.dart';
+import '../widgets/admin_orders_panel.dart';
 import '../widgets/admin_commission_settlements_panel.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
+import '../widgets/admin_order_ratings_panel.dart';
 import '../widgets/admin_kyc_review_panel.dart';
 import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
@@ -98,7 +98,7 @@ class _MainShellState extends State<MainShell> {
     setState(() => _profile = p);
   }
 
-  /// Pestañas admin: Activos, Cerrados, Crédito, Reportes, Perfil (sin catálogo).
+  /// Pestañas admin: Pedidos, Reportes, Valoraciones, Comisiones, KYC, Perfil (sin catálogo).
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,
@@ -154,16 +154,20 @@ class _MainShellState extends State<MainShell> {
         index: _tabIndex,
         children: [
           _adminOrdersScaffold(
-            title: 'Pedidos activos',
-            child: const AdminActiveOrdersPanel(),
-          ),
-          _adminOrdersScaffold(
-            title: 'Pedidos cerrados',
-            child: const AdminClosedOrdersPanel(),
+            title: 'Pedidos',
+            subtitle:
+                'Use «En curso», «Cerrados» o «Todos» y filtre por estado o búsqueda.',
+            child: const AdminOrdersPanel(),
           ),
           _adminOrdersScaffold(
             title: 'Reportes de encomiendas',
             child: const AdminEncomiendasReportPanel(),
+          ),
+          _adminOrdersScaffold(
+            title: 'Valoraciones',
+            subtitle:
+                'Calificaciones cruzadas tras la entrega: estrellas, comentario y criterios opcionales.',
+            child: const AdminOrderRatingsPanel(),
           ),
           _adminOrdersScaffold(
             title: 'Comisiones MotoLink',
@@ -205,17 +209,17 @@ class _MainShellState extends State<MainShell> {
             BottomNavigationBarItem(
               icon: Icon(Icons.local_shipping_outlined),
               activeIcon: Icon(Icons.local_shipping),
-              label: 'Activos',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.archive_outlined),
-              activeIcon: Icon(Icons.archive),
-              label: 'Cerrados',
+              label: 'Pedidos',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.analytics_outlined),
               activeIcon: Icon(Icons.analytics),
               label: 'Reportes',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.star_rate_outlined),
+              activeIcon: Icon(Icons.star_rate),
+              label: 'Valoraciones',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.payments_outlined),

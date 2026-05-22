@@ -3242,8 +3242,11 @@ class SupabaseService {
         q = q.filter('profiles.ciudad', 'ilike', '%$s%');
       }
     }
-    if (filters.ownerId != null && filters.ownerId!.trim().isNotEmpty) {
-      q = q.eq('owner_id', filters.ownerId!.trim());
+    final ownerIds = filters.effectiveOwnerIds;
+    if (ownerIds.length == 1) {
+      q = q.eq('owner_id', ownerIds.first);
+    } else if (ownerIds.length > 1) {
+      q = q.inFilter('owner_id', ownerIds);
     }
     if (filters.minPrice != null) {
       q = q.gte('price_usd', filters.minPrice!);

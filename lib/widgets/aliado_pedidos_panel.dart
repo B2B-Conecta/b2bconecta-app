@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/aliado_pedidos_filters_draft.dart';
 import '../models/profile_model.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -21,6 +22,7 @@ import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
 import 'order_motolink_thread_section.dart';
 import 'moroso_order_visual.dart';
+import 'aliado_pedidos_filters_sheet.dart';
 import 'order_list_filter_bar.dart';
 
 /// Pedidos en curso y cerrados del aliado (pestaña Pedidos).
@@ -40,6 +42,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
   bool _morosoOnly = false;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
   String? _entregaBusyId;
   String? _cancelarBusyId;
 
@@ -59,6 +63,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    _searchCtrl.addListener(_onSearchTextChanged);
     MainShellTabController.registerPedidosNotificationDeepLink(
       _onNotificationPedidosDeepLink,
     );
@@ -123,12 +128,196 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     }
   }
 
+  void _onSearchTextChanged() {
+    if (mounted) setState(() {});
+  }
+
+  AliadoPedidosFiltersDraft _currentFiltersDraft() {
+    return AliadoPedidosFiltersDraft(
+      statusFilter: _statusFilter,
+      morosoOnly: _morosoOnly,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+    );
+  }
+
   void _clearFilters() {
     _searchCtrl.clear();
     setState(() {
       _statusFilter = null;
       _morosoOnly = false;
+      _dateFrom = null;
+      _dateTo = null;
     });
+  }
+
+  void _applyFiltersDraft(AliadoPedidosFiltersDraft draft) {
+    setState(() {
+      _statusFilter = draft.statusFilter;
+      _morosoOnly = draft.morosoOnly;
+      _dateFrom = draft.dateFrom;
+      _dateTo = draft.dateTo;
+    });
+  }
+
+  Future<void> _openPedidosFiltersSheet() async {
+    final result = await AliadoPedidosFiltersSheet.show(
+      context,
+      initial: _currentFiltersDraft(),
+      statusOptions: _statusOptions,
+    );
+    if (result == null || !mounted) return;
+    _applyFiltersDraft(result);
+  }
+
+  String? _statusFilterLabel() {
+    final s = _statusFilter;
+    if (s == null || s.isEmpty) return null;
+    for (final o in _statusOptions) {
+      if (o.status == s) return o.label;
+    }
+    return TransactionRequestStatus.labelEs(s);
+  }
+
+  String _dateFilterChipLabel() {
+    final from = _dateFrom;
+    final to = _dateTo;
+    if (from != null && to != null) {
+      return '${formatAliadoPedidosFilterDate(from)} – ${formatAliadoPedidosFilterDate(to)}';
+    }
+    if (from != null) {
+      return 'Desde ${formatAliadoPedidosFilterDate(from)}';
+    }
+    return 'Hasta ${formatAliadoPedidosFilterDate(to!)}';
+  }
+
+  InputDecoration _pedidosSearchDecoration({required int filterBadge}) {
+    return InputDecoration(
+      hintText: 'Buscar por producto, SKU o importador…',
+      prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brandBlue, width: 1.2),
+      ),
+      isDense: true,
+      suffixIcon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_searchCtrl.text.trim().isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.clear, size: 20),
+              color: AppColors.textSecondary,
+              onPressed: () => _searchCtrl.clear(),
+            ),
+          IconButton(
+            tooltip: 'Filtros',
+            onPressed: _openPedidosFiltersSheet,
+            icon: Badge(
+              isLabelVisible: filterBadge > 0,
+              label: Text('$filterBadge'),
+              backgroundColor: AppColors.brandOrange,
+              child: Icon(
+                Icons.tune,
+                color: filterBadge > 0
+                    ? AppColors.brandOrange
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _activeFilterChip({
+    required String label,
+    required VoidCallback onDeleted,
+    Color? accent,
+  }) {
+    final color = accent ?? AppColors.brandBlue;
+    return InputChip(
+      label: Text(label),
+      deleteIcon: const Icon(Icons.close, size: 16),
+      onDeleted: onDeleted,
+      backgroundColor: color.withOpacity(0.12),
+      side: BorderSide(color: color.withOpacity(0.35)),
+      labelStyle: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  Widget? _buildActiveFilterChipsRow() {
+    final draft = _currentFiltersDraft();
+    final chips = <Widget>[];
+
+    final statusLabel = _statusFilterLabel();
+    if (statusLabel != null) {
+      chips.add(_activeFilterChip(
+        label: statusLabel,
+        onDeleted: () => setState(() => _statusFilter = null),
+      ));
+    }
+    if (draft.morosoOnly) {
+      chips.add(_activeFilterChip(
+        label: 'Morosos',
+        accent: Colors.red.shade800,
+        onDeleted: () => setState(() => _morosoOnly = false),
+      ));
+    }
+    if (draft.hasDateFilter) {
+      chips.add(_activeFilterChip(
+        label: _dateFilterChipLabel(),
+        onDeleted: () => setState(() {
+          _dateFrom = null;
+          _dateTo = null;
+        }),
+      ));
+    }
+
+    if (chips.isEmpty) return null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ...chips,
+          TextButton(
+            onPressed: _clearFilters,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Limpiar',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   List<TransactionRequestModel> get _filtered {
@@ -137,6 +326,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       searchQuery: _searchCtrl.text,
       statusFilter: _statusFilter,
       morosoOnly: _morosoOnly,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
     );
   }
 
@@ -671,6 +862,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     }
 
     final filtered = _filtered;
+    final filterBadge = _currentFiltersDraft().activePanelFilterCount;
+    final activeFilterChips = _buildActiveFilterChipsRow();
+    final showFilteredCount = filterBadge > 0 ||
+        _searchCtrl.text.trim().isNotEmpty;
     final enCursoGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => _esEnCurso(r.status)).toList(),
     );
@@ -684,16 +879,28 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              OrderListFilterBar(
-                searchController: _searchCtrl,
-                onSearchChanged: (_) => setState(() {}),
-                hintText: 'Buscar por producto, SKU o importador',
-                statusOptions: _statusOptions,
-                selectedStatus: _statusFilter,
-                onStatusChanged: (s) => setState(() => _statusFilter = s),
-                morosoOnly: _morosoOnly,
-                onMorosoOnlyChanged: (v) => setState(() => _morosoOnly = v),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _searchCtrl,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => setState(() {}),
+                  decoration: _pedidosSearchDecoration(filterBadge: filterBadge),
+                ),
               ),
+              if (activeFilterChips != null) activeFilterChips,
+              if (showFilteredCount)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    '${filtered.length} de ${_rows.length} pedidos',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               Expanded(
                 child: filtered.isEmpty
                     ? ListView(

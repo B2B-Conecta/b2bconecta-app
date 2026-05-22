@@ -3,6 +3,7 @@ class CatalogFilters {
   const CatalogFilters({
     this.searchQuery,
     this.ownerId,
+    this.ownerIds = const [],
     this.ownerEstado,
     this.ownerCiudad,
     this.minPrice,
@@ -15,8 +16,11 @@ class CatalogFilters {
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
   final String? searchQuery;
 
-  /// `profiles.id` del importador; `null` = todos.
+  /// `profiles.id` del importador; `null` = todos. Preferir [ownerIds] para varios.
   final String? ownerId;
+
+  /// IDs de importadores a incluir; vacío = sin filtro por proveedor.
+  final List<String> ownerIds;
 
   /// Filtro por estado del importador (`profiles.estado`, ilike).
   final String? ownerEstado;
@@ -50,6 +54,7 @@ class CatalogFilters {
   bool get hasAnyFilter {
     final q = searchQuery?.trim();
     return (q != null && q.isNotEmpty) ||
+        ownerIds.isNotEmpty ||
         (ownerId != null && ownerId!.trim().isNotEmpty) ||
         (ownerEstado != null && ownerEstado!.trim().isNotEmpty) ||
         (ownerCiudad != null && ownerCiudad!.trim().isNotEmpty) ||
@@ -57,9 +62,19 @@ class CatalogFilters {
         maxPrice != null;
   }
 
+  List<String> get effectiveOwnerIds {
+    if (ownerIds.isNotEmpty) {
+      return ownerIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    final single = ownerId?.trim();
+    if (single != null && single.isNotEmpty) return [single];
+    return const [];
+  }
+
   CatalogFilters copyWith({
     String? searchQuery,
     String? ownerId,
+    List<String>? ownerIds,
     String? ownerEstado,
     String? ownerCiudad,
     double? minPrice,
@@ -72,6 +87,7 @@ class CatalogFilters {
     return CatalogFilters(
       searchQuery: searchQuery ?? this.searchQuery,
       ownerId: ownerId ?? this.ownerId,
+      ownerIds: ownerIds ?? this.ownerIds,
       ownerEstado: ownerEstado ?? this.ownerEstado,
       ownerCiudad: ownerCiudad ?? this.ownerCiudad,
       minPrice: minPrice ?? this.minPrice,

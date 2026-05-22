@@ -1,6 +1,6 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../models/aliado_catalog_filters_draft.dart';
 import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
 import '../models/part_model.dart';
@@ -10,17 +10,10 @@ import '../services/geolocator_service.dart';
 import '../services/supabase_service.dart';
 import 'cart_screen.dart';
 import '../theme/app_theme.dart';
+import '../widgets/aliado_catalog_filters_sheet.dart';
 import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
-
-const _kCategoryLabels = <String>[
-  'Todos',
-  'Frenos',
-  'Transmisión',
-  'Motor',
-  'Eléctrico',
-];
 
 const _kCategorySearchTokens = <String, String?>{
   'Todos': null,
@@ -78,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingMore = false;
   int? _catalogTotal;
   CatalogFilters _activeFilters = CatalogFilters.empty;
-  String? _selectedOwnerId;
+  Set<String> _selectedImporterIds = {};
   String _selectedCategoryLabel = 'Todos';
 
   late final TextEditingController _searchController;
@@ -112,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _allySortLng = lo;
       }
       _importersFuture = SupabaseService.fetchImporterOptions();
+      _searchController.addListener(_onAliadoSearchTextChanged);
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
       _aliadoFaseContado = widget.profile.esAliadoEnFaseContado;
@@ -171,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final oc = _ownerCiudadFilterController.text.trim();
     return CatalogFilters(
       searchQuery: combined.isEmpty ? null : combined,
-      ownerId: _selectedOwnerId,
+      ownerIds: _selectedImporterIds.toList(),
       ownerEstado: oe.isEmpty ? null : oe,
       ownerCiudad: oc.isEmpty ? null : oc,
       minPrice: minP,
@@ -197,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _ownerEstadoFilterController.clear();
     _ownerCiudadFilterController.clear();
     setState(() {
-      _selectedOwnerId = null;
+      _selectedImporterIds = {};
       _selectedCategoryLabel = 'Todos';
       _closestToMeEnabled = false;
       final la = widget.profile.latitude;
@@ -210,25 +204,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshCatalogTotal();
   }
 
-  Future<void> _onClosestChipSelected(bool selected) async {
-    if (widget.homeRole != AppHomeRole.aliado) return;
+  void _onAliadoSearchTextChanged() {
+    if (!mounted || widget.homeRole != AppHomeRole.aliado) return;
+    setState(() {});
+  }
 
-    if (!selected) {
-      setState(() {
-        _closestToMeEnabled = false;
-        final la = widget.profile.latitude;
-        final lo = widget.profile.longitude;
-        _allySortLat = la;
-        _allySortLng = lo;
-        _activeFilters = _parseFiltersFromControllers();
-        _partsFuture = _fetchProducts(reset: true);
-      });
-      await _refreshCatalogTotal();
-      return;
-    }
+  AliadoCatalogFiltersDraft _currentFiltersDraft() {
+    return AliadoCatalogFiltersDraft(
+      categoryLabel: _selectedCategoryLabel,
+      importerIds: _selectedImporterIds,
+      ownerEstado: _ownerEstadoFilterController.text,
+      ownerCiudad: _ownerCiudadFilterController.text,
+      minPrice: _minPriceController.text,
+      maxPrice: _maxPriceController.text,
+      closestToMe: _closestToMeEnabled,
+    );
+  }
 
+  void _disableClosestSort() {
+    setState(() {
+      _closestToMeEnabled = false;
+      _allySortLat = widget.profile.latitude;
+      _allySortLng = widget.profile.longitude;
+    });
+  }
+
+  Future<bool> _enableClosestSort() async {
     final pos = await GeolocatorService.getCurrentLatLng();
-    if (!mounted) return;
+    if (!mounted) return false;
     if (pos == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -238,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.orange.shade900,
         ),
       );
-      return;
+      return false;
     }
 
     try {
@@ -248,15 +251,46 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (_) {}
 
-    if (!mounted) return;
+    if (!mounted) return false;
     setState(() {
       _closestToMeEnabled = true;
       _allySortLat = pos.lat;
       _allySortLng = pos.lng;
-      _activeFilters = _parseFiltersFromControllers();
-      _partsFuture = _fetchProducts(reset: true);
     });
-    await _refreshCatalogTotal();
+    return true;
+  }
+
+  Future<void> _applyFiltersDraft(AliadoCatalogFiltersDraft draft) async {
+    setState(() {
+      _selectedCategoryLabel = draft.categoryLabel;
+      _selectedImporterIds = Set<String>.from(draft.importerIds);
+      _ownerEstadoFilterController.text = draft.ownerEstado;
+      _ownerCiudadFilterController.text = draft.ownerCiudad;
+      _minPriceController.text = draft.minPrice;
+      _maxPriceController.text = draft.maxPrice;
+    });
+
+    if (draft.closestToMe) {
+      final ok = await _enableClosestSort();
+      if (!ok && mounted) {
+        setState(() => _closestToMeEnabled = false);
+      }
+    } else if (_closestToMeEnabled) {
+      _disableClosestSort();
+    }
+
+    if (!mounted) return;
+    _applyFiltersFromUi();
+  }
+
+  Future<void> _openCatalogFiltersSheet(List<ImporterOption> importers) async {
+    final result = await AliadoCatalogFiltersSheet.show(
+      context,
+      initial: _currentFiltersDraft(),
+      importers: importers,
+    );
+    if (result == null || !mounted) return;
+    await _applyFiltersDraft(result);
   }
 
   Future<List<PartModel>> _fetchProducts({required bool reset}) async {
@@ -302,152 +336,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openAdvancedFiltersSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewPadding.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Filtros avanzados',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ownerEstadoFilterController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        labelText: 'Estado del importador',
-                        hintText: 'Ej. Miranda',
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _ownerCiudadFilterController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        labelText: 'Ciudad del importador',
-                        hintText: 'Ej. Valencia',
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _minPriceController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Precio mín. (REF)',
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _maxPriceController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Precio máx. (REF)',
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        _clearFilters();
-                        Navigator.of(ctx).pop();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Limpiar'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _applyFiltersFromUi();
-                        Navigator.of(ctx).pop();
-                      },
-                      child: const Text('Aplicar'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  InputDecoration _searchDecoration() {
+  InputDecoration _searchDecoration({
+    VoidCallback? onOpenFilters,
+    int filterBadge = 0,
+  }) {
     return InputDecoration(
-      hintText: 'Repuesto, estado o ciudad del importador…',
+      hintText: 'Buscar repuesto…',
       hintStyle: const TextStyle(color: AppColors.textSecondary),
       prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
       filled: true,
@@ -465,60 +359,164 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
-    );
-  }
-
-  /// Fila de chips con scroll horizontal (touch, ratón y trackpad).
-  Widget _chipRow({required List<Widget> children}) {
-    return SizedBox(
-      height: 44,
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            PointerDeviceKind.touch,
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.stylus,
-            PointerDeviceKind.trackpad,
-          },
-        ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                children[i],
+      suffixIcon: onOpenFilters == null
+          ? (_searchController.text.trim().isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    _applyFiltersFromUi();
+                  },
+                ))
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_searchController.text.trim().isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 20),
+                    onPressed: () {
+                      _searchController.clear();
+                      _applyFiltersFromUi();
+                    },
+                  ),
+                IconButton(
+                  tooltip: 'Filtros',
+                  onPressed: onOpenFilters,
+                  icon: Badge(
+                    isLabelVisible: filterBadge > 0,
+                    label: Text('$filterBadge'),
+                    backgroundColor: AppColors.brandOrange,
+                    child: Icon(
+                      Icons.tune,
+                      color: filterBadge > 0
+                          ? AppColors.brandOrange
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
               ],
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
-  ChoiceChip _filterChip({
+  Widget _activeFilterChip({
     required String label,
-    required bool selected,
-    required VoidCallback onSelected,
+    required VoidCallback onDeleted,
   }) {
-    return ChoiceChip(
+    return InputChip(
       label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      selectedColor: AppColors.brandOrange,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : AppColors.textPrimary,
+      deleteIcon: const Icon(Icons.close, size: 16),
+      onDeleted: onDeleted,
+      backgroundColor: AppColors.brandOrange.withOpacity(0.12),
+      side: BorderSide(color: AppColors.brandOrange.withOpacity(0.35)),
+      labelStyle: const TextStyle(
+        fontSize: 12,
         fontWeight: FontWeight.w600,
-        fontSize: 13,
+        color: AppColors.textPrimary,
       ),
-      backgroundColor: Colors.grey.shade200,
-      side: BorderSide.none,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  Widget? _buildActiveFilterChipsRow() {
+    final draft = _currentFiltersDraft();
+    final chips = <Widget>[];
+
+    if (draft.hasCategoryFilter) {
+      chips.add(_activeFilterChip(
+        label: draft.categoryLabel,
+        onDeleted: () {
+          setState(() => _selectedCategoryLabel = 'Todos');
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    if (draft.hasImporterFilter) {
+      final n = draft.importerIds.length;
+      chips.add(_activeFilterChip(
+        label: n == 1 ? '1 proveedor' : '$n proveedores',
+        onDeleted: () {
+          setState(() => _selectedImporterIds = {});
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    final est = draft.ownerEstado.trim();
+    if (est.isNotEmpty) {
+      chips.add(_activeFilterChip(
+        label: 'Estado: $est',
+        onDeleted: () {
+          _ownerEstadoFilterController.clear();
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    final ciu = draft.ownerCiudad.trim();
+    if (ciu.isNotEmpty) {
+      chips.add(_activeFilterChip(
+        label: 'Ciudad: $ciu',
+        onDeleted: () {
+          _ownerCiudadFilterController.clear();
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    final min = draft.minPrice.trim();
+    final max = draft.maxPrice.trim();
+    if (min.isNotEmpty || max.isNotEmpty) {
+      final priceLabel = min.isNotEmpty && max.isNotEmpty
+          ? 'REF $min – $max'
+          : min.isNotEmpty
+              ? 'REF desde $min'
+              : 'REF hasta $max';
+      chips.add(_activeFilterChip(
+        label: priceLabel,
+        onDeleted: () {
+          _minPriceController.clear();
+          _maxPriceController.clear();
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    if (draft.closestToMe) {
+      chips.add(_activeFilterChip(
+        label: 'Más cercanos',
+        onDeleted: () {
+          _disableClosestSort();
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+
+    if (chips.isEmpty) return null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ...chips,
+          TextButton(
+            onPressed: _clearFilters,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Limpiar',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -636,211 +634,47 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final filterBadge = _currentFiltersDraft().activePanelFilterCount;
+    final activeFilterChips = _buildActiveFilterChipsRow();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: appBar,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _applyFiltersFromUi(),
-                    decoration: _searchDecoration(),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Material(
-                  color: AppColors.brandOrange,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: _openAdvancedFiltersSheet,
-                    borderRadius: BorderRadius.circular(12),
-                    child: const SizedBox(
-                      width: 52,
-                      height: 52,
-                      child: Icon(
-                        Icons.tune,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: TextField(
-              controller: _ownerCiudadFilterController,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _applyFiltersFromUi(),
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                hintText: 'Ciudad del importador',
-                hintStyle: const TextStyle(color: AppColors.textSecondary),
-                prefixIcon: Icon(
-                  Icons.location_city_outlined,
-                  color: Colors.grey.shade600,
-                  size: 22,
-                ),
-                isDense: true,
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.brandOrange,
-                    width: 1.5,
+      body: FutureBuilder<List<ImporterOption>>(
+        future: _importersFuture,
+        builder: (context, importerSnapshot) {
+          final importers = importerSnapshot.data ?? const <ImporterOption>[];
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _applyFiltersFromUi(),
+                  decoration: _searchDecoration(
+                    onOpenFilters: importerSnapshot.hasError
+                        ? null
+                        : () => _openCatalogFiltersSheet(importers),
+                    filterBadge: filterBadge,
                   ),
                 ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _chipRow(
-              children: _kCategoryLabels
-                  .map(
-                    (label) => _filterChip(
-                      label: label,
-                      selected: _selectedCategoryLabel == label,
-                      onSelected: () {
-                        setState(() => _selectedCategoryLabel = label);
-                        _applyFiltersFromUi();
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: FutureBuilder<List<ImporterOption>>(
-              future: _importersFuture,
-              builder: (context, snapshot) {
-                final importers = snapshot.data ?? [];
-                if (snapshot.hasError) {
-                  return Text(
-                    'Importadores no disponibles.',
-                    style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
-                  );
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'IMPORTADOR',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _chipRow(
-                      children: [
-                        _filterChip(
-                          label: 'Todos',
-                          selected: _selectedOwnerId == null,
-                          onSelected: () {
-                            setState(() => _selectedOwnerId = null);
-                            _applyFiltersFromUi();
-                          },
-                        ),
-                        ...importers.map(
-                          (o) => Tooltip(
-                            message: o.ubicacionLine,
-                            waitDuration: const Duration(milliseconds: 400),
-                            child: _filterChip(
-                              label: o.businessName,
-                              selected: _selectedOwnerId == o.id,
-                              onSelected: () {
-                                setState(() => _selectedOwnerId = o.id);
-                                _applyFiltersFromUi();
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    FilterChip(
-                      label: const Text('Más cercanos a mí'),
-                      selected: _closestToMeEnabled,
-                      onSelected: _onClosestChipSelected,
-                      avatar: Icon(
-                        Icons.near_me_outlined,
-                        size: 18,
-                        color: _closestToMeEnabled
-                            ? Colors.white
-                            : AppColors.brand,
-                      ),
-                      selectedColor: AppColors.brand,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color:
-                            _closestToMeEnabled ? Colors.white : AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_closestToMeEnabled) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Orden por distancia en línea recta hasta el almacén del importador (cuando hay coordenadas).',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade700,
-                      height: 1.25,
-                    ),
+              if (activeFilterChips != null) activeFilterChips,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Text(
+                  '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
-              ],
-            ),
-          ),
-          Expanded(
+                ),
+              ),
+              Expanded(
             child: FutureBuilder<List<PartModel>>(
               future: _partsFuture,
               builder: (context, snapshot) {
@@ -955,7 +789,9 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

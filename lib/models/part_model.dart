@@ -23,6 +23,7 @@ class PartModel {
     this.distanceKmFromReference,
     this.ownerRatingAvg,
     this.ownerRatingCount,
+    this.ownerCatalogPaidOrders30d,
   });
 
   final String id;
@@ -65,6 +66,9 @@ class PartModel {
   final double? ownerRatingAvg;
   final int? ownerRatingCount;
 
+  /// Pedidos pagados confirmados por el importador en ventana E1 (`profiles.catalog_paid_orders_30d`).
+  final int? ownerCatalogPaidOrders30d;
+
   /// Precio unitario final MotoLink (mayorista + comisión broker).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
@@ -84,6 +88,7 @@ class PartModel {
     final loc = _ownerLocationFromProfiles(json['profiles']);
     final ownerLatLng = _ownerLatLngFromProfiles(json['profiles']);
     final rep = _ownerReputationFromProfiles(json['profiles']);
+    final boost = _ownerCatalogBoostFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
     final isActive = isActiveRaw is bool
@@ -100,6 +105,7 @@ class PartModel {
       ownerLongitude: ownerLatLng.$2,
       ownerRatingAvg: rep.$1,
       ownerRatingCount: rep.$2,
+      ownerCatalogPaidOrders30d: boost,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
@@ -133,6 +139,7 @@ class PartModel {
     double? distanceKmFromReference,
     double? ownerRatingAvg,
     int? ownerRatingCount,
+    int? ownerCatalogPaidOrders30d,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -155,7 +162,24 @@ class PartModel {
           distanceKmFromReference ?? this.distanceKmFromReference,
       ownerRatingAvg: ownerRatingAvg ?? this.ownerRatingAvg,
       ownerRatingCount: ownerRatingCount ?? this.ownerRatingCount,
+      ownerCatalogPaidOrders30d:
+          ownerCatalogPaidOrders30d ?? this.ownerCatalogPaidOrders30d,
     );
+  }
+
+  static int? _ownerCatalogBoostFromProfiles(dynamic profiles) {
+    if (profiles == null) return null;
+    Map<String, dynamic>? m;
+    if (profiles is Map) {
+      m = Map<String, dynamic>.from(profiles);
+    } else if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+      m = Map<String, dynamic>.from(profiles.first as Map);
+    }
+    if (m == null) return null;
+    final v = m['catalog_paid_orders_30d'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '');
   }
 
   static (double?, int?) _ownerReputationFromProfiles(dynamic profiles) {

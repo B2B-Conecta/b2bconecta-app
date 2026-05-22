@@ -61,7 +61,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.hub_outlined, color: AppColors.brandBlue, size: 22),
+              const Icon(Icons.hub_outlined, color: AppColors.brandBlue, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -183,7 +183,7 @@ class _AliadoMultiImporterOrderTabsState extends State<AliadoMultiImporterOrderT
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionHeading(
+        const _SectionHeading(
           title: 'Proveedor',
           subtitle:
               'Toque un importador para ver envío, productos, factura y pago.',

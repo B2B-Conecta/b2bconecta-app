@@ -27,6 +27,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import 'bcv_reference_rate_service.dart';
 import '../utils/broker_pricing.dart';
+import '../utils/catalog_ranking.dart';
 import '../utils/haversine.dart';
 import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
@@ -541,7 +542,8 @@ class SupabaseService {
   }
 
   static String _catalogProfileSelect(CatalogFilters filters) {
-    const rep = 'rating_avg_received, rating_count_received';
+    const rep =
+        'rating_avg_received, rating_count_received, catalog_paid_orders_30d';
     return _catalogNeedsProfileInner(filters)
         ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude, $rep)'
         : 'profiles(business_name, estado, ciudad, latitude, longitude, $rep)';
@@ -3145,16 +3147,7 @@ class SupabaseService {
         );
         return p.copyWith(distanceKmFromReference: km);
       }).toList()
-        ..sort((a, b) {
-          final da = a.distanceKmFromReference;
-          final db = b.distanceKmFromReference;
-          if (da == null && db == null) return a.id.compareTo(b.id);
-          if (da == null) return 1;
-          if (db == null) return -1;
-          final c = da.compareTo(db);
-          if (c != 0) return c;
-          return a.id.compareTo(b.id);
-        });
+        ..sort(comparePartsByDistanceThenCatalogBoost);
       if (offset >= withDist.length) return [];
       final end = (offset + limit).clamp(0, withDist.length);
       return withDist.sublist(offset, end);
@@ -3165,19 +3158,7 @@ class SupabaseService {
     final parts = list
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
         .toList()
-      ..sort((a, b) {
-        final ra = a.ownerRatingAvg;
-        final rb = b.ownerRatingAvg;
-        if (ra != null && rb != null) {
-          final c = rb.compareTo(ra);
-          if (c != 0) return c;
-        } else if (ra != null) {
-          return -1;
-        } else if (rb != null) {
-          return 1;
-        }
-        return a.id.compareTo(b.id);
-      });
+      ..sort(comparePartsForCatalogBoost);
     if (offset >= parts.length) return [];
     final end = (offset + limit).clamp(0, parts.length);
     return parts.sublist(offset, end);

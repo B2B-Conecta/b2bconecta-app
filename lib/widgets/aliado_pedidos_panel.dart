@@ -834,7 +834,7 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Monto de este proveedor: ${formatRefAmount(montoRef!)} REF',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: AppColors.brandBlue,

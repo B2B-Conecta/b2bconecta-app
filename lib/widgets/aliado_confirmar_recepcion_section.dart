@@ -91,7 +91,7 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                       b.importadorNombre!.trim().isNotEmpty) ...[
                     Text(
                       b.importadorNombre!.trim(),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
                         color: AppColors.textPrimary,

@@ -2912,7 +2912,16 @@ class SupabaseService {
     return PromoCampaignModel.fromJson(Map<String, dynamic>.from(row));
   }
 
-  static Future<void> deletePromoCampaign(String id) async {
+  static Future<void> deletePromoCampaign({
+    required String id,
+    String? imageStoragePath,
+  }) async {
+    final path = imageStoragePath?.trim();
+    if (path != null && path.isNotEmpty) {
+      try {
+        await _client.storage.from(_promoCampaignsBucket).remove([path]);
+      } catch (_) {}
+    }
     await _client.from('promo_campaigns').delete().eq('id', id);
   }
 

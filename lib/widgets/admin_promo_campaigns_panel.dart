@@ -129,7 +129,10 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
     );
     if (ok != true) return;
     try {
-      await SupabaseService.deletePromoCampaign(c.id);
+      await SupabaseService.deletePromoCampaign(
+        id: c.id,
+        imageStoragePath: c.imageStoragePath,
+      );
       await _bootstrap();
     } catch (e) {
       if (!mounted) return;

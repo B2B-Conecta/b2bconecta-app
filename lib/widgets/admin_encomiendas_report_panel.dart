@@ -5,6 +5,7 @@ import '../models/catalog_filters.dart';
 import '../models/document_type_preference.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import 'admin_promo_campaigns_panel.dart';
 import '../services/encomiendas_report_excel_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -41,6 +42,7 @@ class _AdminEncomiendasReportPanelState
   bool _soloConValoracion = false;
   bool _soloPagosAprobados = false;
   bool _soloEntregados = false;
+  int _sectionIndex = 0;
 
   static const _docOptions = <_DocOpt>[
     _DocOpt('all', 'Todas las preferencias'),
@@ -322,26 +324,74 @@ class _AdminEncomiendasReportPanelState
     );
   }
 
+  Widget _sectionSwitcher() {
+    return SegmentedButton<int>(
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(
+          value: 0,
+          label: Text('Encomiendas'),
+          icon: Icon(Icons.receipt_long_outlined, size: 18),
+        ),
+        ButtonSegment(
+          value: 1,
+          label: Text('Promociones catálogo'),
+          icon: Icon(Icons.campaign_outlined, size: 18),
+        ),
+      ],
+      selected: {_sectionIndex},
+      onSelectionChanged: (s) => setState(() => _sectionIndex = s.first),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_error != null && _raw.isEmpty && !_loading) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              TextButton(onPressed: _load, child: const Text('Reintentar')),
-            ],
+    if (_sectionIndex == 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _sectionSwitcher(),
           ),
-        ),
+          const Expanded(child: AdminPromoCampaignsPanel()),
+        ],
+      );
+    }
+
+    if (_error != null && _raw.isEmpty && !_loading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _sectionSwitcher(),
+          ),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    TextButton(onPressed: _load, child: const Text('Reintentar')),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _sectionSwitcher(),
+        ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,

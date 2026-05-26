@@ -349,6 +349,10 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon = Icons.fact_check_outlined;
         bg = AppColors.brandBlue;
         break;
+      case 'promocion':
+        icon = Icons.campaign_outlined;
+        bg = AppColors.brandOrange;
+        break;
       default:
         icon = Icons.notifications_none_outlined;
         bg = Colors.orange.shade700;

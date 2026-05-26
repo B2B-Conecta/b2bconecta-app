@@ -78,6 +78,7 @@ class _CartScreenState extends State<CartScreen> {
         destinoEntregaUsaPerfil: result.useProfile,
         destinoEntregaTexto: result.texto,
         destinoEntregaMapsUrl: result.mapsUrl,
+        promoByImportador: _cart.promoAttributionPayloadForCheckout(),
       );
 
       _cart.clear();
@@ -104,6 +105,15 @@ class _CartScreenState extends State<CartScreen> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  bool _importerGroupHasPromo(List<CartLine> lines) {
+    for (final line in lines) {
+      if (_cart.importadorHasPromoAttribution(line.part.ownerId)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @override
@@ -137,13 +147,39 @@ class _CartScreenState extends State<CartScreen> {
                           in _cart.linesGroupedByImporterName.entries) ...[
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6, top: 8),
-                          child: Text(
-                            entry.key,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: AppColors.brandBlue,
-                            ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  entry.key,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: AppColors.brandBlue,
+                                  ),
+                                ),
+                              ),
+                              if (_importerGroupHasPromo(entry.value))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.brandOrange
+                                        .withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Bajo promoción',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandOrange,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                         ...entry.value.map((line) {

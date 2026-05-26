@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/aliado_catalog_filters_draft.dart';
 import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
+import '../models/promo_campaign_model.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
 import '../services/cart_service.dart';
@@ -10,7 +11,9 @@ import '../services/geolocator_service.dart';
 import '../services/supabase_service.dart';
 import 'cart_screen.dart';
 import '../theme/app_theme.dart';
+import '../utils/promo_popup_frequency.dart';
 import '../widgets/aliado_catalog_filters_sheet.dart';
+import '../widgets/aliado_promo_campaign_widgets.dart';
 import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
@@ -80,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final TextEditingController _ownerEstadoFilterController;
   late final TextEditingController _ownerCiudadFilterController;
   late final Future<List<ImporterOption>> _importersFuture;
+  late final Future<List<PromoCampaignModel>> _promoFuture;
+  bool _promoPopupCheckScheduled = false;
 
   /// Alineado con el precio en ficha (descuento en fase contado).
   bool _aliadoFaseContado = false;
@@ -105,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _allySortLng = lo;
       }
       _importersFuture = SupabaseService.fetchImporterOptions();
+      _promoFuture = SupabaseService.fetchActivePromoCampaignsForAliado();
       _searchController.addListener(_onAliadoSearchTextChanged);
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
@@ -117,9 +123,11 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } else if (widget.homeRole == AppHomeRole.administrador) {
       _importersFuture = Future.value(const []);
+      _promoFuture = Future.value(const []);
       _partsFuture = Future.value(const []);
     } else {
       _importersFuture = Future.value(const []);
+      _promoFuture = Future.value(const []);
       _partsFuture = Future.value(const []);
     }
   }
@@ -202,6 +210,53 @@ class _HomeScreenState extends State<HomeScreen> {
       _partsFuture = _fetchProducts(reset: true);
     });
     _refreshCatalogTotal();
+  }
+
+  void _applyImporterFilterFromPromo(String importadorId) {
+    final id = importadorId.trim();
+    if (id.isEmpty) return;
+    setState(() => _selectedImporterIds = {id});
+    _applyFiltersFromUi();
+  }
+
+  void _onPromoCampaignSelected(PromoCampaignModel campaign) {
+    if (!campaign.filtersImporter) return;
+    final importadorId = campaign.importadorId?.trim();
+    if (importadorId == null || importadorId.isEmpty) return;
+    CartService.instance.setPromoAttribution(
+      importadorId: importadorId,
+      campaignId: campaign.id,
+    );
+    _applyImporterFilterFromPromo(importadorId);
+  }
+
+  Future<void> _openActivePromotionsSheet(
+    List<PromoCampaignModel> campaigns,
+  ) async {
+    await showAliadoActivePromotionsSheet(
+      context: context,
+      campaigns: campaigns,
+      onPromoCampaignSelected: _onPromoCampaignSelected,
+    );
+  }
+
+  Future<void> _maybeShowPromoPopup(List<PromoCampaignModel> popups) async {
+    if (!mounted || popups.isEmpty) return;
+    final sorted = List<PromoCampaignModel>.from(popups)
+      ..sort((a, b) => b.priority.compareTo(a.priority));
+    for (final c in sorted) {
+      if (!await PromoPopupFrequency.shouldShow(c.id)) continue;
+      if (!mounted) return;
+      await showAliadoPromoPopupIfDue(
+        context: context,
+        campaign: c,
+        onDismissed: () => PromoPopupFrequency.markShown(c.id),
+        onFilterImporter: c.filtersImporter
+            ? () => _onPromoCampaignSelected(c)
+            : null,
+      );
+      return;
+    }
   }
 
   void _onAliadoSearchTextChanged() {
@@ -640,10 +695,26 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: appBar,
-      body: FutureBuilder<List<ImporterOption>>(
-        future: _importersFuture,
-        builder: (context, importerSnapshot) {
-          final importers = importerSnapshot.data ?? const <ImporterOption>[];
+      body: FutureBuilder<List<Object>>(
+        future: Future.wait<Object>([_importersFuture, _promoFuture]),
+        builder: (context, bootstrapSnapshot) {
+          final importers = bootstrapSnapshot.data != null
+              ? bootstrapSnapshot.data![0] as List<ImporterOption>
+              : const <ImporterOption>[];
+          final promos = bootstrapSnapshot.data != null
+              ? bootstrapSnapshot.data![1] as List<PromoCampaignModel>
+              : const <PromoCampaignModel>[];
+          final bannerPromos =
+              promos.where((p) => p.isBanner).toList(growable: false);
+          final popupPromos =
+              promos.where((p) => p.isPopup).toList(growable: false);
+
+          if (!_promoPopupCheckScheduled && bootstrapSnapshot.hasData) {
+            _promoPopupCheckScheduled = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _maybeShowPromoPopup(popupPromos);
+            });
+          }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -655,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   textInputAction: TextInputAction.search,
                   onSubmitted: (_) => _applyFiltersFromUi(),
                   decoration: _searchDecoration(
-                    onOpenFilters: importerSnapshot.hasError
+                    onOpenFilters: bootstrapSnapshot.hasError
                         ? null
                         : () => _openCatalogFiltersSheet(importers),
                     filterBadge: filterBadge,
@@ -663,6 +734,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               if (activeFilterChips != null) activeFilterChips,
+              if (promos.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => _openActivePromotionsSheet(promos),
+                      icon: const Icon(Icons.campaign_outlined, size: 18),
+                      label: Text('Promociones (${promos.length})'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.brandOrange,
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              AliadoPromoBannerCarousel(
+                campaigns: bannerPromos,
+                onPromoCampaignSelected: _onPromoCampaignSelected,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: Text(

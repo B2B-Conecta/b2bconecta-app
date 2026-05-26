@@ -7,6 +7,7 @@ import '../screens/importer_product_edit_screen.dart';
 import '../services/excel_catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'importer_promo_widgets.dart';
 import 'main_shell_tab.dart';
 
 enum _SkuConflictAction { update, ignore }
@@ -481,6 +482,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 },
               ),
             ),
+            const ImporterActivePromoBanner(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(

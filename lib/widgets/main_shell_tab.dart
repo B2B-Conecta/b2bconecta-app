@@ -104,6 +104,14 @@ class MainShellTabController {
     _importadorValidadosNotificationDeepLink = onNavigate;
   }
 
+  /// Importador: pestaña Inventario (índice 0) tras notificación de campaña promocional.
+  static void navigateToImporterInventoryForNotification() {
+    _goTo?.call(0);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      notifyImporterInventoryReload();
+    });
+  }
+
   /// Importador: pestaña Pedidos (índice 1), filtro Nuevos + expande fila.
   static void navigateToImportadorValidadosForNotification() {
     _importerPedidosPreferNuevosFilter = true;

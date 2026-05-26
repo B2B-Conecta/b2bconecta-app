@@ -23,8 +23,54 @@ class CartService extends ChangeNotifier {
   static final CartService instance = CartService._();
 
   final List<CartLine> _lines = [];
+  final Map<String, String> _promoCampaignByImportadorId = {};
 
   List<CartLine> get lines => List.unmodifiable(_lines);
+
+  /// Campaña promocional (E1.2) asociada al pedido por importador, vía CTA del catálogo.
+  Map<String, String> get promoCampaignByImportadorId =>
+      Map.unmodifiable(_promoCampaignByImportadorId);
+
+  void setPromoAttribution({
+    required String importadorId,
+    required String campaignId,
+  }) {
+    final imp = importadorId.trim();
+    final camp = campaignId.trim();
+    if (imp.isEmpty || camp.isEmpty) return;
+    _promoCampaignByImportadorId[imp] = camp;
+    notifyListeners();
+  }
+
+  String? promoCampaignIdForImportador(String? importadorId) {
+    final id = importadorId?.trim();
+    if (id == null || id.isEmpty) return null;
+    return _promoCampaignByImportadorId[id];
+  }
+
+  bool importadorHasPromoAttribution(String? importadorId) =>
+      promoCampaignIdForImportador(importadorId) != null;
+
+  /// Mapa listo para RPC checkout (`importador_id` → `campaign_id`).
+  Map<String, String> promoAttributionPayloadForCheckout() {
+    final owners = _lines
+        .map((l) => l.part.ownerId?.trim())
+        .whereType<String>()
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final out = <String, String>{};
+    for (final oid in owners) {
+      final cid = _promoCampaignByImportadorId[oid];
+      if (cid != null && cid.isNotEmpty) out[oid] = cid;
+    }
+    return out;
+  }
+
+  void clearPromoAttributions() {
+    if (_promoCampaignByImportadorId.isEmpty) return;
+    _promoCampaignByImportadorId.clear();
+    notifyListeners();
+  }
 
   int get itemCount => _lines.fold<int>(0, (s, e) => s + e.quantity);
 
@@ -91,6 +137,7 @@ class CartService extends ChangeNotifier {
 
   void clear() {
     _lines.clear();
+    _promoCampaignByImportadorId.clear();
     notifyListeners();
   }
 

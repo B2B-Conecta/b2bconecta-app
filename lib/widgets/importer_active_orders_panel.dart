@@ -9,6 +9,7 @@ import '../utils/aliado_order_grouping.dart';
 import '../utils/notification_related_order_match.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
+import 'importer_promo_widgets.dart';
 import 'importer_cancelar_pedido_dialog.dart';
 import 'importer_order_invoice_section.dart';
 import 'importer_order_pago_verification_section.dart';
@@ -459,6 +460,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const ImporterActivePromoBanner(),
               OrderListFilterBar(
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),

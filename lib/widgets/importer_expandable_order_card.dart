@@ -7,6 +7,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
+import 'importer_promo_widgets.dart';
 import 'moroso_order_visual.dart';
 import 'order_motolink_thread_section.dart';
 import 'order_commission_summary.dart';
@@ -71,6 +72,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     final showHeadline = operationalHeadline != null &&
         operationalHeadline!.isNotEmpty &&
         operationalHeadline != '—';
+    final promoChip = importerPromoChipForLines(lines);
 
     final destinoTxt = isCheckoutGroup
         ? lines.first.destinoEntregaLineaCompactaEs
@@ -117,6 +119,10 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 4),
+                          ],
+                          if (promoChip != null) ...[
+                            promoChip,
+                            const SizedBox(height: 6),
                           ],
                           if (r.hasTransitEta &&
                               (r.status ==

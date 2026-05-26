@@ -170,6 +170,16 @@ class NotificationProvider extends ChangeNotifier {
           return;
       }
     }
+    if (t0 == 'promocion') {
+      switch (homeRole) {
+        case AppHomeRole.importador:
+          MainShellTabController.navigateToImporterInventoryForNotification();
+          return;
+        case AppHomeRole.administrador:
+        case AppHomeRole.aliado:
+          return;
+      }
+    }
     if (t0 == 'morosidad') {
       switch (homeRole) {
         case AppHomeRole.aliado:

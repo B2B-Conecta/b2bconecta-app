@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,6 +21,7 @@ import '../models/profile_document_model.dart';
 import '../models/admin_order_rating_row_model.dart';
 import '../models/importador_received_rating_model.dart';
 import '../models/profile_model.dart';
+import '../models/promo_campaign_model.dart';
 import '../models/rating_questionnaire_model.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_message_model.dart';
@@ -44,6 +46,7 @@ class SupabaseService {
   static const _commissionSettlementInvoicesBucket =
       'commission-settlement-invoices';
   static const _profileLogosBucket = 'profile-logos';
+  static const _promoCampaignsBucket = 'promo-campaigns';
 
   static String? get currentUserId => _currentUserId;
 
@@ -821,6 +824,8 @@ class SupabaseService {
     original_checkout_group_id,
     discount_rules,
     confirmado_por,
+    promo_campaign_id,
+    promo_campaign:promo_campaigns ( display_title, internal_title, campaign_type ),
     importador_cancelacion_motivo,
     aliado_experience_stars,
     aliado_experience_comment,
@@ -1441,6 +1446,7 @@ class SupabaseService {
     bool destinoEntregaUsaPerfil = true,
     String? destinoEntregaTexto,
     String? destinoEntregaMapsUrl,
+    Map<String, String> promoByImportador = const {},
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -1474,6 +1480,7 @@ class SupabaseService {
         'p_destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
         'p_destino_entrega_texto': destinoEntregaTexto,
         'p_destino_entrega_maps_url': destinoEntregaMapsUrl,
+        'p_promo_by_importador': promoByImportador,
       },
     );
     return res?.toString() ?? '';
@@ -2828,6 +2835,135 @@ class SupabaseService {
       return RatingQuestionnaireModel.fromJson(Map<String, dynamic>.from(res));
     }
     return const RatingQuestionnaireModel(version: 'bucket_v1', questions: []);
+  }
+
+  /// E1.2: campañas activas visibles en catálogo aliado.
+  static Future<List<PromoCampaignModel>> fetchActivePromoCampaignsForAliado() async {
+    final res = await _client.rpc('get_active_promo_campaigns_for_aliado');
+    final list = _decodeRpcJsonArray(res);
+    return list
+        .map((e) => PromoCampaignModel.fromAliadoRpcJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .where((c) => c.id.isNotEmpty && c.imagePublicUrl.trim().isNotEmpty)
+        .toList();
+  }
+
+  static List<dynamic> _decodeRpcJsonArray(dynamic res) {
+    if (res is List) return res;
+    if (res is String && res.isNotEmpty) {
+      final decoded = jsonDecode(res);
+      if (decoded is List) return decoded;
+    }
+    return const [];
+  }
+
+  /// E1.2: campañas activas del importador autenticado.
+  static Future<List<PromoCampaignModel>>
+      fetchActivePromoCampaignsForImportador() async {
+    final res = await _client.rpc('get_active_promo_campaigns_for_importador');
+    final list = _decodeRpcJsonArray(res);
+    return list
+        .map((e) => PromoCampaignModel.fromImportadorRpcJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .where((c) => c.id.isNotEmpty)
+        .toList();
+  }
+
+  /// E1.2: listado admin de campañas.
+  static Future<List<PromoCampaignModel>> fetchPromoCampaignsAdmin() async {
+    final res = await _client
+        .from('promo_campaigns')
+        .select()
+        .order('priority', ascending: false)
+        .order('created_at', ascending: false);
+    final list = res as List<dynamic>;
+    return list
+        .map((row) =>
+            PromoCampaignModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .toList();
+  }
+
+  static Future<PromoCampaignModel> insertPromoCampaign({
+    required PromoCampaignModel draft,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final payload = draft.toInsertJson(createdBy: uid);
+    final row = await _client
+        .from('promo_campaigns')
+        .insert(payload)
+        .select()
+        .single();
+    return PromoCampaignModel.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  static Future<PromoCampaignModel> updatePromoCampaign({
+    required String id,
+    required PromoCampaignModel draft,
+  }) async {
+    final row = await _client
+        .from('promo_campaigns')
+        .update(draft.toUpdateJson())
+        .eq('id', id)
+        .select()
+        .single();
+    return PromoCampaignModel.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  static Future<void> deletePromoCampaign(String id) async {
+    await _client.from('promo_campaigns').delete().eq('id', id);
+  }
+
+  /// Sube creativo al bucket [promo-campaigns] (solo admin vía RLS).
+  static Future<({String path, String publicUrl})> uploadPromoCampaignImage({
+    required Uint8List bytes,
+    required String fileExtension,
+    String? campaignId,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    if (bytes.isEmpty) {
+      throw ArgumentError('La imagen está vacía. Pruebe otro archivo.');
+    }
+
+    var ext = fileExtension.replaceAll('.', '').toLowerCase();
+    if (ext == 'jpg') ext = 'jpeg';
+    const allowed = {'jpeg', 'png', 'webp'};
+    if (!allowed.contains(ext)) {
+      throw ArgumentError('Usa JPG, PNG o WEBP.');
+    }
+
+    final idPart =
+        (campaignId != null && campaignId.isNotEmpty) ? campaignId : 'nueva';
+    final path = '$uid/$idPart/${DateTime.now().microsecondsSinceEpoch}.$ext';
+
+    final contentType = switch (ext) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+
+    try {
+      await _client.storage.from(_promoCampaignsBucket).uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
+          );
+    } on StorageException catch (e) {
+      final hint = e.statusCode == '404' || e.message.contains('Bucket not found')
+          ? ' Aplique las migraciones Supabase (bucket promo-campaigns).'
+          : '';
+      throw StateError(
+        'No se pudo subir la imagen (${e.statusCode ?? '?'}): '
+        '${e.message}.$hint',
+      );
+    }
+
+    final publicUrl =
+        _client.storage.from(_promoCampaignsBucket).getPublicUrl(path);
+    return (path: path, publicUrl: publicUrl);
   }
 
   /// C4: valoraciones recibidas por el importador (aliado anónimo en etiqueta).

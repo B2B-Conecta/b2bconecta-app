@@ -104,6 +104,8 @@ class TransactionRequestModel {
     this.qtyAdjustmentOffered,
     this.qtyAdjustmentNote,
     this.qtyAdjustmentSolicitadaSnapshot,
+    this.promoCampaignId,
+    this.promoCampaignDisplayTitle,
   });
 
   final String id;
@@ -244,6 +246,17 @@ class TransactionRequestModel {
   final int? qtyAdjustmentOffered;
   final String? qtyAdjustmentNote;
   final int? qtyAdjustmentSolicitadaSnapshot;
+  final String? promoCampaignId;
+  final String? promoCampaignDisplayTitle;
+
+  bool get bajoPromocionCatalogo =>
+      promoCampaignId != null && promoCampaignId!.trim().isNotEmpty;
+
+  String get promoCampaignEtiqueta {
+    final t = promoCampaignDisplayTitle?.trim();
+    if (t != null && t.isNotEmpty) return t;
+    return 'Promoción';
+  }
 
   bool get qtyAdjustmentPendienteAliado =>
       qtyAdjustmentStatus == QtyAdjustmentStatus.pendienteAliado;
@@ -859,6 +872,18 @@ class TransactionRequestModel {
       qtyAdjustmentNote: _nullableText(json['qty_adjustment_note']),
       qtyAdjustmentSolicitadaSnapshot:
           _asNullableInt(json['qty_adjustment_solicitada_snapshot']),
+      promoCampaignId: _nullableText(json['promo_campaign_id']),
+      promoCampaignDisplayTitle: () {
+        final pc = json['promo_campaign'];
+        if (pc is Map) {
+          final m = Map<String, dynamic>.from(pc);
+          final display = m['display_title']?.toString().trim();
+          if (display != null && display.isNotEmpty) return display;
+          final internal = m['internal_title']?.toString().trim();
+          if (internal != null && internal.isNotEmpty) return internal;
+        }
+        return null;
+      }(),
     );
   }
 

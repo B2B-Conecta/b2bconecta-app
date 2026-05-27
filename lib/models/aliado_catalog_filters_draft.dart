@@ -1,3 +1,5 @@
+import 'catalog_sort_mode.dart';
+
 /// Estado editable del panel de filtros del catálogo aliado.
 class AliadoCatalogFiltersDraft {
   const AliadoCatalogFiltersDraft({
@@ -7,7 +9,9 @@ class AliadoCatalogFiltersDraft {
     required this.ownerCiudad,
     required this.minPrice,
     required this.maxPrice,
-    required this.closestToMe,
+    this.sortMode = CatalogSortMode.recommended,
+    this.minOwnerRatingAvg,
+    this.minOwnerRatingCount,
   });
 
   final String categoryLabel;
@@ -16,7 +20,9 @@ class AliadoCatalogFiltersDraft {
   final String ownerCiudad;
   final String minPrice;
   final String maxPrice;
-  final bool closestToMe;
+  final CatalogSortMode sortMode;
+  final double? minOwnerRatingAvg;
+  final int? minOwnerRatingCount;
 
   bool get hasCategoryFilter => categoryLabel != 'Todos';
 
@@ -28,13 +34,20 @@ class AliadoCatalogFiltersDraft {
   bool get hasPriceFilter =>
       minPrice.trim().isNotEmpty || maxPrice.trim().isNotEmpty;
 
+  bool get hasReputationFilter =>
+      (minOwnerRatingAvg != null && minOwnerRatingAvg! > 0) ||
+      (minOwnerRatingCount != null && minOwnerRatingCount! > 0);
+
+  bool get hasNonDefaultSort => sortMode != CatalogSortMode.recommended;
+
   /// Filtros del panel (excluye texto de búsqueda principal).
   bool get hasAnyPanelFilter =>
       hasCategoryFilter ||
       hasImporterFilter ||
       hasLocationFilter ||
       hasPriceFilter ||
-      closestToMe;
+      hasReputationFilter ||
+      hasNonDefaultSort;
 
   int get activePanelFilterCount {
     var n = 0;
@@ -48,7 +61,11 @@ class AliadoCatalogFiltersDraft {
       if (minPrice.trim().isNotEmpty) n++;
       if (maxPrice.trim().isNotEmpty) n++;
     }
-    if (closestToMe) n++;
+    if (hasReputationFilter) {
+      if (minOwnerRatingAvg != null && minOwnerRatingAvg! > 0) n++;
+      if (minOwnerRatingCount != null && minOwnerRatingCount! > 0) n++;
+    }
+    if (hasNonDefaultSort) n++;
     return n;
   }
 }

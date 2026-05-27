@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/aliado_catalog_filters_draft.dart';
 import '../models/app_home_role.dart';
 import '../models/catalog_filters.dart';
+import '../models/catalog_sort_mode.dart';
 import '../models/promo_campaign_model.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
@@ -89,8 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Alineado con el precio en ficha (descuento en fase contado).
   bool _aliadoFaseContado = false;
 
-  /// Filtro rápido «Más cercanos a mí» (GPS + orden Haversine).
-  bool _closestToMeEnabled = false;
+  CatalogSortMode _catalogSortMode = CatalogSortMode.recommended;
+  double? _minOwnerRatingAvg;
+  int? _minOwnerRatingCount;
   double? _allySortLat;
   double? _allySortLng;
 
@@ -171,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .join(' ');
     final oe = _ownerEstadoFilterController.text.trim();
     final oc = _ownerCiudadFilterController.text.trim();
+    final useNearest = _catalogSortMode == CatalogSortMode.nearest;
     return CatalogFilters(
       searchQuery: combined.isEmpty ? null : combined,
       ownerIds: _selectedImporterIds.toList(),
@@ -179,8 +182,11 @@ class _HomeScreenState extends State<HomeScreen> {
       minPrice: minP,
       maxPrice: maxP,
       onlyActiveProducts: true,
-      sortReferenceLat: _closestToMeEnabled ? _allySortLat : null,
-      sortReferenceLng: _closestToMeEnabled ? _allySortLng : null,
+      sortMode: _catalogSortMode,
+      sortReferenceLat: useNearest ? _allySortLat : null,
+      sortReferenceLng: useNearest ? _allySortLng : null,
+      minOwnerRatingAvg: _minOwnerRatingAvg,
+      minOwnerRatingCount: _minOwnerRatingCount,
     );
   }
 
@@ -201,7 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedImporterIds = {};
       _selectedCategoryLabel = 'Todos';
-      _closestToMeEnabled = false;
+      _catalogSortMode = CatalogSortMode.recommended;
+      _minOwnerRatingAvg = null;
+      _minOwnerRatingCount = null;
       final la = widget.profile.latitude;
       final lo = widget.profile.longitude;
       _allySortLat = la;
@@ -272,19 +280,17 @@ class _HomeScreenState extends State<HomeScreen> {
       ownerCiudad: _ownerCiudadFilterController.text,
       minPrice: _minPriceController.text,
       maxPrice: _maxPriceController.text,
-      closestToMe: _closestToMeEnabled,
+      sortMode: _catalogSortMode,
+      minOwnerRatingAvg: _minOwnerRatingAvg,
+      minOwnerRatingCount: _minOwnerRatingCount,
     );
   }
 
-  void _disableClosestSort() {
-    setState(() {
-      _closestToMeEnabled = false;
-      _allySortLat = widget.profile.latitude;
-      _allySortLng = widget.profile.longitude;
-    });
+  void _setCatalogSortMode(CatalogSortMode mode) {
+    setState(() => _catalogSortMode = mode);
   }
 
-  Future<bool> _enableClosestSort() async {
+  Future<bool> _ensureGpsForNearestSort() async {
     final pos = await GeolocatorService.getCurrentLatLng();
     if (!mounted) return false;
     if (pos == null) {
@@ -308,7 +314,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return false;
     setState(() {
-      _closestToMeEnabled = true;
       _allySortLat = pos.lat;
       _allySortLng = pos.lng;
     });
@@ -323,15 +328,25 @@ class _HomeScreenState extends State<HomeScreen> {
       _ownerCiudadFilterController.text = draft.ownerCiudad;
       _minPriceController.text = draft.minPrice;
       _maxPriceController.text = draft.maxPrice;
+      _catalogSortMode = draft.sortMode;
+      _minOwnerRatingAvg = draft.minOwnerRatingAvg;
+      _minOwnerRatingCount = draft.minOwnerRatingCount;
     });
 
-    if (draft.closestToMe) {
-      final ok = await _enableClosestSort();
+    if (draft.sortMode == CatalogSortMode.nearest) {
+      final ok = await _ensureGpsForNearestSort();
       if (!ok && mounted) {
-        setState(() => _closestToMeEnabled = false);
+        setState(() => _catalogSortMode = CatalogSortMode.recommended);
       }
-    } else if (_closestToMeEnabled) {
-      _disableClosestSort();
+    } else {
+      final la = widget.profile.latitude;
+      final lo = widget.profile.longitude;
+      if (la != null && lo != null) {
+        setState(() {
+          _allySortLat = la;
+          _allySortLng = lo;
+        });
+      }
     }
 
     if (!mounted) return;
@@ -535,11 +550,29 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ));
     }
-    if (draft.closestToMe) {
+    if (draft.hasNonDefaultSort) {
       chips.add(_activeFilterChip(
-        label: 'Más cercanos',
+        label: 'Orden: ${draft.sortMode.labelEs}',
         onDeleted: () {
-          _disableClosestSort();
+          _setCatalogSortMode(CatalogSortMode.recommended);
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    if (draft.minOwnerRatingAvg != null && draft.minOwnerRatingAvg! > 0) {
+      chips.add(_activeFilterChip(
+        label: '≥ ${draft.minOwnerRatingAvg!.toStringAsFixed(1)} ★',
+        onDeleted: () {
+          setState(() => _minOwnerRatingAvg = null);
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    if (draft.minOwnerRatingCount != null && draft.minOwnerRatingCount! > 0) {
+      chips.add(_activeFilterChip(
+        label: '≥ ${draft.minOwnerRatingCount} valoraciones',
+        onDeleted: () {
+          setState(() => _minOwnerRatingCount = null);
           _applyFiltersFromUi();
         },
       ));

@@ -1,3 +1,5 @@
+import 'catalog_sort_mode.dart';
+
 /// Filtros del catálogo de repuestos (consultas a `products`).
 class CatalogFilters {
   const CatalogFilters({
@@ -9,8 +11,11 @@ class CatalogFilters {
     this.minPrice,
     this.maxPrice,
     this.onlyActiveProducts = true,
+    this.sortMode = CatalogSortMode.recommended,
     this.sortReferenceLat,
     this.sortReferenceLng,
+    this.minOwnerRatingAvg,
+    this.minOwnerRatingCount,
   });
 
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
@@ -38,18 +43,31 @@ class CatalogFilters {
   /// Inventario del importador: `false` para incluir pausados.
   final bool onlyActiveProducts;
 
-  /// Si ambos están definidos, el catálogo aliado se ordena por distancia creciente
-  /// (Haversine) respecto a este punto (p. ej. GPS del aliado).
+  /// Orden de resultados (E2.2): recomendado, cercanía o reputación.
+  final CatalogSortMode sortMode;
+
+  /// Punto de referencia para [CatalogSortMode.nearest].
   final double? sortReferenceLat;
   final double? sortReferenceLng;
+
+  /// Umbral mínimo sobre `profiles.rating_avg_received_rolling100` (E2.2).
+  final double? minOwnerRatingAvg;
+
+  /// Umbral mínimo sobre `profiles.rating_count_received_rolling100` (E2.2).
+  final int? minOwnerRatingCount;
 
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
 
   bool get sortByDistanceFromReference =>
+      sortMode == CatalogSortMode.nearest &&
       sortReferenceLat != null &&
       sortReferenceLng != null &&
       !sortReferenceLat!.isNaN &&
       !sortReferenceLng!.isNaN;
+
+  bool get hasReputationThreshold =>
+      (minOwnerRatingAvg != null && minOwnerRatingAvg! > 0) ||
+      (minOwnerRatingCount != null && minOwnerRatingCount! > 0);
 
   bool get hasAnyFilter {
     final q = searchQuery?.trim();
@@ -59,7 +77,9 @@ class CatalogFilters {
         (ownerEstado != null && ownerEstado!.trim().isNotEmpty) ||
         (ownerCiudad != null && ownerCiudad!.trim().isNotEmpty) ||
         minPrice != null ||
-        maxPrice != null;
+        maxPrice != null ||
+        hasReputationThreshold ||
+        sortMode != CatalogSortMode.recommended;
   }
 
   List<String> get effectiveOwnerIds {
@@ -80,9 +100,14 @@ class CatalogFilters {
     double? minPrice,
     double? maxPrice,
     bool? onlyActiveProducts,
+    CatalogSortMode? sortMode,
     double? sortReferenceLat,
     double? sortReferenceLng,
+    double? minOwnerRatingAvg,
+    int? minOwnerRatingCount,
     bool clearSortReference = false,
+    bool clearMinOwnerRatingAvg = false,
+    bool clearMinOwnerRatingCount = false,
   }) {
     return CatalogFilters(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -93,10 +118,17 @@ class CatalogFilters {
       minPrice: minPrice ?? this.minPrice,
       maxPrice: maxPrice ?? this.maxPrice,
       onlyActiveProducts: onlyActiveProducts ?? this.onlyActiveProducts,
+      sortMode: sortMode ?? this.sortMode,
       sortReferenceLat:
           clearSortReference ? null : (sortReferenceLat ?? this.sortReferenceLat),
       sortReferenceLng:
           clearSortReference ? null : (sortReferenceLng ?? this.sortReferenceLng),
+      minOwnerRatingAvg: clearMinOwnerRatingAvg
+          ? null
+          : (minOwnerRatingAvg ?? this.minOwnerRatingAvg),
+      minOwnerRatingCount: clearMinOwnerRatingCount
+          ? null
+          : (minOwnerRatingCount ?? this.minOwnerRatingCount),
     );
   }
 }

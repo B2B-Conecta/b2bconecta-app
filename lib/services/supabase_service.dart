@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/cash_phase_exception.dart';
 import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
+import '../models/catalog_sort_mode.dart';
 import '../models/commission_settlement_model.dart';
 import '../models/document_review_status.dart';
 import '../models/document_type_preference.dart';
@@ -541,7 +542,8 @@ class SupabaseService {
     final oc = filters.ownerCiudad?.trim();
     return (sq != null && sq.isNotEmpty) ||
         (oe != null && oe.isNotEmpty) ||
-        (oc != null && oc.isNotEmpty);
+        (oc != null && oc.isNotEmpty) ||
+        filters.hasReputationThreshold;
   }
 
   static String _catalogProfileSelect(CatalogFilters filters) {
@@ -3282,6 +3284,9 @@ class SupabaseService {
       final list = response as List<dynamic>;
       final refLat = f.sortReferenceLat!;
       final refLng = f.sortReferenceLng!;
+      final distanceCompare = f.sortMode == CatalogSortMode.reputation
+          ? comparePartsByDistanceThenCatalogReputation
+          : comparePartsByDistanceThenCatalogBoost;
       final withDist = list.map((row) {
         final p = PartModel.fromJson(row as Map<String, dynamic>);
         final km = Haversine.distanceKm(
@@ -3292,7 +3297,7 @@ class SupabaseService {
         );
         return p.copyWith(distanceKmFromReference: km);
       }).toList()
-        ..sort(comparePartsByDistanceThenCatalogBoost);
+        ..sort(distanceCompare);
       if (offset >= withDist.length) return [];
       final end = (offset + limit).clamp(0, withDist.length);
       return withDist.sublist(offset, end);
@@ -3302,8 +3307,12 @@ class SupabaseService {
     final list = response as List<dynamic>;
     final parts = list
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
-        .toList()
-      ..sort(comparePartsForCatalogBoost);
+        .toList();
+    if (f.sortMode == CatalogSortMode.reputation) {
+      parts.sort(comparePartsForCatalogReputation);
+    } else {
+      parts.sort(comparePartsForCatalogBoost);
+    }
     if (offset >= parts.length) return [];
     final end = (offset + limit).clamp(0, parts.length);
     return parts.sublist(offset, end);
@@ -3401,6 +3410,22 @@ class SupabaseService {
     }
     if (filters.onlyActiveProducts) {
       q = q.eq('is_active', true);
+    }
+    final minAvg = filters.minOwnerRatingAvg;
+    if (minAvg != null && minAvg > 0) {
+      q = q.filter(
+        'profiles.rating_avg_received_rolling100',
+        'gte',
+        minAvg,
+      );
+    }
+    final minCnt = filters.minOwnerRatingCount;
+    if (minCnt != null && minCnt > 0) {
+      q = q.filter(
+        'profiles.rating_count_received_rolling100',
+        'gte',
+        minCnt,
+      );
     }
     // Catálogo B2B (aliados): no listar productos sin inventario.
     q = q.gt('stock', 0);

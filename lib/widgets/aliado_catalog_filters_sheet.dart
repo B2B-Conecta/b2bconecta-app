@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/aliado_catalog_filters_draft.dart';
+import '../models/aliado_catalog_reputation_filter_presets.dart';
 import '../models/catalog_filters.dart';
+import '../models/catalog_sort_mode.dart';
 import '../theme/app_theme.dart';
 
 /// Categorías rápidas del catálogo (tokens de búsqueda en [home_screen]).
@@ -65,7 +67,9 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
   late final TextEditingController _minPriceController;
   late final TextEditingController _maxPriceController;
   late final TextEditingController _importerSearchController;
-  bool _closestToMe = false;
+  late CatalogSortMode _sortMode;
+  double? _minRatingAvg;
+  int? _minRatingCount;
   String _importerQuery = '';
 
   @override
@@ -73,7 +77,9 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     super.initState();
     _category = widget.initial.categoryLabel;
     _importerIds = Set<String>.from(widget.initial.importerIds);
-    _closestToMe = widget.initial.closestToMe;
+    _sortMode = widget.initial.sortMode;
+    _minRatingAvg = widget.initial.minOwnerRatingAvg;
+    _minRatingCount = widget.initial.minOwnerRatingCount;
     _estadoController = TextEditingController(text: widget.initial.ownerEstado);
     _ciudadController = TextEditingController(text: widget.initial.ownerCiudad);
     _minPriceController = TextEditingController(text: widget.initial.minPrice);
@@ -104,7 +110,9 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
       ownerCiudad: _ciudadController.text,
       minPrice: _minPriceController.text,
       maxPrice: _maxPriceController.text,
-      closestToMe: _closestToMe,
+      sortMode: _sortMode,
+      minOwnerRatingAvg: _minRatingAvg,
+      minOwnerRatingCount: _minRatingCount,
     );
   }
 
@@ -112,7 +120,9 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     setState(() {
       _category = 'Todos';
       _importerIds.clear();
-      _closestToMe = false;
+      _sortMode = CatalogSortMode.recommended;
+      _minRatingAvg = null;
+      _minRatingCount = null;
       _estadoController.clear();
       _ciudadController.clear();
       _minPriceController.clear();
@@ -206,7 +216,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Categoría, ubicación, precio, proveedores y orden.',
+                  'Categoría, ubicación, precio, reputación, proveedores y orden.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -246,23 +256,115 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   }).toList(),
                 ),
                 _sectionTitle('ORDEN'),
-                SwitchListTile(
-                  value: _closestToMe,
-                  onChanged: (v) => setState(() => _closestToMe = v),
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.brandOrange,
-                  title: const Text(
-                    'Más cercanos a mí',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                ...CatalogSortMode.values.map((mode) {
+                  return RadioListTile<CatalogSortMode>(
+                    value: mode,
+                    groupValue: _sortMode,
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _sortMode = v);
+                    },
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: AppColors.brandOrange,
+                    title: Text(
+                      mode.labelEs,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
+                    subtitle: Text(
+                      switch (mode) {
+                        CatalogSortMode.recommended =>
+                          'Prioriza actividad reciente y reputación (últ. 100).',
+                        CatalogSortMode.nearest =>
+                          'Ordena por distancia a tu ubicación (GPS).',
+                        CatalogSortMode.reputation =>
+                          'Primero importadores mejor valorados (últ. 100).',
+                      },
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  );
+                }),
+                _sectionTitle('REPUTACIÓN DEL PROVEEDOR'),
+                const Text(
+                  'Solo productos de importadores que cumplan el umbral (ventana móvil de 100 valoraciones).',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
                   ),
-                  subtitle: const Text(
-                    'Usa tu ubicación para ordenar por distancia al almacén.',
-                    style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Promedio mínimo',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
-                  secondary: const Icon(Icons.near_me_outlined),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: kAliadoCatalogMinRatingPresets.map((preset) {
+                    final selected = _minRatingAvg == preset.minAvg;
+                    return FilterChip(
+                      label: Text(preset.label),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _minRatingAvg = preset.minAvg),
+                      selectedColor: AppColors.brandOrange,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color:
+                            selected ? Colors.white : AppColors.textPrimary,
+                      ),
+                      backgroundColor: Colors.grey.shade200,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Cantidad mínima de valoraciones',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: kAliadoCatalogMinRatingCountPresets.map((preset) {
+                    final selected = _minRatingCount == preset.minCount;
+                    return FilterChip(
+                      label: Text(preset.label),
+                      selected: selected,
+                      onSelected: (_) =>
+                          setState(() => _minRatingCount = preset.minCount),
+                      selectedColor: AppColors.brandOrange,
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color:
+                            selected ? Colors.white : AppColors.textPrimary,
+                      ),
+                      backgroundColor: Colors.grey.shade200,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    );
+                  }).toList(),
                 ),
                 _sectionTitle('UBICACIÓN DEL PROVEEDOR'),
                 Row(

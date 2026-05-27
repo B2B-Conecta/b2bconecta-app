@@ -64,8 +64,10 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-    final avg = p.ratingAvgReceived;
-    final cnt = p.ratingCountReceived ?? 0;
+    final avg = p.ratingAvgReceivedRolling100 ?? p.ratingAvgReceived;
+    final cnt =
+        p.ratingCountReceivedRolling100 ?? p.ratingCountReceived ?? 0;
+    final usesRollingWindow = p.ratingAvgReceivedRolling100 != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,6 +109,17 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
                     ),
                   ],
                 ),
+                if (usesRollingWindow) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Promedio de las últimas 100 valoraciones de aliados.',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      height: 1.3,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   avg >= 4.5

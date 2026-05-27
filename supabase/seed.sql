@@ -496,6 +496,13 @@ on conflict (id) do update set
   rating_avg_received = excluded.rating_avg_received,
   rating_count_received = excluded.rating_count_received;
 
+-- Demo E2.1: ventana rolling = histórico mientras no hay order_ratings en seed.
+update public.profiles
+set
+  rating_avg_received_rolling100 = rating_avg_received,
+  rating_count_received_rolling100 = rating_count_received
+where rating_avg_received is not null;
+
 -- ---------------------------------------------------------------------------
 -- Catálogo: importador1/2 → 15 SKU; importador3–12 → 5 SKU (referencias OEM reales)
 -- ---------------------------------------------------------------------------

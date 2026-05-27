@@ -546,7 +546,7 @@ class SupabaseService {
 
   static String _catalogProfileSelect(CatalogFilters filters) {
     const rep =
-        'rating_avg_received, rating_count_received, catalog_paid_orders_30d';
+        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d';
     return _catalogNeedsProfileInner(filters)
         ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude, $rep)'
         : 'profiles(business_name, estado, ciudad, latitude, longitude, $rep)';

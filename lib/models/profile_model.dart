@@ -26,6 +26,8 @@ class ProfileModel {
     this.locationUpdatedAt,
     this.ratingAvgReceived,
     this.ratingCountReceived,
+    this.ratingAvgReceivedRolling100,
+    this.ratingCountReceivedRolling100,
     this.ratingAsPayerAvg,
     this.ratingAsPayerCount,
   });
@@ -79,6 +81,10 @@ class ProfileModel {
   /// Promedio 1–5 como proveedor (valoraciones de aliados).
   final double? ratingAvgReceived;
   final int? ratingCountReceived;
+
+  /// Promedio 1–5 sobre las últimas 100 valoraciones (E2.1, catálogo).
+  final double? ratingAvgReceivedRolling100;
+  final int? ratingCountReceivedRolling100;
 
   /// Promedio 1–5 como pagador (valoraciones de importadores; v2 crédito).
   final double? ratingAsPayerAvg;
@@ -202,6 +208,10 @@ class ProfileModel {
           : null,
       ratingAvgReceived: _asDoubleNullable(json['rating_avg_received']),
       ratingCountReceived: _asIntNullable(json['rating_count_received']),
+      ratingAvgReceivedRolling100:
+          _asDoubleNullable(json['rating_avg_received_rolling100']),
+      ratingCountReceivedRolling100:
+          _asIntNullable(json['rating_count_received_rolling100']),
       ratingAsPayerAvg: _asDoubleNullable(json['rating_as_payer_avg']),
       ratingAsPayerCount: _asIntNullable(json['rating_as_payer_count']),
     );

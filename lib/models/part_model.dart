@@ -62,7 +62,7 @@ class PartModel {
   /// Distancia al punto de referencia del aliado (GPS); la calcula el cliente al ordenar.
   final double? distanceKmFromReference;
 
-  /// Reputación del importador (`profiles.rating_avg_received`).
+  /// Reputación rolling del importador (`profiles.rating_avg_received_rolling100`, E2.1).
   final double? ownerRatingAvg;
   final int? ownerRatingCount;
 
@@ -192,14 +192,15 @@ class PartModel {
     }
     if (m == null) return (null, null);
     double? avg;
-    final a = m['rating_avg_received'];
+    final a = m['rating_avg_received_rolling100'] ?? m['rating_avg_received'];
     if (a is num) {
       avg = a.toDouble();
     } else {
       avg = double.tryParse(a?.toString() ?? '');
     }
     int? cnt;
-    final c = m['rating_count_received'];
+    final c =
+        m['rating_count_received_rolling100'] ?? m['rating_count_received'];
     if (c is int) {
       cnt = c;
     } else if (c is num) {

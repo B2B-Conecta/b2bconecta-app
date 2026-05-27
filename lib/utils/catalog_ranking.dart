@@ -1,6 +1,6 @@
 import '../models/part_model.dart';
 
-/// Orden de catálogo aliado (E1.1): boost por pagos confirmados por importador, luego reputación.
+/// Orden de catálogo aliado (E1.1 + E2.1): boost por pagos confirmados, luego reputación rolling 100.
 int comparePartsForCatalogBoost(PartModel a, PartModel b) {
   final pa = a.ownerCatalogPaidOrders30d ?? 0;
   final pb = b.ownerCatalogPaidOrders30d ?? 0;

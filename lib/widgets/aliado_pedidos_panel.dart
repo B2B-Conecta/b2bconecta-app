@@ -15,8 +15,9 @@ import '../utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
 import 'aliado_confirmar_recepcion_section.dart';
-import 'aliado_order_experience_section.dart';
+import '../utils/aliado_experience_utils.dart';
 import 'aliado_order_pago_section.dart';
+import 'order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
@@ -619,6 +620,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildAliadoRatingBar(
+          context,
+          chunk,
+          bundleCheckoutGroupId: bundleCheckoutGroupId,
+          importadorId: chunk.first.ownerId,
+          importadorLabel: name,
+          onExpandCard: null,
+        ),
         if (disc != null) ...[
           Container(
             width: double.infinity,
@@ -650,10 +659,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           pagoTotal: importerTotal,
           montoRef: subtotal,
           child: usePagoUnificado
-              ? _columnPagoUnificadoImportador(
-                  chunk,
-                  suppressExperienceParent: bundleCheckoutGroupId != null,
-                )
+              ? _columnPagoUnificadoImportador(chunk)
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -678,7 +684,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                         request: chunk[i],
                         profile: _profile,
                         onChanged: _load,
-                        suppressExperience: bundleCheckoutGroupId != null,
                         suppressPrimaryTitle: true,
                         suppressNegotiationIntro: i > 0,
                       ),
@@ -730,25 +735,100 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             onThreadChanged: _load,
           ),
         ],
-        if (bundleCheckoutGroupId != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: AliadoOrderExperienceSection(
-              request: chunk.first,
-              onChanged: _load,
-              bundleCheckoutGroupId: bundleCheckoutGroupId,
-              bundleImportadorId: chunk.first.ownerId,
-            ),
-          ),
       ],
     );
   }
 
-  /// Una pasarela de pago y un comprobante para todas las líneas de este importador (sin plan de cuotas).
-  Widget _columnPagoUnificadoImportador(
-    List<TransactionRequestModel> chunk, {
-    required bool suppressExperienceParent,
+  /// Carrito multi-importador expandido: barra por pestaña; colapsado: resumen en ficha.
+  bool _aliadoRatingBarVisibleEnFicha(
+    List<TransactionRequestModel> lines, {
+    required bool expanded,
   }) {
+    if (!lineasEntregadasParaValorar(lines).any((_) => true)) return false;
+    final variosImportadores = lines.map((r) => r.ownerId).toSet().length > 1;
+    if (variosImportadores && expanded) return false;
+    return true;
+  }
+
+  Widget _buildAliadoRatingBar(
+    BuildContext context,
+    List<TransactionRequestModel> lines, {
+    String? bundleCheckoutGroupId,
+    String? importadorId,
+    String? importadorLabel,
+    VoidCallback? onExpandCard,
+  }) {
+    if (!lineasEntregadasParaValorar(lines).any((_) => true)) {
+      return const SizedBox.shrink();
+    }
+
+    final ref = aliadoLineaReferenciaValoracion(
+      lines,
+      importadorId: importadorId,
+    );
+    final pending = aliadoGrupoTieneValoracionPendiente(
+      lines,
+      importadorId: importadorId,
+    );
+    final pendingImportadores = aliadoLineasPendientesValoracion(lines)
+        .map((r) => r.ownerId)
+        .toSet()
+        .length;
+
+    String pendingLabel = 'Valorar pedido';
+    if (importadorLabel != null && importadorLabel.trim().isNotEmpty) {
+      pendingLabel = 'Valorar a ${importadorLabel.trim()}';
+    } else if (pendingImportadores > 1) {
+      pendingLabel =
+          'Valorar proveedores ($pendingImportadores pendientes)';
+    }
+
+    return OrderRatingPendingBar(
+      pending: pending,
+      completedSummary: !pending && aliadoTieneValoracionRegistrada(ref)
+          ? aliadoValoracionResumenCortoEs(ref)
+          : null,
+      pendingLabel: pendingLabel,
+      onTapPending: () {
+        if (importadorId == null &&
+            pendingImportadores > 1 &&
+            onExpandCard != null) {
+          onExpandCard();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Valorá cada proveedor en su pestaña dentro de este pedido.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+        showAliadoOrderRatingSheet(
+          context,
+          request: ref,
+          onSubmitted: _load,
+          bundleCheckoutGroupId: bundleCheckoutGroupId,
+          bundleImportadorId: importadorId,
+          importadorLabel: importadorLabel,
+        );
+      },
+      onTapView: !pending
+          ? () => showAliadoOrderRatingSheet(
+                context,
+                request: ref,
+                onSubmitted: _load,
+                bundleCheckoutGroupId: bundleCheckoutGroupId,
+                bundleImportadorId: importadorId,
+                importadorLabel: importadorLabel,
+                readOnly: true,
+              )
+          : null,
+    );
+  }
+
+  /// Una pasarela de pago y un comprobante para todas las líneas de este importador (sin plan de cuotas).
+  Widget _columnPagoUnificadoImportador(List<TransactionRequestModel> chunk) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -757,7 +837,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           profile: _profile,
           onChanged: _load,
           pagoBundleLines: chunk,
-          suppressExperience: suppressExperienceParent,
           suppressPrimaryTitle: true,
           suppressNegotiationIntro: false,
         ),
@@ -784,6 +863,19 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       expanded: _expandedRequestId == expandKey,
       onToggle: () => _toggleExpand(expandKey),
       statusLabel: isMulti ? _labelGrupo(g) : _label(primary),
+      ratingBar: _aliadoRatingBarVisibleEnFicha(
+            g,
+            expanded: _expandedRequestId == expandKey,
+          )
+          ? _buildAliadoRatingBar(
+              context,
+              g,
+              bundleCheckoutGroupId: cgForBundle,
+              onExpandCard: isMulti && cgForBundle != null
+                  ? () => _toggleExpand(expandKey)
+                  : null,
+            )
+          : null,
       expandedLeading: _buildRecepcionLeading(context, g),
       onCancelarSolicitudPendiente: _grupoPuedeCancelar(g)
           ? () => _cancelarGrupoPendiente(context, g)

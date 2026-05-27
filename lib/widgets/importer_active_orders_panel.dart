@@ -13,7 +13,7 @@ import 'importer_promo_widgets.dart';
 import 'importer_cancelar_pedido_dialog.dart';
 import 'importer_order_invoice_section.dart';
 import 'importer_order_pago_verification_section.dart';
-import 'importer_order_rating_section.dart';
+import 'order_rating_sheet.dart';
 import 'importer_notificar_ajuste_cantidad_dialog.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
@@ -518,6 +518,20 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                             return ImporterExpandableOrderCard(
                               request: primary,
                               checkoutGroupLines: isBundle ? g : null,
+                              ratingBar: primary.status ==
+                                      TransactionRequestStatus.entregado
+                                  ? ImporterOrderRatingBar(
+                                      request: primary,
+                                      lines: g,
+                                      onSubmitted: _load,
+                                      bundleCheckoutGroupId: isBundle
+                                          ? primary.checkoutGroupId
+                                          : null,
+                                      bundleAliadoId: isBundle
+                                          ? primary.aliadoId
+                                          : null,
+                                    )
+                                  : null,
                               expanded: _expandedRequestId == rk,
                               onToggle: () => _toggleExpand(rk),
                               statusLabel: TransactionRequestStatus
@@ -569,19 +583,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                       request: g.first,
                                       invoiceBundleLines: g,
                                       onChanged: _load,
-                                    ),
-                                  ],
-                                  if (primary.status ==
-                                      TransactionRequestStatus.entregado) ...[
-                                    const SizedBox(height: 12),
-                                    ImporterOrderRatingSection(
-                                      request: primary,
-                                      onChanged: _load,
-                                      bundleCheckoutGroupId: isBundle
-                                          ? primary.checkoutGroupId
-                                          : null,
-                                      bundleAliadoId:
-                                          isBundle ? primary.aliadoId : null,
                                     ),
                                   ],
                                 ],

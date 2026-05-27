@@ -178,7 +178,7 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
         OrderRatingForm(
           title: '¿Cómo fue la experiencia con este aliado?',
           subtitle:
-              'Calificá Comunicación y Pagos (por defecto Regular) y dejá un comentario. '
+              'Calificá Comunicación y Pagos (por defecto Regular). Podés añadir un comentario opcional. '
               'El aliado no verá su identidad en su panel de reputación.',
           questionnaire: _questionnaire!,
           busy: _busy,

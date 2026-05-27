@@ -33,6 +33,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.onNotifyQtyAdjustment,
     this.expandedFooter,
     this.onThreadChanged,
+    this.ratingBar,
   });
 
   final TransactionRequestModel request;
@@ -53,6 +54,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final VoidCallback? onNotifyQtyAdjustment;
   final Widget? expandedFooter;
   final VoidCallback? onThreadChanged;
+  final Widget? ratingBar;
 
   @override
   Widget build(BuildContext context) {
@@ -277,6 +279,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               ),
             ),
           ),
+          if (ratingBar != null) ratingBar!,
           if (nextStatus != null &&
               nextActionLabel != null &&
               onAdvance != null)

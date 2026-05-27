@@ -15,6 +15,7 @@ class OrderRatingForm extends StatefulWidget {
     required this.questionnaire,
     required this.onSubmit,
     this.busy = false,
+    this.emphasized = false,
   });
 
   final String title;
@@ -26,6 +27,9 @@ class OrderRatingForm extends StatefulWidget {
     required Map<String, int> dimensionAnswers,
   }) onSubmit;
   final bool busy;
+
+  /// Estilo más visible en modal / sheet de valoración.
+  final bool emphasized;
 
   @override
   State<OrderRatingForm> createState() => _OrderRatingFormState();
@@ -88,12 +92,6 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
     }
 
     final comment = _commentCtrl.text.trim();
-    if (comment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El comentario es obligatorio.')),
-      );
-      return;
-    }
 
     await widget.onSubmit(
       stars: _computedOverall,
@@ -113,14 +111,47 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
 
     final overall = _computedOverall;
 
+    final titleSize = widget.emphasized ? 15.0 : 13.0;
+    final subtitleSize = widget.emphasized ? 12.5 : 11.5;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.emphasized)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.brandBlueContainer.withOpacity(0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.brandBlue.withOpacity(0.25)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.tune_rounded, color: AppColors.brandBlue, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ajustá cada categoría con el control deslizante. '
+                    'La valoración general se calcula automáticamente.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Text(
           widget.title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 13,
+            fontSize: titleSize,
             color: AppColors.textPrimary,
           ),
         ),
@@ -128,12 +159,12 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
         Text(
           widget.subtitle,
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: subtitleSize,
             color: Colors.grey.shade700,
-            height: 1.3,
+            height: 1.35,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: widget.emphasized ? 16 : 12),
         for (var i = 0; i < _q.questions.length; i++) ...[
           if (i > 0) const SizedBox(height: 10),
           RatingDimensionCard(
@@ -175,21 +206,36 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
           maxLength: 500,
           enabled: !widget.busy,
           decoration: const InputDecoration(
-            labelText: 'Comentario (obligatorio)',
+            labelText: 'Comentario (opcional)',
             border: OutlineInputBorder(),
             isDense: true,
           ),
         ),
-        const SizedBox(height: 6),
-        FilledButton.tonal(
+        SizedBox(height: widget.emphasized ? 16 : 6),
+        FilledButton(
           onPressed: widget.busy ? null : _enviar,
+          style: widget.emphasized
+              ? FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  backgroundColor: AppColors.brandBlue,
+                )
+              : null,
           child: widget.busy
               ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
-              : const Text('Enviar valoración'),
+              : Text(
+                  widget.emphasized ? 'Enviar valoración' : 'Enviar valoración',
+                  style: TextStyle(
+                    fontWeight: widget.emphasized ? FontWeight.w700 : null,
+                    fontSize: widget.emphasized ? 15 : null,
+                  ),
+                ),
         ),
       ],
     );

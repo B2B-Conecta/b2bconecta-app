@@ -5,11 +5,9 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/ves_amount_format.dart';
-import '../utils/aliado_experience_utils.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import '../utils/aliado_order_grouping.dart';
 import 'aliado_multi_importer_order_tabs.dart';
-import 'aliado_order_experience_display.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
@@ -30,6 +28,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     this.expandedLeading,
     this.expandedFooter,
     this.multiImporterPanelBuilder,
+    this.ratingBar,
   });
 
   final TransactionRequestModel request;
@@ -47,6 +46,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   final VoidCallback? onCancelarSolicitudPendiente;
   final bool cancelarSolicitudPendienteBusy;
   final Widget? expandedFooter;
+
+  /// CTA de valoración (modal), visible sin expandir la ficha.
+  final Widget? ratingBar;
 
   /// Carrito multi-importador: factura, pago y mensajes por proveedor (pestañas).
   final Widget Function(
@@ -166,20 +168,6 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               distinctImporterIds.length > 1) ...[
                             const SizedBox(height: 6),
                             _MultiImporterPagoResumenChip(lines: lines),
-                          ],
-                          if (lineasEntregadasParaValorar(lines)
-                              .isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                AliadoOrderExperienceStatusChip(
-                                  request: r,
-                                  linesForGroup: lines,
-                                ),
-                              ],
-                            ),
                           ],
                           if (!isCheckoutGroup && r.productSku != null) ...[
                             const SizedBox(height: 2),
@@ -301,6 +289,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
               ),
             ),
           ),
+          if (ratingBar != null) ratingBar!,
           if (onCancelarSolicitudPendiente != null &&
               (!isCheckoutGroup
                   ? r.status == TransactionRequestStatus.pendiente

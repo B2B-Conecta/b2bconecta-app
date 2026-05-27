@@ -9,7 +9,7 @@ import '../utils/aliado_experience_utils.dart';
 import 'aliado_order_experience_display.dart';
 import 'order_rating_form.dart';
 
-/// C4: calificación 1–5 + comentario obligatorios; Bucket List opcional tras entrega.
+/// C4: calificación 1–5 por dimensiones; comentario opcional tras entrega.
 class AliadoOrderExperienceSection extends StatefulWidget {
   const AliadoOrderExperienceSection({
     super.key,
@@ -181,7 +181,7 @@ class _AliadoOrderExperienceSectionState
             : '¿Cómo fue tu experiencia con este pedido?',
         subtitle:
             'Calificá cada categoría (por defecto Regular). La valoración general '
-            'es el promedio. El comentario es obligatorio.',
+            'es el promedio. El comentario es opcional.',
         questionnaire: _questionnaire!,
         busy: _busy,
         onSubmit: _enviar,

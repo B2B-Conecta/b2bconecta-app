@@ -10,7 +10,6 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
-import 'aliado_order_experience_section.dart';
 import 'moroso_order_visual.dart';
 
 /// Método de pago y comprobante. El importador verifica la acreditación (negociación por chat).
@@ -20,7 +19,6 @@ class AliadoOrderPagoSection extends StatefulWidget {
     required this.request,
     required this.onChanged,
     this.profile,
-    this.suppressExperience = false,
     this.suppressPrimaryTitle = false,
     this.suppressNegotiationIntro = false,
     /// Si hay varias líneas del mismo importador en el carrito: un solo comprobante
@@ -34,9 +32,6 @@ class AliadoOrderPagoSection extends StatefulWidget {
 
   /// Líneas del mismo proveedor a actualizar con el mismo comprobante.
   final List<TransactionRequestModel>? pagoBundleLines;
-
-  /// Si es true, no muestra [AliadoOrderExperienceSection] (el padre muestra una valoración por proveedor).
-  final bool suppressExperience;
 
   /// El padre muestra un título grupal («Pago al importador») cuando hay varias líneas del mismo almacén.
   final bool suppressPrimaryTitle;
@@ -466,11 +461,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               ),
             ),
         ],
-        if (!widget.suppressExperience)
-          AliadoOrderExperienceSection(
-            request: r,
-            onChanged: widget.onChanged,
-          ),
         const SizedBox(height: 8),
       ],
     );

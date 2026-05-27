@@ -6,10 +6,11 @@ import '../models/rating_questionnaire_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
-import 'aliado_order_experience_display.dart';
+import '../utils/rating_dimension_summary.dart';
+import 'importer_dimension_reputation_rows.dart';
 import 'order_rating_form.dart';
 
-/// Comentarios de clientes (aliados anónimos) y resumen de reputación del importador.
+/// Reputación del importador por categoría y comentarios anónimos de aliados.
 class ImporterReputationPanel extends StatefulWidget {
   const ImporterReputationPanel({
     super.key,
@@ -43,7 +44,7 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
     });
     try {
       final results = await Future.wait([
-        SupabaseService.listImportadorReceivedRatings(limit: 40),
+        SupabaseService.listImportadorReceivedRatings(limit: 100),
         SupabaseService.fetchRatingQuestionnaire(audience: 'aliado_rates_importer'),
       ]);
       if (!mounted) return;
@@ -64,10 +65,17 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-    final avg = p.ratingAvgReceivedRolling100 ?? p.ratingAvgReceived;
     final cnt =
         p.ratingCountReceivedRolling100 ?? p.ratingCountReceived ?? 0;
-    final usesRollingWindow = p.ratingAvgReceivedRolling100 != null;
+    final questionnaire = _questionnaire;
+    final dimensionStats = resolveImporterDimensionStats(
+      profile: p,
+      questionnaire: questionnaire,
+      ratings: _ratings,
+    );
+    final hasDimensions = dimensionStats.isNotEmpty &&
+        questionnaire != null &&
+        questionnaire.questions.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -91,56 +99,74 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 6),
-              if (cnt > 0 && avg != null) ...[
-                Row(
-                  children: [
-                    AliadoExperienceStarsRow(
-                      stars: avg.round().clamp(1, 5),
-                      size: 22,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${avg.toStringAsFixed(1)} / 5 · $cnt valoraciones',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 4),
+              Text(
+                'Desglose por categoría (escala 1–5).',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: Colors.grey.shade800,
                 ),
-                if (usesRollingWindow) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Promedio de las últimas 100 valoraciones de aliados.',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      height: 1.3,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
+              ),
+              if (cnt > 0) ...[
                 const SizedBox(height: 4),
                 Text(
-                  avg >= 4.5
-                      ? 'Excelente desempeño: prioridad en búsquedas del catálogo.'
-                      : 'Las valoraciones de aliados mejoran su visibilidad en el catálogo.',
+                  '$cnt valoraciones de aliados · ventana últimas 100',
                   style: TextStyle(
-                    fontSize: 11,
-                    height: 1.35,
-                    color: Colors.grey.shade800,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
                   ),
                 ),
-              ] else
+              ],
+              const SizedBox(height: 10),
+              if (_loading && !hasDimensions)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              else if (hasDimensions)
+                ImporterDimensionReputationRows(
+                  questionnaire: questionnaire,
+                  dimensionStats: dimensionStats,
+                )
+              else if (cnt > 0)
+                Text(
+                  'Las valoraciones registradas aún no incluyen desglose por categoría. '
+                  'Las nuevas valoraciones con el formulario actual mostrarán Calidad, Despacho, Empaque, Comunicación y Socio B2B.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.4,
+                    color: Colors.grey.shade800,
+                  ),
+                )
+              else
                 Text(
                   'Aún no tiene valoraciones de aliados. Al cerrar pedidos como entregados, '
-                  'los talleres podrán calificar su servicio.',
+                  'los talleres calificarán cada aspecto de su servicio.',
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.35,
                     color: Colors.grey.shade800,
                   ),
                 ),
+              if (hasDimensions) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Mejorar estas categorías aumenta su visibilidad en el catálogo de aliados.',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.35,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

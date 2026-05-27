@@ -67,11 +67,11 @@ class _AliadoOrderExperienceSectionState
   Future<void> _enviar({
     required int stars,
     required String comment,
-    required Map<String, int> optionalAnswers,
+    required Map<String, int> dimensionAnswers,
   }) async {
     setState(() => _busy = true);
     try {
-      final answersJson = optionalAnswers.map(
+      final answersJson = dimensionAnswers.map(
         (k, v) => MapEntry<String, dynamic>(k, v),
       );
       final bcg = widget.bundleCheckoutGroupId?.trim();
@@ -121,8 +121,10 @@ class _AliadoOrderExperienceSectionState
       return 'La valoración de este pedido ya fue registrada. '
           'Actualizamos la ficha para mostrarla.';
     }
-    if (raw.contains('Calificación inválida')) {
-      return 'Indique de 1 a 5 estrellas.';
+    if (raw.contains('Calificación inválida') ||
+        raw.contains('Complete todas las categorías') ||
+        raw.contains('cuestionario de valoración')) {
+      return 'Complete todas las categorías de la valoración.';
     }
     if (raw.contains('comentario es obligatorio')) {
       return 'El comentario es obligatorio.';
@@ -178,7 +180,8 @@ class _AliadoOrderExperienceSectionState
             ? '¿Cómo fue tu experiencia con este proveedor en este pedido?'
             : '¿Cómo fue tu experiencia con este pedido?',
         subtitle:
-            'Calificá de 1 a 5 estrellas y dejá un comentario. Al enviar, queda registrado y no puede editarse.',
+            'Calificá cada categoría (por defecto Regular). La valoración general '
+            'es el promedio. El comentario es obligatorio.',
         questionnaire: _questionnaire!,
         busy: _busy,
         onSubmit: _enviar,

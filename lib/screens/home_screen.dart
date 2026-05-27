@@ -1023,6 +1023,14 @@ class _ProductGridCard extends StatelessWidget {
                           color: Colors.grey.shade800,
                         ),
                       ),
+                      Text(
+                        ' · últ. 100',
+                        style: TextStyle(
+                          fontSize: compactDistanceMode ? 8.5 : 9,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ],
                   ),
                 ],

@@ -5,6 +5,7 @@ class AdminOrderRatingRowModel {
     required this.overallStars,
     required this.comment,
     required this.answers,
+    this.questionnaireVersion,
     required this.submittedAt,
     required this.raterRole,
     required this.rateeRole,
@@ -19,6 +20,7 @@ class AdminOrderRatingRowModel {
   final int overallStars;
   final String comment;
   final Map<String, dynamic> answers;
+  final String? questionnaireVersion;
   final DateTime? submittedAt;
   final String raterRole;
   final String rateeRole;
@@ -35,6 +37,7 @@ class AdminOrderRatingRowModel {
       overallStars: _asInt(json['overall_stars']),
       comment: json['comment']?.toString() ?? '',
       answers: ans is Map ? Map<String, dynamic>.from(ans) : const {},
+      questionnaireVersion: json['questionnaire_version']?.toString(),
       submittedAt: json['submitted_at'] != null
           ? DateTime.tryParse(json['submitted_at'].toString())
           : null,
@@ -56,4 +59,6 @@ class AdminOrderRatingRowModel {
 
   String get raterLabelEs =>
       raterRole == 'aliado' ? 'Aliado → importador' : 'Importador → aliado';
+
+  bool get isBucketV2 => questionnaireVersion == 'bucket_v2';
 }

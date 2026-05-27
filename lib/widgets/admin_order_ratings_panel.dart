@@ -185,6 +185,27 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
                           ),
                         ),
                       ),
+                      if (r.isBucketV2)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Text(
+                            'v2',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ),
                       if (at != null)
                         Text(
                           formatEsShortDateTime(at),

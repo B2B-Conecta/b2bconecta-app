@@ -60,16 +60,45 @@ Si tu base es **MotoLink legacy** con `transaction_requests.owner_id`, revisa el
 - Migración `20260606120000_minuta7_c3_admin_pago_rpc.sql`: `admin_aprobar_pago_aliado`, `admin_rechazar_comprobante_pago` (auditoría `confirmado_por`).
 - Morosidad, retiro de crédito/cuotas en plataforma: migraciones `20260601…`–`20260605…`.
 
-## Valoraciones y reputación (C4)
+## Valoraciones y reputación (C4 + E2 + bucket v2)
 
-Migración `20260607120000_minuta7_c4_order_ratings.sql`:
+**C4** — `20260607120000_minuta7_c4_order_ratings.sql`:
 
-- Tabla `order_ratings` (Bucket List opcional en `answers` jsonb; estrellas + comentario obligatorios).
+- Tabla `order_ratings` (`answers` jsonb, estrellas globales + comentario).
 - Valoración **por importador** en carrito (`checkout_group_id` + `importador_id`).
 - Mutua: aliado → importador (legacy `aliado_experience_*` sincronizado) e importador → aliado.
-- Agregados en `profiles`: `rating_avg_received`, `rating_count_received`, `rating_as_payer_*`.
-- RPC: `get_rating_questionnaire`, `list_importador_received_ratings` (aliado anónimo por ciudad), `list_admin_order_ratings`.
-- Catálogo aliado: orden por reputación del importador cuando no hay orden por distancia.
+- Agregados lifetime en `profiles`: `rating_avg_received`, `rating_count_received`, `rating_as_payer_*`.
+- RPC: `get_rating_questionnaire`, `list_importador_received_ratings`, `list_admin_order_ratings`.
+
+**E2.1** — `20260630120000_rating_rolling_100_aggregates.sql`:
+
+- Columnas rolling en `profiles`: `rating_*_rolling100` (últimas 100 valoraciones recibidas / como pagador).
+- `refresh_profile_rating_aggregates()` actualiza lifetime + rolling; catálogo y panel importador usan rolling.
+
+**E2.2** (solo app): catálogo aliado — orden Recomendado / Más cercanos / Mejor reputación; filtros mínimos sobre rolling (estrellas y cantidad).
+
+**Bucket v2 (sliders)** — `20260701120000_rating_questionnaire_bucket_v2.sql`:
+
+- `platform_settings` → cuestionario `bucket_v2` (aliado→importador: 5 dimensiones; importador→aliado: 2).
+- `overall_stars` = promedio redondeado de dimensiones 1–5; `questionnaire_version = 'bucket_v2'`.
+- App: formulario solo v2; lectura de v1 sigue mostrando estrellas sin detalle dimensional.
+
+**Polish** — `20260702120000_rating_admin_questionnaire_version.sql`: admin RPC incluye `questionnaire_version` por fila (badge v2 en app).
+
+**Desglose por categoría (importador)** — `20260703120000_rating_dimension_rolling_aggregates.sql`:
+
+- Columna `profiles.rating_dimensions_received_rolling100` (jsonb por pregunta bucket_v2).
+- `refresh_profile_rating_aggregates()` la recalcula desde `order_ratings` v2.
+- Panel Perfil importador: Calidad, Despacho, Empaque, Comunicación, Socio B2B (sin estrella global única).
+- Demo sin pedidos valorados: `supabase/scripts/seed_demo_importer_dimension_ratings.sql` o re-seed.
+
+**QA valoraciones v2** (sin borrar usuarios/catálogo):
+
+```bash
+supabase db query --linked -f supabase/scripts/reset_demo_order_ratings_for_v2.sql
+```
+
+Para demo completa: `supabase/scripts/clean_database_for_seed.sql` + `supabase/seed.sql` (requiere migraciones C4, E2.1 y bucket v2 aplicadas).
 
 ## Próximos pasos (Flutter)
 

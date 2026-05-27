@@ -74,11 +74,11 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
   Future<void> _enviar({
     required int stars,
     required String comment,
-    required Map<String, int> optionalAnswers,
+    required Map<String, int> dimensionAnswers,
   }) async {
     setState(() => _busy = true);
     try {
-      final answersJson = optionalAnswers.map(
+      final answersJson = dimensionAnswers.map(
         (k, v) => MapEntry<String, dynamic>(k, v),
       );
       final cg = widget.bundleCheckoutGroupId?.trim();
@@ -178,10 +178,10 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
         OrderRatingForm(
           title: '¿Cómo fue la experiencia con este aliado?',
           subtitle:
-              'Calificá de 1 a 5 y dejá un comentario. El aliado no verá su identidad en su panel de reputación.',
+              'Calificá Comunicación y Pagos (por defecto Regular) y dejá un comentario. '
+              'El aliado no verá su identidad en su panel de reputación.',
           questionnaire: _questionnaire!,
           busy: _busy,
-          optionalSectionTitle: '¿Quieres detallar la experiencia? (Opcional)',
           onSubmit: _enviar,
         ),
       ],

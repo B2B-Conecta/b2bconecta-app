@@ -1,15 +1,16 @@
 -- =============================================================================
 -- MotoConecta — datos de desarrollo (seed)
 -- =============================================================================
--- Requisito: migraciones aplicadas (incl. E1.1 catalog_boost) en el mismo proyecto.
+-- Requisito: migraciones aplicadas (E1.1 catalog_boost, C4 ratings, bucket_v2, dimensiones rolling).
 --
 -- Carga:
 --   supabase db query --linked -f supabase/seed.sql
 --
 -- Contraseña común (todos los seed): SeedPass123!
 --
--- Incluye: 12 importadores (2 × 15 SKU + 10 × 5 SKU), datos comerciales realistas
--- y pedidos con pago confirmado por importador (demo E1.1 catálogo boost).
+-- Incluye: 12 importadores (2 × 15 SKU + 10 × 5 SKU), datos comerciales realistas,
+-- pedidos solo en estado entregado con pago aprobado (sin pedidos abiertos) y
+-- valoraciones bucket_v2 de demo (admin / reputación importador).
 --
 -- Flujo recomendado (re-carga limpia):
 --   supabase db query --linked -f supabase/scripts/clean_database_for_seed.sql
@@ -503,27 +504,6 @@ set
   rating_count_received_rolling100 = rating_count_received
 where rating_avg_received is not null;
 
--- Demo desglose dimensional (bucket_v2) para panel importador sin order_ratings en seed.
-update public.profiles
-set rating_dimensions_received_rolling100 = '{
-  "product_quality": {"avg": 4.75, "count": 18},
-  "dispatch_time": {"avg": 4.55, "count": 18},
-  "packaging_condition": {"avg": 4.50, "count": 18},
-  "communication": {"avg": 4.65, "count": 18},
-  "supplier_b2b_experience": {"avg": 4.70, "count": 18}
-}'::jsonb
-where id = 'c1000001-0000-4000-8000-000000000001'::uuid;
-
-update public.profiles
-set rating_dimensions_received_rolling100 = '{
-  "product_quality": {"avg": 4.45, "count": 12},
-  "dispatch_time": {"avg": 4.35, "count": 12},
-  "packaging_condition": {"avg": 4.40, "count": 12},
-  "communication": {"avg": 4.50, "count": 12},
-  "supplier_b2b_experience": {"avg": 4.30, "count": 12}
-}'::jsonb
-where id = 'c1000002-0000-4000-8000-000000000001'::uuid;
-
 -- ---------------------------------------------------------------------------
 -- Catálogo: importador1/2 → 15 SKU; importador3–12 → 5 SKU (referencias OEM reales)
 -- ---------------------------------------------------------------------------
@@ -715,7 +695,7 @@ select
 from product_pick pp
 where pp.product_id is not null;
 
--- Fuera de ventana 30d (no deben sumar al boost)
+-- Fuera de ventana 30d (cerrado y pagado; no suma al boost)
 insert into public.transaction_requests (
   aliado_id,
   importador_id,
@@ -723,10 +703,15 @@ insert into public.transaction_requests (
   status,
   cantidad,
   precio_total_usd,
+  commission_rate_snapshot,
   pago_estado_revision,
   confirmado_por,
   pago_aprobado_at,
-  comprobante_pago_storage_path
+  at_entregado,
+  comprobante_pago_storage_path,
+  comprobante_pago_file_name,
+  created_at,
+  updated_at
 )
 select
   'c2000001-0000-4000-8000-000000000001'::uuid,
@@ -735,68 +720,196 @@ select
   'entregado',
   1,
   p.price_usd,
+  0.05,
   'aprobado',
   'c1000003-0000-4000-8000-000000000001'::uuid,
   now() - interval '45 days',
-  'seed/comprobantes/antiguo.pdf'
+  now() - interval '44 days',
+  'seed/comprobantes/antiguo.pdf',
+  'comprobante-antiguo.pdf',
+  now() - interval '46 days',
+  now() - interval '44 days'
 from public.products p
 where p.owner_id = 'c1000003-0000-4000-8000-000000000001'::uuid
 order by p.sku
 limit 2;
 
--- Pago aprobado solo por admin (no cuenta: confirmado_por ≠ importador)
-insert into public.transaction_requests (
-  aliado_id,
+-- ---------------------------------------------------------------------------
+-- Valoraciones demo (bucket_v2) — solo sobre pedidos entregados y pagados
+-- ---------------------------------------------------------------------------
+with seed_rate_targets as (
+  select
+    tr.id,
+    tr.importador_id,
+    tr.aliado_id,
+    tr.at_entregado,
+    tr.pago_aprobado_at,
+    tr.created_at,
+    row_number() over (
+      partition by tr.importador_id
+      order by tr.created_at desc
+    ) as rn
+  from public.transaction_requests tr
+  where tr.aliado_id = 'c2000001-0000-4000-8000-000000000001'::uuid
+    and tr.status = 'entregado'
+    and tr.pago_estado_revision = 'aprobado'
+    and tr.confirmado_por = tr.importador_id
+),
+seed_rate_pick as (
+  select *
+  from seed_rate_targets t
+  where (t.importador_id = 'c1000001-0000-4000-8000-000000000001'::uuid and t.rn <= 8)
+     or (t.importador_id = 'c1000002-0000-4000-8000-000000000001'::uuid and t.rn <= 4)
+     or (
+       t.importador_id in (
+         'c1000003-0000-4000-8000-000000000001'::uuid,
+         'c1000004-0000-4000-8000-000000000001'::uuid,
+         'c1000005-0000-4000-8000-000000000001'::uuid,
+         'c1000006-0000-4000-8000-000000000001'::uuid,
+         'c1000007-0000-4000-8000-000000000001'::uuid
+       )
+       and t.rn = 1
+     )
+)
+insert into public.order_ratings (
+  transaction_request_id,
   importador_id,
-  product_id,
-  status,
-  cantidad,
-  precio_total_usd,
-  pago_estado_revision,
-  confirmado_por,
-  pago_aprobado_at,
-  comprobante_pago_storage_path
+  aliado_id,
+  rater_role,
+  ratee_role,
+  overall_stars,
+  comment,
+  questionnaire_version,
+  answers,
+  submitted_at
 )
 select
-  'c2000001-0000-4000-8000-000000000001'::uuid,
-  'c1000004-0000-4000-8000-000000000001'::uuid,
   p.id,
-  'en_transito',
-  1,
-  p.price_usd,
-  'aprobado',
-  'c3000001-0000-4000-8000-000000000001'::uuid,
-  now() - interval '5 days',
-  'seed/comprobantes/admin-solo.pdf'
-from public.products p
-where p.owner_id = 'c1000004-0000-4000-8000-000000000001'::uuid
-order by p.sku
-limit 3;
+  p.importador_id,
+  p.aliado_id,
+  'aliado',
+  'importador',
+  case (p.rn % 3)
+    when 0 then 5
+    when 1 then 4
+    else 5
+  end,
+  case (p.rn % 3)
+    when 0 then 'Entrega puntual y producto conforme al catálogo.'
+    when 1 then 'Buen despacho; empaque mejorable en una caja.'
+    else 'Servicio B2B recomendable para el taller.'
+  end,
+  'bucket_v2',
+  case (p.rn % 3)
+    when 0 then '{
+      "product_quality": 5,
+      "dispatch_time": 5,
+      "packaging_condition": 5,
+      "communication": 5,
+      "supplier_b2b_experience": 5
+    }'::jsonb
+    when 1 then '{
+      "product_quality": 4,
+      "dispatch_time": 4,
+      "packaging_condition": 3,
+      "communication": 4,
+      "supplier_b2b_experience": 4
+    }'::jsonb
+    else '{
+      "product_quality": 5,
+      "dispatch_time": 4,
+      "packaging_condition": 5,
+      "communication": 5,
+      "supplier_b2b_experience": 5
+    }'::jsonb
+  end,
+  coalesce(p.at_entregado, p.pago_aprobado_at, p.created_at) + interval '12 hours'
+from seed_rate_pick p
+where not exists (
+  select 1
+  from public.order_ratings r
+  where r.transaction_request_id = p.id
+    and r.rater_role = 'aliado'
+);
 
--- Pedido entregado moroso (no cuenta hasta aprobación importador)
-insert into public.transaction_requests (
-  aliado_id,
+-- Valoración mutua importador → aliado (muestra admin)
+with seed_imp_rate as (
+  select
+    tr.id,
+    tr.importador_id,
+    tr.aliado_id,
+    tr.at_entregado,
+    tr.pago_aprobado_at,
+    tr.created_at,
+    row_number() over (order by tr.created_at desc) as rn
+  from public.transaction_requests tr
+  where tr.aliado_id = 'c2000001-0000-4000-8000-000000000001'::uuid
+    and tr.importador_id = 'c1000001-0000-4000-8000-000000000001'::uuid
+    and tr.status = 'entregado'
+    and tr.pago_estado_revision = 'aprobado'
+    and tr.confirmado_por = tr.importador_id
+  limit 2
+)
+insert into public.order_ratings (
+  transaction_request_id,
   importador_id,
-  product_id,
-  status,
-  cantidad,
-  precio_total_usd,
-  pago_estado_revision,
-  at_entregado
+  aliado_id,
+  rater_role,
+  ratee_role,
+  overall_stars,
+  comment,
+  questionnaire_version,
+  answers,
+  submitted_at
 )
 select
-  'c2000001-0000-4000-8000-000000000001'::uuid,
-  'c100000b-0000-4000-8000-000000000001'::uuid,
-  p.id,
-  'entregado',
-  1,
-  p.price_usd,
-  'pendiente',
-  now() - interval '3 days'
-from public.products p
-where p.owner_id = 'c100000b-0000-4000-8000-000000000001'::uuid
-order by p.sku
-limit 1;
+  s.id,
+  s.importador_id,
+  s.aliado_id,
+  'importador',
+  'aliado',
+  4,
+  'Aliado cumplió plazos de pago y comunicación clara.',
+  'bucket_v2',
+  '{"communication": 4, "payment_punctuality_transparency": 5}'::jsonb,
+  coalesce(s.at_entregado, s.pago_aprobado_at, s.created_at) + interval '1 day'
+from seed_imp_rate s
+where not exists (
+  select 1
+  from public.order_ratings r
+  where r.transaction_request_id = s.id
+    and r.rater_role = 'importador'
+);
+
+update public.transaction_requests tr
+set
+  aliado_experience_stars = r.overall_stars,
+  aliado_experience_comment = r.comment,
+  aliado_experience_submitted_at = r.submitted_at,
+  updated_at = greatest(tr.updated_at, r.submitted_at)
+from public.order_ratings r
+where r.transaction_request_id = tr.id
+  and r.rater_role = 'aliado';
+
+do $$
+declare
+  v_id uuid;
+begin
+  for v_id in
+    select distinct p.id
+    from public.profiles p
+    where p.role = 'importador'
+      and exists (
+        select 1
+        from public.order_ratings r
+        where r.importador_id = p.id
+           or (r.ratee_role = 'aliado' and r.aliado_id = p.id)
+      )
+  loop
+    perform public.refresh_profile_rating_aggregates(v_id);
+  end loop;
+end;
+$$;
 
 -- Reconciliar agregados E1 (por si triggers se omitieron en carga masiva)
 select public.refresh_all_importer_catalog_boost ();

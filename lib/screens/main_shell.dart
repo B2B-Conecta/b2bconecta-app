@@ -166,7 +166,7 @@ class _MainShellState extends State<MainShell> {
           _adminOrdersScaffold(
             title: 'Valoraciones',
             subtitle:
-                'Calificaciones cruzadas tras la entrega: estrellas, comentario y criterios opcionales.',
+                'Expediente aliado ↔ importador tras la entrega. Filtre por dirección y despliegue el detalle.',
             child: const AdminOrderRatingsPanel(),
           ),
           _adminOrdersScaffold(

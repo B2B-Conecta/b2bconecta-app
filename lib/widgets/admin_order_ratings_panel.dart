@@ -5,8 +5,11 @@ import '../models/rating_questionnaire_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/rating_scale_labels.dart';
 import 'aliado_order_experience_display.dart';
 import 'order_rating_form.dart';
+
+enum _AdminRatingFilter { all, aliadoRatesImporter, importerRatesAliado }
 
 /// C4: expediente admin — listado de valoraciones con nombres reales.
 class AdminOrderRatingsPanel extends StatefulWidget {
@@ -31,11 +34,23 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
   int _offset = 0;
   static const _pageSize = 50;
   bool _end = false;
+  _AdminRatingFilter _filter = _AdminRatingFilter.all;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  List<AdminOrderRatingRowModel> get _filteredRows {
+    switch (_filter) {
+      case _AdminRatingFilter.all:
+        return _rows;
+      case _AdminRatingFilter.aliadoRatesImporter:
+        return _rows.where((r) => r.raterRole == 'aliado').toList();
+      case _AdminRatingFilter.importerRatesAliado:
+        return _rows.where((r) => r.raterRole == 'importador').toList();
+    }
   }
 
   Future<void> _load() async {
@@ -123,7 +138,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 12),
               FilledButton(
-                onPressed: () => _load(),
+                onPressed: _load,
                 child: const Text('Reintentar'),
               ),
             ],
@@ -140,142 +155,435 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       );
     }
 
+    final filtered = _filteredRows;
+
     return RefreshIndicator(
-      onRefresh: () => _load(),
-      child: ListView.builder(
+      onRefresh: _load,
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        itemCount: _rows.length + (_end ? 0 : 1),
-        itemBuilder: (context, i) {
-          if (i == _rows.length) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+        children: [
+          _AdminRatingsToolbar(
+            totalCount: _rows.length,
+            filteredCount: filtered.length,
+            filter: _filter,
+            loading: _loading,
+            onFilterChanged: (f) => setState(() => _filter = f),
+            onRefresh: _load,
+          ),
+          const SizedBox(height: 10),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
               child: Center(
-                child: TextButton(
-                  onPressed: _loadMore,
-                  child: const Text('Cargar más'),
+                child: Text(
+                  'Ninguna valoración coincide con el filtro.',
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                 ),
               ),
-            );
-          }
-          final r = _rows[i];
-          final q = _questionnaireFor(r);
-          final at = r.submittedAt;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
+            )
+          else
+            ...filtered.map(
+              (r) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _AdminOrderRatingCard(
+                  row: r,
+                  questionnaire: _questionnaireFor(r),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          r.raterLabelEs,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                          ),
+            ),
+          if (!_end) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : TextButton(
+                      onPressed: _loadMore,
+                      child: const Text('Cargar más'),
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminRatingsToolbar extends StatelessWidget {
+  const _AdminRatingsToolbar({
+    required this.totalCount,
+    required this.filteredCount,
+    required this.filter,
+    required this.loading,
+    required this.onFilterChanged,
+    required this.onRefresh,
+  });
+
+  final int totalCount;
+  final int filteredCount;
+  final _AdminRatingFilter filter;
+  final bool loading;
+  final ValueChanged<_AdminRatingFilter> onFilterChanged;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                filter == _AdminRatingFilter.all
+                    ? '$totalCount valoraciones'
+                    : '$filteredCount de $totalCount',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: loading ? null : onRefresh,
+              icon: const Icon(Icons.refresh, size: 20),
+              tooltip: 'Actualizar',
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _filterChip(
+                label: 'Todas',
+                selected: filter == _AdminRatingFilter.all,
+                onTap: () => onFilterChanged(_AdminRatingFilter.all),
+              ),
+              const SizedBox(width: 6),
+              _filterChip(
+                label: 'Aliado → importador',
+                selected: filter == _AdminRatingFilter.aliadoRatesImporter,
+                onTap: () =>
+                    onFilterChanged(_AdminRatingFilter.aliadoRatesImporter),
+              ),
+              const SizedBox(width: 6),
+              _filterChip(
+                label: 'Importador → aliado',
+                selected: filter == _AdminRatingFilter.importerRatesAliado,
+                onTap: () =>
+                    onFilterChanged(_AdminRatingFilter.importerRatesAliado),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _filterChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return FilterChip(
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      visualDensity: VisualDensity.compact,
+      showCheckmark: false,
+      selectedColor: AppColors.brandBlueContainer,
+      side: BorderSide(
+        color: selected ? AppColors.brandBlue : Colors.grey.shade400,
+      ),
+    );
+  }
+}
+
+class _AdminOrderRatingCard extends StatefulWidget {
+  const _AdminOrderRatingCard({
+    required this.row,
+    required this.questionnaire,
+  });
+
+  final AdminOrderRatingRowModel row;
+  final RatingQuestionnaireModel questionnaire;
+
+  @override
+  State<_AdminOrderRatingCard> createState() => _AdminOrderRatingCardState();
+}
+
+class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
+  bool _detailExpanded = false;
+
+  bool get _isAliadoRater => widget.row.raterRole == 'aliado';
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.row;
+    final q = widget.questionnaire;
+    final at = r.submittedAt;
+    final hasDimensions = r.answers.isNotEmpty && q.questions.isNotEmpty;
+    final accent = _isAliadoRater
+        ? Colors.deepPurple.shade700
+        : Colors.teal.shade800;
+    final accentBg = _isAliadoRater
+        ? Colors.deepPurple.shade50
+        : Colors.teal.shade50;
+
+    return Material(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            color: accentBg,
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: accent.withOpacity(0.35)),
+                  ),
+                  child: Text(
+                    r.raterLabelEs,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: accent,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (at != null)
+                  Text(
+                    formatEsShortDateTime(at),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.store_outlined, size: 14, color: accent),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _shortName(r.importadorName),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (r.isBucketV2)
-                        Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: Text(
-                            'v2',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.orange.shade900,
-                            ),
-                          ),
-                        ),
-                      if (at != null)
-                        Text(
-                          formatEsShortDateTime(at),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                    ],
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 7, top: 2, bottom: 2),
+                  child: Icon(
+                    Icons.arrow_downward,
+                    size: 12,
+                    color: Colors.grey.shade500,
                   ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.build_outlined, size: 14, color: accent),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _shortName(r.aliadoName),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (r.checkoutGroupId != null &&
+                    r.checkoutGroupId!.trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
-                    'Importador: ${r.importadorName}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                    'Carrito ${_shortUuid(r.checkoutGroupId!)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade600,
+                    ),
                   ),
-                  Text(
-                    'Aliado: ${r.aliadoName}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-                  ),
-                  if (r.checkoutGroupId != null &&
-                      r.checkoutGroupId!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    AliadoExperienceStarsRow(
+                      stars: r.overallStars.clamp(1, 5),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
                     Text(
-                      'Carrito: ${r.checkoutGroupId}',
+                      '${r.overallStars} / 5',
                       style: TextStyle(
-                          fontSize: 10.5, color: Colors.grey.shade600),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: ratingValueColor(r.overallStars.clamp(1, 5)),
+                      ),
                     ),
                   ],
+                ),
+                if (r.comment.trim().isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      AliadoExperienceStarsRow(
-                        stars: r.overallStars.clamp(1, 5),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${r.overallStars} / 5',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    r.comment.trim(),
+                    maxLines: _detailExpanded ? null : 3,
+                    overflow: _detailExpanded
+                        ? TextOverflow.visible
+                        : TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: Colors.grey.shade900,
+                    ),
                   ),
-                  if (r.comment.trim().isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      '«${r.comment.trim()}»',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: Colors.grey.shade900,
-                        fontStyle: FontStyle.italic,
+                ],
+                if (hasDimensions) ...[
+                  const SizedBox(height: 10),
+                  _AdminRatingDimensionChips(
+                    answers: r.answers,
+                    questionnaire: q,
+                  ),
+                  InkWell(
+                    onTap: () =>
+                        setState(() => _detailExpanded = !_detailExpanded),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _detailExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 18,
+                            color: AppColors.brandBlue,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _detailExpanded
+                                ? 'Ocultar detalle por categoría'
+                                : 'Ver detalle por categoría',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brandBlue,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                  if (r.answers.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                  ),
+                  if (_detailExpanded) ...[
+                    const SizedBox(height: 4),
                     OrderRatingAnswersReadOnly(
                       answers: r.answers,
                       questionnaire: q,
                     ),
                   ],
                 ],
-              ),
+              ],
             ),
-          );
-        },
+          ),
+        ],
       ),
+    );
+  }
+
+  static String _shortName(String raw, {int max = 36}) {
+    final s = raw.trim();
+    if (s.length <= max) return s;
+    return '${s.substring(0, max - 1)}…';
+  }
+
+  static String _shortUuid(String id) {
+    final s = id.replaceAll('-', '');
+    if (s.length <= 8) return s;
+    return '${s.substring(0, 8)}…';
+  }
+}
+
+/// Resumen compacto de dimensiones (chips con color por nota).
+class _AdminRatingDimensionChips extends StatelessWidget {
+  const _AdminRatingDimensionChips({
+    required this.answers,
+    required this.questionnaire,
+  });
+
+  final Map<String, dynamic> answers;
+  final RatingQuestionnaireModel questionnaire;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <Widget>[];
+    for (final q in questionnaire.questions) {
+      final v = answers[q.id];
+      final n = v is int ? v : int.tryParse(v?.toString() ?? '');
+      if (n == null || n < questionnaire.scaleMin) continue;
+      final color = ratingValueColor(n);
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color.withOpacity(0.45)),
+          ),
+          child: Text(
+            '${q.displayTitle} · $n',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ),
+      );
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: chips,
     );
   }
 }

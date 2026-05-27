@@ -211,26 +211,153 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           )
         else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _ratings.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+          _ImporterCommentsCarousel(
+            ratings: _ratings,
+            questionnaire: _questionnaire,
+          ),
+      ],
+    );
+  }
+}
+
+/// Carrusel horizontal de valoraciones recibidas (evita scroll largo en perfil).
+class _ImporterCommentsCarousel extends StatefulWidget {
+  const _ImporterCommentsCarousel({
+    required this.ratings,
+    required this.questionnaire,
+  });
+
+  final List<ImportadorReceivedRatingModel> ratings;
+  final RatingQuestionnaireModel? questionnaire;
+
+  @override
+  State<_ImporterCommentsCarousel> createState() =>
+      _ImporterCommentsCarouselState();
+}
+
+class _ImporterCommentsCarouselState extends State<_ImporterCommentsCarousel> {
+  static const _carouselHeight = 360.0;
+
+  late final PageController _pageController;
+  int _pageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 0.92);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ImporterCommentsCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ratings.length != widget.ratings.length) {
+      _pageIndex = 0;
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.ratings.length;
+    final showPager = count > 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showPager) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: _pageIndex > 0
+                    ? () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOut,
+                        )
+                    : null,
+                icon: const Icon(Icons.chevron_left),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Anterior',
+              ),
+              Text(
+                '${_pageIndex + 1} / $count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              IconButton(
+                onPressed: _pageIndex < count - 1
+                    ? () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOut,
+                        )
+                    : null,
+                icon: const Icon(Icons.chevron_right),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Siguiente',
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+        ],
+        SizedBox(
+          height: _carouselHeight,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: count,
+            onPageChanged: (i) => setState(() => _pageIndex = i),
             itemBuilder: (context, i) {
-              final r = _ratings[i];
+              final r = widget.ratings[i];
               final at = r.submittedAt;
-              final label =
-                  at != null ? formatEsShortDateTime(at) : '';
-              return OrderRatingReceivedCard(
-                overallStars: r.overallStars,
-                comment: r.comment,
-                authorLabel: r.aliadoLabel,
-                submittedAtLabel: label,
-                answers: r.answers,
-                questionnaire: _questionnaire,
+              final label = at != null ? formatEsShortDateTime(at) : '';
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: OrderRatingReceivedCard(
+                    overallStars: r.overallStars,
+                    comment: r.comment,
+                    authorLabel: r.aliadoLabel,
+                    submittedAtLabel: label,
+                    answers: r.answers,
+                    questionnaire: widget.questionnaire,
+                  ),
+                ),
               );
             },
           ),
+        ),
+        if (showPager) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(count, (i) {
+              final active = i == _pageIndex;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 8 : 6,
+                height: active ? 8 : 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active
+                      ? AppColors.brandBlue
+                      : Colors.grey.shade400,
+                ),
+              );
+            }),
+          ),
+        ],
       ],
     );
   }

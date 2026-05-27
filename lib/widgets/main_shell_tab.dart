@@ -63,11 +63,19 @@ class MainShellTabController {
 
   static void notifyImporterPedidosReload() => _refreshImporterPedidos?.call();
 
-  /// Importador y aliado (3 pestañas): Perfil = 2.
+  /// Importador y aliado (4 pestañas): Perfil = 3, Reputación = 2.
   static void registerB2BProfileTabIndex(int index) =>
       _b2bProfileTabIndex = index;
 
-  static int get _resolvedB2BProfileTabIndex => _b2bProfileTabIndex ?? 2;
+  static int get _resolvedB2BProfileTabIndex => _b2bProfileTabIndex ?? 3;
+
+  /// Pestaña Reputación (índice 2) — E2 panel dedicado.
+  static void navigateToReputationTab() {
+    _goTo?.call(2);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      requestNotificationsReload();
+    });
+  }
 
   /// Abrir listado importador en filtro «Nuevos» (p. ej. tras tocar notificación).
   static void setImporterPedidosPreferNuevosFilter(bool value) =>
@@ -90,7 +98,7 @@ class MainShellTabController {
     return v;
   }
 
-  /// Índices: 0 Inventario/Catálogo, 1 Pedidos, 2 Perfil (importador/aliado).
+  /// Índices: 0 Inventario/Catálogo, 1 Pedidos, 2 Reputación, 3 Perfil.
   static void goTo(int index) => _goTo?.call(index);
 
   /// [AliadoPedidosPanel] / [ImporterActiveOrdersPanel] registran el expand tras deep link.

@@ -9,3 +9,12 @@ String formatEsShortDateTime(DateTime? utcOrLocal) {
   final min = d.minute.toString().padLeft(2, '0');
   return '$day/$m/$y $h:$min';
 }
+
+/// Rango de semana ISO (lunes–domingo) para cierres de reputación.
+String formatEsWeekRange(DateTime weekStartMonday) {
+  final start = DateTime(weekStartMonday.year, weekStartMonday.month, weekStartMonday.day);
+  final end = start.add(const Duration(days: 6));
+  String short(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  return '${short(start)} – ${short(end)}';
+}

@@ -1,3 +1,4 @@
+import '../models/aliado_received_rating_model.dart';
 import '../models/importador_received_rating_model.dart';
 import '../models/profile_model.dart';
 import '../models/rating_dimension_stat_model.dart';
@@ -84,6 +85,57 @@ Map<String, RatingDimensionStatModel> resolveImporterDimensionStats({
     return const {};
   }
   final avgs = computeDimensionAverages(
+    questionnaire: questionnaire,
+    ratings: ratings,
+  );
+  return {
+    for (final d in avgs)
+      d.questionId: RatingDimensionStatModel(
+        average: d.average,
+        count: d.count,
+      ),
+  };
+}
+
+List<RatingDimensionAverage> computeAliadoDimensionAverages({
+  required RatingQuestionnaireModel questionnaire,
+  required List<AliadoReceivedRatingModel> ratings,
+  int maxRatings = 100,
+}) {
+  if (!questionnaire.isBucketV2 || questionnaire.questions.isEmpty) {
+    return const [];
+  }
+  final adapted = ratings
+      .map(
+        (r) => ImportadorReceivedRatingModel(
+          id: r.id,
+          overallStars: r.overallStars,
+          comment: r.comment,
+          answers: r.answers,
+          submittedAt: r.submittedAt,
+          aliadoLabel: r.importerLabel,
+        ),
+      )
+      .toList();
+  return computeDimensionAverages(
+    questionnaire: questionnaire,
+    ratings: adapted,
+  );
+}
+
+/// Agregados dimensionales del aliado (perfil BD o cálculo local).
+Map<String, RatingDimensionStatModel> resolveAliadoDimensionStats({
+  required ProfileModel profile,
+  required RatingQuestionnaireModel? questionnaire,
+  required List<AliadoReceivedRatingModel> ratings,
+}) {
+  if (profile.ratingDimensionsAsPayerRolling100.isNotEmpty) {
+    return profile.ratingDimensionsAsPayerRolling100;
+  }
+  if (questionnaire == null || !questionnaire.isBucketV2) {
+    return const {};
+  }
+  final avgs = computeAliadoDimensionAverages(
     questionnaire: questionnaire,
     ratings: ratings,
   );

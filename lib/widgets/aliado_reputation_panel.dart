@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/importador_received_rating_model.dart';
+import '../models/aliado_received_rating_model.dart';
 import '../models/profile_model.dart';
 import '../models/rating_questionnaire_model.dart';
 import '../services/supabase_service.dart';
@@ -11,9 +11,9 @@ import 'importer_dimension_reputation_rows.dart';
 import 'order_rating_form.dart';
 import 'received_ratings_carousel.dart';
 
-/// Reputación del importador por categoría y comentarios anónimos de aliados.
-class ImporterReputationPanel extends StatefulWidget {
-  const ImporterReputationPanel({
+/// Reputación del aliado (valorado por importadores) — pestaña dedicada E2.
+class AliadoReputationPanel extends StatefulWidget {
+  const AliadoReputationPanel({
     super.key,
     required this.profile,
     this.onProfileRefresh,
@@ -23,13 +23,13 @@ class ImporterReputationPanel extends StatefulWidget {
   final VoidCallback? onProfileRefresh;
 
   @override
-  State<ImporterReputationPanel> createState() => _ImporterReputationPanelState();
+  State<AliadoReputationPanel> createState() => _AliadoReputationPanelState();
 }
 
-class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
+class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
   bool _loading = true;
   String? _error;
-  List<ImportadorReceivedRatingModel> _ratings = const [];
+  List<AliadoReceivedRatingModel> _ratings = const [];
   RatingQuestionnaireModel? _questionnaire;
 
   @override
@@ -45,12 +45,13 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
     });
     try {
       final results = await Future.wait([
-        SupabaseService.listImportadorReceivedRatings(limit: 100),
-        SupabaseService.fetchRatingQuestionnaire(audience: 'aliado_rates_importer'),
+        SupabaseService.listAliadoReceivedRatings(limit: 100),
+        SupabaseService.fetchRatingQuestionnaire(
+            audience: 'importer_rates_aliado'),
       ]);
       if (!mounted) return;
       setState(() {
-        _ratings = results[0] as List<ImportadorReceivedRatingModel>;
+        _ratings = results[0] as List<AliadoReceivedRatingModel>;
         _questionnaire = results[1] as RatingQuestionnaireModel;
         _loading = false;
       });
@@ -66,10 +67,10 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
-    final cnt =
-        p.ratingCountReceivedRolling100 ?? p.ratingCountReceived ?? 0;
+    final cnt = p.ratingAsPayerCountRolling100 ?? p.ratingAsPayerCount ?? 0;
+    final avg = p.ratingAsPayerAvgRolling100 ?? p.ratingAsPayerAvg;
     final questionnaire = _questionnaire;
-    final dimensionStats = resolveImporterDimensionStats(
+    final dimensionStats = resolveAliadoDimensionStats(
       profile: p,
       questionnaire: questionnaire,
       ratings: _ratings,
@@ -85,24 +86,24 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           decoration: BoxDecoration(
-            color: AppColors.brandBlueContainer.withOpacity(0.45),
+            color: Colors.teal.shade50,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.brandBlue.withOpacity(0.35)),
+            border: Border.all(color: Colors.teal.shade200),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Reputación en MotoLink',
+              Text(
+                'Reputación como aliado',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
-                  color: AppColors.textPrimary,
+                  color: Colors.teal.shade900,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'Desglose por categoría (escala 1–5).',
+                'Valoraciones de importadores sobre su taller (Comunicación y Pagos).',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,
@@ -112,13 +113,24 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
               if (cnt > 0) ...[
                 const SizedBox(height: 4),
                 Text(
-                  '$cnt valoraciones de aliados · ventana últimas 100',
+                  '$cnt valoraciones · ventana últimas 100',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey.shade700,
                   ),
                 ),
+                if (avg != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Promedio global: ${avg.toStringAsFixed(1)} / 5',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.teal.shade900,
+                    ),
+                  ),
+                ],
               ],
               const SizedBox(height: 10),
               if (_loading && !hasDimensions)
@@ -139,8 +151,7 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
                 )
               else if (cnt > 0)
                 Text(
-                  'Las valoraciones registradas aún no incluyen desglose por categoría. '
-                  'Las nuevas valoraciones con el formulario actual mostrarán Calidad, Despacho, Empaque, Comunicación y Socio B2B.',
+                  'Aún no hay desglose por categoría en las valoraciones registradas.',
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.4,
@@ -149,25 +160,13 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
                 )
               else
                 Text(
-                  'Aún no tiene valoraciones de aliados. Al cerrar pedidos como entregados, '
-                  'los talleres calificarán cada aspecto de su servicio.',
+                  'Cuando los importadores valoren pedidos entregados, verá aquí su reputación.',
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.35,
                     color: Colors.grey.shade800,
                   ),
                 ),
-              if (hasDimensions) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'Mejorar estas categorías aumenta su visibilidad en el catálogo de aliados.',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    height: 1.35,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -176,7 +175,7 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
           children: [
             const Expanded(
               child: Text(
-                'Comentarios de clientes',
+                'Comentarios de importadores',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13.5,
@@ -192,8 +191,7 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
           ],
         ),
         Text(
-          'Los comentarios se muestran de forma anónima (ciudad del aliado, sin nombre comercial). '
-          'Use el feedback para mejorar catálogo y despacho.',
+          'Los importadores se muestran de forma anónima (solo ciudad).',
           style: TextStyle(fontSize: 11, height: 1.35, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 10),
@@ -221,7 +219,7 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
               return OrderRatingReceivedCard(
                 overallStars: r.overallStars,
                 comment: r.comment,
-                authorLabel: r.aliadoLabel,
+                authorLabel: r.importerLabel,
                 submittedAtLabel: label,
                 answers: r.answers,
                 questionnaire: _questionnaire,

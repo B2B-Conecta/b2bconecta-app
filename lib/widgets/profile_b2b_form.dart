@@ -11,7 +11,6 @@ import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'profile_kyc_documents_section.dart';
 import 'importer_commission_settlements_section.dart';
-import 'importer_reputation_panel.dart';
 import 'authorization_status_section.dart';
 import 'profile_kyc_documents_info.dart';
 
@@ -259,6 +258,37 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           fontWeight: FontWeight.w800,
           letterSpacing: 0.6,
           color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _reputationTabHint(BuildContext context) {
+    return Material(
+      color: AppColors.brandBlueContainer.withOpacity(0.35),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => MainShellTabController.navigateToReputationTab(),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.star_outline, color: Colors.amber.shade800, size: 22),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Reputación, cierres semanales y comentarios en la pestaña Reputación.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade600),
+            ],
+          ),
         ),
       ),
     );
@@ -601,11 +631,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           if (_persistedAsImportador && widget.initial != null) ...[
             const SizedBox(height: 20),
             const ImporterCommissionSettlementsSection(),
-            const SizedBox(height: 20),
-            ImporterReputationPanel(
-              profile: widget.initial!,
-              onProfileRefresh: widget.onRelatedDataChanged,
-            ),
+            const SizedBox(height: 12),
+            _reputationTabHint(context),
+          ],
+          if (_persistedAsAliado && widget.initial != null) ...[
+            const SizedBox(height: 12),
+            _reputationTabHint(context),
           ],
           if (_persistedAsAliado || _persistedAsImportador) ...[
             const SizedBox(height: 20),

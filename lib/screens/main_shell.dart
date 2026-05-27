@@ -20,6 +20,7 @@ import '../widgets/notification_center_sheet.dart';
 import '../widgets/profile_b2b_form.dart';
 import 'account_settings_screen.dart';
 import 'home_screen.dart';
+import 'reputation_tab.dart';
 
 /// Shell principal: navegación por rol (admin: pedidos; aliado: catálogo / pedidos / perfil).
 class MainShell extends StatefulWidget {
@@ -57,7 +58,7 @@ class _MainShellState extends State<MainShell> {
     });
     if (widget.homeRole == AppHomeRole.importador ||
         widget.homeRole == AppHomeRole.aliado) {
-      MainShellTabController.registerB2BProfileTabIndex(2);
+      MainShellTabController.registerB2BProfileTabIndex(3);
     }
     unawaited(_ensureDailyTasaBcvNotification());
   }
@@ -259,6 +260,13 @@ class _MainShellState extends State<MainShell> {
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
           ),
+          ReputationTab(
+            profile: _profile,
+            homeRole: widget.homeRole,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+            onProfileRefresh: _refreshProfile,
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: widget.homeRole,
@@ -281,9 +289,10 @@ class _MainShellState extends State<MainShell> {
         ),
         child: BottomNavigationBar(
           currentIndex: _tabIndex,
+          type: BottomNavigationBarType.fixed,
           onTap: (i) {
             setState(() => _tabIndex = i);
-            if (widget.homeRole == AppHomeRole.aliado && i == 2) {
+            if (widget.homeRole == AppHomeRole.aliado && i == 3) {
               unawaited(_refreshProfile());
             }
           },
@@ -297,6 +306,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.shopping_cart_outlined),
               activeIcon: Icon(Icons.shopping_cart),
               label: 'Pedidos',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.star_outline),
+              activeIcon: Icon(Icons.star),
+              label: 'Reputación',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
@@ -338,6 +352,13 @@ class _MainShellState extends State<MainShell> {
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
           ),
+          ReputationTab(
+            profile: _profile,
+            homeRole: AppHomeRole.importador,
+            onNotificationTap: _openNotificationCenter,
+            unreadNotifications: _notifications.unreadCount,
+            onProfileRefresh: _refreshProfile,
+          ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.importador,
@@ -366,6 +387,9 @@ class _MainShellState extends State<MainShell> {
             if (i == 1) {
               MainShellTabController.notifyImporterPedidosReload();
             }
+            if (i == 2) {
+              unawaited(_refreshProfile());
+            }
           },
           items: const [
             BottomNavigationBarItem(
@@ -377,6 +401,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.shopping_cart_outlined),
               activeIcon: Icon(Icons.shopping_cart),
               label: 'Pedidos',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.star_outline),
+              activeIcon: Icon(Icons.star),
+              label: 'Reputación',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

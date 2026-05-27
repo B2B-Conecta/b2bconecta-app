@@ -898,12 +898,12 @@ begin
   for v_id in
     select distinct p.id
     from public.profiles p
-    where p.role = 'importador'
+    where p.role in ('importador', 'aliado')
       and exists (
         select 1
         from public.order_ratings r
         where r.importador_id = p.id
-           or (r.ratee_role = 'aliado' and r.aliado_id = p.id)
+           or r.aliado_id = p.id
       )
   loop
     perform public.refresh_profile_rating_aggregates(v_id);

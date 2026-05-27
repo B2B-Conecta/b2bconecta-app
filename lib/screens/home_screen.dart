@@ -767,6 +767,44 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               if (activeFilterChips != null) activeFilterChips,
+              if (_catalogSortMode == CatalogSortMode.reputation &&
+                  widget.homeRole == AppHomeRole.aliado)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.leaderboard_outlined,
+                          size: 18,
+                          color: Colors.amber.shade900,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Ranking por reputación (últ. 100 valoraciones). '
+                            'Los proveedores mejor calificados aparecen primero.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.35,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               if (promos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),

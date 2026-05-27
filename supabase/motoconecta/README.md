@@ -89,8 +89,14 @@ Si tu base es **MotoLink legacy** con `transaction_requests.owner_id`, revisa el
 
 - Columna `profiles.rating_dimensions_received_rolling100` (jsonb por pregunta bucket_v2).
 - `refresh_profile_rating_aggregates()` la recalcula desde `order_ratings` v2.
-- Panel Perfil importador: Calidad, Despacho, Empaque, Comunicación, Socio B2B (sin estrella global única).
-- Demo sin pedidos valorados: `supabase/scripts/seed_demo_importer_dimension_ratings.sql` o re-seed.
+- Pestaña **Reputación** (importador y aliado): dimensiones + comentarios en carrusel.
+
+**E2.3 cierres semanales** — `20260704120000_e2_reputation_weekly_snapshots.sql`:
+
+- Tabla `reputation_weekly_snapshots`; cron lunes 08:15 UTC (`run_weekly_reputation_snapshots_auto`).
+- RPC `list_my_reputation_weekly_snapshots`, `list_aliado_received_ratings`.
+- Aliado: `rating_dimensions_as_payer_rolling100` (Comunicación, Pagos).
+- Índice `profiles_importador_rating_rolling_idx` para ranking en catálogo.
 
 **QA valoraciones v2** (sin borrar usuarios/catálogo):
 

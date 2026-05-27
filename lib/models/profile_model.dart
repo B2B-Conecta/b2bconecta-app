@@ -32,6 +32,9 @@ class ProfileModel {
     this.ratingDimensionsReceivedRolling100 = const {},
     this.ratingAsPayerAvg,
     this.ratingAsPayerCount,
+    this.ratingAsPayerAvgRolling100,
+    this.ratingAsPayerCountRolling100,
+    this.ratingDimensionsAsPayerRolling100 = const {},
   });
 
   final String id;
@@ -94,6 +97,13 @@ class ProfileModel {
   /// Promedio 1–5 como pagador (valoraciones de importadores; v2 crédito).
   final double? ratingAsPayerAvg;
   final int? ratingAsPayerCount;
+
+  /// Rolling 100 cuando el aliado es valorado por importadores (E2).
+  final double? ratingAsPayerAvgRolling100;
+  final int? ratingAsPayerCountRolling100;
+
+  /// Dimensiones Comunicación / Pagos (aliado ratee, bucket_v2).
+  final Map<String, RatingDimensionStatModel> ratingDimensionsAsPayerRolling100;
 
   /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
@@ -223,6 +233,14 @@ class ProfileModel {
       ),
       ratingAsPayerAvg: _asDoubleNullable(json['rating_as_payer_avg']),
       ratingAsPayerCount: _asIntNullable(json['rating_as_payer_count']),
+      ratingAsPayerAvgRolling100:
+          _asDoubleNullable(json['rating_as_payer_avg_rolling100']),
+      ratingAsPayerCountRolling100:
+          _asIntNullable(json['rating_as_payer_count_rolling100']),
+      ratingDimensionsAsPayerRolling100:
+          RatingDimensionStatModel.mapFromProfileJson(
+        json['rating_dimensions_as_payer_rolling100'],
+      ),
     );
   }
 

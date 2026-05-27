@@ -20,7 +20,9 @@ import '../models/admin_aliado_morosidad_flag.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/admin_order_rating_row_model.dart';
+import '../models/aliado_received_rating_model.dart';
 import '../models/importador_received_rating_model.dart';
+import '../models/reputation_weekly_snapshot_model.dart';
 import '../models/profile_model.dart';
 import '../models/promo_campaign_model.dart';
 import '../models/rating_questionnaire_model.dart';
@@ -2975,6 +2977,43 @@ class SupabaseService {
     final publicUrl =
         _client.storage.from(_promoCampaignsBucket).getPublicUrl(path);
     return (path: path, publicUrl: publicUrl);
+  }
+
+  /// E2: cierres semanales de reputación del usuario actual.
+  static Future<List<ReputationWeeklySnapshotModel>>
+      listMyReputationWeeklySnapshots({
+    int limit = 12,
+  }) async {
+    final res = await _client.rpc(
+      'list_my_reputation_weekly_snapshots',
+      params: <String, dynamic>{'p_limit': limit},
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => ReputationWeeklySnapshotModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  /// C4: valoraciones recibidas por el aliado (importador anónimo en etiqueta).
+  static Future<List<AliadoReceivedRatingModel>> listAliadoReceivedRatings({
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_aliado_received_ratings',
+      params: <String, dynamic>{
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AliadoReceivedRatingModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
   }
 
   /// C4: valoraciones recibidas por el importador (aliado anónimo en etiqueta).

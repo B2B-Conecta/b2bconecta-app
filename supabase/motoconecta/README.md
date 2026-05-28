@@ -23,7 +23,7 @@ Solo la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`
 2. Si la base ya existía con un esquema anterior MotoConecta: ejecuta **`upgrade_lat_lng_sku.sql`** (y revisa columnas nuevas manualmente si hace falta).
 3. Si la app falla con **`proveedor_factura_storage_path` does not exist**: ejecuta en SQL Editor **`upgrade_proveedor_factura.sql`** (solo añade las columnas de adjunto).
 4. Si el panel **Pedidos** del aliado muestra **PGRST202** / «`aliado_effective_open_exposure` not found»: ejecuta **`upgrade_aliado_effective_open_exposure.sql`** (RPC de suma de pedidos activos para el cupo en pantalla).
-5. Desde la raíz del repo, `supabase/seed.sql` — 12 importadores, un aliado, un admin; catálogo; **pedidos solo entregados y pagados** (sin abiertos) y **valoraciones bucket_v2** de demo. Para vaciar operación: `supabase/scripts/reset_operational_data.sql` + `seed.sql`.
+5. Desde la raíz del repo, `supabase/seed.sql` — 12 importadores, un aliado, un admin; catálogo; **pedidos solo entregados y pagados** (sin abiertos), **valoraciones bucket_v2** y demo **E3 tramos** (`importador11` ≈ 5 %, `importador12` ≈ 3 %). Para vaciar operación: `supabase/scripts/reset_operational_data.sql` + `seed.sql`.
 
 Contraseña de todos los usuarios seed: **`SeedPass123!`**
 
@@ -33,6 +33,8 @@ Si al ejecutar `seed.sql` aparece **`profiles_id_fkey`**: suele ser un email `@m
 |-----|--------|
 | Importador (Delta) | `importador1@motoconecta.seed` |
 | Importador (Omega) | `importador2@motoconecta.seed` |
+| Importador (tramo 5 % demo E3) | `importador11@motoconecta.seed` — Accesorios Punto Fijo |
+| Importador (tramo 3 % demo E3) | `importador12@motoconecta.seed` — Margarita Moto Base |
 | Aliado | `aliado1@motoconecta.seed` |
 | Admin | `admin@motoconecta.seed` |
 
@@ -111,11 +113,17 @@ Para demo completa: `supabase/scripts/clean_database_for_seed.sql` + `supabase/s
 1. Enlazar `.env` al proyecto Supabase MotoConecta (URL + clave publicable); no commitear secretos.
 2. Aplicar migraciones pendientes con `supabase db push` (incl. C3 admin pago, C4 ratings y tasa BCV).
 
-## Comisiones MotoLink (C1)
+## Comisiones MotoLink (C1 + E3)
 
-Migraciones en `supabase/migrations/` (prefijo `20260520…` / `20260526…`): devengo al Recibido, cortes, referencia automática, PDF, pago con comprobante, cron semanal (lunes 07:00 UTC).
+Migraciones C1 (`20260520…` / `20260526…`): devengo al Recibido, cortes, referencia automática, PDF, pago con comprobante, cron semanal (lunes 07:00 UTC).
 
-- **Admin:** pestaña Comisiones — generar corte, emitir factura (genera PDF), confirmar pago.
+**E3** (`20260706120000_e3_commission_volume_tiers_and_document_type.sql`):
+
+- **Tramos por volumen:** `platform_settings.commission_volume_tiers` (JSON). Volumen mensual = suma `precio_total_usd` en `entregado` con `comision_devengada_at` (mes America/Caracas), sin cancelados/anulados. `profiles.commission_rate_pct` NULL → tramos; con valor → override absoluto. Tasa en `commission_rate_snapshot` al checkout.
+- **Seed:** `importador11` / `importador12` tienen devengo fijado en el mes actual (~4 500 USD → 5 %; ~10 500 USD → 3 %). Tras `seed.sql`, ver consulta al final de ese archivo.
+- **Doble documento al emitir:** `commission_settlements.document_type` = `fiscal_invoice` (ML-COM-, IVA 16 %) o `delivery_note` (ML-NOT-, sin IVA, control interno). Irreversible; `issued_by` para auditoría.
+
+- **Admin:** pestaña Comisiones — tramos, generar corte, emitir factura o nota de entrega, confirmar pago.
 - **Importador:** Perfil → Cortes de comisión — ver PDF, registrar comprobante.
 - **Storage:** `commission-settlement-invoices` (PDF) y `order-payment-proofs/commission-settlements/` (comprobantes).
 

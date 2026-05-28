@@ -36,7 +36,10 @@ import '../utils/catalog_ranking.dart';
 import '../utils/haversine.dart';
 import '../config/motolink_ally_invoice_constants.dart';
 import 'motolink_ally_invoice_pdf_service.dart';
+import 'motolink_commission_delivery_note_pdf_service.dart';
 import 'motolink_commission_invoice_pdf_service.dart';
+import '../models/commission_settlement_document_type.dart';
+import '../utils/commission_volume_tiers.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -3491,6 +3494,8 @@ class SupabaseService {
     pago_rechazo_nota,
     invoice_pdf_storage_path,
     invoice_pdf_file_name,
+    document_type,
+    issued_by,
     importador:profiles!commission_settlements_importador_id_fkey (
       business_name,
       rif,
@@ -3530,6 +3535,24 @@ class SupabaseService {
       params: <String, dynamic>{
         'p_importador_id': importadorId,
         'p_rate': rate,
+      },
+    );
+  }
+
+  static Future<List<CommissionVolumeTier>> fetchCommissionVolumeTiers() async {
+    final raw = await _client.rpc('admin_get_commission_volume_tiers');
+    return parseCommissionVolumeTiers(raw);
+  }
+
+  static Future<void> adminSetCommissionVolumeTiers(
+    List<CommissionVolumeTier> tiers,
+  ) async {
+    final sorted = [...tiers]
+      ..sort((a, b) => a.minMonthlySalesUsd.compareTo(b.minMonthlySalesUsd));
+    await _client.rpc(
+      'admin_set_commission_volume_tiers',
+      params: <String, dynamic>{
+        'p_tiers': sorted.map((t) => t.toJson()).toList(),
       },
     );
   }
@@ -3635,7 +3658,10 @@ class SupabaseService {
     final safeRef = (ref != null && ref.isNotEmpty)
         ? ref.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
         : settlement.id.substring(0, 8);
-    final fileName = 'MotoLink_comision_$safeRef.pdf';
+    final isNota = settlement.isDeliveryNote;
+    final fileName = isNota
+        ? 'MotoLink_nota_entrega_$safeRef.pdf'
+        : 'MotoLink_comision_$safeRef.pdf';
     final path = '${settlement.id}/$fileName';
 
     final oldPath = settlement.invoicePdfStoragePath?.trim();
@@ -3647,15 +3673,28 @@ class SupabaseService {
       } catch (_) {}
     }
 
-    final bytes = await MotolinkCommissionInvoicePdfService.build(
-      settlement: settlement,
-      lines: lines,
-      tasaBcvEmision: tasa,
-      importadorDireccion: impMap?['direccion']?.toString(),
-      importadorEstado: impMap?['estado']?.toString(),
-      importadorCiudad: impMap?['ciudad']?.toString(),
-      importadorPhone: impMap?['phone']?.toString(),
-    );
+    final Uint8List bytes;
+    if (isNota) {
+      bytes = await MotolinkCommissionDeliveryNotePdfService.build(
+        settlement: settlement,
+        lines: lines,
+        tasaBcvEmision: tasa,
+        importadorDireccion: impMap?['direccion']?.toString(),
+        importadorEstado: impMap?['estado']?.toString(),
+        importadorCiudad: impMap?['ciudad']?.toString(),
+        importadorPhone: impMap?['phone']?.toString(),
+      );
+    } else {
+      bytes = await MotolinkCommissionInvoicePdfService.build(
+        settlement: settlement,
+        lines: lines,
+        tasaBcvEmision: tasa,
+        importadorDireccion: impMap?['direccion']?.toString(),
+        importadorEstado: impMap?['estado']?.toString(),
+        importadorCiudad: impMap?['ciudad']?.toString(),
+        importadorPhone: impMap?['phone']?.toString(),
+      );
+    }
 
     await _client.storage
         .from(_commissionSettlementInvoicesBucket)
@@ -3678,19 +3717,27 @@ class SupabaseService {
     );
   }
 
-  /// Vista previa del siguiente Nº de factura de comisión (sin consumir secuencia).
-  static Future<String> peekCommissionInvoiceReference() async {
-    final raw =
-        await _client.rpc('motoconecta_peek_commission_invoice_reference');
+  /// Vista previa del siguiente Nº (ML-COM- o ML-NOT- según tipo).
+  static Future<String> peekCommissionSettlementReference(
+    CommissionSettlementDocumentType documentType,
+  ) async {
+    final raw = await _client.rpc(
+      'motoconecta_peek_commission_settlement_reference',
+      params: <String, dynamic>{'p_document_type': documentType.rpcValue},
+    );
     return raw?.toString().trim() ?? '';
   }
 
-  /// Emite el corte. Si [invoiceReference] es null/vacío, la BD asigna ML-COM-{año}-{seq}.
+  /// Emite el corte. Referencia automática según [documentType].
   static Future<String> adminIssueCommissionSettlement({
     required String settlementId,
+    required CommissionSettlementDocumentType documentType,
     String? invoiceReference,
   }) async {
-    final params = <String, dynamic>{'p_settlement_id': settlementId};
+    final params = <String, dynamic>{
+      'p_settlement_id': settlementId,
+      'p_document_type': documentType.rpcValue,
+    };
     final manual = invoiceReference?.trim();
     if (manual != null && manual.isNotEmpty) {
       params['p_invoice_reference'] = manual;

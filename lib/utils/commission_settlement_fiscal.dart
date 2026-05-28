@@ -31,7 +31,17 @@ extension CommissionSettlementFiscalX on CommissionSettlementModel {
   double get baseImponibleComisionUsd =>
       CommissionSettlementFiscal.baseImponibleUsd(this);
 
-  double get ivaComisionUsd => CommissionSettlementFiscal.ivaUsd(this);
+  double get ivaComisionUsd =>
+      isDeliveryNote ? 0 : CommissionSettlementFiscal.ivaUsd(this);
 
-  double get totalFacturaUsd => CommissionSettlementFiscal.totalFacturaUsd(this);
+  double get totalFacturaUsd => isDeliveryNote
+      ? baseImponibleComisionUsd
+      : CommissionSettlementFiscal.totalFacturaUsd(this);
+
+  /// Monto que debe pagar el importador según tipo de documento.
+  double get totalCobroUsd => totalFacturaUsd;
+
+  String get totalCobroLabelEs => isDeliveryNote
+      ? 'Total neto (sin IVA)'
+      : 'Total a pagar (IVA incl.)';
 }

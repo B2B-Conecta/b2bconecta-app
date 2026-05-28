@@ -8,9 +8,9 @@ import '../utils/commission_settlement_fiscal.dart';
 import '../utils/ves_amount_format.dart';
 import 'motolink_commission_settlement_pdf_layout.dart';
 
-/// Factura fiscal de comisión MotoLink → importador (corte semanal).
-class MotolinkCommissionInvoicePdfService {
-  MotolinkCommissionInvoicePdfService._();
+/// Nota de entrega / relación de control interno (mismo formato que factura fiscal, sin IVA).
+class MotolinkCommissionDeliveryNotePdfService {
+  MotolinkCommissionDeliveryNotePdfService._();
 
   static Future<Uint8List> build({
     required CommissionSettlementModel settlement,
@@ -40,13 +40,10 @@ class MotolinkCommissionInvoicePdfService {
     final impDir = dirParts.isEmpty ? '—' : dirParts.join(', ');
     final impTel = importadorPhone?.trim() ?? '—';
 
-    final baseUsd = settlement.baseImponibleComisionUsd;
-    final ivaUsd = settlement.ivaComisionUsd;
-    final totalUsd = settlement.totalFacturaUsd;
-    final baseBs = baseUsd * tasaBcvEmision;
-    final ivaBs = ivaUsd * tasaBcvEmision;
-    final totalBs = totalUsd * tasaBcvEmision;
-    final ivaPct = CommissionSettlementFiscal.ivaPct;
+    final netUsd = settlement.baseImponibleComisionUsd;
+    final netBs = netUsd * tasaBcvEmision;
+    final ventasInfo =
+        CommissionSettlementFiscal.totalVentasInformativoUsd(lines);
     final serviceDesc =
         'Servicio de intermediación digital y uso de plataforma tecnológica '
         'MotoLink, según corte de cuenta referencia $ref';
@@ -59,14 +56,14 @@ class MotolinkCommissionInvoicePdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(28),
         footer: (ctx) => MotolinkCommissionSettlementPdfLayout.pageFooter(
-          'Documento fiscal por intermediación B2B (comisión MotoLink + IVA). '
-          'Sujeto a validación con su contador. '
+          'Relación de control interno (nota de entrega). Sin desglose de IVA. '
           'Tasa BCV referencia emisión: $tasaTxt.',
         ),
         build: (ctx) => [
           MotolinkCommissionSettlementPdfLayout.headerRow(
             logoBytes: logoBytes,
-            title: 'FACTURA DE COMISIÓN',
+            title: 'NOTA DE ENTREGA',
+            subtitle: 'Relación de control interno',
             ref: ref,
             issued: issued,
             periodLabel: settlement.periodLabelEs,
@@ -81,45 +78,39 @@ class MotolinkCommissionInvoicePdfService {
           ),
           pw.SizedBox(height: 10),
           MotolinkCommissionSettlementPdfLayout.conceptTable(
-            sectionTitle: 'Concepto facturado (servicio de intermediación)',
+            sectionTitle:
+                'Concepto registrado (servicio de intermediación)',
             serviceDesc: serviceDesc,
-            amountUsd: baseUsd,
+            amountUsd: netUsd,
           ),
           pw.SizedBox(height: 12),
           MotolinkCommissionSettlementPdfLayout.totalsPanel(
             leftNote:
                 'Montos en REF (divisa de referencia). Contravalor en bolívares '
                 'según tasa oficial BCV del día de emisión ($tasaTxt). '
-                'IVA ${formatVesAmount(ivaPct, fractionDigits: 2)} % sobre la base imponible de comisión.',
+                'Documento exento de IVA (control operativo). '
+                'Ventas del periodo (informativo): '
+                '${MotolinkCommissionSettlementPdfLayout.fmtRef(ventasInfo)} · '
+                '${lines.length} pedido(s) en el corte.',
             rows: [
               (
-                label: 'Subtotal / Base imponible REF',
-                value: MotolinkCommissionSettlementPdfLayout.fmtRef(baseUsd),
+                label: 'Subtotal / Base comisión REF',
+                value: MotolinkCommissionSettlementPdfLayout.fmtRef(netUsd),
                 bold: false,
               ),
               (
-                label: 'Subtotal / Base imponible Bs',
-                value: MotolinkCommissionSettlementPdfLayout.fmtBs(baseBs),
+                label: 'Subtotal / Base comisión Bs',
+                value: MotolinkCommissionSettlementPdfLayout.fmtBs(netBs),
                 bold: false,
               ),
               (
-                label: 'IVA (${formatVesAmount(ivaPct, fractionDigits: 2)}%) REF',
-                value: MotolinkCommissionSettlementPdfLayout.fmtRef(ivaUsd),
-                bold: false,
-              ),
-              (
-                label: 'IVA Bs',
-                value: MotolinkCommissionSettlementPdfLayout.fmtBs(ivaBs),
-                bold: false,
-              ),
-              (
-                label: 'Total general de la factura REF',
-                value: MotolinkCommissionSettlementPdfLayout.fmtRef(totalUsd),
+                label: 'Total neto de la nota REF',
+                value: MotolinkCommissionSettlementPdfLayout.fmtRef(netUsd),
                 bold: true,
               ),
               (
-                label: 'Total general de la factura Bs',
-                value: MotolinkCommissionSettlementPdfLayout.fmtBs(totalBs),
+                label: 'Total neto de la nota Bs',
+                value: MotolinkCommissionSettlementPdfLayout.fmtBs(netBs),
                 bold: true,
               ),
             ],

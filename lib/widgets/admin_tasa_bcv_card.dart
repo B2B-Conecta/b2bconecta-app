@@ -77,7 +77,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'No se pudo obtener la tasa. Consulte Al Cambio o ingrésela manualmente.',
+              'No se pudo obtener la tasa. Consulte el BCV oficial o ingrésela manualmente.',
             ),
           ),
         );
@@ -135,14 +135,14 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
     }
   }
 
-  Future<void> _openAlCambio() async {
+  Future<void> _openBcvOfficial() async {
     final ok = await launchUrl(
-      Uri.parse(BcvReferenceRateService.alcambioUrl),
+      Uri.parse(BcvReferenceRateService.bcvOfficialUrl),
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir Al Cambio.')),
+        const SnackBar(content: Text('No se pudo abrir el sitio del BCV.')),
       );
     }
   }
@@ -251,9 +251,9 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                         ),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _openAlCambio,
+                        onPressed: _openBcvOfficial,
                         icon: const Icon(Icons.open_in_new, size: 16),
-                        label: const Text('Al Cambio'),
+                        label: const Text('BCV oficial'),
                         style: OutlinedButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(

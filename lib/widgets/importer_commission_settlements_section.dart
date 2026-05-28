@@ -305,7 +305,8 @@ class _ImporterCommissionSettlementsSectionState
                         children: [
                           Text(
                             '${CommissionSettlementModel.statusLabelEs(s.status)} · '
-                            'Total a pagar: USD ${s.totalFacturaUsd.toStringAsFixed(2)} (IVA incl.)',
+                            '${s.documentTypeEffective.importerDocumentLabelEs} · '
+                            '${s.totalCobroLabelEs}: USD ${s.totalCobroUsd.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 12,
                               color: _statusColor(s.status),
@@ -313,9 +314,11 @@ class _ImporterCommissionSettlementsSectionState
                             ),
                           ),
                           Text(
-                            'Base comisión: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
-                            'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
-                            'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
+                            s.isDeliveryNote
+                                ? 'Comisión neta (sin IVA en documento): USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
+                                : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
+                                    'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
+                                    'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey.shade700,

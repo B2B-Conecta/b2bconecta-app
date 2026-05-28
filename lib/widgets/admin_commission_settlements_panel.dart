@@ -3,17 +3,22 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/commission_settlement_document_type.dart';
 import '../models/commission_settlement_model.dart';
 import '../models/catalog_filters.dart';
 import '../services/supabase_service.dart';
+import '../utils/commission_settlement_filter_utils.dart';
+import '../utils/commission_volume_tiers.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/commission_settlement_fiscal.dart';
 import 'admin_tasa_bcv_card.dart';
 import 'commission_settlement_lines_section.dart';
+import 'commission_settlement_list_filter_bar.dart';
+import 'commission_settlement_filters_sheet.dart';
 import 'main_shell_tab.dart';
 
-/// Admin — Minuta #7 C1: cortes semanales, facturación y cobro de comisiones MotoLink.
+/// Admin: cortes semanales, facturación y cobro de comisiones MotoLink.
 class AdminCommissionSettlementsPanel extends StatefulWidget {
   const AdminCommissionSettlementsPanel({super.key});
 
@@ -28,8 +33,63 @@ class _AdminCommissionSettlementsPanelState
   bool _loading = true;
   String? _error;
   double _defaultRate = 0.05;
+  List<CommissionVolumeTier> _volumeTiers = [];
   bool _busy = false;
   final Set<String> _expandedSettlementIds = {};
+  final TextEditingController _searchController = TextEditingController();
+  CommissionSettlementFilters _filters = const CommissionSettlementFilters();
+
+  List<CommissionSettlementModel> get _filteredRows =>
+      filterCommissionSettlements(_rows, _filters);
+
+  int get _activeFilterCount {
+    final f = _filters;
+    var count = 0;
+    if (f.searchQuery.trim().isNotEmpty) count++;
+    if (f.status != null) count++;
+    if (f.weekScope != null) count++;
+    if (f.documentType != null) count++;
+    if (f.importadorId != null) count++;
+    return count;
+  }
+
+  Future<void> _openCommissionSettlementFiltersSheet() async {
+    final result = await CommissionSettlementFiltersSheet.show(
+      context,
+      initial: _filters,
+      importadorOptions: _importadorFilterOptions,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _filters = result;
+      _searchController.text = result.searchQuery;
+    });
+  }
+
+  List<CommissionSettlementImporterOption> get _importadorFilterOptions {
+    final map = <String, String>{};
+    for (final row in _rows) {
+      if (row.importadorId.trim().isEmpty) continue;
+      final name = row.importadorBusinessName?.trim();
+      map[row.importadorId] = (name == null || name.isEmpty)
+          ? 'Importador'
+          : name;
+    }
+    final options = map.entries
+        .map(
+          (e) => CommissionSettlementImporterOption(
+            id: e.key,
+            businessName: e.value,
+          ),
+        )
+        .toList();
+    options.sort(
+      (a, b) => a.businessName.toLowerCase().compareTo(
+        b.businessName.toLowerCase(),
+      ),
+    );
+    return options;
+  }
 
   @override
   void initState() {
@@ -43,6 +103,7 @@ class _AdminCommissionSettlementsPanelState
   @override
   void dispose() {
     MainShellTabController.registerAdminCommissionSettlementDeepLink(null);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -59,10 +120,12 @@ class _AdminCommissionSettlementsPanelState
     });
     try {
       final rate = await SupabaseService.fetchDefaultCommissionRate();
+      final tiers = await SupabaseService.fetchCommissionVolumeTiers();
       final rows = await SupabaseService.fetchCommissionSettlements();
       if (!mounted) return;
       setState(() {
         _defaultRate = rate;
+        _volumeTiers = tiers;
         _rows = rows;
         _loading = false;
       });
@@ -211,7 +274,7 @@ class _AdminCommissionSettlementsPanelState
               TextField(
                 controller: ctrl,
                 decoration: const InputDecoration(
-                  labelText: 'Porcentaje (%) — vacío = global',
+                  labelText: 'Porcentaje (%) — vacío = tramos por volumen',
                   hintText: '5.00',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -320,10 +383,175 @@ class _AdminCommissionSettlementsPanelState
     }
   }
 
-  Future<void> _issueSettlement(CommissionSettlementModel s) async {
+  Future<void> _editVolumeTiers() async {
+    final rows = _volumeTiers
+        .map(
+          (t) => (
+            min: TextEditingController(
+              text: t.minMonthlySalesUsd.toStringAsFixed(0),
+            ),
+            rate: TextEditingController(
+              text: t.ratePercentDisplay.toStringAsFixed(2),
+            ),
+          ),
+        )
+        .toList();
+    if (rows.isEmpty) {
+      rows.add((
+        min: TextEditingController(text: '0'),
+        rate: TextEditingController(text: '5.00'),
+      ));
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('Tramos por volumen mensual'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Volumen = suma USD de pedidos entregados en el mes (Caracas). '
+                    'Umbrales inclusivos. La tasa fija por importador tiene prioridad.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  for (var i = 0; i < rows.length; i++) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: rows[i].min,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Mín. USD/mes',
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: rows[i].rate,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Tasa %',
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: rows.length > 1
+                              ? () => setDlg(() => rows.removeAt(i))
+                              : null,
+                          icon: const Icon(Icons.remove_circle_outline),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  TextButton.icon(
+                    onPressed: () => setDlg(
+                      () => rows.add((
+                        min: TextEditingController(text: '10000'),
+                        rate: TextEditingController(text: '3.00'),
+                      )),
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Añadir tramo'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok != true || !mounted) {
+      for (final r in rows) {
+        r.min.dispose();
+        r.rate.dispose();
+      }
+      return;
+    }
+
+    final parsed = <CommissionVolumeTier>[];
+    for (final r in rows) {
+      final min = double.tryParse(r.min.text.replaceAll(',', '.'));
+      final pct = double.tryParse(r.rate.text.replaceAll(',', '.'));
+      if (min == null || pct == null || min < 0 || pct < 0 || pct > 100) {
+        for (final r in rows) {
+          r.min.dispose();
+          r.rate.dispose();
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Revise los tramos (USD y % válidos).')),
+        );
+        return;
+      }
+      parsed.add(
+        CommissionVolumeTier(
+          minMonthlySalesUsd: min,
+          ratePct: pct / 100,
+        ),
+      );
+    }
+    for (final r in rows) {
+      r.min.dispose();
+      r.rate.dispose();
+    }
+
+    setState(() => _busy = true);
+    try {
+      await SupabaseService.adminSetCommissionVolumeTiers(parsed);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tramos de comisión actualizados.')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _issueSettlement(
+    CommissionSettlementModel s, {
+    required CommissionSettlementDocumentType documentType,
+  }) async {
     String previewRef = '';
     try {
-      previewRef = await SupabaseService.peekCommissionInvoiceReference();
+      previewRef = await SupabaseService.peekCommissionSettlementReference(
+        documentType,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -332,15 +560,23 @@ class _AdminCommissionSettlementsPanelState
       return;
     }
     if (!mounted) return;
+
+    final isNota =
+        documentType == CommissionSettlementDocumentType.deliveryNote;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Emitir factura MotoLink'),
+        title: Text(
+          isNota ? 'Confirmar emisión' : 'Emitir factura fiscal',
+        ),
         content: Text(
-          'Se asignará automáticamente la referencia:\n\n'
-          '$previewRef\n\n'
-          'Formato: ML-COM-{año}-{secuencia de 6 dígitos}. '
-          'El importador la verá en sus cortes de comisión.',
+          isNota
+              ? 'Se asignará la referencia:\n\n$previewRef\n\n'
+                  'Serie ML-NOT- (sin IVA). La emisión no se puede deshacer.'
+              : 'Factura fiscal con IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %.\n\n'
+                  'Referencia: $previewRef\n'
+                  'Formato: ML-COM-{año}-{secuencia}. '
+                  'Esta acción es irreversible.',
           style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade800),
         ),
         actions: [
@@ -350,7 +586,7 @@ class _AdminCommissionSettlementsPanelState
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Emitir'),
+            child: Text(isNota ? 'Confirmar' : 'Emitir factura'),
           ),
         ],
       ),
@@ -360,6 +596,7 @@ class _AdminCommissionSettlementsPanelState
     try {
       final assignedRef = await SupabaseService.adminIssueCommissionSettlement(
         settlementId: s.id,
+        documentType: documentType,
       );
       if (!mounted) return;
       await _load();
@@ -395,7 +632,7 @@ class _AdminCommissionSettlementsPanelState
         SnackBar(
           content: Text(
             assignedRef.isNotEmpty
-                ? 'Corte emitido. Factura: $assignedRef (PDF listo).'
+                ? 'Corte emitido ($assignedRef). PDF listo.'
                 : 'Corte marcado como emitido.',
           ),
         ),
@@ -694,19 +931,37 @@ class _AdminCommissionSettlementsPanelState
               const SizedBox(height: 12),
               _ConfigCard(
                 defaultRatePct: _defaultRate * 100,
+                volumeTiersSummary:
+                    commissionVolumeTiersSummaryEs(_volumeTiers),
                 onEditRate: _busy ? null : _editDefaultRate,
                 onEditImportadorRate: _busy ? null : _editImportadorRate,
+                onEditVolumeTiers: _busy ? null : _editVolumeTiers,
                 onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
                 onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
               ),
               const SizedBox(height: 12),
               Text(
-                'Cortes registrados (${_rows.length})',
+                _filters.hasActiveFilters
+                    ? 'Cortes registrados (${_filteredRows.length} de ${_rows.length})'
+                    : 'Cortes registrados (${_rows.length})',
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 14,
                 ),
               ),
+              if (_rows.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _rows.isEmpty ? null : _openCommissionSettlementFiltersSheet,
+                  icon: Badge(
+                    isLabelVisible: _activeFilterCount > 0,
+                    label: Text('$_activeFilterCount'),
+                    backgroundColor: AppColors.brandOrange,
+                    child: const Icon(Icons.tune),
+                  ),
+                  label: const Text('Filtros'),
+                ),
+              ],
               const SizedBox(height: 8),
               if (_rows.isEmpty)
                 Padding(
@@ -718,8 +973,28 @@ class _AdminCommissionSettlementsPanelState
                     textAlign: TextAlign.center,
                   ),
                 )
+              else if (_filteredRows.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Ningún corte coincide con los filtros.',
+                        style: TextStyle(color: Colors.grey.shade700),
+                        textAlign: TextAlign.center,
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _filters = const CommissionSettlementFilters());
+                        },
+                        child: const Text('Limpiar filtros'),
+                      ),
+                    ],
+                  ),
+                )
               else
-                ..._rows.map(_settlementTile),
+                ..._filteredRows.map(_settlementTile),
             ],
           ),
         ),
@@ -775,10 +1050,37 @@ class _AdminCommissionSettlementsPanelState
                     ),
                   ),
                 ),
+                if (!s.isBorrador) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: s.isDeliveryNote
+                          ? Colors.grey.shade100
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: s.isDeliveryNote
+                            ? Colors.grey.shade300
+                            : Colors.blue.shade200,
+                      ),
+                    ),
+                    child: Text(
+                      s.documentTypeEffective.labelEs,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: s.isDeliveryNote
+                            ? Colors.grey.shade800
+                            : Colors.blue.shade900,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'Total a pagar: USD ${s.totalFacturaUsd.toStringAsFixed(2)} (IVA incl.) · '
+                    '${s.totalCobroLabelEs}: USD ${s.totalCobroUsd.toStringAsFixed(2)} · '
                     '${s.lineCount} pedido(s)',
                     style: const TextStyle(
                       fontSize: 12,
@@ -791,9 +1093,11 @@ class _AdminCommissionSettlementsPanelState
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                'Base comisión: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
-                'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
-                'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
+                s.isDeliveryNote
+                    ? 'Base comisión (neta, sin IVA): USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
+                    : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
+                        'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
+                        'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ),
@@ -801,7 +1105,7 @@ class _AdminCommissionSettlementsPanelState
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Factura: ${s.invoiceReference}',
+                  'Ref.: ${s.invoiceReference}',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                 ),
               ),
@@ -850,9 +1154,37 @@ class _AdminCommissionSettlementsPanelState
                   runSpacing: 8,
                   children: [
                     if (s.isBorrador) ...[
-                      OutlinedButton(
-                        onPressed: _busy ? null : () => _issueSettlement(s),
+                      FilledButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _issueSettlement(
+                                  s,
+                                  documentType: CommissionSettlementDocumentType
+                                      .fiscalInvoice,
+                                ),
                         child: const Text('Emitir factura'),
+                      ),
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _issueSettlement(
+                                  s,
+                                  documentType: CommissionSettlementDocumentType
+                                      .deliveryNote,
+                                ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey.shade600,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                        ),
+                        child: Text(
+                          CommissionSettlementDocumentType
+                              .deliveryNote.adminEmitActionLabel,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                       TextButton(
                         onPressed: _busy ? null : () => _cancelSettlement(s),
@@ -863,12 +1195,12 @@ class _AdminCommissionSettlementsPanelState
                       OutlinedButton.icon(
                         onPressed: _busy ? null : () => _abrirFacturaPdf(s),
                         icon: const Icon(Icons.picture_as_pdf, size: 18),
-                        label: const Text('Ver factura PDF'),
+                        label: const Text('Ver PDF'),
                       ),
                     if ((s.isEmitido || s.isPagado) && !s.tieneFacturaPdf)
                       OutlinedButton(
                         onPressed: _busy ? null : () => _generarFacturaPdf(s),
-                        child: const Text('Generar factura PDF'),
+                        child: const Text('Generar PDF'),
                       ),
                     if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
                       TextButton(
@@ -930,12 +1262,12 @@ class _CommissionSummaryCard extends StatelessWidget {
       if (s.isBorrador) borrador++;
       if (s.isEmitido) {
         emitido++;
-        usdEmitido += s.totalFacturaUsd;
+        usdEmitido += s.totalCobroUsd;
         if (s.pagoEnRevision) enRevision++;
       }
       if (s.isPagado) {
         pagado++;
-        usdPagado += s.totalFacturaUsd;
+        usdPagado += s.totalCobroUsd;
       }
     }
 
@@ -964,8 +1296,8 @@ class _CommissionSummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'USD pendiente de cobro (emitido, con IVA): ${usdEmitido.toStringAsFixed(2)} · '
-              'USD cobrado (pagado, con IVA): ${usdPagado.toStringAsFixed(2)}',
+              'USD pendiente de cobro (emitido): ${usdEmitido.toStringAsFixed(2)} · '
+              'USD cobrado (pagado): ${usdPagado.toStringAsFixed(2)}',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
             ),
           ],
@@ -997,85 +1329,185 @@ class _CommissionSummaryCard extends StatelessWidget {
 class _ConfigCard extends StatelessWidget {
   const _ConfigCard({
     required this.defaultRatePct,
+    required this.volumeTiersSummary,
     this.onEditRate,
     this.onEditImportadorRate,
+    this.onEditVolumeTiers,
     this.onGeneratePreviousWeek,
     this.onGenerateCurrentWeek,
   });
 
   final double defaultRatePct;
+  final String volumeTiersSummary;
   final VoidCallback? onEditRate;
   final VoidCallback? onEditImportadorRate;
+  final VoidCallback? onEditVolumeTiers;
   final VoidCallback? onGeneratePreviousWeek;
   final VoidCallback? onGenerateCurrentWeek;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.brandBlueContainer.withOpacity(0.35),
-      borderRadius: BorderRadius.circular(12),
+    return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Comisiones MotoLink (C1)',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              'Reglas y cortes',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
             ),
             const SizedBox(height: 6),
             Text(
               'La comisión se devenga cuando el aliado marca Recibido. '
-              'Tasa global actual: ${defaultRatePct.toStringAsFixed(2)} % '
-              '(cada importador puede tener tasa propia). '
-              'El cobro fiscal es la comisión (base imponible) más IVA '
-              '${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %; '
-              'el volumen de ventas del importador figura solo como detalle informativo. '
-              'Los lunes 07:00 UTC se genera el corte de la semana anterior. '
-              'Al emitir, la referencia es automática y se genera el PDF de factura de comisión.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800, height: 1.35),
+              'La tasa se fija en el checkout según el volumen del mes o un override por importador.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: Colors.grey.shade800,
+              ),
             ),
+            const SizedBox(height: 14),
+            const Text(
+              'Tasas',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            _configRow(
+              icon: Icons.percent,
+              title: 'Tasa global (reserva)',
+              subtitle: '${defaultRatePct.toStringAsFixed(2)} % si no aplica un tramo',
+              actionLabel: 'Editar',
+              onAction: onEditRate,
+            ),
+            const SizedBox(height: 6),
+            _configRow(
+              icon: Icons.stacked_line_chart,
+              title: 'Tramos por volumen mensual',
+              subtitle: volumeTiersSummary,
+              actionLabel: 'Tramos',
+              onAction: onEditVolumeTiers,
+            ),
+            const SizedBox(height: 6),
+            _configRow(
+              icon: Icons.store_outlined,
+              title: 'Tasa fija por importador',
+              subtitle: 'Opcional; anula tramos y volumen',
+              actionLabel: 'Configurar',
+              onAction: onEditImportadorRate,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Emisión habitual: ML-COM- con IVA. '
+              'Alternativa ML-NOT- (sin IVA): botón secundario al emitir.',
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: onEditRate,
-                  icon: const Icon(Icons.percent, size: 18),
-                  label: const Text('Tasa global'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: onEditImportadorRate,
-                  icon: const Icon(Icons.store, size: 18),
-                  label: const Text('Tasa importador'),
-                ),
-              ],
+            const Text(
+              'Generar cortes en borrador',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            const SizedBox(height: 8),
+            Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: onGeneratePreviousWeek,
-                  icon: const Icon(Icons.calendar_view_week, size: 18),
-                  label: const Text('Generar corte semana anterior'),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: onGeneratePreviousWeek,
+                    icon: const Icon(Icons.calendar_view_week, size: 18),
+                    label: const Text('Semana anterior'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
                 ),
-                OutlinedButton.icon(
-                  onPressed: onGenerateCurrentWeek,
-                  icon: const Icon(Icons.science_outlined, size: 18),
-                  label: const Text('Semana actual (prueba)'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.deepOrange.shade800,
-                    side: BorderSide(color: Colors.deepOrange.shade300),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onGenerateCurrentWeek,
+                    icon: const Icon(Icons.today_outlined, size: 18),
+                    label: const Text('Semana actual'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.deepOrange.shade800,
+                      side: BorderSide(color: Colors.deepOrange.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
                   ),
                 ),
               ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '«Semana actual» solo para pruebas en desarrollo.',
+                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  static Widget _configRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AppColors.brandBlue),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.3,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

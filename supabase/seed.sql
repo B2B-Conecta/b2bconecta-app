@@ -9,8 +9,9 @@
 -- Contraseña común (todos los seed): SeedPass123!
 --
 -- Incluye: 12 importadores (2 × 15 SKU + 10 × 5 SKU), datos comerciales realistas,
--- pedidos solo en estado entregado con pago aprobado (sin pedidos abiertos) y
--- valoraciones bucket_v2 de demo (admin / reputación importador).
+-- pedidos solo en estado entregado con pago aprobado (sin pedidos abiertos),
+-- valoraciones bucket_v2 de demo (admin / reputación importador) y
+-- E3 tramos comisión: importador11 ≈ 4 500 USD/mes (5 %), importador12 ≈ 10 500 USD/mes (3 %).
 --
 -- Flujo recomendado (re-carga limpia):
 --   supabase db query --linked -f supabase/scripts/clean_database_for_seed.sql
@@ -735,6 +736,138 @@ order by p.sku
 limit 2;
 
 -- ---------------------------------------------------------------------------
+-- E3: tramos comisión por volumen mensual (mes actual America/Caracas)
+-- importador11 — Accesorios Punto Fijo: ~4 500 USD devengado → tramo 5 %
+-- importador12 — Margarita Moto Base: ~10 500 USD devengado → tramo 3 %
+-- Sin override en profiles.commission_rate_pct (NULL).
+-- ---------------------------------------------------------------------------
+with e3_month as (
+  select
+    (
+      date_trunc('month', timezone('America/Caracas', now()))
+      + interval '5 days'
+    ) at time zone 'America/Caracas' as devengo_base
+)
+insert into public.transaction_requests (
+  id,
+  aliado_id,
+  importador_id,
+  product_id,
+  status,
+  cantidad,
+  precio_total_usd,
+  commission_rate_snapshot,
+  comision_devengada_usd,
+  comision_devengada_at,
+  comprobante_pago_storage_path,
+  comprobante_pago_file_name,
+  pago_estado_revision,
+  confirmado_por,
+  pago_aprobado_at,
+  at_entregado,
+  created_at,
+  updated_at
+)
+select
+  v.id,
+  'c2000001-0000-4000-8000-000000000001'::uuid,
+  v.importador_id,
+  v.product_id,
+  'entregado'::text,
+  1,
+  v.precio_total_usd,
+  v.commission_rate_snapshot,
+  round((v.precio_total_usd * v.commission_rate_snapshot)::numeric, 4),
+  m.devengo_base + (v.line_no * interval '1 day'),
+  'seed/comprobantes/e3-tramo-demo.pdf',
+  'comprobante-e3-tramo.pdf',
+  'aprobado'::text,
+  v.importador_id,
+  m.devengo_base + (v.line_no * interval '1 day') - interval '6 hours',
+  m.devengo_base + (v.line_no * interval '1 day'),
+  m.devengo_base + (v.line_no * interval '1 day') - interval '1 day',
+  m.devengo_base + (v.line_no * interval '1 day')
+from e3_month m
+cross join (
+  values
+    (
+      'e3b00001-0000-4000-8000-000000000001'::uuid,
+      'c100000b-0000-4000-8000-000000000001'::uuid,
+      'd100000b-0000-4000-8000-000000000001'::uuid,
+      1,
+      2000.0000::numeric,
+      0.05::numeric
+    ),
+    (
+      'e3b00002-0000-4000-8000-000000000002'::uuid,
+      'c100000b-0000-4000-8000-000000000001'::uuid,
+      'd100000b-0000-4000-8000-000000000002'::uuid,
+      2,
+      1500.0000::numeric,
+      0.05::numeric
+    ),
+    (
+      'e3b00003-0000-4000-8000-000000000003'::uuid,
+      'c100000b-0000-4000-8000-000000000001'::uuid,
+      'd100000b-0000-4000-8000-000000000003'::uuid,
+      3,
+      1000.0000::numeric,
+      0.05::numeric
+    ),
+    (
+      'e3c00001-0000-4000-8000-000000000001'::uuid,
+      'c100000c-0000-4000-8000-000000000001'::uuid,
+      'd100000c-0000-4000-8000-000000000001'::uuid,
+      1,
+      5500.0000::numeric,
+      0.03::numeric
+    ),
+    (
+      'e3c00002-0000-4000-8000-000000000002'::uuid,
+      'c100000c-0000-4000-8000-000000000001'::uuid,
+      'd100000c-0000-4000-8000-000000000002'::uuid,
+      2,
+      3000.0000::numeric,
+      0.03::numeric
+    ),
+    (
+      'e3c00003-0000-4000-8000-000000000003'::uuid,
+      'c100000c-0000-4000-8000-000000000001'::uuid,
+      'd100000c-0000-4000-8000-000000000003'::uuid,
+      3,
+      2000.0000::numeric,
+      0.03::numeric
+    )
+) as v(id, importador_id, product_id, line_no, precio_total_usd, commission_rate_snapshot)
+on conflict (id) do update set
+  importador_id = excluded.importador_id,
+  product_id = excluded.product_id,
+  status = excluded.status,
+  cantidad = excluded.cantidad,
+  precio_total_usd = excluded.precio_total_usd,
+  commission_rate_snapshot = excluded.commission_rate_snapshot,
+  comision_devengada_usd = excluded.comision_devengada_usd,
+  comision_devengada_at = excluded.comision_devengada_at,
+  pago_estado_revision = excluded.pago_estado_revision,
+  confirmado_por = excluded.confirmado_por,
+  pago_aprobado_at = excluded.pago_aprobado_at,
+  at_entregado = excluded.at_entregado,
+  updated_at = now();
+
+-- Devengo C1 en el resto de pedidos entregados del seed (fechas históricas de at_entregado)
+update public.transaction_requests tr
+set
+  commission_rate_snapshot = coalesce(tr.commission_rate_snapshot, 0.05),
+  comision_devengada_usd = round(
+    (tr.precio_total_usd * coalesce(tr.commission_rate_snapshot, 0.05))::numeric,
+    4
+  ),
+  comision_devengada_at = coalesce(tr.comision_devengada_at, tr.at_entregado, tr.updated_at, now())
+where tr.aliado_id = 'c2000001-0000-4000-8000-000000000001'::uuid
+  and tr.status = 'entregado'
+  and tr.comision_devengada_at is null;
+
+-- ---------------------------------------------------------------------------
 -- Valoraciones demo (bucket_v2) — solo sobre pedidos entregados y pagados
 -- ---------------------------------------------------------------------------
 with seed_rate_targets as (
@@ -919,3 +1052,17 @@ select public.refresh_all_importer_catalog_boost ();
 -- from public.profiles p
 -- where p.role = 'importador'
 -- order by p.catalog_paid_orders_30d desc, p.business_name;
+--
+-- Referencia E3 tramos (volumen mes Caracas + tasa efectiva):
+-- select
+--   p.business_name,
+--   u.email,
+--   public.motoconecta_importer_monthly_sales_volume_usd(p.id) as volumen_usd_mes,
+--   public.motoconecta_commission_rate_for_importador(p.id) as tasa_efectiva
+-- from public.profiles p
+-- join auth.users u on u.id = p.id
+-- where p.id in (
+--   'c100000b-0000-4000-8000-000000000001'::uuid,
+--   'c100000c-0000-4000-8000-000000000001'::uuid
+-- );
+-- Esperado: importador11 ~4500 → 0.05; importador12 ~10500 → 0.03

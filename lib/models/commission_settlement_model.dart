@@ -1,3 +1,4 @@
+import 'commission_settlement_document_type.dart';
 import 'pago_revision_estado.dart';
 
 /// Corte de cuenta semanal de comisiones MotoLink por importador.
@@ -24,6 +25,8 @@ class CommissionSettlementModel {
     this.pagoRechazoNota,
     this.invoicePdfStoragePath,
     this.invoicePdfFileName,
+    this.documentType,
+    this.issuedBy,
   });
 
   final String id;
@@ -47,6 +50,19 @@ class CommissionSettlementModel {
   final String? pagoRechazoNota;
   final String? invoicePdfStoragePath;
   final String? invoicePdfFileName;
+
+  /// E3: `fiscal_invoice` | `delivery_note` (null en borradores).
+  final String? documentType;
+  final String? issuedBy;
+
+  CommissionSettlementDocumentType get documentTypeEffective =>
+      CommissionSettlementDocumentType.effective(documentType);
+
+  bool get isDeliveryNote =>
+      documentTypeEffective == CommissionSettlementDocumentType.deliveryNote;
+
+  bool get isFiscalInvoice =>
+      documentTypeEffective == CommissionSettlementDocumentType.fiscalInvoice;
 
   bool get tieneFacturaPdf =>
       invoicePdfStoragePath != null &&
@@ -79,7 +95,7 @@ class CommissionSettlementModel {
       case 'borrador':
         return 'Borrador';
       case 'emitido':
-        return 'Factura emitida';
+        return 'Documento emitido';
       case 'pagado':
         return 'Pagado';
       case 'anulado':
@@ -146,6 +162,8 @@ class CommissionSettlementModel {
       pagoRechazoNota: json['pago_rechazo_nota']?.toString(),
       invoicePdfStoragePath: json['invoice_pdf_storage_path']?.toString(),
       invoicePdfFileName: json['invoice_pdf_file_name']?.toString(),
+      documentType: json['document_type']?.toString(),
+      issuedBy: json['issued_by']?.toString(),
     );
   }
 

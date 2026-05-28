@@ -291,11 +291,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           ),
           if (ratingBar != null) ratingBar!,
           if (onCancelarSolicitudPendiente != null &&
-              (!isCheckoutGroup
-                  ? r.status == TransactionRequestStatus.pendiente
-                  : lines.every(
-                      (l) => l.status == TransactionRequestStatus.pendiente,
-                    ))) ...[
+              lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
               child: OutlinedButton.icon(
@@ -324,7 +320,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: Text(
-                'Solo si sigue pendiente; motivo obligatorio.',
+                'Hasta que el proveedor emita su factura. Motivo obligatorio.',
                 style: TextStyle(
                   fontSize: 10.5,
                   height: 1.35,

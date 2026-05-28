@@ -1,20 +1,16 @@
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import 'order_rating_eligibility.dart';
 
 /// Valoración del aliado ya guardada en servidor.
 bool aliadoTieneValoracionRegistrada(TransactionRequestModel r) =>
     r.aliadoExperienceSubmittedAt != null;
 
-/// Líneas entregadas que aún pueden / deben valorarse.
+/// Líneas que el aliado puede valorar (entregadas o canceladas).
 Iterable<TransactionRequestModel> lineasEntregadasParaValorar(
   Iterable<TransactionRequestModel> lines,
 ) {
-  return lines.where(
-    (r) =>
-        r.status == TransactionRequestStatus.entregado &&
-        !r.canceladoPorAliado &&
-        !r.anuladoPorMotolink,
-  );
+  return lines.where(lineaElegibleValoracionAliado);
 }
 
 bool aliadoGrupoPendienteValoracion(List<TransactionRequestModel> lines) {

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../models/commission_settlement_model.dart';
+import '../models/importer_commission_volume_context.dart';
 import '../services/supabase_service.dart';
+import 'commission_volume_tier_banner.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/commission_settlement_fiscal.dart';
@@ -30,6 +32,7 @@ class ImporterCommissionSettlementsSection extends StatefulWidget {
 class _ImporterCommissionSettlementsSectionState
     extends State<ImporterCommissionSettlementsSection> {
   List<CommissionSettlementModel> _rows = [];
+  ImporterCommissionVolumeContext? _volumeContext;
   bool _loading = true;
   String? _error;
   bool _sectionExpanded = false;
@@ -68,10 +71,14 @@ class _ImporterCommissionSettlementsSectionState
       _error = null;
     });
     try {
-      final rows = await SupabaseService.fetchCommissionSettlements(limit: 48);
+      final results = await Future.wait([
+        SupabaseService.fetchCommissionSettlements(limit: 48),
+        SupabaseService.fetchImporterCommissionVolumeContext(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _rows = rows;
+        _rows = results[0] as List<CommissionSettlementModel>;
+        _volumeContext = results[1] as ImporterCommissionVolumeContext?;
         _loading = false;
       });
       final pending =
@@ -236,6 +243,13 @@ class _ImporterCommissionSettlementsSectionState
           style: const TextStyle(fontSize: 12),
         ),
         children: [
+          if (_volumeContext != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: CommissionVolumeTierBanner(
+                volumeContext: _volumeContext!,
+              ),
+            ),
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(16),

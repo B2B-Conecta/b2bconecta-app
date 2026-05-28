@@ -292,11 +292,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: onAdvance,
-                      child: Text(
-                        isCheckoutGroup
-                            ? '${nextActionLabel!} (carrito completo)'
-                            : nextActionLabel!,
-                      ),
+                      child: Text(nextActionLabel!),
                     ),
                   ),
                 ],

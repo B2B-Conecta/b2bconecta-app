@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Importador: cancelar pedido en gestión con motivo obligatorio.
+/// Importador (proveedor): cancelar pedido en gestión con motivo obligatorio.
+/// Tras confirmar, la app abre el mismo cuestionario bucket para valorar al aliado.
 Future<String?> showImporterCancelarPedidoDialog(
   BuildContext context, {
   required String productName,
@@ -17,7 +18,7 @@ Future<String?> showImporterCancelarPedidoDialog(
           children: [
             Text(
               'El pedido "$productName" se cerrará y se notificará al aliado y a MotoLink. '
-              'Indique un motivo claro para seguimiento.',
+              'Indique un motivo; después podrá valorar al aliado.',
               style: const TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),

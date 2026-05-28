@@ -377,7 +377,20 @@ class TransactionRequestModel {
 
   /// Aliado: puede cancelar mientras el pedido sigue pendiente de gestión del importador.
   bool get aliadoPuedeCancelarAntesDeGestionImportadores =>
-      status == TransactionRequestStatus.pendiente;
+      aliadoPuedeCancelarHastaFacturaProveedor;
+
+  /// Factura del proveedor ya cargada en el pedido.
+  bool get tieneProveedorFacturaEmitida =>
+      proveedorFacturaStoragePath != null &&
+      proveedorFacturaStoragePath!.trim().isNotEmpty;
+
+  /// Aliado: cancelar en cualquier fase activa hasta que el proveedor emita su factura.
+  bool get aliadoPuedeCancelarHastaFacturaProveedor =>
+      !tieneProveedorFacturaEmitida &&
+      status != TransactionRequestStatus.entregado &&
+      status != TransactionRequestStatus.rechazado &&
+      !anuladoPorMotolink &&
+      !qtyAdjustmentPendienteAliado;
 
   /// Distingue rechazo inicial, anulación MotoLink (post-aprobación) y cancelación por aliado.
   String statusLabelEs({bool aliadoViewer = false}) {

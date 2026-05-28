@@ -119,12 +119,13 @@ Migraciones C1 (`20260520…` / `20260526…`): devengo al Recibido, cortes, ref
 
 **E3** (`20260706120000_e3_commission_volume_tiers_and_document_type.sql`):
 
-- **Tramos por volumen:** `platform_settings.commission_volume_tiers` (JSON). Volumen mensual = suma `precio_total_usd` en `entregado` con `comision_devengada_at` (mes America/Caracas), sin cancelados/anulados. `profiles.commission_rate_pct` NULL → tramos; con valor → override absoluto. Tasa en `commission_rate_snapshot` al checkout.
+- **Tramos por volumen:** `platform_settings.commission_volume_tiers` (JSON). Volumen mensual = suma `precio_total_usd` en `entregado` con `comision_devengada_at` (mes en curso, todos los estados), sin cancelados/anulados. `profiles.commission_rate_pct` NULL → tramos; con valor → override absoluto. Tasa en `commission_rate_snapshot` al checkout.
 - **Seed:** `importador11` / `importador12` tienen devengo fijado en el mes actual (~4 500 USD → 5 %; ~10 500 USD → 3 %). Tras `seed.sql`, ver consulta al final de ese archivo.
 - **Doble documento al emitir:** `commission_settlements.document_type` = `fiscal_invoice` (ML-COM-, IVA 16 %) o `delivery_note` (ML-NOT-, sin IVA, control interno). Irreversible; `issued_by` para auditoría.
 
-- **Admin:** pestaña Comisiones — tramos, generar corte, emitir factura o nota de entrega, confirmar pago.
-- **Importador:** Perfil → Cortes de comisión — ver PDF, registrar comprobante.
+- **Admin:** pestaña Comisiones — tramos, generar corte, emitir factura o nota de entrega, confirmar pago. En cada corte **borrador** se muestra el volumen mensual del importador y el tramo/tasa vigente.
+- **Importador:** Perfil → Cortes de comisión — banner con volumen del mes → tramo → %; ver PDF, registrar comprobante.
+- **RPC UI:** `motoconecta_importer_commission_volume_context` (`20260708120000_importer_commission_volume_context_rpc.sql`).
 - **Storage:** `commission-settlement-invoices` (PDF) y `order-payment-proofs/commission-settlements/` (comprobantes).
 
 ## Comunicación y KYC en pedido (C2)

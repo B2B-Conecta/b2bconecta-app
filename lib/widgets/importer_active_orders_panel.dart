@@ -317,17 +317,44 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         );
       }
       if (!context.mounted) return;
+      await _load(silent: true);
+      if (!context.mounted) return;
+      final refreshed = _rows.where((r) => g.any((x) => x.id == r.id)).toList();
+      final primary = refreshed.isNotEmpty ? refreshed.first : g.first;
+      final cg = (primary.checkoutGroupId ??
+              primary.originalCheckoutGroupId ??
+              g.first.checkoutGroupId)
+          ?.trim();
+      final isBundle = refreshed.length > 1;
+      final aid = primary.aliadoId.trim();
+      void openRatingSheet() {
+        showImporterOrderRatingSheet(
+          context,
+          request: primary,
+          onSubmitted: () => _load(silent: true),
+          bundleCheckoutGroupId:
+              (isBundle && cg != null && cg.isNotEmpty) ? cg : null,
+          bundleAliadoId:
+              (isBundle && aid.isNotEmpty) ? aid : null,
+          cancellationReason: draft,
+        );
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        openRatingSheet();
+      });
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             g.length > 1
-                ? 'Se cancelaron ${g.length} líneas del carrito.'
-                : 'Pedido cancelado y notificado al aliado.',
+                ? 'Carrito cancelado. Complete la valoración del aliado.'
+                : 'Pedido cancelado. Complete la valoración del aliado.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
       );
-      await _load(silent: true);
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -518,8 +545,16 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                             return ImporterExpandableOrderCard(
                               request: primary,
                               checkoutGroupLines: isBundle ? g : null,
-                              ratingBar: primary.status ==
-                                      TransactionRequestStatus.entregado
+                              ratingBar: g.any(
+                                (r) =>
+                                    r.status ==
+                                        TransactionRequestStatus.entregado ||
+                                    (r.status ==
+                                            TransactionRequestStatus
+                                                .rechazado &&
+                                        (r.canceladoPorImportador ||
+                                            r.canceladoPorAliado)),
+                              )
                                   ? ImporterOrderRatingBar(
                                       request: primary,
                                       lines: g,
@@ -539,8 +574,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                               operationalHeadline: headline,
                               nextStatus: next,
                               nextActionLabel: next != null
-                                  ? TransactionRequestStatus.actionLabelForNext(
+                                  ? TransactionRequestStatus
+                                      .importerAdvanceButtonLabel(
                                       next,
+                                      checkoutGroup: isBundle,
                                     )
                                   : null,
                               onAdvance: next != null

@@ -39,6 +39,7 @@ import 'motolink_ally_invoice_pdf_service.dart';
 import 'motolink_commission_delivery_note_pdf_service.dart';
 import 'motolink_commission_invoice_pdf_service.dart';
 import '../models/commission_settlement_document_type.dart';
+import '../models/importer_commission_volume_context.dart';
 import '../utils/commission_volume_tiers.dart';
 
 class SupabaseService {
@@ -834,6 +835,8 @@ class SupabaseService {
     promo_campaign_id,
     promo_campaign:promo_campaigns ( display_title, internal_title, campaign_type ),
     importador_cancelacion_motivo,
+    cancelado_por_aliado,
+    aliado_cancelacion_motivo,
     aliado_experience_stars,
     aliado_experience_comment,
     aliado_experience_submitted_at,
@@ -3542,6 +3545,42 @@ class SupabaseService {
   static Future<List<CommissionVolumeTier>> fetchCommissionVolumeTiers() async {
     final raw = await _client.rpc('admin_get_commission_volume_tiers');
     return parseCommissionVolumeTiers(raw);
+  }
+
+  /// E3: volumen mensual + tramo/tasa (propio importador o admin con id).
+  static Future<ImporterCommissionVolumeContext?>
+      fetchImporterCommissionVolumeContext({
+    String? importadorId,
+  }) async {
+    final params = <String, dynamic>{};
+    final id = importadorId?.trim();
+    if (id != null && id.isNotEmpty) {
+      params['p_importador_id'] = id;
+    }
+    final raw = await _client.rpc(
+      'motoconecta_importer_commission_volume_context',
+      params: params.isEmpty ? null : params,
+    );
+    return ImporterCommissionVolumeContext.fromRpc(raw);
+  }
+
+  /// Varias consultas en paralelo (admin: cortes por importador).
+  static Future<Map<String, ImporterCommissionVolumeContext>>
+      fetchImporterCommissionVolumeContexts(
+    Iterable<String> importadorIds,
+  ) async {
+    final unique = importadorIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    if (unique.isEmpty) return {};
+    final entries = await Future.wait(
+      unique.map((id) async {
+        final ctx = await fetchImporterCommissionVolumeContext(importadorId: id);
+        return MapEntry(id, ctx);
+      }),
+    );
+    return {
+      for (final e in entries)
+        if (e.value != null) e.key: e.value!,
+    };
   }
 
   static Future<void> adminSetCommissionVolumeTiers(

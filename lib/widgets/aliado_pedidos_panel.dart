@@ -338,6 +338,44 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     });
   }
 
+  List<TransactionRequestModel>? _grupoPorExpandKey(String expandKey) {
+    for (final g in groupAliadoOrdersByCheckout(_rows)) {
+      if (checkoutGroupExpandKey(g) == expandKey) return g;
+    }
+    return null;
+  }
+
+  Future<void> _abrirValoracionTrasCancelacionAliado(
+    BuildContext context,
+    List<TransactionRequestModel> g, {
+    required String motivo,
+  }) async {
+    if (g.isEmpty) return;
+    final ref = aliadoLineaReferenciaValoracion(g);
+    final cg = (ref.checkoutGroupId ??
+            ref.originalCheckoutGroupId ??
+            g.first.checkoutGroupId)
+        ?.trim();
+    final imp = ref.ownerId.trim();
+    final label = ref.ownerBusinessName?.trim();
+
+    if (!context.mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      showAliadoOrderRatingSheet(
+        context,
+        request: ref,
+        onSubmitted: _load,
+        bundleCheckoutGroupId:
+            (cg != null && cg.isNotEmpty) ? cg : null,
+        bundleImportadorId: imp.isNotEmpty ? imp : null,
+        importadorLabel:
+            (label != null && label.isNotEmpty) ? label : null,
+        cancellationReason: motivo,
+      );
+    });
+  }
+
   Future<void> _cancelarGrupoPendiente(
     BuildContext context,
     List<TransactionRequestModel> rows,
@@ -350,29 +388,39 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     setState(() => _cancelarBusyId = expandKey);
     try {
       for (final r in rows) {
+        if (!r.aliadoPuedeCancelarHastaFacturaProveedor) continue;
         await SupabaseService.aliadoCancelaPedidoPendiente(
           transactionRequestId: r.id,
           motivo: m,
         );
       }
       if (!context.mounted) return;
+      await _load();
+      if (!context.mounted) return;
+      final refreshed = _grupoPorExpandKey(expandKey) ?? rows;
+      await _abrirValoracionTrasCancelacionAliado(
+        context,
+        refreshed,
+        motivo: m,
+      );
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            rows.length > 1
-                ? 'Se cancelaron ${rows.length} solicitudes. MotoLink ha sido notificada.'
-                : 'Solicitud cancelada. MotoLink ha sido notificada.',
+            'Pedido cancelado. Complete la valoración del proveedor.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
       );
-      await _load();
     } catch (e) {
       if (!context.mounted) return;
       var msg = e.toString();
-      if (msg.contains('Solo puede cancelar mientras')) {
-        msg =
-            'Solo puede cancelar antes de que MotoLink apruebe la solicitud.';
+      if (msg.contains('emitió su factura')) {
+        msg = 'No puede cancelar: el proveedor ya emitió su factura.';
+      } else if (msg.contains('propuesta de cantidad')) {
+        msg = 'Responda primero a la propuesta de cantidad del proveedor.';
+      } else if (msg.contains('ya está cerrado')) {
+        msg = 'El pedido ya está cerrado.';
       } else if (msg.contains('Debe indicar un motivo') ||
           msg.contains('3 caracteres')) {
         msg = 'El motivo es obligatorio (mín. 3 caracteres).';
@@ -529,11 +577,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   bool _grupoPuedeCancelar(List<TransactionRequestModel> g) {
     return g.isNotEmpty &&
-        g.every(
-          (r) =>
-              r.aliadoPuedeCancelarAntesDeGestionImportadores &&
-              r.status == TransactionRequestStatus.pendiente,
-        );
+        g.every((r) => r.aliadoPuedeCancelarHastaFacturaProveedor);
   }
 
   Widget _buildRecepcionLeading(

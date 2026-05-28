@@ -7,13 +7,14 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
     context: context,
     builder: (ctx) {
       return AlertDialog(
-        title: const Text('Cancelar solicitud'),
+        title: const Text('Cancelar pedido'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'MotoLink aún no ha aprobado este pedido. Indique el motivo; se notificará al equipo MotoLink y a su importador.',
+              'Puede cancelar hasta que el proveedor emita su factura. '
+              'Indique el motivo; después podrá valorar el servicio.',
               style: TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),

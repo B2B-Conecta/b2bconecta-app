@@ -16,6 +16,8 @@ class OrderRatingForm extends StatefulWidget {
     required this.onSubmit,
     this.busy = false,
     this.emphasized = false,
+    this.initialComment = '',
+    this.cancellationReasonBanner,
   });
 
   final String title;
@@ -31,12 +33,18 @@ class OrderRatingForm extends StatefulWidget {
   /// Estilo más visible en modal / sheet de valoración.
   final bool emphasized;
 
+  /// Comentario inicial (p. ej. motivo de cancelación).
+  final String initialComment;
+
+  /// Texto destacado con el motivo de cancelación (si aplica).
+  final String? cancellationReasonBanner;
+
   @override
   State<OrderRatingForm> createState() => _OrderRatingFormState();
 }
 
 class _OrderRatingFormState extends State<OrderRatingForm> {
-  final _commentCtrl = TextEditingController();
+  late final TextEditingController _commentCtrl;
   late Map<String, int> _answers;
 
   RatingQuestionnaireModel get _q => widget.questionnaire;
@@ -44,6 +52,7 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
   @override
   void initState() {
     super.initState();
+    _commentCtrl = TextEditingController(text: widget.initialComment);
     _answers = _defaultAnswersFor(_q);
   }
 
@@ -164,6 +173,36 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
             height: 1.35,
           ),
         ),
+        if (widget.cancellationReasonBanner != null &&
+            widget.cancellationReasonBanner!.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 18, color: Colors.orange.shade900),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.cancellationReasonBanner!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         SizedBox(height: widget.emphasized ? 16 : 12),
         for (var i = 0; i < _q.questions.length; i++) ...[
           if (i > 0) const SizedBox(height: 10),

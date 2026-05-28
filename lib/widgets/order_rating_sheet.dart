@@ -3,10 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/rating_questionnaire_model.dart';
 import '../models/transaction_request_model.dart';
-import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_experience_utils.dart';
+import '../utils/order_rating_eligibility.dart';
 import 'aliado_order_experience_display.dart';
 import 'order_rating_form.dart';
 
@@ -19,8 +19,9 @@ Future<void> showAliadoOrderRatingSheet(
   String? bundleImportadorId,
   String? importadorLabel,
   bool readOnly = false,
+  String? cancellationReason,
 }) {
-  return showModalBottomSheet<void>(
+    return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -29,7 +30,10 @@ Future<void> showAliadoOrderRatingSheet(
       accentColor: Colors.amber.shade800,
       headerTitle: readOnly
           ? 'Valoración registrada'
-          : 'Valorar pedido',
+          : (cancellationReason != null &&
+                  cancellationReason.trim().isNotEmpty)
+              ? 'Valorar tras cancelación'
+              : 'Valorar pedido',
       headerSubtitle: importadorLabel != null && importadorLabel.trim().isNotEmpty
           ? importadorLabel.trim()
           : (bundleImportadorId != null
@@ -41,6 +45,7 @@ Future<void> showAliadoOrderRatingSheet(
         bundleCheckoutGroupId: bundleCheckoutGroupId,
         bundleImportadorId: bundleImportadorId,
         readOnly: readOnly,
+        cancellationReason: cancellationReason,
       ),
     ),
   );
@@ -54,6 +59,7 @@ Future<void> showImporterOrderRatingSheet(
   String? bundleCheckoutGroupId,
   String? bundleAliadoId,
   bool readOnly = false,
+  String? cancellationReason,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -62,7 +68,12 @@ Future<void> showImporterOrderRatingSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => _OrderRatingSheetScaffold(
       accentColor: AppColors.brandBlue,
-      headerTitle: readOnly ? 'Valoración registrada' : 'Valorar aliado',
+      headerTitle: readOnly
+          ? 'Valoración registrada'
+          : (cancellationReason != null &&
+                  cancellationReason.trim().isNotEmpty)
+              ? 'Valorar tras cancelación'
+              : 'Valorar aliado',
       headerSubtitle: request.aliadoBusinessName?.trim().isNotEmpty == true
           ? request.aliadoBusinessName!.trim()
           : 'Aliado en este pedido',
@@ -72,6 +83,7 @@ Future<void> showImporterOrderRatingSheet(
         bundleCheckoutGroupId: bundleCheckoutGroupId,
         bundleAliadoId: bundleAliadoId,
         readOnly: readOnly,
+        cancellationReason: cancellationReason,
       ),
     ),
   );
@@ -194,6 +206,7 @@ class _AliadoOrderRatingSheetBody extends StatefulWidget {
     this.bundleCheckoutGroupId,
     this.bundleImportadorId,
     this.readOnly = false,
+    this.cancellationReason,
   });
 
   final TransactionRequestModel request;
@@ -201,6 +214,7 @@ class _AliadoOrderRatingSheetBody extends StatefulWidget {
   final String? bundleCheckoutGroupId;
   final String? bundleImportadorId;
   final bool readOnly;
+  final String? cancellationReason;
 
   @override
   State<_AliadoOrderRatingSheetBody> createState() =>
@@ -329,14 +343,26 @@ class _AliadoOrderRatingSheetBodyState extends State<_AliadoOrderRatingSheetBody
       );
     }
 
+    final motivo = widget.cancellationReason?.trim();
+    final esCancelacion = motivo != null && motivo.isNotEmpty;
+
     return OrderRatingForm(
-      title: 'Calificá cada aspecto del servicio',
-      subtitle:
-          'Deslizá cada categoría (1 = Muy mal … 5 = Excelente). '
-          'El promedio define la valoración general. Podés añadir un comentario opcional.',
+      title: esCancelacion
+          ? 'Valorar tras la cancelación'
+          : 'Calificá cada aspecto del servicio',
+      subtitle: esCancelacion
+          ? 'Su motivo quedó registrado. Califique al proveedor; puede ampliar el comentario.'
+          : 'Deslizá cada categoría (1 = Muy mal … 5 = Excelente). '
+              'El promedio define la valoración general. Podés añadir un comentario opcional.',
       questionnaire: _questionnaire!,
       busy: _busy,
       emphasized: true,
+      initialComment: esCancelacion
+          ? orderRatingCommentWithCancellationReason(motivo)
+          : '',
+      cancellationReasonBanner: esCancelacion
+          ? 'Cancelación registrada: $motivo'
+          : null,
       onSubmit: _enviar,
     );
   }
@@ -349,6 +375,7 @@ class _ImporterOrderRatingSheetBody extends StatefulWidget {
     this.bundleCheckoutGroupId,
     this.bundleAliadoId,
     this.readOnly = false,
+    this.cancellationReason,
   });
 
   final TransactionRequestModel request;
@@ -356,6 +383,7 @@ class _ImporterOrderRatingSheetBody extends StatefulWidget {
   final String? bundleCheckoutGroupId;
   final String? bundleAliadoId;
   final bool readOnly;
+  final String? cancellationReason;
 
   @override
   State<_ImporterOrderRatingSheetBody> createState() =>
@@ -487,13 +515,25 @@ class _ImporterOrderRatingSheetBodyState extends State<_ImporterOrderRatingSheet
       );
     }
 
+    final motivo = widget.cancellationReason?.trim();
+    final esCancelacion = motivo != null && motivo.isNotEmpty;
+
     return OrderRatingForm(
-      title: 'Calificá la experiencia con el aliado',
-      subtitle:
-          'Comunicación y Pagos (escala 1–5). El aliado no verá su nombre en su panel de reputación.',
+      title: esCancelacion
+          ? 'Valorar tras la cancelación'
+          : 'Calificá la experiencia con el aliado',
+      subtitle: esCancelacion
+          ? 'Su motivo quedó registrado. Califique al aliado; puede ampliar el comentario.'
+          : 'Comunicación y Pagos (escala 1–5). El aliado no verá su nombre en su panel de reputación.',
       questionnaire: _questionnaire!,
       busy: _busy,
       emphasized: true,
+      initialComment: esCancelacion
+          ? orderRatingCommentWithCancellationReason(motivo)
+          : '',
+      cancellationReasonBanner: esCancelacion
+          ? 'Cancelación registrada: $motivo'
+          : null,
       onSubmit: _enviar,
     );
   }
@@ -531,9 +571,7 @@ class _ImporterOrderRatingBarState extends State<ImporterOrderRatingBar> {
   }
 
   Future<void> _load() async {
-    if (!widget.lines.any(
-      (r) => r.status == TransactionRequestStatus.entregado,
-    )) {
+    if (!widget.lines.any(lineaElegibleValoracionImportador)) {
       if (mounted) setState(() => _loading = false);
       return;
     }
@@ -558,9 +596,7 @@ class _ImporterOrderRatingBarState extends State<ImporterOrderRatingBar> {
 
   bool get _showBar {
     if (_loading) return false;
-    return widget.lines.any(
-      (r) => r.status == TransactionRequestStatus.entregado,
-    );
+    return widget.lines.any(lineaElegibleValoracionImportador);
   }
 
   @override

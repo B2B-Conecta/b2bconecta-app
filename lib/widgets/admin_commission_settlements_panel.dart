@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/commission_settlement_document_type.dart';
 import '../models/commission_settlement_model.dart';
+import '../models/importer_commission_volume_context.dart';
 import '../models/catalog_filters.dart';
 import '../services/supabase_service.dart';
 import '../utils/commission_settlement_filter_utils.dart';
@@ -13,6 +14,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/commission_settlement_fiscal.dart';
 import 'admin_tasa_bcv_card.dart';
+import 'commission_volume_tier_banner.dart';
 import 'commission_settlement_lines_section.dart';
 import 'commission_settlement_list_filter_bar.dart';
 import 'commission_settlement_filters_sheet.dart';
@@ -34,6 +36,7 @@ class _AdminCommissionSettlementsPanelState
   String? _error;
   double _defaultRate = 0.05;
   List<CommissionVolumeTier> _volumeTiers = [];
+  Map<String, ImporterCommissionVolumeContext> _volumeByImportador = {};
   bool _busy = false;
   final Set<String> _expandedSettlementIds = {};
   final TextEditingController _searchController = TextEditingController();
@@ -122,11 +125,16 @@ class _AdminCommissionSettlementsPanelState
       final rate = await SupabaseService.fetchDefaultCommissionRate();
       final tiers = await SupabaseService.fetchCommissionVolumeTiers();
       final rows = await SupabaseService.fetchCommissionSettlements();
+      final volumeByImportador =
+          await SupabaseService.fetchImporterCommissionVolumeContexts(
+        rows.map((r) => r.importadorId),
+      );
       if (!mounted) return;
       setState(() {
         _defaultRate = rate;
         _volumeTiers = tiers;
         _rows = rows;
+        _volumeByImportador = volumeByImportador;
         _loading = false;
       });
       if (MainShellTabController.peekPendingCommissionSettlementId() != null) {
@@ -416,7 +424,7 @@ class _AdminCommissionSettlementsPanelState
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Volumen = suma USD de pedidos entregados en el mes (Caracas). '
+                    'Volumen = suma USD de pedidos entregados en el mes (todos los estados). '
                     'Umbrales inclusivos. La tasa fija por importador tiene prioridad.',
                     style: TextStyle(
                       fontSize: 12,
@@ -1032,6 +1040,14 @@ class _AdminCommissionSettlementsPanelState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(s.periodLabelEs, style: const TextStyle(fontSize: 12)),
+            if (s.isBorrador && _volumeByImportador[s.importadorId] != null) ...[
+              const SizedBox(height: 6),
+              CommissionVolumeTierBanner(
+                volumeContext: _volumeByImportador[s.importadorId]!,
+                compact: true,
+                title: 'Volumen mes (referencia al emitir)',
+              ),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [

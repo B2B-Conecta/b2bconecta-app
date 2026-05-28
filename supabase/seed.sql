@@ -736,7 +736,7 @@ order by p.sku
 limit 2;
 
 -- ---------------------------------------------------------------------------
--- E3: tramos comisión por volumen mensual (mes actual America/Caracas)
+-- E3: tramos comisión por volumen mensual (mes en curso)
 -- importador11 — Accesorios Punto Fijo: ~4 500 USD devengado → tramo 5 %
 -- importador12 — Margarita Moto Base: ~10 500 USD devengado → tramo 3 %
 -- Sin override en profiles.commission_rate_pct (NULL).
@@ -1053,7 +1053,7 @@ select public.refresh_all_importer_catalog_boost ();
 -- where p.role = 'importador'
 -- order by p.catalog_paid_orders_30d desc, p.business_name;
 --
--- Referencia E3 tramos (volumen mes Caracas + tasa efectiva):
+-- Referencia E3 tramos (volumen del mes + tasa efectiva):
 -- select
 --   p.business_name,
 --   u.email,

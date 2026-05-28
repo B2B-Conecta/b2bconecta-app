@@ -203,13 +203,31 @@ abstract final class TransactionRequestStatus {
       case pedidoListo:
         return 'Marcar listo para despacho';
       case enTransito:
-        return 'Marcar en tránsito (despachado)';
+        return 'Marcar en tránsito';
       case enviado:
         return 'Marcar enviado';
       case entregado:
         return 'Confirmar recepción en tu taller';
       default:
         return 'Avanzar';
+    }
+  }
+
+  /// Etiqueta del botón de avance en panel importador (línea o carrito).
+  static String importerAdvanceButtonLabel(
+    String nextStatus, {
+    bool checkoutGroup = false,
+  }) {
+    if (!checkoutGroup) return actionLabelForNext(nextStatus);
+    switch (nextStatus) {
+      case enPreparacion:
+        return 'Preparar carrito';
+      case pedidoListo:
+        return 'Listo para despacho';
+      case enTransito:
+        return 'Despachar carrito';
+      default:
+        return actionLabelForNext(nextStatus);
     }
   }
 

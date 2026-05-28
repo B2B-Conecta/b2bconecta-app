@@ -16,6 +16,7 @@ class CatalogFilters {
     this.sortReferenceLng,
     this.minOwnerRatingAvg,
     this.minOwnerRatingCount,
+    this.onlyWithCommercialDiscount = false,
   });
 
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
@@ -56,6 +57,9 @@ class CatalogFilters {
   /// Umbral mínimo sobre `profiles.rating_count_received_rolling100` (E2.2).
   final int? minOwnerRatingCount;
 
+  /// Solo productos con oferta directa (`sale_price_usd`) o tramos por volumen.
+  final bool onlyWithCommercialDiscount;
+
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
 
   bool get sortByDistanceFromReference =>
@@ -79,6 +83,7 @@ class CatalogFilters {
         minPrice != null ||
         maxPrice != null ||
         hasReputationThreshold ||
+        onlyWithCommercialDiscount ||
         sortMode != CatalogSortMode.recommended;
   }
 
@@ -105,6 +110,7 @@ class CatalogFilters {
     double? sortReferenceLng,
     double? minOwnerRatingAvg,
     int? minOwnerRatingCount,
+    bool? onlyWithCommercialDiscount,
     bool clearSortReference = false,
     bool clearMinOwnerRatingAvg = false,
     bool clearMinOwnerRatingCount = false,
@@ -129,6 +135,8 @@ class CatalogFilters {
       minOwnerRatingCount: clearMinOwnerRatingCount
           ? null
           : (minOwnerRatingCount ?? this.minOwnerRatingCount),
+      onlyWithCommercialDiscount:
+          onlyWithCommercialDiscount ?? this.onlyWithCommercialDiscount,
     );
   }
 }

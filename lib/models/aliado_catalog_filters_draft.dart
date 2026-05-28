@@ -12,6 +12,7 @@ class AliadoCatalogFiltersDraft {
     this.sortMode = CatalogSortMode.recommended,
     this.minOwnerRatingAvg,
     this.minOwnerRatingCount,
+    this.onlyWithCommercialDiscount = false,
   });
 
   final String categoryLabel;
@@ -23,8 +24,11 @@ class AliadoCatalogFiltersDraft {
   final CatalogSortMode sortMode;
   final double? minOwnerRatingAvg;
   final int? minOwnerRatingCount;
+  final bool onlyWithCommercialDiscount;
 
   bool get hasCategoryFilter => categoryLabel != 'Todos';
+
+  bool get hasCommercialDiscountFilter => onlyWithCommercialDiscount;
 
   bool get hasImporterFilter => importerIds.isNotEmpty;
 
@@ -47,6 +51,7 @@ class AliadoCatalogFiltersDraft {
       hasLocationFilter ||
       hasPriceFilter ||
       hasReputationFilter ||
+      hasCommercialDiscountFilter ||
       hasNonDefaultSort;
 
   int get activePanelFilterCount {
@@ -65,6 +70,7 @@ class AliadoCatalogFiltersDraft {
       if (minOwnerRatingAvg != null && minOwnerRatingAvg! > 0) n++;
       if (minOwnerRatingCount != null && minOwnerRatingCount! > 0) n++;
     }
+    if (hasCommercialDiscountFilter) n++;
     if (hasNonDefaultSort) n++;
     return n;
   }

@@ -7,6 +7,8 @@ import '../screens/importer_product_edit_screen.dart';
 import '../services/excel_catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/product_catalog_pricing.dart';
+import '../utils/product_volume_tiers.dart';
 import 'importer_promo_widgets.dart';
 import 'main_shell_tab.dart';
 
@@ -93,6 +95,41 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
   }
 
+  Future<void> _exportRegisteredInventory() async {
+    try {
+      final parts = await SupabaseService.fetchMyInventory(limit: 2000);
+      if (parts.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No tienes productos registrados para exportar.'),
+          ),
+        );
+        return;
+      }
+      final bytes = ExcelCatalogService.buildInventoryExportBytes(parts);
+      await FileSaver.instance.saveFile(
+        name: 'motolink_inventario_actual',
+        bytes: bytes,
+        ext: 'xlsx',
+        mimeType: MimeType.microsoftExcel,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Inventario exportado (${parts.length} producto(s)).',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo exportar el inventario: $e')),
+      );
+    }
+  }
+
   Future<_SkuConflictAction?> _askSkuConflict(String sku) async {
     return showDialog<_SkuConflictAction>(
       context: context,
@@ -141,6 +178,15 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 style: TextStyle(
                   color: Colors.orange.shade900,
                   fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Tip: también puedes usar "Exportar inventario actual" para '
+                'descargar un Excel con tus productos ya registrados y editarlo.',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -255,6 +301,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             productId: existingId,
             priceUsd: row.precio,
             stock: row.stock,
+            salePriceUsd: row.precioOfertaUsd,
+            discountRules: row.discountRules,
           );
           ok++;
         } else {
@@ -264,6 +312,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               name: row.nombre,
               description: row.descripcion,
               priceUsd: row.precio,
+              salePriceUsd: row.precioOfertaUsd,
+              discountRules: row.discountRules,
               stock: row.stock,
               category: row.categoria,
               compatibility: row.compatibilidad,
@@ -302,6 +352,21 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     } finally {
       if (mounted) setState(() => _importing = false);
     }
+  }
+
+  String? _commercialTermsLine(PartModel p) {
+    final parts = <String>[];
+    if (p.tieneOfertaDirecta) parts.add('Oferta');
+    final vol = ProductCatalogPricing.volumeIncentiveChipEs(p.discountRules);
+    if (vol != null) parts.add(vol);
+    final usdPct = parseUsdPaymentDiscountPct(p.discountRules);
+    if (usdPct != null) {
+      parts.add(
+        'USD ${usdPct.toStringAsFixed(usdPct.truncateToDouble() == usdPct ? 0 : 1)}% dto.',
+      );
+    }
+    if (parts.isEmpty) return null;
+    return parts.join(' · ');
   }
 
   Future<void> _openEditor(PartModel? part) async {
@@ -521,6 +586,16 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     onPressed: _importing ? null : _downloadTemplate,
                     icon: const Icon(Icons.table_chart_outlined),
                     tooltip: 'Descargar plantilla Excel',
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.brandOrange,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _importing ? null : _exportRegisteredInventory,
+                    icon: const Icon(Icons.download_outlined),
+                    tooltip: 'Exportar inventario actual',
                   ),
                   const SizedBox(width: 4),
                   IconButton(
@@ -815,7 +890,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                                           Row(
                                             children: [
                                               Text(
-                                                '${p.precio.toStringAsFixed(2)} REF',
+                                                '${p.precio.toStringAsFixed(2)} USD lista',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.w800,
                                                   color: AppColors.brandOrange,
@@ -841,6 +916,24 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                                               ),
                                             ],
                                           ),
+                                          if (_commercialTermsLine(p) !=
+                                              null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 6,
+                                              ),
+                                              child: Text(
+                                                _commercialTermsLine(p)!,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  height: 1.25,
+                                                  color: Colors.teal.shade800,
+                                                ),
+                                              ),
+                                            ),
                                           if (p.category != null &&
                                               p.category!.isNotEmpty)
                                             Padding(

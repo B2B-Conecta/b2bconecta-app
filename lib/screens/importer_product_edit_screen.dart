@@ -6,7 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/product_volume_tiers.dart';
 import '../widgets/product_validated_orders_list.dart';
+import '../widgets/importer_product_commercial_terms_section.dart';
+import '../widgets/product_usd_payment_discount_field.dart';
 
 /// Crear o editar un producto del inventario (importador).
 class ImporterProductEditScreen extends StatefulWidget {
@@ -28,7 +31,10 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
   late final TextEditingController _nameController;
   late final TextEditingController _descController;
   late final TextEditingController _priceController;
+  late final TextEditingController _salePriceController;
+  late final TextEditingController _usdPaymentDiscountController;
   late final TextEditingController _stockController;
+  List<ProductVolumeTier> _volumeTiers = [];
   late final TextEditingController _categoryController;
   late final TextEditingController _compatController;
   late final TextEditingController _imageController;
@@ -96,6 +102,14 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
     _priceController = TextEditingController(
       text: p != null ? p.precio.toStringAsFixed(2) : '',
     );
+    _salePriceController = TextEditingController(
+      text: p?.salePriceUsd != null ? p!.salePriceUsd!.toStringAsFixed(2) : '',
+    );
+    final usdPct = parseUsdPaymentDiscountPct(p?.discountRules);
+    _usdPaymentDiscountController = TextEditingController(
+      text: usdPct != null ? usdPct.toStringAsFixed(1) : '',
+    );
+    _volumeTiers = p?.volumeTiers ?? [];
     _stockController = TextEditingController(
       text: p != null ? '${p.stock}' : '',
     );
@@ -116,6 +130,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
     _nameController.dispose();
     _descController.dispose();
     _priceController.dispose();
+    _salePriceController.dispose();
+    _usdPaymentDiscountController.dispose();
     _stockController.dispose();
     _categoryController.dispose();
     _compatController.dispose();
@@ -141,6 +157,46 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
       );
       return;
     }
+    final saleRaw = _salePriceController.text.trim();
+    double? salePrice;
+    if (saleRaw.isNotEmpty) {
+      salePrice = double.tryParse(saleRaw.replaceAll(',', '.'));
+      if (salePrice == null || salePrice <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Precio oferta inválido.')),
+        );
+        return;
+      }
+      if (salePrice >= price) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'El precio oferta debe ser menor que el precio lista.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    final usdPctRaw = _usdPaymentDiscountController.text.trim();
+    double? usdPaymentDiscountPct;
+    if (usdPctRaw.isNotEmpty) {
+      usdPaymentDiscountPct = parseUsdPaymentDiscountPctField(usdPctRaw);
+      if (usdPaymentDiscountPct == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Descuento línea USD inválido: use un % entre 0 y 100.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    final discountRules = buildProductDiscountRules(
+      volumeTiers: _volumeTiers,
+      usdPaymentDiscountPct: usdPaymentDiscountPct,
+    );
 
     setState(() => _saving = true);
     try {
@@ -167,6 +223,10 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           name: _nameController.text.trim(),
           description: _descController.text.trim(),
           priceUsd: price,
+          salePriceUsd: salePrice,
+          clearSalePrice: salePrice == null,
+          discountRules: discountRules,
+          clearDiscountRules: discountRules == null,
           stock: stock,
           category: _categoryController.text.trim(),
           compatibility: _compatController.text.trim(),
@@ -179,6 +239,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           name: _nameController.text.trim(),
           description: _descController.text.trim(),
           priceUsd: price,
+          salePriceUsd: salePrice,
+          discountRules: discountRules,
           stock: stock,
           category: _categoryController.text.trim(),
           compatibility: _compatController.text.trim(),
@@ -294,13 +356,21 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           const SizedBox(height: 12),
           TextFormField(
             controller: _priceController,
-            decoration: _dec('Precio (REF)'),
+            decoration: _dec('Precio lista (USD)'),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          ImporterProductCommercialTermsSection(
+            salePriceController: _salePriceController,
+            usdPaymentDiscountController: _usdPaymentDiscountController,
+            volumeTiers: _volumeTiers,
+            onVolumeTiersChanged: (t) => setState(() => _volumeTiers = t),
+            enabled: !_saving,
+          ),
+          const SizedBox(height: 16),
           TextFormField(
             controller: _stockController,
             decoration: _dec('Stock'),

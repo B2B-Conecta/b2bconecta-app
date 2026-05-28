@@ -612,6 +612,338 @@ on conflict (id) do update set
   stock = excluded.stock,
   is_active = excluded.is_active;
 
+-- E4 demo: oferta directa y/o tramos por unidades (importadores 1–12)
+with seed_e4_pricing (
+  product_id,
+  sale_price_usd,
+  discount_rules
+) as (
+  values
+    -- importador1 (15 SKU en catálogo; aquí 8 con política comercial)
+    (
+      'd1000001-0000-4000-8000-000000000001'::uuid,
+      41.0000,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":3},{"min_units":20,"percent_discount":6}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000002'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5},{"min_units":48,"percent_discount":10}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000003'::uuid,
+      15.5000,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":8}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000007'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":24,"percent_discount":5},{"min_units":72,"percent_discount":8}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000008'::uuid,
+      4.2000,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5},{"min_units":48,"percent_discount":8}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000009'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000011'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":15,"percent_discount":4}]}'::jsonb
+    ),
+    (
+      'd1000001-0000-4000-8000-000000000014'::uuid,
+      14.0000,
+      '{"volume_tiers":[{"min_units":8,"percent_discount":6}]}'::jsonb
+    ),
+    -- importador2 (8 productos)
+    (
+      'd1000002-0000-4000-8000-000000000001'::uuid,
+      42.0000,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":3},{"min_units":18,"percent_discount":7}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000002'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":5},{"min_units":40,"percent_discount":9}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000003'::uuid,
+      40.0000,
+      '{"volume_tiers":[{"min_units":8,"percent_discount":7}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000007'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":20,"percent_discount":5},{"min_units":60,"percent_discount":8}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000008'::uuid,
+      4.5000,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000009'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":6}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000012'::uuid,
+      17.0000,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000002-0000-4000-8000-000000000014'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":4},{"min_units":24,"percent_discount":8}]}'::jsonb
+    ),
+    -- importador3 (3 SKU)
+    (
+      'd1000003-0000-4000-8000-000000000001'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5},{"min_units":48,"percent_discount":9}]}'::jsonb
+    ),
+    (
+      'd1000003-0000-4000-8000-000000000002'::uuid,
+      16.5000,
+      '{"volume_tiers":[{"min_units":8,"percent_discount":4}]}'::jsonb
+    ),
+    (
+      'd1000003-0000-4000-8000-000000000004'::uuid,
+      4.9000,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}'::jsonb
+    ),
+    -- importador4
+    (
+      'd1000004-0000-4000-8000-000000000001'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000004-0000-4000-8000-000000000002'::uuid,
+      48.0000,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":3}]}'::jsonb
+    ),
+    (
+      'd1000004-0000-4000-8000-000000000003'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":20,"percent_discount":4}]}'::jsonb
+    ),
+    -- importador5
+    (
+      'd1000005-0000-4000-8000-000000000001'::uuid,
+      42.0000,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":3},{"min_units":18,"percent_discount":6}]}'::jsonb
+    ),
+    (
+      'd1000005-0000-4000-8000-000000000002'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":15,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000005-0000-4000-8000-000000000005'::uuid,
+      14.5000,
+      '{"volume_tiers":[{"min_units":8,"percent_discount":5}]}'::jsonb
+    ),
+    -- importador6
+    (
+      'd1000006-0000-4000-8000-000000000002'::uuid,
+      16.0000,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":7}]}'::jsonb
+    ),
+    (
+      'd1000006-0000-4000-8000-000000000003'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":24,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000006-0000-4000-8000-000000000004'::uuid,
+      4.8000,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}'::jsonb
+    ),
+    -- importador7
+    (
+      'd1000007-0000-4000-8000-000000000001'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":8,"percent_discount":4}]}'::jsonb
+    ),
+    (
+      'd1000007-0000-4000-8000-000000000003'::uuid,
+      58.0000,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":3}]}'::jsonb
+    ),
+    (
+      'd1000007-0000-4000-8000-000000000005'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":20,"percent_discount":6}]}'::jsonb
+    ),
+    -- importador8
+    (
+      'd1000008-0000-4000-8000-000000000001'::uuid,
+      7.8000,
+      '{"volume_tiers":[{"min_units":24,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000008-0000-4000-8000-000000000002'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd1000008-0000-4000-8000-000000000003'::uuid,
+      9.5000,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":4}]}'::jsonb
+    ),
+    -- importador9
+    (
+      'd1000009-0000-4000-8000-000000000001'::uuid,
+      11.0000,
+      '{"volume_tiers":[{"min_units":15,"percent_discount":4}]}'::jsonb
+    ),
+    (
+      'd1000009-0000-4000-8000-000000000003'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5},{"min_units":36,"percent_discount":8}]}'::jsonb
+    ),
+    (
+      'd1000009-0000-4000-8000-000000000004'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":20,"percent_discount":5}]}'::jsonb
+    ),
+    -- importador10
+    (
+      'd100000a-0000-4000-8000-000000000001'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd100000a-0000-4000-8000-000000000002'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":4}]}'::jsonb
+    ),
+    (
+      'd100000a-0000-4000-8000-000000000003'::uuid,
+      11.0000,
+      '{"volume_tiers":[{"min_units":6,"percent_discount":3}]}'::jsonb
+    ),
+    -- importador11
+    (
+      'd100000b-0000-4000-8000-000000000002'::uuid,
+      10.5000,
+      '{"volume_tiers":[{"min_units":8,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd100000b-0000-4000-8000-000000000004'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":15,"percent_discount":6}]}'::jsonb
+    ),
+    (
+      'd100000b-0000-4000-8000-000000000005'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":10,"percent_discount":4}]}'::jsonb
+    ),
+    -- importador12
+    (
+      'd100000c-0000-4000-8000-000000000003'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}'::jsonb
+    ),
+    (
+      'd100000c-0000-4000-8000-000000000004'::uuid,
+      null::numeric,
+      '{"volume_tiers":[{"min_units":18,"percent_discount":7}]}'::jsonb
+    ),
+    (
+      'd100000c-0000-4000-8000-000000000005'::uuid,
+      10.0000,
+      '{"volume_tiers":[{"min_units":20,"percent_discount":5}]}'::jsonb
+    )
+)
+update public.products p
+set
+  sale_price_usd = v.sale_price_usd,
+  discount_rules = v.discount_rules
+from seed_e4_pricing v
+where p.id = v.product_id;
+
+-- E4 demo: descuento en línea USD (pago Zelle/divisas; % sobre precio REF del catálogo)
+with seed_e4_usd_payment_discount (product_id, pct) as (
+  values
+    -- importador1
+    ('d1000001-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000003'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000005'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000007'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000008'::uuid, 3.0),
+    ('d1000001-0000-4000-8000-000000000009'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000011'::uuid, 2.0),
+    ('d1000001-0000-4000-8000-000000000014'::uuid, 2.5),
+    -- importador2
+    ('d1000002-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000002-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000002-0000-4000-8000-000000000003'::uuid, 2.0),
+    ('d1000002-0000-4000-8000-000000000005'::uuid, 1.5),
+    ('d1000002-0000-4000-8000-000000000007'::uuid, 2.0),
+    ('d1000002-0000-4000-8000-000000000008'::uuid, 3.0),
+    ('d1000002-0000-4000-8000-000000000009'::uuid, 2.0),
+    ('d1000002-0000-4000-8000-000000000012'::uuid, 2.0),
+    ('d1000002-0000-4000-8000-000000000014'::uuid, 2.0),
+    -- importador3
+    ('d1000003-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000003-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000003-0000-4000-8000-000000000004'::uuid, 2.5),
+    ('d1000003-0000-4000-8000-000000000005'::uuid, 2.5),
+    -- importador4
+    ('d1000004-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000004-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000004-0000-4000-8000-000000000003'::uuid, 1.5),
+    ('d1000004-0000-4000-8000-000000000004'::uuid, 3.0),
+    -- importador5
+    ('d1000005-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000005-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000005-0000-4000-8000-000000000005'::uuid, 2.0),
+    -- importador6
+    ('d1000006-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000006-0000-4000-8000-000000000003'::uuid, 2.0),
+    ('d1000006-0000-4000-8000-000000000004'::uuid, 2.0),
+    ('d1000006-0000-4000-8000-000000000005'::uuid, 1.5),
+    -- importador7
+    ('d1000007-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000007-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000007-0000-4000-8000-000000000003'::uuid, 2.0),
+    ('d1000007-0000-4000-8000-000000000005'::uuid, 2.0),
+    -- importador8
+    ('d1000008-0000-4000-8000-000000000001'::uuid, 3.0),
+    ('d1000008-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d1000008-0000-4000-8000-000000000003'::uuid, 2.0),
+    -- importador9
+    ('d1000009-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d1000009-0000-4000-8000-000000000003'::uuid, 2.5),
+    ('d1000009-0000-4000-8000-000000000004'::uuid, 2.0),
+    -- importador10
+    ('d100000a-0000-4000-8000-000000000001'::uuid, 2.0),
+    ('d100000a-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d100000a-0000-4000-8000-000000000003'::uuid, 2.0),
+    -- importador11
+    ('d100000b-0000-4000-8000-000000000002'::uuid, 2.0),
+    ('d100000b-0000-4000-8000-000000000004'::uuid, 2.0),
+    ('d100000b-0000-4000-8000-000000000005'::uuid, 2.0),
+    -- importador12
+    ('d100000c-0000-4000-8000-000000000003'::uuid, 4.0),
+    ('d100000c-0000-4000-8000-000000000004'::uuid, 2.0),
+    ('d100000c-0000-4000-8000-000000000005'::uuid, 2.0)
+)
+update public.products p
+set
+  discount_rules = coalesce(p.discount_rules, '{}'::jsonb)
+    || jsonb_build_object('usd_payment_discount_pct', v.pct)
+from seed_e4_usd_payment_discount v
+where p.id = v.product_id;
+
 -- ---------------------------------------------------------------------------
 -- Pedidos demo E1.1: pago aprobado por importador (confirmado_por = importador_id)
 -- paid_lines = líneas que cuentan en catalog_paid_orders_30d (ventana 30 días)

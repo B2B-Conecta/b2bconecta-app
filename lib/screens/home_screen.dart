@@ -15,6 +15,7 @@ import '../theme/app_theme.dart';
 import '../utils/promo_popup_frequency.dart';
 import '../widgets/aliado_catalog_filters_sheet.dart';
 import '../widgets/aliado_promo_campaign_widgets.dart';
+import '../widgets/catalog_product_price_display.dart';
 import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
@@ -93,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
   CatalogSortMode _catalogSortMode = CatalogSortMode.recommended;
   double? _minOwnerRatingAvg;
   int? _minOwnerRatingCount;
+  bool _onlyWithCommercialDiscount = false;
   double? _allySortLat;
   double? _allySortLng;
 
@@ -187,6 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
       sortReferenceLng: useNearest ? _allySortLng : null,
       minOwnerRatingAvg: _minOwnerRatingAvg,
       minOwnerRatingCount: _minOwnerRatingCount,
+      onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
     );
   }
 
@@ -210,6 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _catalogSortMode = CatalogSortMode.recommended;
       _minOwnerRatingAvg = null;
       _minOwnerRatingCount = null;
+      _onlyWithCommercialDiscount = false;
       final la = widget.profile.latitude;
       final lo = widget.profile.longitude;
       _allySortLat = la;
@@ -283,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
       sortMode: _catalogSortMode,
       minOwnerRatingAvg: _minOwnerRatingAvg,
       minOwnerRatingCount: _minOwnerRatingCount,
+      onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
     );
   }
 
@@ -331,6 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _catalogSortMode = draft.sortMode;
       _minOwnerRatingAvg = draft.minOwnerRatingAvg;
       _minOwnerRatingCount = draft.minOwnerRatingCount;
+      _onlyWithCommercialDiscount = draft.onlyWithCommercialDiscount;
     });
 
     if (draft.sortMode == CatalogSortMode.nearest) {
@@ -573,6 +579,15 @@ class _HomeScreenState extends State<HomeScreen> {
         label: '≥ ${draft.minOwnerRatingCount} valoraciones',
         onDeleted: () {
           setState(() => _minOwnerRatingCount = null);
+          _applyFiltersFromUi();
+        },
+      ));
+    }
+    if (draft.hasCommercialDiscountFilter) {
+      chips.add(_activeFilterChip(
+        label: 'Con descuentos',
+        onDeleted: () {
+          setState(() => _onlyWithCommercialDiscount = false);
           _applyFiltersFromUi();
         },
       ));
@@ -895,17 +910,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Expanded(
                       child: GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: _kCrossAxisCount,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          // cross / main = ancho / alto del hijo. Menor ratio = celdas más altas
-                          // (evita overflow al mostrar importador, ubicación, rating y precio).
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
                           childAspectRatio:
                               _activeFilters.sortByDistanceFromReference
-                                  ? 0.54
-                                  : 0.56,
+                                  ? 0.42
+                                  : 0.44,
                         ),
                         itemCount: parts.length,
                         itemBuilder: (context, index) {
@@ -979,7 +992,6 @@ class _ProductGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compactDistanceMode = showDistanceChips;
     final importer = (part.ownerBusinessName ?? '').trim();
     final importerLine =
         importer.isNotEmpty ? importer.toUpperCase() : 'SIN IMPORTADOR';
@@ -991,16 +1003,17 @@ class _ProductGridCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade200),
           boxShadow: AppDecorations.cardShadow,
         ),
         child: Padding(
-          padding: EdgeInsets.all(compactDistanceMode ? 6 : 8),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AspectRatio(
-                  aspectRatio: compactDistanceMode ? 1.25 : 1.05,
+                  aspectRatio: 1.0,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Hero(
@@ -1019,132 +1032,133 @@ class _ProductGridCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  importerLine,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: compactDistanceMode ? 11 : 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                if (locLine.isNotEmpty) ...[
-                  SizedBox(height: compactDistanceMode ? 1 : 2),
-                  Text(
-                    locLine,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: compactDistanceMode ? 9.5 : 10,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-                if (part.ownerRatingAvg != null &&
-                    (part.ownerRatingCount ?? 0) > 0) ...[
-                  SizedBox(height: compactDistanceMode ? 2 : 4),
-                  Row(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.star,
-                        size: compactDistanceMode ? 12 : 13,
-                        color: Colors.amber.shade800,
-                      ),
-                      const SizedBox(width: 3),
                       Text(
-                        '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
-                        style: TextStyle(
-                          fontSize: compactDistanceMode ? 9.5 : 10,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey.shade800,
+                        part.nombre,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          height: 1.2,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        ' · últ. 100',
-                        style: TextStyle(
-                          fontSize: compactDistanceMode ? 8.5 : 9,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (showDistanceChips) ...[
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    height: 28,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        Chip(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          label: Text(
-                            _distanceChipLabel(part),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          backgroundColor: AppColors.brandBlue.withOpacity(0.1),
-                          side:
-                              BorderSide(color: AppColors.brandBlue.withOpacity(0.35)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 18,
-                  child: Text(
-                    part.nombre,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.15,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${part.precioUnitarioParaAliado(faseContado: faseContadoAliado).toStringAsFixed(2)} REF',
-                  style: TextStyle(
-                    fontSize: compactDistanceMode ? 15.5 : 17,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.brand,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.successGreen,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${part.stock} en stock',
+                        importerLine,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: compactDistanceMode ? 11 : 12,
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Colors.green.shade700,
+                          color: AppColors.textSecondary,
+                          height: 1.1,
                         ),
                       ),
-                    ),
-                  ],
+                      if (locLine.isNotEmpty)
+                        Text(
+                          locLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
+                            height: 1.1,
+                          ),
+                        ),
+                      if (part.ownerRatingAvg != null &&
+                          (part.ownerRatingCount ?? 0) > 0) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star,
+                              size: 12,
+                              color: Colors.amber.shade800,
+                            ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (showDistanceChips) ...[
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Chip(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            label: Text(
+                              _distanceChipLabel(part),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            backgroundColor:
+                                AppColors.brandBlue.withOpacity(0.1),
+                            side: BorderSide(
+                              color: AppColors.brandBlue.withOpacity(0.35),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      CatalogProductPriceDisplay(
+                        listPriceUsd: part.precio,
+                        salePriceUsd: part.salePriceUsd,
+                        discountRules: part.discountRules,
+                        faseContado: faseContadoAliado,
+                        catalogGrid: true,
+                      ),
+                      const Spacer(),
+                      Divider(height: 1, color: Colors.grey.shade200),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.successGreen,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${part.stock} en stock',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart';
+
+import '../models/part_model.dart';
+import '../utils/product_volume_tiers.dart';
 
 /// Fila parseada de la plantilla de inventario (.xlsx).
 class ExcelInventoryRow {
@@ -15,6 +19,9 @@ class ExcelInventoryRow {
     this.categoria,
     this.compatibilidad,
     this.urlImagen,
+    this.precioOfertaUsd,
+    this.usdPaymentDiscountPct,
+    this.tramosVolumenJson,
   });
 
   final int rowIndex;
@@ -26,6 +33,17 @@ class ExcelInventoryRow {
   final String? categoria;
   final String? compatibilidad;
   final String? urlImagen;
+  final double? precioOfertaUsd;
+  final double? usdPaymentDiscountPct;
+  final String? tramosVolumenJson;
+
+  /// `discount_rules` listo para Supabase.
+  Map<String, dynamic>? get discountRules => buildProductDiscountRules(
+        volumeTiers: parseProductVolumeTiers(
+          parseVolumeTiersJsonCell(tramosVolumenJson),
+        ),
+        usdPaymentDiscountPct: usdPaymentDiscountPct,
+      );
 }
 
 /// Genera y lee plantillas Excel para carga masiva de inventario.
@@ -34,16 +52,19 @@ class ExcelCatalogService {
 
   /// Cabeceras exportadas en la plantilla (orden fijo).
   /// Obligatorias en cada fila de datos: sku, nombre, precio, stock.
-  /// Opcionales: descripcion, categoria, compatibilidad, url_imagen.
+  /// El resto se etiqueta como "(opcional)" para guiar la carga masiva.
   static const templateHeaders = [
     'sku',
     'nombre',
-    'descripcion',
+    'descripcion (opcional)',
     'precio',
+    'precio_oferta_usd (opcional)',
+    'descuento_pago_usd_pct (opcional)',
+    'tramos_volumen_json (opcional)',
     'stock',
-    'categoria',
-    'compatibilidad',
-    'url_imagen',
+    'categoria (opcional)',
+    'compatibilidad (opcional)',
+    'url_imagen (opcional)',
   ];
 
   /// Bytes de un .xlsx con cabeceras (columnas alineadas al formulario y a BD).
@@ -60,6 +81,11 @@ class ExcelCatalogService {
         TextCellValue('Repuesto de muestra (puede borrar esta fila)'),
         TextCellValue('Descripción opcional'),
         TextCellValue('12.50'),
+        TextCellValue('10.99'),
+        TextCellValue('2'),
+        TextCellValue(
+          '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}',
+        ),
         TextCellValue('10'),
         TextCellValue('Motor'),
         TextCellValue('CG150, CG125'),
@@ -69,6 +95,55 @@ class ExcelCatalogService {
     final bytes = excel.encode();
     if (bytes == null) {
       throw StateError('No se pudo generar el archivo Excel.');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  /// Exporta filas reales del inventario del importador con el mismo layout
+  /// que la plantilla de carga masiva.
+  static Uint8List buildInventoryExportBytes(List<PartModel> parts) {
+    final excel = Excel.createExcel();
+    final sheet = excel['Sheet1'];
+    sheet.appendRow(
+      templateHeaders.map((h) => TextCellValue(h)).toList(),
+    );
+
+    for (final p in parts) {
+      final tiers = parseProductVolumeTiers(p.discountRules);
+      final tiersJson = tiers.isEmpty
+          ? ''
+          : jsonEncode({
+              'volume_tiers': tiers.map((t) => t.toJson()).toList(),
+            });
+      final usdPct = parseUsdPaymentDiscountPct(p.discountRules);
+      sheet.appendRow(
+        [
+          TextCellValue((p.sku ?? '').trim()),
+          TextCellValue(p.nombre),
+          TextCellValue(p.descripcion ?? ''),
+          TextCellValue(p.precio.toStringAsFixed(2)),
+          TextCellValue(
+            p.salePriceUsd == null ? '' : p.salePriceUsd!.toStringAsFixed(2),
+          ),
+          TextCellValue(
+            usdPct == null
+                ? ''
+                : usdPct.toStringAsFixed(
+                    usdPct.truncateToDouble() == usdPct ? 0 : 1,
+                  ),
+          ),
+          TextCellValue(tiersJson),
+          TextCellValue('${p.stock}'),
+          TextCellValue(p.category ?? ''),
+          TextCellValue(p.compatibilidad ?? ''),
+          TextCellValue(p.imagenUrl ?? ''),
+        ],
+      );
+    }
+
+    final bytes = excel.encode();
+    if (bytes == null) {
+      throw StateError('No se pudo generar el archivo Excel de inventario.');
     }
     return Uint8List.fromList(bytes);
   }
@@ -116,6 +191,10 @@ class ExcelCatalogService {
       final key = raw.trim().toLowerCase();
       if (key.isEmpty) continue;
       colIndex[key] = c;
+      final normalized = _normalizeHeaderKey(key);
+      if (normalized.isNotEmpty) {
+        colIndex[normalized] = c;
+      }
     }
 
     void needColumn(String name) {
@@ -138,6 +217,12 @@ class ExcelCatalogService {
 
     final urlCol = headerCol('url_imagen', 'image_url');
     final compatCol = colIndex['compatibilidad'];
+    final ofertaCol = headerCol('precio_oferta_usd', 'precio_oferta');
+    final usdPctCol = headerCol(
+      'descuento_pago_usd_pct',
+      'usd_payment_discount_pct',
+    );
+    final tiersCol = headerCol('tramos_volumen_json', 'tramos_volumen');
 
     final out = <ExcelInventoryRow>[];
     for (var r = 1; r < sheet.maxRows; r++) {
@@ -184,6 +269,49 @@ class ExcelCatalogService {
       final urlImagen =
           urlCol != null ? _nullableText(_cellText(_col(row, urlCol))) : null;
 
+      double? precioOferta;
+      if (ofertaCol != null) {
+        final ofertaStr = _cellText(_col(row, ofertaCol)).trim();
+        if (ofertaStr.isNotEmpty) {
+          precioOferta = double.tryParse(ofertaStr.replaceAll(',', '.'));
+          if (precioOferta == null || precioOferta <= 0) {
+            throw FormatException(
+              'Fila ${r + 1}: precio_oferta_usd inválido para SKU $sku',
+            );
+          }
+          if (precioOferta >= precio) {
+            throw FormatException(
+              'Fila ${r + 1}: precio_oferta_usd debe ser menor que precio para SKU $sku',
+            );
+          }
+        }
+      }
+
+      final tramosJson = tiersCol != null
+          ? _nullableText(_cellText(_col(row, tiersCol)))
+          : null;
+
+      double? usdPaymentDiscountPct;
+      if (usdPctCol != null) {
+        final pctStr = _cellText(_col(row, usdPctCol)).trim();
+        if (pctStr.isNotEmpty) {
+          usdPaymentDiscountPct =
+              double.tryParse(pctStr.replaceAll(',', '.'));
+          if (usdPaymentDiscountPct == null ||
+              usdPaymentDiscountPct <= 0 ||
+              usdPaymentDiscountPct >= 100) {
+            throw FormatException(
+              'Fila ${r + 1}: descuento_pago_usd_pct inválido para SKU $sku '
+              '(use un número entre 0 y 100, sin incluir los extremos).',
+            );
+          }
+        }
+      }
+      if (usdPaymentDiscountPct == null && tramosJson != null) {
+        final fromJson = parseVolumeTiersJsonCell(tramosJson);
+        usdPaymentDiscountPct = parseUsdPaymentDiscountPct(fromJson);
+      }
+
       out.add(
         ExcelInventoryRow(
           rowIndex: r + 1,
@@ -195,6 +323,9 @@ class ExcelCatalogService {
           categoria: categoria,
           compatibilidad: compatibilidad,
           urlImagen: urlImagen,
+          precioOfertaUsd: precioOferta,
+          usdPaymentDiscountPct: usdPaymentDiscountPct,
+          tramosVolumenJson: tramosJson,
         ),
       );
     }
@@ -216,6 +347,21 @@ class ExcelCatalogService {
     final v = cell.value;
     if (v == null) return '';
     return v.toString();
+  }
+
+  static String _normalizeHeaderKey(String raw) {
+    var key = raw.trim().toLowerCase();
+    if (key.isEmpty) return '';
+    key = key
+        .replaceAll('(opcional)', '')
+        .replaceAll('(optional)', '')
+        .replaceAll('(obligatorio)', '')
+        .replaceAll('(required)', '')
+        .replaceAll('*', '')
+        .trim();
+    // Compactar dobles espacios por si el usuario edita manualmente.
+    key = key.replaceAll(RegExp(r'\s+'), ' ');
+    return key;
   }
 
   /// Corrige archivos que declaran numFmt custom con IDs reservados (<164).

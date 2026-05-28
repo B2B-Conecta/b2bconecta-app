@@ -1,4 +1,6 @@
 import '../utils/broker_pricing.dart';
+import '../utils/product_catalog_pricing.dart';
+import '../utils/product_volume_tiers.dart';
 
 /// Modelo de repuesto. Los datos provienen de la tabla Supabase `products`
 /// (`owner_id` → `profiles.id`).
@@ -24,6 +26,8 @@ class PartModel {
     this.ownerRatingAvg,
     this.ownerRatingCount,
     this.ownerCatalogPaidOrders30d,
+    this.salePriceUsd,
+    this.discountRules,
   });
 
   final String id;
@@ -69,12 +73,35 @@ class PartModel {
   /// Pedidos pagados confirmados por el importador en ventana E1 (`profiles.catalog_paid_orders_30d`).
   final int? ownerCatalogPaidOrders30d;
 
+  /// E4: precio mayorista promocional USD (`products.sale_price_usd`).
+  final double? salePriceUsd;
+
+  /// E4: tramos por volumen (`volume_tiers` con `min_units`).
+  final Map<String, dynamic>? discountRules;
+
+  bool get tieneOfertaDirecta => ProductCatalogPricing.hasDirectSale(
+        listPriceUsd: precio,
+        salePriceUsd: salePriceUsd,
+      );
+
+  List<ProductVolumeTier> get volumeTiers =>
+      parseProductVolumeTiers(discountRules);
+
   /// Precio unitario final MotoLink (mayorista + comisión broker).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
-  /// Precio de venta al aliado: mismo que [precioFinalUnitario] salvo en fase contado (descuento promocional).
-  double precioUnitarioParaAliado({required bool faseContado}) =>
-      BrokerPricing.unitPriceForAliado(precio, faseContado: faseContado);
+  /// Precio de venta al aliado (cascada E4; sin tramo volumen si [quantity] = 1 en grid).
+  double precioUnitarioParaAliado({
+    required bool faseContado,
+    int quantity = 1,
+  }) =>
+      ProductCatalogPricing.aliadoUnitUsd(
+        listPriceUsd: precio,
+        salePriceUsd: salePriceUsd,
+        discountRules: discountRules,
+        quantity: quantity,
+        faseContado: faseContado,
+      );
 
   factory PartModel.fromJson(Map<String, dynamic> json) {
     // Tabla `products`: owner_id, name, description, compatibility, price_usd, stock, image_url.
@@ -82,6 +109,7 @@ class PartModel {
     final descripcionRaw = json['description'] ?? json['descripcion'];
     final compatibilidadRaw = json['compatibility'] ?? json['compatibilidad'];
     final precioRaw = json['price_usd'] ?? json['price'] ?? json['precio'];
+    final saleRaw = json['sale_price_usd'];
     final imagenRaw = json['image_url'] ?? json['imagen_url'];
 
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
@@ -110,6 +138,8 @@ class PartModel {
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
       precio: _asDouble(precioRaw),
+      salePriceUsd: _asNullableDouble(saleRaw),
+      discountRules: _discountRulesFromJson(json['discount_rules']),
       stock: _asInt(json['stock']),
       imagenUrl: _nullableUrl(imagenRaw),
       sku: _nullableText(json['sku']),
@@ -140,6 +170,8 @@ class PartModel {
     double? ownerRatingAvg,
     int? ownerRatingCount,
     int? ownerCatalogPaidOrders30d,
+    double? salePriceUsd,
+    Map<String, dynamic>? discountRules,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -164,7 +196,21 @@ class PartModel {
       ownerRatingCount: ownerRatingCount ?? this.ownerRatingCount,
       ownerCatalogPaidOrders30d:
           ownerCatalogPaidOrders30d ?? this.ownerCatalogPaidOrders30d,
+      salePriceUsd: salePriceUsd ?? this.salePriceUsd,
+      discountRules: discountRules ?? this.discountRules,
     );
+  }
+
+  static double? _asNullableDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
+  }
+
+  static Map<String, dynamic>? _discountRulesFromJson(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
   }
 
   static int? _ownerCatalogBoostFromProfiles(dynamic profiles) {

@@ -70,6 +70,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
   late CatalogSortMode _sortMode;
   double? _minRatingAvg;
   int? _minRatingCount;
+  late bool _onlyWithCommercialDiscount;
   String _importerQuery = '';
 
   @override
@@ -80,6 +81,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     _sortMode = widget.initial.sortMode;
     _minRatingAvg = widget.initial.minOwnerRatingAvg;
     _minRatingCount = widget.initial.minOwnerRatingCount;
+    _onlyWithCommercialDiscount = widget.initial.onlyWithCommercialDiscount;
     _estadoController = TextEditingController(text: widget.initial.ownerEstado);
     _ciudadController = TextEditingController(text: widget.initial.ownerCiudad);
     _minPriceController = TextEditingController(text: widget.initial.minPrice);
@@ -113,6 +115,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
       sortMode: _sortMode,
       minOwnerRatingAvg: _minRatingAvg,
       minOwnerRatingCount: _minRatingCount,
+      onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
     );
   }
 
@@ -123,6 +126,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
       _sortMode = CatalogSortMode.recommended;
       _minRatingAvg = null;
       _minRatingCount = null;
+      _onlyWithCommercialDiscount = false;
       _estadoController.clear();
       _ciudadController.clear();
       _minPriceController.clear();
@@ -216,7 +220,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Categoría, ubicación, precio, reputación, proveedores y orden.',
+                  'Categoría, descuentos, ubicación, precio, reputación, proveedores y orden.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -391,6 +395,36 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       ),
                     ),
                   ],
+                ),
+                _sectionTitle('DESCUENTOS'),
+                const Text(
+                  'Oferta directa, descuento por volumen o % extra en la línea USD (Zelle/divisas).',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilterChip(
+                  label: const Text('Solo con descuentos'),
+                  selected: _onlyWithCommercialDiscount,
+                  onSelected: (v) =>
+                      setState(() => _onlyWithCommercialDiscount = v),
+                  selectedColor: AppColors.brandOrange,
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: _onlyWithCommercialDiscount
+                        ? Colors.white
+                        : AppColors.textPrimary,
+                  ),
+                  backgroundColor: Colors.grey.shade200,
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 _sectionTitle('PRECIO (REF)'),
                 Row(

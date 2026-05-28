@@ -64,6 +64,7 @@ create table public.products (
   stock integer not null default 0 check (stock >= 0),
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
+  sale_price_usd numeric(12, 4),
   discount_rules jsonb
 );
 

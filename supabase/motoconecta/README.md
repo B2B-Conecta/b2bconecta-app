@@ -128,6 +128,18 @@ Migraciones C1 (`20260520…` / `20260526…`): devengo al Recibido, cortes, ref
 - **RPC UI:** `motoconecta_importer_commission_volume_context` (`20260708120000_importer_commission_volume_context_rpc.sql`).
 - **Storage:** `commission-settlement-invoices` (PDF) y `order-payment-proofs/commission-settlements/` (comprobantes).
 
+## Descuentos y precios (E4)
+
+Migración `20260709120000_e4_sale_price_volume_pricing.sql`:
+
+- **`products.sale_price_usd`:** precio mayorista promocional (columna indexable). En catálogo: precio lista tachado + precio oferta en verde (REF); línea USD con % adicional si `usd_payment_discount_pct` en `discount_rules`.
+- **`products.discount_rules`:** tramos por volumen (`volume_tiers`) y opcional `usd_payment_discount_pct` (% sobre precio REF en línea USD del catálogo).
+- **Checkout (cascada):** oferta → % volumen por unidades → +10 % MotoLink → −5 % contado si aplica. Snapshot en `discount_rules` incluye `applied_volume_*`.
+- **`promo_campaigns`:** no alteran precio (solo visibilidad / ranking).
+- **Importador:** ficha de producto + Excel (`precio_oferta_usd`, `descuento_pago_usd_pct`, `tramos_volumen_json`).
+- **Seed demo:** importadores 1–12 con oferta, tramos por volumen y `usd_payment_discount_pct` (1,5 %–4 % según SKU).
+- **Catálogo aliado:** filtro «Solo con descuentos» (oferta directa o tramos por volumen).
+
 ## Comunicación y KYC en pedido (C2)
 
 Migraciones `20260527120000_minuta7_c2_chat_sla_kyc.sql` y `20260529120000_minuta7_c2_kyc_admin_sla_completion.sql`:

@@ -1,93 +1,61 @@
 import '../models/transaction_request_model.dart';
+import 'product_volume_tiers.dart';
 import 'ves_amount_format.dart';
 
-/// Tramos opcionales en `discount_rules` (producto / línea de pedido), p. ej.:
-/// `{ "volume_tiers": [ { "min_subtotal_ref": 1000, "percent_discount": 5 } ] }`
-class VolumeDiscountTier {
-  const VolumeDiscountTier({
-    required this.minSubtotalRef,
-    required this.percentDiscount,
-  });
-
-  final double minSubtotalRef;
-  final double percentDiscount;
-}
-
+/// Resumen de descuento por volumen ya aplicado en el pedido (snapshot servidor).
 class VolumeDiscountResult {
   const VolumeDiscountResult({
-    required this.subtotalRef,
+    required this.quantity,
     required this.percentApplied,
-    required this.amountOff,
-    required this.totalAfterDiscount,
+    required this.subtotalUsd,
+    this.appliedMinUnits,
   });
 
-  final double subtotalRef;
+  final int quantity;
   final double percentApplied;
-  final double amountOff;
-  final double totalAfterDiscount;
+  final double subtotalUsd;
+  final int? appliedMinUnits;
 
   String get resumenEs {
     if (percentApplied <= 0) return '';
-    return 'Subtotal ${formatRefAmount(subtotalRef)} REF · '
-        '${percentApplied.toStringAsFixed(0)} % descuento por volumen · '
-        'Total ${formatRefAmount(totalAfterDiscount)} REF';
+    final minPart = appliedMinUnits != null
+        ? ' (desde $appliedMinUnits uds.)'
+        : '';
+    return 'Descuento por volumen$minPart: '
+        '${percentApplied.toStringAsFixed(0)}% · '
+        'Total línea USD ${formatRefAmount(subtotalUsd)}';
+  }
+
+  factory VolumeDiscountResult.fromLine(TransactionRequestModel r) {
+    final rules = r.discountRules;
+    final pct = appliedVolumeDiscountPctFromSnapshot(rules) ?? 0;
+    final minRaw = rules?['applied_volume_min_units'];
+    final minUnits = minRaw is int
+        ? minRaw
+        : (minRaw is num ? minRaw.toInt() : int.tryParse('$minRaw'));
+    return VolumeDiscountResult(
+      quantity: r.cantidad,
+      percentApplied: pct,
+      subtotalUsd: r.precioTotal,
+      appliedMinUnits: minUnits,
+    );
   }
 }
 
-List<VolumeDiscountTier> _tiersFromRules(Map<String, dynamic>? rules) {
-  if (rules == null || rules.isEmpty) return const [];
-  final raw = rules['volume_tiers'];
-  if (raw is! List) return const [];
-  final out = <VolumeDiscountTier>[];
-  for (final e in raw) {
-    if (e is! Map) continue;
-    final m = Map<String, dynamic>.from(e);
-    final minV = m['min_subtotal_ref'] ?? m['min'];
-    final pctV = m['percent_discount'] ?? m['pct'] ?? m['percent'];
-    final min = minV is num
-        ? minV.toDouble()
-        : double.tryParse(minV?.toString() ?? '') ?? 0;
-    final pct = pctV is num
-        ? pctV.toDouble()
-        : double.tryParse(pctV?.toString() ?? '') ?? 0;
-    if (min > 0 && pct > 0) {
-      out.add(VolumeDiscountTier(minSubtotalRef: min, percentDiscount: pct));
-    }
-  }
-  out.sort((a, b) => b.minSubtotalRef.compareTo(a.minSubtotalRef));
-  return out;
+/// Línea con descuento por volumen registrado en checkout.
+VolumeDiscountResult? volumeDiscountFromOrderLine(TransactionRequestModel r) {
+  final pct = appliedVolumeDiscountPctFromSnapshot(r.discountRules);
+  if (pct == null || pct <= 0) return null;
+  return VolumeDiscountResult.fromLine(r);
 }
 
-/// Evalúa descuento por volumen sobre el subtotal de las líneas (mismo importador).
+/// Varias líneas del mismo importador (muestra si alguna tiene volumen).
 VolumeDiscountResult? computeVolumeDiscountForLines(
   List<TransactionRequestModel> lines,
 ) {
-  if (lines.isEmpty) return null;
-  final subtotal = lines.fold<double>(0, (s, r) => s + r.precioTotal);
-  Map<String, dynamic>? rules;
   for (final r in lines) {
-    final m = r.discountRules;
-    if (m != null && m.isNotEmpty) {
-      rules = m;
-      break;
-    }
+    final d = volumeDiscountFromOrderLine(r);
+    if (d != null) return d;
   }
-  final tiers = _tiersFromRules(rules);
-  if (tiers.isEmpty) return null;
-  VolumeDiscountTier? picked;
-  for (final t in tiers) {
-    if (subtotal + 1e-9 >= t.minSubtotalRef) {
-      picked = t;
-      break;
-    }
-  }
-  if (picked == null) return null;
-  final off = subtotal * (picked.percentDiscount / 100.0);
-  final after = (subtotal - off).clamp(0.0, 1e15);
-  return VolumeDiscountResult(
-    subtotalRef: subtotal,
-    percentApplied: picked.percentDiscount,
-    amountOff: off,
-    totalAfterDiscount: after,
-  );
+  return null;
 }

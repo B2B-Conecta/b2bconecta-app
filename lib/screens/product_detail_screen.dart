@@ -12,6 +12,8 @@ import '../models/profile_model.dart';
 import '../services/cart_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/product_catalog_pricing.dart';
+import '../widgets/catalog_product_price_display.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -47,8 +49,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool get _pedidosSuspendidosMorosidad =>
       _profile?.pedidosSuspendidosMorosidad ?? false;
 
-  double get _precioVentaUnit =>
-      part.precioUnitarioParaAliado(faseContado: _faseContado);
+  double _precioVentaUnit({int quantity = 1}) =>
+      part.precioUnitarioParaAliado(
+        faseContado: _faseContado,
+        quantity: quantity,
+      );
 
   String get _direccionFiscalParaDialogo {
     final p = _profile;
@@ -191,7 +196,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     CartService.instance.addOrIncrement(
       part,
-      precioUnitarioAliadoRef: _precioVentaUnit,
+      precioUnitarioAliadoRef: _precioVentaUnit(),
       delta: q,
     );
     if (!mounted) return;
@@ -272,15 +277,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         part.nombre,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${_precioVentaUnit.toStringAsFixed(2)} REF / u.',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.brandBlue,
-                        ),
-                      ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: qtyController,
@@ -302,14 +298,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         builder: (context, v, _) {
                           final q = int.tryParse(v.text) ?? 0;
                           final safe = q.clamp(1, maxQty);
-                          final total = _precioVentaUnit * safe;
-                          return Text(
-                            'Total: ${total.toStringAsFixed(2)} REF',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: AppColors.brandOrange,
-                            ),
+                          final unit = _precioVentaUnit(quantity: safe);
+                          final total = unit * safe;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                '${unit.toStringAsFixed(2)} REF / u.',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.brandBlue,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Total: ${total.toStringAsFixed(2)} REF',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                  color: AppColors.brandOrange,
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -712,25 +723,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Precio',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                          letterSpacing: 0.2,
-                        ),
+                      const SizedBox(height: 8),
+                      CatalogProductPriceDisplay(
+                        listPriceUsd: part.precio,
+                        salePriceUsd: part.salePriceUsd,
+                        discountRules: part.discountRules,
+                        faseContado: _faseContado,
+                        showPromotionChips: false,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_precioVentaUnit.toStringAsFixed(2)} REF',
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.brand,
+                      if (ProductCatalogPricing.volumeIncentiveBadgeEs(
+                            part.discountRules,
+                          ) !=
+                          null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.teal.shade200),
+                          ),
+                          child: Text(
+                            ProductCatalogPricing.volumeIncentiveBadgeEs(
+                              part.discountRules,
+                            )!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.teal.shade900,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 10),
                       Row(
                         children: [

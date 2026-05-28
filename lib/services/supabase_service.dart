@@ -722,6 +722,8 @@ class SupabaseService {
     required String name,
     String? description,
     required double priceUsd,
+    double? salePriceUsd,
+    Map<String, dynamic>? discountRules,
     required int stock,
     String? category,
     String? compatibility,
@@ -747,6 +749,12 @@ class SupabaseService {
     if (comp != null && comp.isNotEmpty) payload['compatibility'] = comp;
     final img = imageUrl?.trim();
     if (img != null && img.isNotEmpty) payload['image_url'] = img;
+    if (salePriceUsd != null && salePriceUsd > 0) {
+      payload['sale_price_usd'] = salePriceUsd;
+    }
+    if (discountRules != null && discountRules.isNotEmpty) {
+      payload['discount_rules'] = discountRules;
+    }
 
     final inserted =
         await _client.from('products').insert(payload).select('id').single();
@@ -759,6 +767,10 @@ class SupabaseService {
     required String name,
     String? description,
     required double priceUsd,
+    double? salePriceUsd,
+    bool clearSalePrice = false,
+    Map<String, dynamic>? discountRules,
+    bool clearDiscountRules = false,
     required int stock,
     String? category,
     String? compatibility,
@@ -780,6 +792,17 @@ class SupabaseService {
     upd['compatibility'] = comp;
     final img = imageUrl?.trim();
     upd['image_url'] = (img == null || img.isEmpty) ? null : img;
+    if (clearSalePrice) {
+      upd['sale_price_usd'] = null;
+    } else if (salePriceUsd != null && salePriceUsd > 0) {
+      upd['sale_price_usd'] = salePriceUsd;
+    }
+    if (clearDiscountRules) {
+      upd['discount_rules'] = null;
+    } else if (discountRules != null) {
+      upd['discount_rules'] =
+          discountRules.isEmpty ? null : discountRules;
+    }
 
     await _client.from('products').update(upd).eq('id', productId);
   }
@@ -788,11 +811,27 @@ class SupabaseService {
     required String productId,
     required double priceUsd,
     required int stock,
+    double? salePriceUsd,
+    bool clearSalePrice = false,
+    Map<String, dynamic>? discountRules,
+    bool clearDiscountRules = false,
   }) async {
-    await _client.from('products').update({
+    final upd = <String, dynamic>{
       'price_usd': priceUsd,
       'stock': stock,
-    }).eq('id', productId);
+    };
+    if (clearSalePrice) {
+      upd['sale_price_usd'] = null;
+    } else if (salePriceUsd != null && salePriceUsd > 0) {
+      upd['sale_price_usd'] = salePriceUsd;
+    }
+    if (clearDiscountRules) {
+      upd['discount_rules'] = null;
+    } else if (discountRules != null) {
+      upd['discount_rules'] =
+          discountRules.isEmpty ? null : discountRules;
+    }
+    await _client.from('products').update(upd).eq('id', productId);
   }
 
   /// MotoConecta: pedido directo (sin `sub_orders`, `payment_schedule`, ni FK anidada legacy).
@@ -3470,6 +3509,11 @@ class SupabaseService {
         'profiles.rating_count_received_rolling100',
         'gte',
         minCnt,
+      );
+    }
+    if (filters.onlyWithCommercialDiscount) {
+      q = q.or(
+        'sale_price_usd.not.is.null,discount_rules->volume_tiers.neq.[],discount_rules->usd_payment_discount_pct.gt.0',
       );
     }
     // Catálogo B2B (aliados): no listar productos sin inventario.

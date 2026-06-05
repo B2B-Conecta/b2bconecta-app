@@ -120,7 +120,7 @@ class _ReputationWeeklySummarySectionState
   Widget _weekRow(ReputationWeeklySnapshotModel w) {
     final avg = w.avgOverall;
     final stars = avg != null ? avg.round().clamp(1, 5) : 0;
-    final maxBar = 5.0;
+    const maxBar = 5.0;
     final barW = avg != null ? (avg / maxBar).clamp(0.0, 1.0) : 0.0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

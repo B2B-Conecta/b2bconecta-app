@@ -30,7 +30,7 @@ void main() {
       ],
     );
     final ratings = [
-      ImportadorReceivedRatingModel(
+      const ImportadorReceivedRatingModel(
         id: '1',
         overallStars: 4,
         comment: 'ok',
@@ -38,7 +38,7 @@ void main() {
         submittedAt: null,
         aliadoLabel: 'Aliado',
       ),
-      ImportadorReceivedRatingModel(
+      const ImportadorReceivedRatingModel(
         id: '2',
         overallStars: 4,
         comment: 'ok',

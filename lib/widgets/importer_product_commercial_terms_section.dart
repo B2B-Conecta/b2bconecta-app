@@ -40,7 +40,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.local_offer_outlined,
                   color: AppColors.brandOrange,
                   size: 22,

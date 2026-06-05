@@ -1052,7 +1052,7 @@ class _ProductGridCard extends StatelessWidget {
                         importerLine,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,

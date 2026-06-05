@@ -1,5 +1,4 @@
 import '../models/transaction_request_model.dart';
-import '../models/transaction_request_status.dart';
 import 'order_rating_eligibility.dart';
 
 /// Valoración del aliado ya guardada en servidor.

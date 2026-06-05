@@ -126,7 +126,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.campaign_outlined,
                       color: AppColors.brandOrange,
                       size: 22,

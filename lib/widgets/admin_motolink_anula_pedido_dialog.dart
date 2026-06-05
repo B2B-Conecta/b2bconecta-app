@@ -17,7 +17,7 @@ Future<String?> showAdminMotolinkAnulaPedidoDialog(
           children: [
             Text(
               'El pedido «$productName» pasará a cerrado y se notificará al aliado e importador. '
-              'Si ya se había descontado inventario por la factura MotoLink, se reintegra la cantidad.',
+              'Si ya se había descontado inventario, se reintegra la cantidad.',
               style: const TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),

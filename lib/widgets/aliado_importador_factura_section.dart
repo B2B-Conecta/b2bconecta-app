@@ -26,7 +26,7 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
 
   Future<void> _abrir(BuildContext context, String path) async {
     try {
-      final url = await SupabaseService.createSignedUrlForFacturaAliado(path);
+      final url = await SupabaseService.createSignedUrlForOrderInvoice(path);
       final uri = Uri.parse(url);
       if (!context.mounted) return;
       await launchUrl(uri, mode: LaunchMode.externalApplication);

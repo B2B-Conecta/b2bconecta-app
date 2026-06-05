@@ -378,14 +378,14 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             ],
             if (chunk.any(
               (r) =>
-                  r.hasFacturaAliado &&
+                  r.hasProveedorFactura &&
                   (r.status == TransactionRequestStatus.enTransito ||
                       r.status == TransactionRequestStatus.entregado),
             )) ...[
               const SizedBox(height: 8),
               for (final r in chunk.where(
                 (x) =>
-                    x.hasFacturaAliado &&
+                    x.hasProveedorFactura &&
                     (x.status == TransactionRequestStatus.enTransito ||
                         x.status == TransactionRequestStatus.entregado),
               ))

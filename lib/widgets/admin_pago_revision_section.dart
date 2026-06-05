@@ -36,7 +36,7 @@ String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
 }
 
 /// Revisión del pago del aliado (comprobante / efectivo): ver archivo y aprobar o rechazar.
-/// Aplica en cualquier fase operativa con factura MotoLink al aliado; el RPC admite hasta `entregado`.
+/// Aplica cuando el importador ya adjuntó su factura al aliado; el RPC admite hasta `entregado`.
 class AdminPagoRevisionSection extends StatefulWidget {
   const AdminPagoRevisionSection({
     super.key,
@@ -176,7 +176,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
-    if (!r.hasFacturaAliado) return const SizedBox.shrink();
+    if (!r.hasProveedorFactura) return const SizedBox.shrink();
 
     final pe = r.pagoEstadoRevisionEfectivo;
 

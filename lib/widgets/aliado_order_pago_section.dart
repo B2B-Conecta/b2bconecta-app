@@ -9,7 +9,6 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/app_date_format.dart';
 import 'moroso_order_visual.dart';
 
 /// Método de pago y comprobante. El importador verifica la acreditación (negociación por chat).
@@ -73,22 +72,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         oldWidget.profile?.primerosPedidosContadoEntregados !=
             widget.profile?.primerosPedidosContadoEntregados) {
       _syncMetodoSeleccionado();
-    }
-  }
-
-  Future<void> _abrirFacturaPath(BuildContext context, String path) async {
-    final p = path.trim();
-    if (p.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForFacturaAliado(p);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
     }
   }
 
@@ -209,7 +192,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     final mostrarGestionPago = !referenciaHistorica
         ? (_estadoPermiteDeclaracionPago(r) ||
             r.hasComprobantePago ||
-            r.hasFacturaAliado)
+            r.hasProveedorFactura)
         : r.tieneDocumentacionFacturaPago;
 
     return Column(
@@ -276,47 +259,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
           ),
           const SizedBox(height: 8),
         ],
-        if (r.hasFacturaAliado) ...[
-          Text(
-            r.motolinkAllyInvoicesDescargables.length > 1
-                ? 'Facturas MotoLink (${r.motolinkAllyInvoicesDescargables.length} documentos)'
-                : 'Factura MotoLink: ${r.facturaAliadoFileName ?? 'documento'}',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-          ),
-          Text(
-            'Emitida: ${formatEsShortDateTime(r.facturaAliadoSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 6),
-          if (r.motolinkAllyInvoicesDescargables.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final e in r.motolinkAllyInvoicesDescargables)
-                  OutlinedButton.icon(
-                    onPressed: e.storagePath == null ||
-                            e.storagePath!.trim().isEmpty
-                        ? null
-                        : () => _abrirFacturaPath(context, e.storagePath!),
-                    icon: const Icon(Icons.download_outlined, size: 18),
-                    label: Text(
-                      e.downloadButtonLabel,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-            )
-          else if (r.facturaAliadoStoragePath != null &&
-              r.facturaAliadoStoragePath!.trim().isNotEmpty)
-            OutlinedButton.icon(
-              onPressed: () =>
-                  _abrirFacturaPath(context, r.facturaAliadoStoragePath!),
-              icon: const Icon(Icons.download_outlined, size: 18),
-              label: const Text('Ver / descargar factura'),
-            ),
-        ],
         if (referenciaHistorica && r.hasComprobantePago) ...[
           const SizedBox(height: 10),
           if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty) ...[
@@ -332,7 +274,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             label: const Text('Ver comprobante de pago'),
           ),
         ],
-        if (!r.hasFacturaAliado && !referenciaHistorica && !mostrarGestionPago)
+        if (!r.hasProveedorFactura && !referenciaHistorica && !mostrarGestionPago)
           Text(
             'Aquí podrá registrar método de pago y comprobante cuando el pedido lo permita.',
             style: TextStyle(

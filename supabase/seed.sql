@@ -8,8 +8,9 @@
 --
 -- Contraseña común (todos los seed): SeedPass123!
 --
--- Incluye: 12 importadores (2 × 15 SKU + 10 × 5 SKU), datos comerciales realistas,
--- pedidos solo en estado entregado con pago aprobado (sin pedidos abiertos),
+-- Incluye: 15 importadores (2 × 15 SKU + 10 × 5 SKU; 13–15 catálogo vacío para carga masiva),
+-- 3 aliados (solo aliado1 con pedidos demo), 2 admins,
+-- pedidos entregados con pago aprobado + método de pago y comprobante,
 -- valoraciones bucket_v2 de demo (admin / reputación importador) y
 -- E3 tramos comisión: importador11 ≈ 4 500 USD/mes (5 %), importador12 ≈ 10 500 USD/mes (3 %).
 --
@@ -22,9 +23,10 @@
 --   supabase/scripts/seed_catalog_stock.sql
 --
 -- Cuentas:
---   importador1@motoconecta.seed … importador12@motoconecta.seed
---   aliado1@motoconecta.seed
---   admin@motoconecta.seed
+--   importador1@motoconecta.seed … importador15@motoconecta.seed
+--   importador13–15: sin productos (plantilla carga masiva)
+--   aliado1@motoconecta.seed … aliado3@motoconecta.seed (solo aliado1 con pedidos)
+--   admin@motoconecta.seed, admin2@motoconecta.seed
 -- =============================================================================
 
 create extension if not exists pgcrypto;
@@ -65,7 +67,10 @@ where aliado_id = 'c2000001-0000-4000-8000-000000000001'::uuid
      'c1000009-0000-4000-8000-000000000001'::uuid,
      'c100000a-0000-4000-8000-000000000001'::uuid,
      'c100000b-0000-4000-8000-000000000001'::uuid,
-     'c100000c-0000-4000-8000-000000000001'::uuid
+     'c100000c-0000-4000-8000-000000000001'::uuid,
+     'c100000d-0000-4000-8000-000000000001'::uuid,
+     'c100000e-0000-4000-8000-000000000001'::uuid,
+     'c100000f-0000-4000-8000-000000000001'::uuid
    );
 
 delete from public.notifications
@@ -88,7 +93,10 @@ where owner_id in (
   'c1000009-0000-4000-8000-000000000001'::uuid,
   'c100000a-0000-4000-8000-000000000001'::uuid,
   'c100000b-0000-4000-8000-000000000001'::uuid,
-  'c100000c-0000-4000-8000-000000000001'::uuid
+  'c100000c-0000-4000-8000-000000000001'::uuid,
+  'c100000d-0000-4000-8000-000000000001'::uuid,
+  'c100000e-0000-4000-8000-000000000001'::uuid,
+  'c100000f-0000-4000-8000-000000000001'::uuid
 );
 
 delete from public.profiles
@@ -106,7 +114,10 @@ where id in (
   'c100000b-0000-4000-8000-000000000001'::uuid,
   'c100000c-0000-4000-8000-000000000001'::uuid,
   'c2000001-0000-4000-8000-000000000001'::uuid,
-  'c3000001-0000-4000-8000-000000000001'::uuid
+  'c2000002-0000-4000-8000-000000000001'::uuid,
+  'c2000003-0000-4000-8000-000000000001'::uuid,
+  'c3000001-0000-4000-8000-000000000001'::uuid,
+  'c3000002-0000-4000-8000-000000000001'::uuid
 );
 
 delete from auth.identities
@@ -116,7 +127,7 @@ delete from auth.users
 where email like '%@motoconecta.seed';
 
 -- ---------------------------------------------------------------------------
--- auth.users + identities (12 importadores, 1 aliado, 1 admin)
+-- auth.users + identities (15 importadores, 3 aliados, 2 admins)
 -- ---------------------------------------------------------------------------
 with inst as (
   select coalesce(
@@ -138,8 +149,14 @@ seed_users (id, email) as (
     ('c100000a-0000-4000-8000-000000000001'::uuid, 'importador10@motoconecta.seed'),
     ('c100000b-0000-4000-8000-000000000001'::uuid, 'importador11@motoconecta.seed'),
     ('c100000c-0000-4000-8000-000000000001'::uuid, 'importador12@motoconecta.seed'),
+    ('c100000d-0000-4000-8000-000000000001'::uuid, 'importador13@motoconecta.seed'),
+    ('c100000e-0000-4000-8000-000000000001'::uuid, 'importador14@motoconecta.seed'),
+    ('c100000f-0000-4000-8000-000000000001'::uuid, 'importador15@motoconecta.seed'),
     ('c2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motoconecta.seed'),
-    ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed')
+    ('c2000002-0000-4000-8000-000000000001'::uuid, 'aliado2@motoconecta.seed'),
+    ('c2000003-0000-4000-8000-000000000001'::uuid, 'aliado3@motoconecta.seed'),
+    ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed'),
+    ('c3000002-0000-4000-8000-000000000001'::uuid, 'admin2@motoconecta.seed')
 )
 insert into auth.users (
   instance_id,
@@ -215,8 +232,14 @@ from (
     ('c100000a-0000-4000-8000-000000000001'::uuid, 'importador10@motoconecta.seed'),
     ('c100000b-0000-4000-8000-000000000001'::uuid, 'importador11@motoconecta.seed'),
     ('c100000c-0000-4000-8000-000000000001'::uuid, 'importador12@motoconecta.seed'),
+    ('c100000d-0000-4000-8000-000000000001'::uuid, 'importador13@motoconecta.seed'),
+    ('c100000e-0000-4000-8000-000000000001'::uuid, 'importador14@motoconecta.seed'),
+    ('c100000f-0000-4000-8000-000000000001'::uuid, 'importador15@motoconecta.seed'),
     ('c2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motoconecta.seed'),
-    ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed')
+    ('c2000002-0000-4000-8000-000000000001'::uuid, 'aliado2@motoconecta.seed'),
+    ('c2000003-0000-4000-8000-000000000001'::uuid, 'aliado3@motoconecta.seed'),
+    ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed'),
+    ('c3000002-0000-4000-8000-000000000001'::uuid, 'admin2@motoconecta.seed')
 ) as s(id, email)
 where exists (select 1 from auth.users u where u.id = s.id)
   and not exists (
@@ -482,6 +505,108 @@ values
     null,
     0,
     now()
+  ),
+  (
+    'c100000d-0000-4000-8000-000000000001',
+    'Cúcuta Motopartes Limpia C.A.',
+    'J-413456789',
+    'importador',
+    '+58 424-1000013',
+    null,
+    'Táchira',
+    'San Cristóbal',
+    'Av. Universidad, galpón 1 (catálogo vacío; carga masiva desde plantilla).',
+    'https://www.google.com/maps?q=7.7660,-72.2250',
+    7.7660,
+    -72.2250,
+    null,
+    0,
+    now()
+  ),
+  (
+    'c100000e-0000-4000-8000-000000000001',
+    'Trujillo Cadena Express C.A.',
+    'J-414567890',
+    'importador',
+    '+58 424-1000014',
+    null,
+    'Trujillo',
+    'Valera',
+    'Zona industrial Los Apamates, nave 4 (catálogo vacío; carga masiva).',
+    'https://www.google.com/maps?q=9.3170,-70.6040',
+    9.3170,
+    -70.6040,
+    null,
+    0,
+    now()
+  ),
+  (
+    'c100000f-0000-4000-8000-000000000001',
+    'Puerto Ordaz Lubricantes C.A.',
+    'J-415678901',
+    'importador',
+    '+58 424-1000015',
+    null,
+    'Bolívar',
+    'Puerto Ordaz',
+    'Av. Venezuela, sector industrial (catálogo vacío; carga masiva).',
+    'https://www.google.com/maps?q=8.2890,-62.7300',
+    8.2890,
+    -62.7300,
+    null,
+    0,
+    now()
+  ),
+  (
+    'c2000002-0000-4000-8000-000000000001',
+    'Taller Moto La California C.A.',
+    'J-502345678',
+    'aliado',
+    '+58 414-2000002',
+    null,
+    'Miranda',
+    'Caracas',
+    'Av. Francisco de Miranda, La California, local 3 (sin pedidos demo).',
+    'https://www.google.com/maps?q=10.4750,-66.8350',
+    10.4750,
+    -66.8350,
+    null,
+    0,
+    now()
+  ),
+  (
+    'c2000003-0000-4000-8000-000000000001',
+    'Servicio Biker El Hatillo C.A.',
+    'J-503456789',
+    'aliado',
+    '+58 414-2000003',
+    null,
+    'Miranda',
+    'El Hatillo',
+    'Calle principal El Hatillo, local 7 (sin pedidos demo).',
+    'https://www.google.com/maps?q=10.4250,-66.8250',
+    10.4250,
+    -66.8250,
+    null,
+    0,
+    now()
+  ),
+  (
+    'c3000002-0000-4000-8000-000000000001',
+    'MotoLink Soporte Operaciones C.A.',
+    'J-300234567',
+    'administrador',
+    '+58 212-3000002',
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    0,
+    now()
   )
 on conflict (id) do update set
   business_name = excluded.business_name,
@@ -506,7 +631,7 @@ set
 where rating_avg_received is not null;
 
 -- ---------------------------------------------------------------------------
--- Catálogo: importador1/2 → 15 SKU; importador3–12 → 5 SKU (referencias OEM reales)
+-- Catálogo: importador1/2 → 15 SKU; importador3–12 → 5 SKU; importador13–15 → vacío (plantilla Excel)
 -- ---------------------------------------------------------------------------
 insert into public.products (
   id,
@@ -1000,8 +1125,10 @@ insert into public.transaction_requests (
   cantidad,
   precio_total_usd,
   commission_rate_snapshot,
+  pago_metodo,
   comprobante_pago_storage_path,
   comprobante_pago_file_name,
+  comprobante_pago_submitted_at,
   pago_estado_revision,
   confirmado_por,
   pago_aprobado_at,
@@ -1017,8 +1144,12 @@ select
   1 + (pp.line_no % 3),
   round((pp.unit_price * (1 + (pp.line_no % 3)))::numeric, 4),
   0.05,
+  (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'binance'])[
+    1 + (pp.line_no % 5)
+  ],
   'seed/comprobantes/aliado-demo.pdf',
   'comprobante-seed.pdf',
+  now() - ((pp.line_no % 25) || ' days')::interval + interval '3 hours',
   'aprobado'::text,
   pp.importador_id,
   now() - ((pp.line_no % 25) || ' days')::interval,
@@ -1037,12 +1168,14 @@ insert into public.transaction_requests (
   cantidad,
   precio_total_usd,
   commission_rate_snapshot,
+  pago_metodo,
   pago_estado_revision,
   confirmado_por,
   pago_aprobado_at,
   at_entregado,
   comprobante_pago_storage_path,
   comprobante_pago_file_name,
+  comprobante_pago_submitted_at,
   created_at,
   updated_at
 )
@@ -1054,12 +1187,14 @@ select
   1,
   p.price_usd,
   0.05,
+  'transferencia',
   'aprobado',
   'c1000003-0000-4000-8000-000000000001'::uuid,
   now() - interval '45 days',
   now() - interval '44 days',
   'seed/comprobantes/antiguo.pdf',
   'comprobante-antiguo.pdf',
+  now() - interval '45 days' + interval '2 hours',
   now() - interval '46 days',
   now() - interval '44 days'
 from public.products p
@@ -1091,8 +1226,10 @@ insert into public.transaction_requests (
   commission_rate_snapshot,
   comision_devengada_usd,
   comision_devengada_at,
+  pago_metodo,
   comprobante_pago_storage_path,
   comprobante_pago_file_name,
+  comprobante_pago_submitted_at,
   pago_estado_revision,
   confirmado_por,
   pago_aprobado_at,
@@ -1111,8 +1248,12 @@ select
   v.commission_rate_snapshot,
   round((v.precio_total_usd * v.commission_rate_snapshot)::numeric, 4),
   m.devengo_base + (v.line_no * interval '1 day'),
+  (array['pago_movil', 'zelle_divisas', 'transferencia', 'efectivo', 'binance'])[
+    1 + (v.line_no % 5)
+  ],
   'seed/comprobantes/e3-tramo-demo.pdf',
   'comprobante-e3-tramo.pdf',
+  m.devengo_base + (v.line_no * interval '1 day') - interval '8 hours',
   'aprobado'::text,
   v.importador_id,
   m.devengo_base + (v.line_no * interval '1 day') - interval '6 hours',
@@ -1180,11 +1321,58 @@ on conflict (id) do update set
   commission_rate_snapshot = excluded.commission_rate_snapshot,
   comision_devengada_usd = excluded.comision_devengada_usd,
   comision_devengada_at = excluded.comision_devengada_at,
+  pago_metodo = excluded.pago_metodo,
   pago_estado_revision = excluded.pago_estado_revision,
   confirmado_por = excluded.confirmado_por,
   pago_aprobado_at = excluded.pago_aprobado_at,
+  comprobante_pago_submitted_at = excluded.comprobante_pago_submitted_at,
   at_entregado = excluded.at_entregado,
   updated_at = now();
+
+-- Asegurar factura importador, método y comprobante en pedidos demo entregados (aliado1)
+update public.transaction_requests tr
+set
+  proveedor_factura_storage_path = coalesce(
+    tr.proveedor_factura_storage_path,
+    'seed/facturas/importador-demo.pdf'
+  ),
+  proveedor_factura_file_name = coalesce(
+    tr.proveedor_factura_file_name,
+    'factura-importador-seed.pdf'
+  ),
+  proveedor_factura_submitted_at = coalesce(
+    tr.proveedor_factura_submitted_at,
+    tr.created_at + interval '1 day',
+    tr.updated_at
+  ),
+  pago_metodo = coalesce(
+    tr.pago_metodo,
+    (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'binance'])[
+      1 + (abs(hashtext(tr.id::text)) % 5)
+    ]
+  ),
+  pago_estado_revision = coalesce(tr.pago_estado_revision, 'aprobado'),
+  comprobante_pago_storage_path = coalesce(
+    tr.comprobante_pago_storage_path,
+    'seed/comprobantes/aliado-demo.pdf'
+  ),
+  comprobante_pago_file_name = coalesce(
+    tr.comprobante_pago_file_name,
+    'comprobante-seed.pdf'
+  ),
+  comprobante_pago_submitted_at = coalesce(
+    tr.comprobante_pago_submitted_at,
+    tr.pago_aprobado_at - interval '4 hours',
+    tr.at_entregado - interval '1 day'
+  ),
+  confirmado_por = coalesce(tr.confirmado_por, tr.importador_id),
+  pago_aprobado_at = coalesce(
+    tr.pago_aprobado_at,
+    tr.at_entregado,
+    tr.updated_at
+  )
+where tr.aliado_id = 'c2000001-0000-4000-8000-000000000001'::uuid
+  and tr.status = 'entregado';
 
 -- Devengo C1 en el resto de pedidos entregados del seed (fechas históricas de at_entregado)
 update public.transaction_requests tr

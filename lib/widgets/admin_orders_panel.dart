@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../models/admin_aliado_morosidad_flag.dart';
-import '../models/document_type_preference.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -154,7 +153,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       });
       _tryExpandFromPendingNotification();
       if (_scope == _AdminOrdersScope.enCurso) {
-        unawaited(_runPendingMotolinkAutoInvoices(rows));
       }
     } catch (e) {
       if (!mounted) return;
@@ -163,30 +161,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         _loading = false;
       });
     }
-  }
-
-  Future<void> _runPendingMotolinkAutoInvoices(
-    List<TransactionRequestModel> rows,
-  ) async {
-    final targets = rows
-        .where(
-          (r) =>
-              r.motolinkPendingAutoInvoice &&
-              !r.hasFacturaAliado &&
-              r.documentTypePreference != null &&
-              DocumentTypePreference.values.contains(r.documentTypePreference),
-        )
-        .toList();
-    if (targets.isEmpty) return;
-    for (final r in targets) {
-      if (!mounted) return;
-      try {
-        await SupabaseService.adminGenerateMotolinkAllyDocumentPdf(
-          transactionRequestId: r.id,
-        );
-      } catch (_) {}
-    }
-    if (mounted) await _load();
   }
 
   void _clearFilters() {
@@ -354,7 +328,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
             onRefresh: _load,
             onMarcarEnTransito: () => _marcarEnTransito(context, r),
           ),
-        if (r.hasFacturaAliado &&
+        if (r.hasProveedorFactura &&
             (r.status == TransactionRequestStatus.enTransito ||
                 r.status == TransactionRequestStatus.entregado))
           Padding(
@@ -397,7 +371,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           ),
           const SizedBox(height: 10),
         ],
-        if (primary.hasFacturaAliado)
+        if (primary.hasProveedorFactura)
           AdminPagoRevisionSection(
             request: primary,
             onRefresh: _load,

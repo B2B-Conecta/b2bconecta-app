@@ -1,4 +1,3 @@
-import 'motolink_ally_document_emission_model.dart';
 import 'order_item_model.dart';
 import 'qty_adjustment_status.dart';
 import 'pago_metodo.dart';
@@ -65,9 +64,6 @@ class TransactionRequestModel {
     this.transitEtaDays,
     this.transitEtaHours,
     this.transitEtaSetAt,
-    this.facturaAliadoStoragePath,
-    this.facturaAliadoFileName,
-    this.facturaAliadoSubmittedAt,
     this.pagoMetodo,
     this.comprobantePagoStoragePath,
     this.comprobantePagoFileName,
@@ -83,14 +79,11 @@ class TransactionRequestModel {
     this.destinoEntregaMapsUrl,
     this.adminRutaMapsUrl,
     this.documentTypePreference,
-    this.motolinkPendingAutoInvoice = false,
     this.aliadoExperienceStars,
     this.aliadoExperienceComment,
     this.aliadoExperienceSubmittedAt,
     this.tasaBcvSnapshot,
     this.importerViewOrderItems = const <OrderItemModel>[],
-    this.motolinkAllyDocumentEmissions =
-        const <MotolinkAllyDocumentEmissionModel>[],
     this.facturaUrl,
     this.checkoutGroupId,
     this.originalCheckoutGroupId,
@@ -121,7 +114,7 @@ class TransactionRequestModel {
   /// Total sin recargo por efectivo; [precioTotal] puede incluir +4 % si el método es efectivo.
   final double precioBaseAliadoTotal;
 
-  /// Inventario descontado al emitir la primera factura MotoLink al aliado.
+  /// Inventario descontado al avanzar el pedido (referencia operativa).
   final DateTime? stockDescontadoEn;
 
   final String? notasAdmin;
@@ -177,12 +170,7 @@ class TransactionRequestModel {
   final int? transitEtaHours;
   final DateTime? transitEtaSetAt;
 
-  /// Factura oficial MotoLink al aliado (`order-ally-invoices`).
-  final String? facturaAliadoStoragePath;
-  final String? facturaAliadoFileName;
-  final DateTime? facturaAliadoSubmittedAt;
-
-  /// Pago del aliado: método, comprobante (`order-payment-proofs`) y revisión MotoLink.
+  /// Pago del aliado: método, comprobante (`order-payment-proofs`) y revisión.
   final String? pagoMetodo;
   final String? comprobantePagoStoragePath;
   final String? comprobantePagoFileName;
@@ -207,8 +195,6 @@ class TransactionRequestModel {
   /// A6: nota de entrega vs factura fiscal; `null` hasta que el aliado elija.
   final String? documentTypePreference;
 
-  /// Cola server-side: generar factura MotoLink al aliado al abrir Pedidos activos (admin).
-  final bool motolinkPendingAutoInvoice;
   final int? aliadoExperienceStars;
   final String? aliadoExperienceComment;
   final DateTime? aliadoExperienceSubmittedAt;
@@ -217,9 +203,6 @@ class TransactionRequestModel {
   final double? tasaBcvSnapshot;
 
   final List<OrderItemModel> importerViewOrderItems;
-
-  /// Emisiones de documento MotoLink al aliado (nota / factura; puede haber varias hojas).
-  final List<MotolinkAllyDocumentEmissionModel> motolinkAllyDocumentEmissions;
 
   /// URL pública de factura / documento del importador (`transaction_requests.factura_url`).
   final String? facturaUrl;
@@ -271,15 +254,6 @@ class TransactionRequestModel {
   /// Reglas comerciales snapshot JSON al checkout (p. ej. tramos por volumen).
   final Map<String, dynamic>? discountRules;
 
-  /// Documentos MotoLink al aliado listos para descarga (finalizados con archivo).
-  List<MotolinkAllyDocumentEmissionModel>
-      get motolinkAllyInvoicesDescargables =>
-          motolinkAllyDocumentEmissions.where((e) => e.isFinalized).toList();
-
-  /// Pedido con más de una hoja fiscal MotoLink (límite de ítems SENIAT).
-  bool get hasMultiFragmentMotolinkAllyDocs =>
-      motolinkAllyInvoicesDescargables.any((e) => e.fragmentTotal > 1);
-
   /// El aliado puede confirmar recepción cuando el pedido está en tránsito o enviado.
   bool get puedeConfirmarRecepcionAliado =>
       status == TransactionRequestStatus.enTransito ||
@@ -313,11 +287,6 @@ class TransactionRequestModel {
       proveedorFacturaStoragePath != null &&
       proveedorFacturaStoragePath!.trim().isNotEmpty;
 
-  bool get hasFacturaAliado =>
-      (facturaAliadoStoragePath != null &&
-          facturaAliadoStoragePath!.trim().isNotEmpty) ||
-      motolinkAllyDocumentEmissions.any((e) => e.isFinalized);
-
   /// Negocio nota vs factura fiscal: solo en el chat con el importador (sin selector en app).
   bool get aliadoDebeElegirDocumentTypeAntesDePago => false;
 
@@ -329,11 +298,11 @@ class TransactionRequestModel {
       efectivoRespaldoStoragePath != null &&
       efectivoRespaldoStoragePath!.trim().isNotEmpty;
 
-  /// Hay factura MotoLink y/o comprobante para mostrar (p. ej. como referencia con pedido entregado).
+  /// Factura del importador y/o comprobante (referencia en pedidos cerrados).
   bool get tieneDocumentacionFacturaPago =>
-      hasFacturaAliado || hasComprobantePago;
+      hasProveedorFactura || hasComprobantePago;
 
-  /// Pedido entregado y pago a MotoLink sin aprobar (aunque la factura siga generándose).
+  /// Pedido entregado y pago sin aprobar por el importador.
   bool get pagoMotolinkPendienteTrasEntrega {
     if (status != TransactionRequestStatus.entregado) return false;
     final pe = pagoEstadoRevision?.trim();
@@ -347,16 +316,16 @@ class TransactionRequestModel {
         status != TransactionRequestStatus.enviado) {
       return false;
     }
-    if (!hasFacturaAliado) return false;
+    if (!hasProveedorFactura) return false;
     final pe = pagoEstadoRevision?.trim();
     if (pe == PagoRevisionEstado.aprobado) return false;
     return true;
   }
 
-  /// Entregado, con factura MotoLink y pago validado por el broker.
+  /// Entregado, con factura del importador y pago aprobado.
   bool get pedidoEntregadoYPagado {
     if (status != TransactionRequestStatus.entregado) return false;
-    if (!hasFacturaAliado) return false;
+    if (!hasProveedorFactura) return false;
     return pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
   }
 
@@ -368,7 +337,7 @@ class TransactionRequestModel {
     return businessDaysElapsedAfterUtcDate(at.toUtc()) >= 3;
   }
 
-  /// Entregado con factura MotoLink y pago aún no aprobado.
+  /// Entregado con pago aún no aprobado (morosidad operativa).
   bool get esPedidoMoroso => pagoMotolinkPendienteTrasEntrega;
 
   /// Total pedido en bolívares (solo presentación UI). Fuente de verdad: [precioTotal] en REF.
@@ -642,44 +611,33 @@ class TransactionRequestModel {
       }
       return 'Entrega confirmada · pendiente de validación del pago por el importador.';
     }
-    if (!hasFacturaAliado) {
-      switch (pagoEstadoRevisionEfectivo) {
-        case PagoRevisionEstado.pendiente:
-          return 'Elija método, pague al importador y adjunte comprobante; el importador verificará la acreditación.';
-        case PagoRevisionEstado.enRevision:
-          return 'Comprobante en revisión por el importador.';
-        case PagoRevisionEstado.rechazado:
-          return 'Comprobante no aceptado · puede enviar otro.';
-        case PagoRevisionEstado.aprobado:
-          return 'Pago confirmado por el importador.';
-        default:
-          return null;
-      }
+    if (!hasProveedorFactura) {
+      return 'Espere la factura del importador para registrar método y comprobante.';
     }
     final metodo = pagoMetodo?.trim();
     if (metodo == PagoMetodo.efectivo) {
       switch (pagoEstadoRevisionEfectivo) {
         case PagoRevisionEstado.pendiente:
-          return 'Factura lista · confirme que pagará en efectivo (revisión MotoLink).';
+          return 'Factura del importador lista · declare pago en efectivo y adjunte comprobante.';
         case PagoRevisionEstado.enRevision:
-          return 'Pago en efectivo en revisión por MotoLink.';
+          return 'Pago en efectivo en revisión por el importador.';
         case PagoRevisionEstado.rechazado:
-          return 'Declaración no aceptada · puede intentar de nuevo.';
+          return 'Comprobante no aceptado · puede enviar otro.';
         case PagoRevisionEstado.aprobado:
-          return 'Pago en efectivo confirmado · MotoLink marcará el envío en tránsito.';
+          return 'Pago en efectivo confirmado por el importador.';
         default:
           return null;
       }
     }
     switch (pagoEstadoRevisionEfectivo) {
       case PagoRevisionEstado.pendiente:
-        return 'Factura lista · realice el pago y adjunte el comprobante.';
+        return 'Factura del importador lista · realice el pago y adjunte el comprobante.';
       case PagoRevisionEstado.enRevision:
-        return 'Comprobante en revisión por MotoLink.';
+        return 'Comprobante en revisión por el importador.';
       case PagoRevisionEstado.rechazado:
         return 'Comprobante no aceptado · puede enviar otro.';
       case PagoRevisionEstado.aprobado:
-        return 'Pago aprobado · MotoLink marcará el envío en tránsito.';
+        return 'Pago confirmado por el importador.';
       default:
         return null;
     }
@@ -820,10 +778,6 @@ class TransactionRequestModel {
       transitEtaDays: _asNullableInt(json['transit_eta_days']),
       transitEtaHours: _asNullableInt(json['transit_eta_hours']),
       transitEtaSetAt: _parseDate(json['transit_eta_set_at']),
-      facturaAliadoStoragePath:
-          _nullableText(json['factura_aliado_storage_path']),
-      facturaAliadoFileName: _nullableText(json['factura_aliado_file_name']),
-      facturaAliadoSubmittedAt: _parseDate(json['factura_aliado_submitted_at']),
       pagoMetodo: _nullableText(json['pago_metodo']),
       comprobantePagoStoragePath:
           _nullableText(json['comprobante_pago_storage_path']),
@@ -846,7 +800,6 @@ class TransactionRequestModel {
       destinoEntregaMapsUrl: _nullableText(json['destino_entrega_maps_url']),
       adminRutaMapsUrl: _nullableText(json['admin_ruta_maps_url']),
       documentTypePreference: _nullableText(json['document_type_preference']),
-      motolinkPendingAutoInvoice: json['motolink_pending_auto_invoice'] == true,
       aliadoExperienceStars: _asNullableInt(json['aliado_experience_stars']),
       aliadoExperienceComment: _nullableText(json['aliado_experience_comment']),
       aliadoExperienceSubmittedAt:
@@ -854,10 +807,6 @@ class TransactionRequestModel {
       tasaBcvSnapshot: _asNullableDouble(json['tasa_bcv_snapshot']),
       importerViewOrderItems:
           _parseImporterViewOrderItems(json['_importer_view_order_items']),
-      motolinkAllyDocumentEmissions:
-          MotolinkAllyDocumentEmissionModel.listFromJson(
-        json['motolink_ally_document_emissions'],
-      ),
       facturaUrl: _nullableText(json['factura_url']),
       checkoutGroupId: _nullableText(json['checkout_group_id']),
       originalCheckoutGroupId: _nullableText(json['original_checkout_group_id']),

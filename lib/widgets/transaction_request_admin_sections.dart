@@ -446,47 +446,6 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
         ),
       );
     }
-    if (r.hasFacturaAliado) {
-      final moto = r.motolinkAllyInvoicesDescargables;
-      if (moto.isNotEmpty) {
-        for (final e in moto) {
-          final path = e.storagePath?.trim();
-          if (path == null || path.isEmpty) continue;
-          chips.add(
-            OutlinedButton.icon(
-              onPressed: () => _launchSignedOrderDoc(
-                context,
-                () => SupabaseService.createSignedUrlForFacturaAliado(path),
-              ),
-              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-              label: Text(
-                'Factura MotoLink · ${e.downloadButtonLabel}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          );
-        }
-      } else if (r.facturaAliadoStoragePath != null) {
-        final path = r.facturaAliadoStoragePath!.trim();
-        chips.add(
-          OutlinedButton.icon(
-            onPressed: () => _launchSignedOrderDoc(
-              context,
-              () => SupabaseService.createSignedUrlForFacturaAliado(path),
-            ),
-            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-            label: Text(
-              r.facturaAliadoFileName?.trim().isNotEmpty == true
-                  ? 'Factura MotoLink · ${r.facturaAliadoFileName}'
-                  : 'Factura MotoLink al aliado',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        );
-      }
-    }
     if (r.hasComprobantePago && r.comprobantePagoStoragePath != null) {
       final path = r.comprobantePagoStoragePath!.trim();
       chips.add(
@@ -583,8 +542,8 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'El comprobante de pago y la aprobación de MotoLink quedan en el expediente del pedido '
-          '(apartado «Factura y pago» del aliado, activo tras la factura MotoLink); no forman parte de este cronograma.',
+          'El comprobante de pago y su aprobación quedan en el expediente del pedido '
+          '(apartado de pago del aliado, activo tras la factura del importador); no forman parte de este cronograma.',
           style: TextStyle(
             fontSize: 10.5,
             height: 1.35,
@@ -693,9 +652,9 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                   Divider(
                       height: 16, thickness: 0.5, color: Colors.grey.shade300),
                   _TimelineRow(
-                    label: 'Factura MotoLink al aliado',
-                    value: _facturaAliadoTimeline(r),
-                    isDone: r.hasFacturaAliado,
+                    label: 'Factura importador al aliado',
+                    value: _facturaImportadorTimeline(r),
+                    isDone: r.hasProveedorFactura,
                   ),
                   Divider(
                       height: 16, thickness: 0.5, color: Colors.grey.shade300),
@@ -754,10 +713,10 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
     return '$d\nEntrega estimada al aliado: $eta';
   }
 
-  static String _facturaAliadoTimeline(TransactionRequestModel r) {
-    if (!r.hasFacturaAliado) return '—';
-    final fn = r.facturaAliadoFileName?.trim();
-    final t = formatEsShortDateTime(r.facturaAliadoSubmittedAt);
+  static String _facturaImportadorTimeline(TransactionRequestModel r) {
+    if (!r.hasProveedorFactura) return '—';
+    final fn = r.proveedorFacturaFileName?.trim();
+    final t = formatEsShortDateTime(r.proveedorFacturaSubmittedAt);
     if (fn != null && fn.isNotEmpty) return '$fn\n$t';
     return t;
   }

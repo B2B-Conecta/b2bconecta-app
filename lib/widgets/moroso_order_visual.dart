@@ -122,20 +122,20 @@ String _detailMessage(
   TransactionRequestModel request, {
   required bool aliadoViewer,
 }) {
-  final faltaFactura = !request.hasFacturaAliado;
+  final faltaFactura = !request.hasProveedorFactura;
   if (aliadoViewer) {
     if (faltaFactura) {
-      return 'Pago pendiente tras la recepción. Cuando MotoLink emita la factura, '
+      return 'Pago pendiente tras la recepción. Cuando el importador adjunte su factura, '
           'registre su comprobante en la sección de pago.';
     }
-    return 'Pago pendiente de aprobación por MotoLink. Registre o actualice su comprobante '
+    return 'Pago pendiente de aprobación por el importador. Registre o actualice su comprobante '
         'en la sección de pago.';
   }
   if (faltaFactura) {
-    return 'Entregado sin pago aprobado. Factura MotoLink pendiente; '
+    return 'Entregado sin pago aprobado. Factura del importador pendiente; '
         'el aliado debe registrar comprobante cuando corresponda.';
   }
-  return 'Pago pendiente de verificación MotoLink. Revise el comprobante del aliado.';
+  return 'Pago pendiente de verificación. Revise el comprobante del aliado.';
 }
 
 /// En la ficha del pedido: sin aviso extra si está colapsada (basta el chip).

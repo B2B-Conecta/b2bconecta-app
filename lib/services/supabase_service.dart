@@ -9,7 +9,6 @@ import '../models/catalog_filters.dart';
 import '../models/catalog_sort_mode.dart';
 import '../models/commission_settlement_model.dart';
 import '../models/document_review_status.dart';
-import '../models/document_type_preference.dart';
 import '../models/in_app_notification_model.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
@@ -34,8 +33,6 @@ import 'bcv_reference_rate_service.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/catalog_ranking.dart';
 import '../utils/haversine.dart';
-import '../config/motolink_ally_invoice_constants.dart';
-import 'motolink_ally_invoice_pdf_service.dart';
 import 'motolink_commission_delivery_note_pdf_service.dart';
 import 'motolink_commission_invoice_pdf_service.dart';
 import '../models/commission_settlement_document_type.dart';
@@ -48,7 +45,6 @@ class SupabaseService {
   static const _productImagesBucket = 'product-images';
   static const _profileDocumentsBucket = 'profile-documents';
   static const _orderInvoicesBucket = 'order-invoices';
-  static const _orderAllyInvoicesBucket = 'order-ally-invoices';
   static const _orderPaymentProofsBucket = 'order-payment-proofs';
   static const _commissionSettlementInvoicesBucket =
       'commission-settlement-invoices';
@@ -888,9 +884,6 @@ class SupabaseService {
     at_pedido_listo,
     at_en_transito,
     at_entregado,
-    factura_aliado_storage_path,
-    factura_aliado_file_name,
-    factura_aliado_submitted_at,
     created_at,
     updated_at,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status ),
@@ -1633,14 +1626,6 @@ class SupabaseService {
         .createSignedUrl(storagePath, 3600);
   }
 
-  /// Factura oficial MotoLink al aliado (`order-ally-invoices`).
-  static Future<String> createSignedUrlForFacturaAliado(
-      String storagePath) async {
-    return _client.storage
-        .from(_orderAllyInvoicesBucket)
-        .createSignedUrl(storagePath, 3600);
-  }
-
   /// Comprobante de pago del aliado (`order-payment-proofs`).
   static Future<String> createSignedUrlForComprobantePago(
       String storagePath) async {
@@ -1655,285 +1640,6 @@ class SupabaseService {
     return _client.storage
         .from(_orderPaymentProofsBucket)
         .createSignedUrl(storagePath, 3600);
-  }
-
-  /// MotoLink: sube o reemplaza la factura oficial al aliado (pedido en preparación).
-  static Future<void> adminSubmitFacturaAliadoOrder({
-    required String transactionRequestId,
-    required Uint8List bytes,
-    required String fileName,
-  }) async {
-    final uid = _currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-
-    final profile = await fetchMyProfile();
-    if (profile?.role?.trim().toLowerCase() != 'administrador') {
-      throw StateError(
-          'Solo MotoLink puede adjuntar la factura oficial al aliado.');
-    }
-
-    final row = await _client
-        .from('transaction_requests')
-        .select(
-          'status, proveedor_factura_storage_path, pago_estado_revision',
-        )
-        .eq('id', transactionRequestId)
-        .maybeSingle();
-
-    if (row == null) throw StateError('Pedido no encontrado.');
-    final m = Map<String, dynamic>.from(row);
-    final st = m['status']?.toString();
-    final stAllowed = st == TransactionRequestStatus.enPreparacion ||
-        st == TransactionRequestStatus.pedidoListo;
-    if (!stAllowed) {
-      throw StateError(
-        'Solo aplica con el pedido en preparación o listo para recolección.',
-      );
-    }
-    final prov = m['proveedor_factura_storage_path']?.toString().trim();
-    if (prov == null || prov.isEmpty) {
-      throw StateError(
-        'El importador debe haber adjuntado antes la factura del proveedor.',
-      );
-    }
-    final pe = m['pago_estado_revision']?.toString().trim();
-    if (pe == PagoRevisionEstado.enRevision) {
-      throw StateError(
-        'Hay un comprobante en revisión. Resuélvalo antes de cambiar la factura.',
-      );
-    }
-    if (pe == PagoRevisionEstado.aprobado) {
-      throw StateError(
-          'El pago ya fue aprobado; no puede reemplazar la factura.');
-    }
-
-    final ext = _profileDocExtension(fileName);
-    if (!_isAllowedProfileDocExtension(ext)) {
-      throw ArgumentError('Formato no permitido. Use PDF, JPG o PNG.');
-    }
-
-    var safeBase = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').trim();
-    if (safeBase.isEmpty) safeBase = 'factura_aliado.$ext';
-
-    final stamp = DateTime.now().microsecondsSinceEpoch;
-    final path = '$transactionRequestId/${stamp}_$safeBase';
-
-    final existing = await _client
-        .from('transaction_requests')
-        .select('factura_aliado_storage_path')
-        .eq('id', transactionRequestId)
-        .maybeSingle();
-    if (existing != null) {
-      final oldPath =
-          Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
-              ?.toString()
-              .trim();
-      if (oldPath != null && oldPath.isNotEmpty) {
-        try {
-          await _client.storage
-              .from(_orderAllyInvoicesBucket)
-              .remove([oldPath]);
-        } catch (_) {}
-      }
-    }
-
-    final contentType = _mimeForProfileDocExtension(ext);
-    await _client.storage.from(_orderAllyInvoicesBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            contentType: contentType,
-            upsert: true,
-          ),
-        );
-
-    await _client.from('transaction_requests').update({
-      'factura_aliado_storage_path': path,
-      'factura_aliado_file_name': fileName.trim(),
-      'factura_aliado_submitted_at': DateTime.now().toUtc().toIso8601String(),
-      'pago_estado_revision': PagoRevisionEstado.pendiente,
-      'pago_metodo': null,
-      'comprobante_pago_storage_path': null,
-      'comprobante_pago_file_name': null,
-      'comprobante_pago_submitted_at': null,
-      'pago_comprobante_rechazo_nota': null,
-      'pago_aprobado_at': null,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', transactionRequestId);
-  }
-
-  /// MotoLink: reserva correlativo y valida gate; luego genere PDF en cliente y llame a [adminFinalizeMotolinkAllyDocumentEmission].
-  static Future<Map<String, dynamic>> adminPrepareMotolinkAllyDocumentEmission({
-    required String transactionRequestId,
-    required String documentType,
-    String? reissueMotivo,
-    int fragmentIndex = 1,
-    int fragmentTotal = 1,
-  }) async {
-    final raw = await _client.rpc(
-      'admin_prepare_motolink_ally_document_emission',
-      params: <String, dynamic>{
-        'p_request_id': transactionRequestId,
-        'p_document_type': documentType,
-        'p_reissue_motivo': reissueMotivo?.trim(),
-        'p_fragment_index': fragmentIndex,
-        'p_fragment_total': fragmentTotal,
-      },
-    );
-    if (raw is! Map) {
-      throw StateError('Respuesta inválida al preparar emisión.');
-    }
-    return Map<String, dynamic>.from(raw);
-  }
-
-  static Future<void> adminFinalizeMotolinkAllyDocumentEmission({
-    required String emissionId,
-    required String storagePath,
-    required String fileName,
-    bool isLastFragment = true,
-  }) async {
-    await _client.rpc(
-      'admin_finalize_motolink_ally_document_emission',
-      params: <String, dynamic>{
-        'p_emission_id': emissionId,
-        'p_storage_path': storagePath,
-        'p_file_name': fileName,
-        'p_is_last_fragment': isLastFragment,
-      },
-    );
-  }
-
-  /// Genera uno o varios PDF oficiales (fragmentación por [MotolinkAllyInvoiceConstants.maxItemsPerDocument]).
-  static Future<void> adminGenerateMotolinkAllyDocumentPdf({
-    required String transactionRequestId,
-    String? reissueMotivo,
-  }) async {
-    final uid = _currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-    final profile = await fetchMyProfile();
-    if (profile?.role?.trim().toLowerCase() != 'administrador') {
-      throw StateError('Solo MotoLink puede generar este documento.');
-    }
-
-    final r0 = await fetchTransactionRequestById(transactionRequestId);
-    if (r0 == null) throw StateError('Pedido no encontrado.');
-    final pref = r0.documentTypePreference?.trim();
-    if (pref == null || !DocumentTypePreference.values.contains(pref)) {
-      throw StateError(
-        'El aliado no indicó tipo de documento (nota o factura) en el pedido.',
-      );
-    }
-
-    final lines = MotolinkAllyInvoicePdfService.linesFromRequest(r0);
-    const maxItems = MotolinkAllyInvoiceConstants.maxItemsPerDocument;
-    final chunks = <List<MotolinkAllyInvoicePdfLine>>[];
-    for (var i = 0; i < lines.length; i += maxItems) {
-      final end = (i + maxItems > lines.length) ? lines.length : i + maxItems;
-      chunks.add(lines.sublist(i, end));
-    }
-    if (chunks.isEmpty) {
-      chunks.add(lines);
-    }
-
-    final trimmedReissue = reissueMotivo?.trim();
-    final isReissue = trimmedReissue != null && trimmedReissue.isNotEmpty;
-    if (isReissue && chunks.length > 1) {
-      throw StateError(
-        'La reemisión con varias hojas no está soportada. Contacte soporte.',
-      );
-    }
-
-    final existingDone = r0.motolinkAllyDocumentEmissions
-        .where((e) => e.documentType == pref && e.isFinalized)
-        .length;
-
-    if (!isReissue) {
-      if (existingDone >= chunks.length) return;
-    }
-
-    var startIndex = isReissue ? 0 : existingDone;
-    if (startIndex > 0 && startIndex >= chunks.length) {
-      throw StateError(
-        'Estado de emisiones inconsistente con las líneas del pedido.',
-      );
-    }
-
-    if (startIndex == 0) {
-      final existing = await _client
-          .from('transaction_requests')
-          .select('factura_aliado_storage_path')
-          .eq('id', transactionRequestId)
-          .maybeSingle();
-      if (existing != null) {
-        final oldPath =
-            Map<String, dynamic>.from(existing)['factura_aliado_storage_path']
-                ?.toString()
-                .trim();
-        if (oldPath != null && oldPath.isNotEmpty) {
-          try {
-            await _client.storage
-                .from(_orderAllyInvoicesBucket)
-                .remove([oldPath]);
-          } catch (_) {}
-        }
-      }
-    }
-
-    final label = pref == DocumentTypePreference.notaEntrega ? 'NE' : 'FF';
-    final totalFrags = chunks.length;
-
-    for (var fi = startIndex; fi < chunks.length; fi++) {
-      final fragmentIndex = fi + 1;
-      final prep = await adminPrepareMotolinkAllyDocumentEmission(
-        transactionRequestId: transactionRequestId,
-        documentType: pref,
-        reissueMotivo: fragmentIndex == 1 ? trimmedReissue : null,
-        fragmentIndex: fragmentIndex,
-        fragmentTotal: totalFrags,
-      );
-
-      final emissionId = prep['emission_id']?.toString() ?? '';
-      if (emissionId.isEmpty) {
-        throw StateError('Emisión sin id.');
-      }
-      final correlativo = (prep['correlativo'] as num?)?.toInt() ?? 0;
-      final tasa = (prep['tasa_bcv_emision'] as num?)?.toDouble() ?? 0;
-      final iva = (prep['iva_pct_emision'] as num?)?.toDouble() ?? 16;
-      final igtf = (prep['igtf_pct_emision'] as num?)?.toDouble() ?? 3;
-
-      final bytes = await MotolinkAllyInvoicePdfService.build(
-        request: r0,
-        documentType: pref,
-        correlativo: correlativo,
-        tasaBcvEmision: tasa,
-        ivaPct: iva,
-        igtfPct: igtf,
-        emissionId: emissionId,
-        lines: chunks[fi],
-        fragmentIndex: fragmentIndex,
-        fragmentTotal: totalFrags,
-      );
-
-      final safeName =
-          'MotoLink_${label}_${correlativo.toString().padLeft(6, '0')}.pdf';
-      final path = '$transactionRequestId/motolink_$emissionId.pdf';
-
-      await _client.storage.from(_orderAllyInvoicesBucket).uploadBinary(
-            path,
-            bytes,
-            fileOptions: const FileOptions(
-              contentType: 'application/pdf',
-              upsert: true,
-            ),
-          );
-
-      await adminFinalizeMotolinkAllyDocumentEmission(
-        emissionId: emissionId,
-        storagePath: path,
-        fileName: safeName,
-        isLastFragment: fi == chunks.length - 1,
-      );
-    }
   }
 
   /// Aliado: sube foto del comprobante y envía a revisión MotoLink.
@@ -2406,8 +2112,7 @@ class SupabaseService {
     }).inFilter('id', ids);
   }
 
-  /// Importador: sube o reemplaza la factura digital mientras el pedido está en preparación
-  /// y antes de que MotoLink confirme la factura oficial al aliado.
+  /// Importador: sube o reemplaza la factura al aliado mientras el pedido está en preparación.
   static Future<void> importerSubmitOrderInvoice({
     required String transactionRequestId,
     required Uint8List bytes,
@@ -2419,7 +2124,7 @@ class SupabaseService {
     final row = await _client
         .from('transaction_requests')
         .select(
-          'owner_id, status, proveedor_factura_storage_path, factura_aliado_storage_path',
+          'owner_id, status, proveedor_factura_storage_path, pago_estado_revision',
         )
         .eq('id', transactionRequestId)
         .maybeSingle();
@@ -2436,11 +2141,15 @@ class SupabaseService {
         'Solo puede adjuntar la factura mientras el pedido está en preparación.',
       );
     }
-    final facturaAliadoPath =
-        m['factura_aliado_storage_path']?.toString().trim();
-    if (facturaAliadoPath != null && facturaAliadoPath.isNotEmpty) {
+    final pe = m['pago_estado_revision']?.toString().trim();
+    if (pe == PagoRevisionEstado.aprobado) {
       throw StateError(
-        'MotoLink ya confirmó la factura del pedido; no puede reemplazar la factura del proveedor.',
+        'El pago ya fue aprobado; no puede reemplazar la factura.',
+      );
+    }
+    if (pe == PagoRevisionEstado.enRevision) {
+      throw StateError(
+        'Hay un comprobante en revisión. Espere antes de cambiar la factura.',
       );
     }
 

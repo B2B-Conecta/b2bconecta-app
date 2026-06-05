@@ -60,14 +60,6 @@ $t$;
 
 do $t$
 begin
-  delete from public.motolink_ally_document_emissions;
-exception
-  when undefined_table then null;
-end;
-$t$;
-
-do $t$
-begin
   delete from public.order_ratings;
 exception
   when undefined_table then null;

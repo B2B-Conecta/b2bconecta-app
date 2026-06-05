@@ -100,29 +100,6 @@ exception
 end;
 $t$;
 
--- motolink_ally_document_emissions: esquema puede variar; borrar por pedidos seed si existe FK
-do $t$
-begin
-  delete from public.motolink_ally_document_emissions e
-  where exists (
-    select 1
-    from public.transaction_requests tr
-    where tr.id = e.transaction_request_id
-      and (
-        tr.aliado_id in (select id from _seed_profile_ids)
-        or tr.importador_id in (select id from _seed_profile_ids)
-      )
-  );
-exception
-  when undefined_table or undefined_column then
-    begin
-      delete from public.motolink_ally_document_emissions;
-    exception
-      when undefined_table then null;
-    end;
-end;
-$t$;
-
 do $t$
 begin
   delete from public.payment_schedule ps

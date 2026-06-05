@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../models/catalog_filters.dart';
 import '../models/document_type_preference.dart';
+import '../models/pago_metodo.dart';
+import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import 'admin_promo_campaigns_panel.dart';
@@ -38,11 +40,11 @@ class _AdminEncomiendasReportPanelState
 
   String? _ownerId;
   String _docPrefFilter = 'all';
-  bool _soloConFacturaAliado = false;
   bool _soloConValoracion = false;
   bool _soloPagosAprobados = false;
   bool _soloEntregados = false;
   int _sectionIndex = 0;
+  bool _exporting = false;
 
   static const _docOptions = <_DocOpt>[
     _DocOpt('all', 'Todas las preferencias'),
@@ -135,9 +137,6 @@ class _AdminEncomiendasReportPanelState
         break;
     }
 
-    if (_soloConFacturaAliado) {
-      list = list.where((r) => r.hasFacturaAliado).toList();
-    }
     if (_soloConValoracion) {
       list = list.where((r) => r.aliadoExperienceSubmittedAt != null).toList();
     }
@@ -163,16 +162,383 @@ class _AdminEncomiendasReportPanelState
     _applyLocalFilters();
   }
 
-  void _clearClientFilters() {
+  void _clearAllFilters() {
     setState(() {
+      _statusSelection.clear();
+      _ownerId = null;
       _docPrefFilter = 'all';
-      _soloConFacturaAliado = false;
       _soloConValoracion = false;
       _soloPagosAprobados = false;
       _soloEntregados = false;
       _searchCtrl.clear();
     });
-    _applyLocalFilters();
+    _load();
+  }
+
+  String _formatDateShort(DateTime d) =>
+      '${d.day}/${d.month}/${d.year}';
+
+  int get _activeFilterCount {
+    var n = 0;
+    if (_statusSelection.isNotEmpty) n++;
+    if (_ownerId != null) n++;
+    if (_docPrefFilter != 'all') n++;
+    if (_soloConValoracion) n++;
+    if (_soloPagosAprobados) n++;
+    if (_soloEntregados) n++;
+    if (_searchCtrl.text.trim().isNotEmpty) n++;
+    return n;
+  }
+
+  Future<void> _showAdvancedFiltersSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void refreshSheet() => setSheetState(() {});
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 8,
+                bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Filtros del reporte',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Estado e importador consultan el servidor. El resto filtra en pantalla.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.grey.shade700,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Estado del pedido',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final s
+                            in TransactionRequestStatus.valuesForReportFilter)
+                          FilterChip(
+                            label: Text(
+                              TransactionRequestStatus.labelEs(s),
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                            selected: _statusSelection.contains(s),
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (v) {
+                              setState(() {
+                                if (v) {
+                                  _statusSelection.add(s);
+                                } else {
+                                  _statusSelection.remove(s);
+                                }
+                              });
+                              refreshSheet();
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      value: _ownerId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Importador',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Todos los importadores'),
+                        ),
+                        ..._importers.map(
+                          (o) => DropdownMenuItem<String?>(
+                            value: o.id,
+                            child: Text(
+                              o.businessName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _ownerId = v);
+                        refreshSheet();
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Preferencia de documento',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final opt in _docOptions)
+                          FilterChip(
+                            label: Text(
+                              opt.label,
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                            selected: _docPrefFilter == opt.value,
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (_) {
+                              _setDocPrefFilter(
+                                _docPrefFilter == opt.value
+                                    ? 'all'
+                                    : opt.value,
+                              );
+                              refreshSheet();
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text(
+                        'Con valoración del aliado',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      value: _soloConValoracion,
+                      onChanged: (v) {
+                        setState(() => _soloConValoracion = v);
+                        _applyLocalFilters();
+                        refreshSheet();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text(
+                        'Pago aprobado',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      value: _soloPagosAprobados,
+                      onChanged: (v) {
+                        setState(() => _soloPagosAprobados = v);
+                        _applyLocalFilters();
+                        refreshSheet();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text(
+                        'Solo entregados',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      value: _soloEntregados,
+                      onChanged: (v) {
+                        setState(() => _soloEntregados = v);
+                        _applyLocalFilters();
+                        refreshSheet();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              _clearAllFilters();
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Limpiar todo'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _load();
+                            },
+                            child: const Text('Aplicar al servidor'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCompactFiltersCard() {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _pickDesde,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 10,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(
+                      'Desde ${_formatDateShort(_desde)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _pickHasta,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 10,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(
+                      'Hasta ${_formatDateShort(_hasta)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton.filled(
+                  onPressed: _loading ? null : _load,
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.refresh, size: 20),
+                  tooltip: 'Actualizar desde servidor',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final days in const [30, 90, 365])
+                  ActionChip(
+                    label: Text('$days d'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            _presetDays(days);
+                            _load();
+                          },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Buscar producto, SKU, aliado…',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                border: const OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: _searchCtrl.text.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          _applyLocalFilters();
+                        },
+                      ),
+              ),
+              onChanged: (_) {
+                _applyLocalFilters();
+                setState(() {});
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _showAdvancedFiltersSheet,
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: Text(
+                      _activeFilterCount == 0
+                          ? 'Filtros avanzados'
+                          : 'Filtros ($_activeFilterCount)',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+                if (_activeFilterCount > 0) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _clearAllFilters,
+                    child: const Text('Limpiar'),
+                  ),
+                ],
+              ],
+            ),
+            if (_activeFilterCount > 0) ...[
+              const SizedBox(height: 8),
+              _activeFilterChips(),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _pickDesde() async {
@@ -204,21 +570,70 @@ class _AdminEncomiendasReportPanelState
     });
   }
 
+  EncomiendasReportExportMeta _exportMeta() {
+    final lines = <String>[];
+    if (_statusSelection.isNotEmpty) {
+      final labels = _statusSelection
+          .map(TransactionRequestStatus.labelEs)
+          .join(', ');
+      lines.add('Estados: $labels');
+    } else {
+      lines.add('Estados: todos');
+    }
+    if (_ownerId != null) {
+      final imp = _importers
+          .where((o) => o.id == _ownerId)
+          .map((o) => o.businessName)
+          .firstOrNull;
+      lines.add('Importador: ${imp ?? _ownerId}');
+    }
+    final docLabel = _docOptions
+        .where((o) => o.value == _docPrefFilter)
+        .map((o) => o.label)
+        .firstOrNull;
+    if (docLabel != null && _docPrefFilter != 'all') {
+      lines.add('Documento: $docLabel');
+    }
+    if (_soloConValoracion) lines.add('Solo con valoración del aliado');
+    if (_soloPagosAprobados) lines.add('Solo pagos aprobados');
+    if (_soloEntregados) lines.add('Solo entregados');
+    final q = _searchCtrl.text.trim();
+    if (q.isNotEmpty) lines.add('Búsqueda: «$q»');
+    lines.add('Filas exportadas: ${_filtered.length}');
+    return EncomiendasReportExportMeta(
+      generatedAt: DateTime.now(),
+      dateFromLabel:
+          '${_desde.day.toString().padLeft(2, '0')}/${_desde.month.toString().padLeft(2, '0')}/${_desde.year}',
+      dateToLabel:
+          '${_hasta.day.toString().padLeft(2, '0')}/${_hasta.month.toString().padLeft(2, '0')}/${_hasta.year}',
+      filterSummaryLines: lines,
+    );
+  }
+
   Future<void> _exportExcel() async {
-    if (_filtered.isEmpty) {
+    if (_loading) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay filas para exportar.')),
+        const SnackBar(
+          content: Text('Espere a que termine la carga del servidor.'),
+        ),
       );
       return;
     }
-    try {
-      final bucket =
-          await SupabaseService.fetchAliadoOrderRatingAnswerSummariesForExport(
-        _filtered,
+    if (_filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No hay filas para exportar. Amplíe fechas o quite filtros.',
+          ),
+        ),
       );
+      return;
+    }
+    setState(() => _exporting = true);
+    try {
       final bytes = EncomiendasReportExcelService.buildReportBytes(
         _filtered,
-        aliadoBucketAnswersByRequestId: bucket,
+        meta: _exportMeta(),
       );
       final stamp = DateTime.now().toIso8601String().split('T').first;
       await FileSaver.instance.saveFile(
@@ -230,7 +645,9 @@ class _AdminEncomiendasReportPanelState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Exportadas ${_filtered.length} filas.'),
+          content: Text(
+            'Excel listo: ${_filtered.length} pedidos en la hoja «Encomiendas».',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -239,7 +656,76 @@ class _AdminEncomiendasReportPanelState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al exportar: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  Widget _activeFilterChips() {
+    final chips = <Widget>[];
+    if (_statusSelection.isNotEmpty) {
+      for (final s in _statusSelection) {
+        chips.add(
+          Chip(
+            label: Text(TransactionRequestStatus.labelEs(s)),
+            visualDensity: VisualDensity.compact,
+          ),
+        );
+      }
+    }
+    if (_ownerId != null) {
+      final name = _importers
+          .where((o) => o.id == _ownerId)
+          .map((o) => o.businessName)
+          .firstOrNull;
+      chips.add(
+        Chip(
+          label: Text(name ?? 'Importador'),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+    if (_docPrefFilter != 'all') {
+      final label = _docOptions
+          .where((o) => o.value == _docPrefFilter)
+          .map((o) => o.label)
+          .firstOrNull;
+      if (label != null) {
+        chips.add(Chip(label: Text(label), visualDensity: VisualDensity.compact));
+      }
+    }
+    if (_soloConValoracion) {
+      chips.add(const Chip(
+        label: Text('Con valoración'),
+        visualDensity: VisualDensity.compact,
+      ));
+    }
+    if (_soloPagosAprobados) {
+      chips.add(const Chip(
+        label: Text('Pago aprobado'),
+        visualDensity: VisualDensity.compact,
+      ));
+    }
+    if (_soloEntregados) {
+      chips.add(const Chip(
+        label: Text('Solo entregados'),
+        visualDensity: VisualDensity.compact,
+      ));
+    }
+    if (_searchCtrl.text.trim().isNotEmpty) {
+      chips.add(Chip(
+        label: Text('«${_searchCtrl.text.trim()}»'),
+        visualDensity: VisualDensity.compact,
+      ));
+    }
+    if (chips.isEmpty) {
+      return Text(
+        'Sin filtros locales activos · rango ${_desde.day}/${_desde.month}/${_desde.year} — '
+        '${_hasta.day}/${_hasta.month}/${_hasta.year}',
+        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+      );
+    }
+    return Wrap(spacing: 6, runSpacing: 6, children: chips);
   }
 
   Widget _summary() {
@@ -251,7 +737,11 @@ class _AdminEncomiendasReportPanelState
       );
     }
     final totalUsd = list.fold<double>(0, (s, r) => s + r.precioTotal);
-    final conFactura = list.where((r) => r.hasFacturaAliado).length;
+    final conFacturaImportador =
+        list.where((r) => r.hasProveedorFactura).length;
+    final pagosAprobados = list
+        .where((r) => r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado)
+        .length;
     final prefNota = list
         .where((r) =>
             r.documentTypePreference == DocumentTypePreference.notaEntrega)
@@ -297,9 +787,14 @@ class _AdminEncomiendasReportPanelState
               icon: Icons.payments_outlined,
             ),
             _StatCard(
-              title: 'Con factura MotoLink',
-              value: '$conFactura',
+              title: 'Factura importador',
+              value: '$conFacturaImportador',
               icon: Icons.receipt_long_outlined,
+            ),
+            _StatCard(
+              title: 'Pagos aprobados',
+              value: '$pagosAprobados',
+              icon: Icons.verified_outlined,
             ),
             _StatCard(
               title: 'Entregados',
@@ -399,312 +894,79 @@ class _AdminEncomiendasReportPanelState
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               children: [
                 Text(
-                  'Consolidado de encomiendas para facturación (preferencia nota vs fiscal), seguimiento de '
-                  'factura MotoLink al aliado y valoraciones post-entrega. Use los filtros y exporte a Excel '
-                  'para contabilidad o reportes gerenciales.',
+                  'Facturación del importador al aliado, pagos y valoraciones. '
+                  'Ajuste fechas, busque y abra filtros avanzados si necesita afinar el detalle.',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 12,
                     height: 1.35,
-                    color: Colors.grey.shade800,
+                    color: Colors.grey.shade700,
                   ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.brandBlue.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppColors.brandBlue.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Filtros rápidos de facturación',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          FilterChip(
-                            label: const Text('Solo facturas fiscales'),
-                            selected: _docPrefFilter ==
-                                DocumentTypePreference.facturaFiscal,
-                            onSelected: (_) => _setDocPrefFilter(
-                              _docPrefFilter ==
-                                      DocumentTypePreference.facturaFiscal
-                                  ? 'all'
-                                  : DocumentTypePreference.facturaFiscal,
-                            ),
-                          ),
-                          FilterChip(
-                            label: const Text('Solo nota de entrega'),
-                            selected: _docPrefFilter ==
-                                DocumentTypePreference.notaEntrega,
-                            onSelected: (_) => _setDocPrefFilter(
-                              _docPrefFilter ==
-                                      DocumentTypePreference.notaEntrega
-                                  ? 'all'
-                                  : DocumentTypePreference.notaEntrega,
-                            ),
-                          ),
-                          FilterChip(
-                            label: const Text('Preferencia pendiente'),
-                            selected: _docPrefFilter == 'pendiente',
-                            onSelected: (_) => _setDocPrefFilter(
-                              _docPrefFilter == 'pendiente'
-                                  ? 'all'
-                                  : 'pendiente',
-                            ),
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.clear_all, size: 18),
-                            label: const Text('Limpiar filtros locales'),
-                            onPressed: _clearClientFilters,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Filtros',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickDesde,
-                        icon: const Icon(Icons.calendar_today, size: 18),
-                        label: Text(
-                          'Desde ${_desde.day}/${_desde.month}/${_desde.year}',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickHasta,
-                        icon: const Icon(Icons.calendar_today, size: 18),
-                        label: Text(
-                          'Hasta ${_hasta.day}/${_hasta.month}/${_hasta.year}',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    ActionChip(
-                      label: const Text('30 días'),
-                      onPressed: () {
-                        _presetDays(30);
-                        _load();
-                      },
-                    ),
-                    ActionChip(
-                      label: const Text('90 días'),
-                      onPressed: () {
-                        _presetDays(90);
-                        _load();
-                      },
-                    ),
-                    ActionChip(
-                      label: const Text('365 días'),
-                      onPressed: () {
-                        _presetDays(365);
-                        _load();
-                      },
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Estado (servidor; dejar vacío = todos)',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    for (final s
-                        in TransactionRequestStatus.valuesForReportFilter)
-                      FilterChip(
-                        label: Text(TransactionRequestStatus.labelEs(s)),
-                        selected: _statusSelection.contains(s),
-                        onSelected: (v) {
-                          setState(() {
-                            if (v) {
-                              _statusSelection.add(s);
-                            } else {
-                              _statusSelection.remove(s);
-                            }
-                          });
-                          _load();
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String?>(
-                  value: _ownerId,
-                  decoration: const InputDecoration(
-                    labelText: 'Importador',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Todos'),
-                    ),
-                    ..._importers.map(
-                      (o) => DropdownMenuItem<String?>(
-                        value: o.id,
-                        child: Text(
-                          o.businessName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    setState(() => _ownerId = v);
-                    _load();
-                  },
-                ),
-                const SizedBox(height: 10),
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Más filtros',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Documento, pago, entrega y valoración',
-                    style: TextStyle(fontSize: 11.5),
-                  ),
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: _docPrefFilter,
-                      decoration: const InputDecoration(
-                        labelText: 'Preferencia de documento',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: _docOptions
-                          .map(
-                            (e) => DropdownMenuItem(
-                              value: e.value,
-                              child: Text(e.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v == null) return;
-                        _setDocPrefFilter(v);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Solo con factura MotoLink al aliado'),
-                      value: _soloConFacturaAliado,
-                      onChanged: (v) {
-                        setState(() => _soloConFacturaAliado = v);
-                        _applyLocalFilters();
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title:
-                          const Text('Solo pedidos con valoración del aliado'),
-                      value: _soloConValoracion,
-                      onChanged: (v) {
-                        setState(() => _soloConValoracion = v);
-                        _applyLocalFilters();
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Solo pagos aprobados por MotoLink'),
-                      value: _soloPagosAprobados,
-                      onChanged: (v) {
-                        setState(() => _soloPagosAprobados = v);
-                        _applyLocalFilters();
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Solo entregados (cliente)'),
-                      value: _soloEntregados,
-                      onChanged: (v) {
-                        setState(() => _soloEntregados = v);
-                        _applyLocalFilters();
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _searchCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Buscar producto, SKU, aliado o importador',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (_) => _applyLocalFilters(),
-                ),
+                _buildCompactFiltersCard(),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _loading ? null : _load,
-                        icon: _loading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.refresh, size: 20),
-                        label: Text(_loading
-                            ? 'Cargando…'
-                            : 'Aplicar fechas (servidor)'),
-                      ),
+                Material(
+                  color: AppColors.surfaceTinted,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.table_chart_outlined,
+                              size: 20,
+                              color: AppColors.brandBlue.withOpacity(0.9),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _filtered.isEmpty
+                                    ? 'Sin datos para exportar'
+                                    : '${_filtered.length} pedidos listos para Excel',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'La hoja «Encomiendas» incluye filtros aplicados, cabeceras y '
+                          'una fila por pedido visible en pantalla.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.35,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        FilledButton.tonalIcon(
+                          onPressed: (_filtered.isEmpty || _exporting || _loading)
+                              ? null
+                              : _exportExcel,
+                          icon: _exporting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.download_outlined),
+                          label: Text(
+                            _exporting
+                                ? 'Generando Excel…'
+                                : 'Descargar Excel (.xlsx)',
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: _exportExcel,
-                      icon: const Icon(Icons.download_outlined),
-                      tooltip: 'Exportar Excel',
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -763,49 +1025,120 @@ class _AdminEncomiendasReportPanelState
     );
   }
 
+  String? _pagoEstadoLabel(TransactionRequestModel r) {
+    final pe = r.pagoEstadoRevision?.trim();
+    if (pe == null || pe.isEmpty) return null;
+    switch (pe) {
+      case PagoRevisionEstado.pendiente:
+        return 'Pago pendiente';
+      case PagoRevisionEstado.enRevision:
+        return 'Pago en revisión';
+      case PagoRevisionEstado.aprobado:
+        return 'Pago aprobado';
+      case PagoRevisionEstado.rechazado:
+        return 'Pago rechazado';
+      default:
+        return pe;
+    }
+  }
+
+  String? _pagoMetodoLabel(TransactionRequestModel r) {
+    final m = r.pagoMetodo?.trim();
+    if (m == null || m.isEmpty) return null;
+    return PagoMetodo.labelEs(m);
+  }
+
   Widget _detailTile(TransactionRequestModel r) {
     final doc = r.documentTypePreference?.trim();
-    final docTxt = doc == null || doc.isEmpty
-        ? 'Doc: pendiente'
-        : 'Doc: ${DocumentTypePreference.labelEs(doc) ?? doc}';
+    final docLabel = doc == null || doc.isEmpty
+        ? 'Pendiente'
+        : (DocumentTypePreference.labelEs(doc) ?? doc);
     final stars = r.aliadoExperienceStars;
-    final valTxt = r.aliadoExperienceSubmittedAt == null
-        ? 'Valoración: —'
-        : 'Valoración: ${stars ?? 0}/5';
+    final hasRating = r.aliadoExperienceSubmittedAt != null;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    r.productName ?? 'Producto',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _StatusBadge(label: TransactionRequestStatus.labelEs(r.status)),
+              ],
+            ),
+            if ((r.productSku ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'SKU ${r.productSku!.trim()}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
+            const SizedBox(height: 6),
             Text(
-              r.productName ?? 'Producto',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              '${formatEsShortDateTime(r.createdAt)} · '
+              '${r.precioTotal.toStringAsFixed(2)} REF · ${r.cantidad} uds.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
             ),
             const SizedBox(height: 4),
             Text(
-              '${TransactionRequestStatus.labelEs(r.status)} · '
-              '${formatEsShortDateTime(r.createdAt)} · '
-              '${r.precioTotal.toStringAsFixed(2)} REF',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              '${r.aliadoBusinessName ?? "Aliado"} → ${r.ownerBusinessName ?? "Importador"}',
+              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
             ),
-            const SizedBox(height: 2),
-            Text(
-              '${r.aliadoBusinessName ?? "Aliado"} ← ${r.ownerBusinessName ?? "Importador"}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '$docTxt · $valTxt',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.brandBlue.withOpacity(0.95),
-              ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _MiniChip(
+                  icon: Icons.description_outlined,
+                  label: docLabel,
+                ),
+                _MiniChip(
+                  icon: Icons.receipt_long_outlined,
+                  label: r.hasProveedorFactura
+                      ? 'Factura importador'
+                      : 'Sin factura importador',
+                  highlighted: r.hasProveedorFactura,
+                ),
+                if (_pagoEstadoLabel(r) != null)
+                  _MiniChip(
+                    icon: Icons.payments_outlined,
+                    label: _pagoEstadoLabel(r)!,
+                    highlighted: r.pagoEstadoRevision?.trim() ==
+                        PagoRevisionEstado.aprobado,
+                  ),
+                if (_pagoMetodoLabel(r) != null)
+                  _MiniChip(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: _pagoMetodoLabel(r)!,
+                  ),
+                if (hasRating)
+                  _MiniChip(
+                    icon: Icons.star_rounded,
+                    label: '${stars ?? 0}/5',
+                    highlighted: true,
+                  ),
+              ],
             ),
             if ((r.aliadoExperienceComment ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 '“${r.aliadoExperienceComment!.trim()}”',
                 style: TextStyle(
@@ -818,6 +1151,73 @@ class _AdminEncomiendasReportPanelState
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.brandBlue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: AppColors.brandBlue.withOpacity(0.95),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniChip extends StatelessWidget {
+  const _MiniChip({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = highlighted ? AppColors.brandBlue : Colors.grey.shade800;
+    final bg = highlighted
+        ? AppColors.brandBlue.withOpacity(0.08)
+        : Colors.grey.shade100;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }

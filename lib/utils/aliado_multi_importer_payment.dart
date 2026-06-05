@@ -38,9 +38,8 @@ AliadoImportadorPagoFase fasePagoBloqueImportador(
   if (!puedePagar) return AliadoImportadorPagoFase.enCurso;
 
   final tieneFacturaProveedor = chunk.any((r) => r.hasProveedorFactura);
-  final tieneFacturaMotolink = chunk.any((r) => r.hasFacturaAliado);
 
-  if (!tieneFacturaProveedor && !tieneFacturaMotolink) {
+  if (!tieneFacturaProveedor) {
     return AliadoImportadorPagoFase.esperandoFacturaProveedor;
   }
 

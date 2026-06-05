@@ -5,6 +5,18 @@ allprojects {
     }
 }
 
+// Plugins (p. ej. app_links) usan flutter.compileSdkVersion antes de que :app evalúe.
+gradle.beforeProject { project ->
+    if (project.name != "app" && project != project.rootProject) {
+        project.ext.flutter = [
+            compileSdkVersion: 35,
+            minSdkVersion: 21,
+            targetSdkVersion: 35,
+            ndkVersion: "23.1.7779620",
+        ]
+    }
+}
+
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"

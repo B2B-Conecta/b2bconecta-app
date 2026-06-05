@@ -1,5 +1,4 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 
 import '../models/part_model.dart';
@@ -7,6 +6,7 @@ import '../screens/importer_product_edit_screen.dart';
 import '../services/excel_catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/excel_file_export.dart';
 import '../utils/product_catalog_pricing.dart';
 import '../utils/product_volume_tiers.dart';
 import 'importer_promo_widgets.dart';
@@ -77,15 +77,23 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   Future<void> _downloadTemplate() async {
     try {
       final bytes = ExcelCatalogService.buildTemplateBytes();
-      await FileSaver.instance.saveFile(
+      final result = await saveExcelForExport(
         name: 'motolink_plantilla_inventario',
         bytes: bytes,
-        ext: 'xlsx',
-        mimeType: MimeType.microsoftExcel,
       );
       if (!mounted) return;
+      if (result == ExcelExportResult.cancelled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Descarga de plantilla cancelada.')),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plantilla lista para descargar.')),
+        SnackBar(
+          content: Text(
+            excelExportSavedMessage('Plantilla lista para descargar.'),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -108,17 +116,23 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         return;
       }
       final bytes = ExcelCatalogService.buildInventoryExportBytes(parts);
-      await FileSaver.instance.saveFile(
+      final result = await saveExcelForExport(
         name: 'motolink_inventario_actual',
         bytes: bytes,
-        ext: 'xlsx',
-        mimeType: MimeType.microsoftExcel,
       );
       if (!mounted) return;
+      if (result == ExcelExportResult.cancelled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Exportación de inventario cancelada.')),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Inventario exportado (${parts.length} producto(s)).',
+            excelExportSavedMessage(
+              'Inventario exportado (${parts.length} producto(s)).',
+            ),
           ),
         ),
       );

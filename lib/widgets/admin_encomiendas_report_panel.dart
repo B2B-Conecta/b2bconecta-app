@@ -1,4 +1,3 @@
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 
 import '../models/catalog_filters.dart';
@@ -9,6 +8,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import 'admin_promo_campaigns_panel.dart';
 import '../services/encomiendas_report_excel_service.dart';
+import '../utils/excel_file_export.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
@@ -636,17 +636,26 @@ class _AdminEncomiendasReportPanelState
         meta: _exportMeta(),
       );
       final stamp = DateTime.now().toIso8601String().split('T').first;
-      await FileSaver.instance.saveFile(
+      final result = await saveExcelForExport(
         name: 'motolink_encomiendas_$stamp',
         bytes: bytes,
-        ext: 'xlsx',
-        mimeType: MimeType.microsoftExcel,
       );
       if (!mounted) return;
+      if (result == ExcelExportResult.cancelled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Exportación cancelada.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Excel listo: ${_filtered.length} pedidos en la hoja «Encomiendas».',
+            excelExportSavedMessage(
+              'Excel listo: ${_filtered.length} pedidos en la hoja «Encomiendas».',
+            ),
           ),
           behavior: SnackBarBehavior.floating,
         ),

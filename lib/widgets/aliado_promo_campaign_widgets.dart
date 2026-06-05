@@ -1,7 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/promo_campaign_model.dart';
 import '../theme/app_theme.dart';
+
+Future<void> launchPromoCampaignExternalUrl(
+  BuildContext context,
+  PromoCampaignModel campaign,
+) async {
+  final raw = campaign.externalUrl?.trim();
+  if (raw == null || raw.isEmpty) return;
+  final uri = Uri.tryParse(raw);
+  if (uri == null || !uri.hasScheme) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Enlace del anuncio no válido.')),
+    );
+    return;
+  }
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No se pudo abrir el enlace.')),
+    );
+  }
+}
 
 /// Carrusel de banners promocionales (E1.2) en catálogo aliado.
 class AliadoPromoBannerCarousel extends StatefulWidget {
@@ -35,9 +58,13 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     super.dispose();
   }
 
-  void _onTap(PromoCampaignModel c) {
+  Future<void> _onTap(PromoCampaignModel c) async {
     if (c.filtersImporter) {
       widget.onPromoCampaignSelected?.call(c);
+      return;
+    }
+    if (c.opensExternalUrl) {
+      await launchPromoCampaignExternalUrl(context, c);
     }
   }
 
@@ -64,7 +91,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                   borderRadius: BorderRadius.circular(12),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: c.filtersImporter ? () => _onTap(c) : null,
+                    onTap: c.isTappable ? () => _onTap(c) : null,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -89,9 +116,9 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                               color: AppColors.brandOrange.withOpacity(0.92),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
-                              'Promoción',
-                              style: TextStyle(
+                            child: Text(
+                              c.badgeLabel,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
@@ -99,7 +126,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                             ),
                           ),
                         ),
-                        if (c.filtersImporter)
+                        if (c.isTappable)
                           Positioned(
                             right: 8,
                             bottom: 8,
@@ -207,10 +234,12 @@ Future<void> showAliadoPromoPopupDialog({
                           color: AppColors.brandOrange.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          'Promoción',
+                        child: Text(
+                          campaign.badgeLabel,
                           style: TextStyle(
-                            color: AppColors.brandOrange,
+                            color: campaign.isThirdParty
+                                ? AppColors.brandBlue
+                                : AppColors.brandOrange,
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                           ),
@@ -257,6 +286,20 @@ Future<void> showAliadoPromoPopupDialog({
                           onFilterImporter?.call();
                         },
                         child: const Text('Ver proveedor'),
+                      ),
+                    ),
+                  ] else if (campaign.opensExternalUrl) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          await launchPromoCampaignExternalUrl(
+                            context,
+                            campaign,
+                          );
+                        },
+                        child: const Text('Más información'),
                       ),
                     ),
                   ],

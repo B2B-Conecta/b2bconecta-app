@@ -28,6 +28,7 @@ class PartModel {
     this.ownerCatalogPaidOrders30d,
     this.salePriceUsd,
     this.discountRules,
+    this.ownerPagoSoloDivisas = false,
   });
 
   final String id;
@@ -79,6 +80,9 @@ class PartModel {
   /// E4: tramos por volumen (`volume_tiers` con `min_units`).
   final Map<String, dynamic>? discountRules;
 
+  /// Importador dueño: solo acepta pagos en divisas (sin descuento línea USD).
+  final bool ownerPagoSoloDivisas;
+
   bool get tieneOfertaDirecta => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: precio,
         salePriceUsd: salePriceUsd,
@@ -113,6 +117,7 @@ class PartModel {
     final ownerLatLng = _ownerLatLngFromProfiles(json['profiles']);
     final rep = _ownerReputationFromProfiles(json['profiles']);
     final boost = _ownerCatalogBoostFromProfiles(json['profiles']);
+    final soloDivisas = _ownerPagoSoloDivisasFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
     final isActive = isActiveRaw is bool
@@ -130,6 +135,7 @@ class PartModel {
       ownerRatingAvg: rep.$1,
       ownerRatingCount: rep.$2,
       ownerCatalogPaidOrders30d: boost,
+      ownerPagoSoloDivisas: soloDivisas,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
@@ -168,6 +174,7 @@ class PartModel {
     int? ownerCatalogPaidOrders30d,
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
+    bool? ownerPagoSoloDivisas,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -194,6 +201,8 @@ class PartModel {
           ownerCatalogPaidOrders30d ?? this.ownerCatalogPaidOrders30d,
       salePriceUsd: salePriceUsd ?? this.salePriceUsd,
       discountRules: discountRules ?? this.discountRules,
+      ownerPagoSoloDivisas:
+          ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
     );
   }
 
@@ -222,6 +231,20 @@ class PartModel {
     if (v is int) return v;
     if (v is num) return v.toInt();
     return int.tryParse(v?.toString() ?? '');
+  }
+
+  static bool _ownerPagoSoloDivisasFromProfiles(dynamic profiles) {
+    if (profiles == null) return false;
+    Map<String, dynamic>? m;
+    if (profiles is Map) {
+      m = Map<String, dynamic>.from(profiles);
+    } else if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+      m = Map<String, dynamic>.from(profiles.first as Map);
+    }
+    if (m == null) return false;
+    final raw = m['pago_solo_divisas'];
+    if (raw is bool) return raw;
+    return raw?.toString().toLowerCase() == 'true';
   }
 
   static (double?, int?) _ownerReputationFromProfiles(dynamic profiles) {

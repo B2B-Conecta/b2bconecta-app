@@ -1,4 +1,4 @@
-/// Campaña promocional E1.2 (banner / popup en catálogo aliado).
+/// Campaña promocional E1.2 (banner / popup en catálogo y vallas de terceros).
 class PromoCampaignModel {
   const PromoCampaignModel({
     required this.id,
@@ -14,12 +14,24 @@ class PromoCampaignModel {
     required this.priority,
     required this.isActive,
     this.createdAt,
+    this.sponsorType = sponsorImportador,
+    this.audience = audienceAliado,
+    this.advertiserName,
+    this.externalUrl,
   });
 
   static const typeBanner = 'banner';
   static const typePopup = 'popup';
   static const actionNone = 'none';
   static const actionFilterImporter = 'filter_importer';
+  static const actionExternalUrl = 'external_url';
+
+  static const sponsorImportador = 'importador';
+  static const sponsorTercero = 'tercero';
+
+  static const audienceAliado = 'aliado';
+  static const audienceImportador = 'importador';
+  static const audienceAmbos = 'ambos';
 
   final String id;
   final String internalTitle;
@@ -34,18 +46,53 @@ class PromoCampaignModel {
   final int priority;
   final bool isActive;
   final DateTime? createdAt;
+  final String sponsorType;
+  final String audience;
+  final String? advertiserName;
+  final String? externalUrl;
 
   bool get isBanner => campaignType == typeBanner;
   bool get isPopup => campaignType == typePopup;
+  bool get isThirdParty => sponsorType == sponsorTercero;
+  bool get isImporterSponsored => sponsorType == sponsorImportador;
+
   bool get filtersImporter =>
       actionType == actionFilterImporter &&
       importadorId != null &&
       importadorId!.trim().isNotEmpty;
 
+  bool get opensExternalUrl {
+    final url = externalUrl?.trim();
+    return actionType == actionExternalUrl &&
+        url != null &&
+        url.isNotEmpty;
+  }
+
+  bool get isTappable => filtersImporter || opensExternalUrl;
+
+  String get badgeLabel => isThirdParty ? 'Publicidad' : 'Promoción';
+
   String get promoLabel {
+    if (isThirdParty) {
+      final adv = advertiserName?.trim();
+      if (adv != null && adv.isNotEmpty) return adv;
+    }
     final t = displayTitle?.trim();
     if (t != null && t.isNotEmpty) return t;
-    return 'Promoción';
+    return isThirdParty ? 'Anuncio' : 'Promoción';
+  }
+
+  static String audienceLabelEs(String? value) {
+    switch (value?.trim()) {
+      case audienceAliado:
+        return 'Solo aliados';
+      case audienceImportador:
+        return 'Solo importadores';
+      case audienceAmbos:
+        return 'Aliados e importadores';
+      default:
+        return value ?? '—';
+    }
   }
 
   factory PromoCampaignModel.fromJson(Map<String, dynamic> json) {
@@ -65,6 +112,10 @@ class PromoCampaignModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())?.toLocal()
           : null,
+      sponsorType: json['sponsor_type']?.toString() ?? sponsorImportador,
+      audience: json['audience']?.toString() ?? audienceAliado,
+      advertiserName: json['advertiser_name']?.toString(),
+      externalUrl: json['external_url']?.toString(),
     );
   }
 
@@ -83,6 +134,14 @@ class PromoCampaignModel {
       'ends_at': endsAt.toUtc().toIso8601String(),
       'priority': priority,
       'is_active': isActive,
+      'sponsor_type': sponsorType,
+      'audience': audience,
+      'advertiser_name': advertiserName?.trim().isEmpty ?? true
+          ? null
+          : advertiserName!.trim(),
+      'external_url': externalUrl?.trim().isEmpty ?? true
+          ? null
+          : externalUrl!.trim(),
       'created_by': createdBy,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
@@ -103,11 +162,19 @@ class PromoCampaignModel {
       'ends_at': endsAt.toUtc().toIso8601String(),
       'priority': priority,
       'is_active': isActive,
+      'sponsor_type': sponsorType,
+      'audience': audience,
+      'advertiser_name': advertiserName?.trim().isEmpty ?? true
+          ? null
+          : advertiserName!.trim(),
+      'external_url': externalUrl?.trim().isEmpty ?? true
+          ? null
+          : externalUrl!.trim(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
   }
 
-  /// Respuesta compacta del RPC aliado.
+  /// Respuesta compacta del RPC aliado / vallas importador.
   factory PromoCampaignModel.fromAliadoRpcJson(Map<String, dynamic> json) {
     return PromoCampaignModel(
       id: json['id']?.toString() ?? '',
@@ -122,10 +189,14 @@ class PromoCampaignModel {
       endsAt: DateTime.now(),
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       isActive: true,
+      sponsorType: json['sponsor_type']?.toString() ?? sponsorImportador,
+      audience: json['audience']?.toString() ?? audienceAliado,
+      advertiserName: json['advertiser_name']?.toString(),
+      externalUrl: json['external_url']?.toString(),
     );
   }
 
-  /// Respuesta del RPC importador (incluye fechas y título interno).
+  /// Respuesta del RPC importador (campañas propias en catálogo aliado).
   factory PromoCampaignModel.fromImportadorRpcJson(Map<String, dynamic> json) {
     return PromoCampaignModel(
       id: json['id']?.toString() ?? '',
@@ -140,6 +211,8 @@ class PromoCampaignModel {
       endsAt: DateTime.parse(json['ends_at'].toString()).toLocal(),
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       isActive: true,
+      sponsorType: sponsorImportador,
+      audience: audienceAliado,
     );
   }
 }

@@ -2,6 +2,7 @@ import 'order_item_model.dart';
 import 'profile_model.dart';
 import 'qty_adjustment_status.dart';
 import 'pago_metodo.dart';
+import 'pago_metodo_instrucciones.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
 import '../utils/business_calendar.dart';
@@ -104,6 +105,8 @@ class TransactionRequestModel {
     this.promoCampaignId,
     this.promoCampaignDisplayTitle,
     this.ownerAcceptedPagoMetodos,
+    this.ownerPagoMetodoInstrucciones = const {},
+    this.ownerPagoSoloDivisas = false,
   });
 
   final String id;
@@ -167,6 +170,12 @@ class TransactionRequestModel {
 
   /// Métodos de pago que acepta el importador de este pedido.
   final List<String>? ownerAcceptedPagoMetodos;
+
+  /// Datos de cuenta del importador por método de pago.
+  final Map<String, String> ownerPagoMetodoInstrucciones;
+
+  /// Importador: solo pagos en divisas/USD.
+  final bool ownerPagoSoloDivisas;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -252,7 +261,13 @@ class TransactionRequestModel {
       );
 
   List<String> get metodosPagoPermitidos =>
-      PagoMetodo.filterByImporterAccepted(ownerAcceptedPagoMetodos);
+      PagoMetodo.filterByImporterAccepted(
+        ownerAcceptedPagoMetodos,
+        pagoSoloDivisas: ownerPagoSoloDivisas,
+      );
+
+  String? pagoInstruccionesImportadorFor(String? metodo) =>
+      PagoMetodoInstrucciones.forMetodo(ownerPagoMetodoInstrucciones, metodo);
 
   /// Snapshot del pedido o, si falta el % divisas, reglas actuales del producto.
   Map<String, dynamic>? get effectiveDiscountRulesForPago {
@@ -266,6 +281,7 @@ class TransactionRequestModel {
   }
 
   bool get tieneDescuentoDivisasDisponible =>
+      !ownerPagoSoloDivisas &&
       parseUsdPaymentDiscountPct(effectiveDiscountRulesForPago) != null;
 
   double totalForPagoMetodo(String? metodo) =>
@@ -273,6 +289,7 @@ class TransactionRequestModel {
         refBaseTotal: refBaseTotalForPago,
         discountRules: effectiveDiscountRulesForPago,
         pagoMetodo: metodo,
+        ownerPagoSoloDivisas: ownerPagoSoloDivisas,
       );
 
   /// Tras registrar comprobante con método en divisas/efectivo con descuento.
@@ -819,6 +836,12 @@ class TransactionRequestModel {
       ownerKycStatus: _nullableText(ownerMap?['kyc_status']),
       ownerAcceptedPagoMetodos:
           ProfileModel.parseStringList(ownerMap?['accepted_pago_metodos']),
+      ownerPagoMetodoInstrucciones: PagoMetodoInstrucciones.parseMap(
+        ownerMap?['pago_metodo_instrucciones'],
+      ),
+      ownerPagoSoloDivisas: ownerMap?['pago_solo_divisas'] is bool
+          ? ownerMap!['pago_solo_divisas'] as bool
+          : ownerMap?['pago_solo_divisas']?.toString().toLowerCase() == 'true',
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:

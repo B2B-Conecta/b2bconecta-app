@@ -7,6 +7,7 @@ import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
+import '../utils/admin_product_sales_ranking.dart';
 import '../utils/app_date_format.dart';
 
 /// Metadatos opcionales del export (filtros aplicados en pantalla).
@@ -30,6 +31,18 @@ class EncomiendasReportExcelService {
 
   static const _sheetName = 'Encomiendas';
 
+  static const _topProductsSheetName = 'Productos mas vendidos';
+
+  static const _topProductsHeaders = [
+    '#',
+    'Producto',
+    'SKU',
+    'Importador',
+    'Pedidos',
+    'Unidades',
+    'Total REF (aliado)',
+  ];
+
   static const _headers = [
     'ID pedido',
     'Creado',
@@ -52,6 +65,7 @@ class EncomiendasReportExcelService {
   static Uint8List buildReportBytes(
     List<TransactionRequestModel> rows, {
     EncomiendasReportExportMeta? meta,
+    List<AdminProductSalesStat>? topProducts,
   }) {
     final excel = Excel.createExcel();
     final sheet = excel['Sheet1'];
@@ -71,6 +85,24 @@ class EncomiendasReportExcelService {
     }
 
     excel.rename('Sheet1', _sheetName);
+
+    final ranking = topProducts ?? aggregateProductSales(rows);
+    if (ranking.isNotEmpty) {
+      final topSheet = excel[_topProductsSheetName];
+      topSheet.appendRow(_topProductsHeaders.map(TextCellValue.new).toList());
+      for (var i = 0; i < ranking.length; i++) {
+        final s = ranking[i];
+        topSheet.appendRow([
+          IntCellValue(i + 1),
+          TextCellValue(s.productName),
+          TextCellValue(s.productSku ?? ''),
+          TextCellValue(s.importerName ?? ''),
+          IntCellValue(s.orderCount),
+          IntCellValue(s.unitsSold),
+          DoubleCellValue(s.totalRefUsd),
+        ]);
+      }
+    }
 
     final bytes = excel.encode();
     if (bytes == null) {

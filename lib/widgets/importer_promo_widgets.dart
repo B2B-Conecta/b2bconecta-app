@@ -5,6 +5,7 @@ import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'aliado_promo_campaign_widgets.dart';
 
 String _formatPromoRange(DateTime start, DateTime end) {
   final a = formatEsShortDateTime(
@@ -73,6 +74,43 @@ class ImporterPedidoPromoChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Carrusel de vallas publicitarias de terceros (importador / ambos).
+class ImporterThirdPartyAdsCarousel extends StatefulWidget {
+  const ImporterThirdPartyAdsCarousel({super.key});
+
+  @override
+  State<ImporterThirdPartyAdsCarousel> createState() =>
+      _ImporterThirdPartyAdsCarouselState();
+}
+
+class _ImporterThirdPartyAdsCarouselState
+    extends State<ImporterThirdPartyAdsCarousel> {
+  late Future<List<PromoCampaignModel>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = SupabaseService.fetchActivePromoCampaignsForImportadorAds();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<PromoCampaignModel>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final banners = (snapshot.data ?? const <PromoCampaignModel>[])
+            .where((c) => c.isBanner)
+            .toList();
+        if (banners.isEmpty) return const SizedBox.shrink();
+        return AliadoPromoBannerCarousel(campaigns: banners);
+      },
     );
   }
 }

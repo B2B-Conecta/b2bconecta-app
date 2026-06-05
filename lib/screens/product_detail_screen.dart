@@ -314,6 +314,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         salePriceUsd: part.salePriceUsd,
                         discountRules: part.discountRules,
                         showPromotionChips: false,
+                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                       ),
                       if (ProductCatalogPricing.volumeIncentiveBadgeEs(
                             part.discountRules,

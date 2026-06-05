@@ -1115,6 +1115,7 @@ class _ProductGridCard extends StatelessWidget {
                         salePriceUsd: part.salePriceUsd,
                         discountRules: part.discountRules,
                         catalogGrid: true,
+                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                       ),
                       const Spacer(),
                       Divider(height: 1, color: Colors.grey.shade200),

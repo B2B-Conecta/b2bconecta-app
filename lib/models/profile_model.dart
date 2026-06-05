@@ -1,4 +1,5 @@
 import 'pago_metodo.dart';
+import 'pago_metodo_instrucciones.dart';
 import 'rating_dimension_stat_model.dart';
 
 /// Perfil B2B en Supabase (`profiles`), alineado a `auth.users.id`.
@@ -36,6 +37,8 @@ class ProfileModel {
     this.ratingAsPayerCountRolling100,
     this.ratingDimensionsAsPayerRolling100 = const {},
     this.acceptedPagoMetodos,
+    this.pagoMetodoInstrucciones = const {},
+    this.pagoSoloDivisas = false,
   });
 
   final String id;
@@ -109,9 +112,21 @@ class ProfileModel {
   /// Importador: métodos que el aliado puede elegir al pagar (`profiles.accepted_pago_metodos`).
   final List<String>? acceptedPagoMetodos;
 
+  /// Importador: datos de cuenta por método (`profiles.pago_metodo_instrucciones`).
+  final Map<String, String> pagoMetodoInstrucciones;
+
+  /// Importador: solo pagos en divisas/USD; sin descuento línea USD en productos.
+  final bool pagoSoloDivisas;
+
   /// Métodos visibles para aliados según configuración del importador.
   List<String> get effectiveAcceptedPagoMetodos =>
-      PagoMetodo.filterByImporterAccepted(acceptedPagoMetodos);
+      PagoMetodo.filterByImporterAccepted(
+        acceptedPagoMetodos,
+        pagoSoloDivisas: pagoSoloDivisas,
+      );
+
+  String? pagoInstruccionesFor(String? metodo) =>
+      PagoMetodoInstrucciones.forMetodo(pagoMetodoInstrucciones, metodo);
 
   /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
@@ -243,7 +258,15 @@ class ProfileModel {
         json['rating_dimensions_as_payer_rolling100'],
       ),
       acceptedPagoMetodos: parseStringList(json['accepted_pago_metodos']),
+      pagoMetodoInstrucciones:
+          PagoMetodoInstrucciones.parseMap(json['pago_metodo_instrucciones']),
+      pagoSoloDivisas: _parseBool(json['pago_solo_divisas']),
     );
+  }
+
+  static bool _parseBool(dynamic raw) {
+    if (raw is bool) return raw;
+    return raw?.toString().toLowerCase() == 'true';
   }
 
   static List<String>? parseStringList(dynamic raw) {

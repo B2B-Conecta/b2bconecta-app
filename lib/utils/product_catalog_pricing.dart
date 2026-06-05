@@ -9,15 +9,34 @@ abstract final class ProductCatalogPricing {
   static double? usdPaymentDiscountPct(Map<String, dynamic>? discountRules) =>
       parseUsdPaymentDiscountPct(discountRules);
 
-  static bool hasUsdPaymentDiscount(Map<String, dynamic>? discountRules) =>
-      usdPaymentDiscountPct(discountRules) != null;
+  static double? effectiveUsdPaymentDiscountPct({
+    Map<String, dynamic>? discountRules,
+    bool ownerPagoSoloDivisas = false,
+  }) {
+    if (ownerPagoSoloDivisas) return null;
+    return usdPaymentDiscountPct(discountRules);
+  }
+
+  static bool hasUsdPaymentDiscount(
+    Map<String, dynamic>? discountRules, {
+    bool ownerPagoSoloDivisas = false,
+  }) =>
+      effectiveUsdPaymentDiscountPct(
+        discountRules: discountRules,
+        ownerPagoSoloDivisas: ownerPagoSoloDivisas,
+      ) !=
+      null;
 
   /// Precio unitario aliado en línea USD (sobre [refUnitUsd] ya con cascada E4).
   static double aliadoUnitUsdPaymentLine({
     required double refUnitUsd,
     Map<String, dynamic>? discountRules,
+    bool ownerPagoSoloDivisas = false,
   }) {
-    final pct = usdPaymentDiscountPct(discountRules);
+    final pct = effectiveUsdPaymentDiscountPct(
+      discountRules: discountRules,
+      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
+    );
     if (pct == null) return refUnitUsd;
     return refUnitUsd * (1 - pct / 100.0);
   }
@@ -26,10 +45,14 @@ abstract final class ProductCatalogPricing {
     required double listPriceUsd,
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
+    bool ownerPagoSoloDivisas = false,
   }) =>
       hasDirectSale(listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd) ||
       volumeDiscountPercent(discountRules, 1) > 0 ||
-      hasUsdPaymentDiscount(discountRules);
+      hasUsdPaymentDiscount(
+        discountRules,
+        ownerPagoSoloDivisas: ownerPagoSoloDivisas,
+      );
 
   static bool hasDirectSale({
     required double listPriceUsd,
@@ -126,8 +149,12 @@ abstract final class ProductCatalogPricing {
   static String? usdPaymentChipEs({
     required double refUnitUsd,
     Map<String, dynamic>? discountRules,
+    bool ownerPagoSoloDivisas = false,
   }) {
-    final pct = usdPaymentDiscountPct(discountRules);
+    final pct = effectiveUsdPaymentDiscountPct(
+      discountRules: discountRules,
+      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
+    );
     if (pct == null) return null;
     final usd = aliadoUnitUsdPaymentLine(
       refUnitUsd: refUnitUsd,

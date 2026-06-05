@@ -14,6 +14,14 @@ String _formatPromoDate(DateTime d) {
   ).split(' ').first;
 }
 
+Widget _promoDropdownLabel(String text) {
+  return Text(
+    text,
+    overflow: TextOverflow.ellipsis,
+    maxLines: 1,
+  );
+}
+
 /// Subsección admin: CRUD de campañas promocionales E1.2.
 class AdminPromoCampaignsPanel extends StatefulWidget {
   const AdminPromoCampaignsPanel({super.key});
@@ -65,6 +73,8 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -96,6 +106,10 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           priority: c.priority,
           isActive: !c.isActive,
           createdAt: c.createdAt,
+          sponsorType: c.sponsorType,
+          audience: c.audience,
+          advertiserName: c.advertiserName,
+          externalUrl: c.externalUrl,
         ),
       );
       await _bootstrap();
@@ -168,7 +182,8 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
             children: [
               Expanded(
                 child: Text(
-                  'Banners y pop-ups en el catálogo del aliado. Etiqueta «Promoción»; CTA filtra por proveedor.',
+                  'Promociones de proveedores (aliados) o vallas de terceros '
+                  '(ej. agencia de transporte) para aliados, importadores o ambos.',
                   style: TextStyle(fontSize: 12.5, color: Colors.grey.shade800),
                 ),
               ),
@@ -205,6 +220,10 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                           .where((o) => o.id == c.importadorId)
                           .map((o) => o.businessName)
                           .firstOrNull;
+                      final sponsorLabel =
+                          c.isThirdParty ? 'Tercero' : 'Proveedor';
+                      final audienceLabel =
+                          PromoCampaignModel.audienceLabelEs(c.audience);
                       return Card(
                         child: ListTile(
                           leading: ClipRRect(
@@ -227,9 +246,11 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           subtitle: Text(
+                            '${c.badgeLabel} · $sponsorLabel · $audienceLabel · '
                             '${c.isBanner ? 'Banner' : 'Pop-up'} · '
                             '${_formatPromoDate(c.startsAt)} – ${_formatPromoDate(c.endsAt)}\n'
                             'Prioridad ${c.priority}'
+                            '${c.isThirdParty && c.advertiserName != null ? ' · ${c.advertiserName}' : ''}'
                             '${imp != null ? ' · $imp' : ''}',
                             style: const TextStyle(fontSize: 12),
                           ),
@@ -289,8 +310,12 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late final TextEditingController _internalTitleCtrl;
   late final TextEditingController _displayTitleCtrl;
   late final TextEditingController _priorityCtrl;
+  late final TextEditingController _advertiserNameCtrl;
+  late final TextEditingController _externalUrlCtrl;
   late String _type;
   late String _actionType;
+  late String _sponsorType;
+  late String _audience;
   String? _importadorId;
   late DateTime _startsAt;
   late DateTime _endsAt;
@@ -301,17 +326,52 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   bool _uploading = false;
   bool _saving = false;
 
+  bool get _isThirdParty =>
+      _sponsorType == PromoCampaignModel.sponsorTercero;
+
+  void _onSponsorTypeChanged(String? value) {
+    if (value == null) return;
+    setState(() {
+      _sponsorType = value;
+      if (_isThirdParty) {
+        _importadorId = null;
+        if (_actionType == PromoCampaignModel.actionFilterImporter) {
+          _actionType = PromoCampaignModel.actionExternalUrl;
+        }
+        if (_audience == PromoCampaignModel.audienceAliado &&
+            widget.existing == null) {
+          _audience = PromoCampaignModel.audienceAmbos;
+        }
+      } else {
+        _audience = PromoCampaignModel.audienceAliado;
+        if (_actionType == PromoCampaignModel.actionExternalUrl) {
+          _actionType = PromoCampaignModel.actionFilterImporter;
+        }
+        _advertiserNameCtrl.clear();
+        _externalUrlCtrl.clear();
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
     _internalTitleCtrl = TextEditingController(text: e?.internalTitle ?? '');
     _displayTitleCtrl = TextEditingController(text: e?.displayTitle ?? '');
+    _advertiserNameCtrl =
+        TextEditingController(text: e?.advertiserName ?? '');
+    _externalUrlCtrl = TextEditingController(text: e?.externalUrl ?? '');
     _priorityCtrl = TextEditingController(
       text: '${e?.priority ?? 0}',
     );
     _type = e?.campaignType ?? PromoCampaignModel.typeBanner;
-    _actionType = e?.actionType ?? PromoCampaignModel.actionFilterImporter;
+    _sponsorType = e?.sponsorType ?? PromoCampaignModel.sponsorImportador;
+    _audience = e?.audience ?? PromoCampaignModel.audienceAliado;
+    _actionType = e?.actionType ??
+        (e == null && _sponsorType == PromoCampaignModel.sponsorTercero
+            ? PromoCampaignModel.actionExternalUrl
+            : PromoCampaignModel.actionFilterImporter);
     _importadorId = e?.importadorId;
     final now = DateTime.now();
     _startsAt = e?.startsAt ?? DateTime(now.year, now.month, now.day);
@@ -327,6 +387,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _internalTitleCtrl.dispose();
     _displayTitleCtrl.dispose();
     _priorityCtrl.dispose();
+    _advertiserNameCtrl.dispose();
+    _externalUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -395,6 +457,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
 
   PromoCampaignModel _buildDraft() {
     final priority = int.tryParse(_priorityCtrl.text.trim()) ?? 0;
+    final thirdParty = _isThirdParty;
     return PromoCampaignModel(
       id: widget.existing?.id ?? '',
       internalTitle: _internalTitleCtrl.text,
@@ -402,7 +465,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       campaignType: _type,
       imageStoragePath: _imagePath ?? '',
       imagePublicUrl: _imageUrl ?? '',
-      importadorId: _actionType == PromoCampaignModel.actionFilterImporter
+      importadorId: !thirdParty &&
+              _actionType == PromoCampaignModel.actionFilterImporter
           ? _importadorId
           : null,
       actionType: _actionType,
@@ -410,6 +474,14 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       endsAt: _endsAt,
       priority: priority,
       isActive: _isActive,
+      sponsorType: _sponsorType,
+      audience: thirdParty ? _audience : PromoCampaignModel.audienceAliado,
+      advertiserName:
+          thirdParty ? _advertiserNameCtrl.text : null,
+      externalUrl: thirdParty &&
+              _actionType == PromoCampaignModel.actionExternalUrl
+          ? _externalUrlCtrl.text
+          : null,
     );
   }
 
@@ -426,10 +498,25 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       );
       return;
     }
-    if (_actionType == PromoCampaignModel.actionFilterImporter &&
+    if (!_isThirdParty &&
+        _actionType == PromoCampaignModel.actionFilterImporter &&
         (_importadorId == null || _importadorId!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Seleccione un proveedor para el CTA.')),
+      );
+      return;
+    }
+    if (_isThirdParty && _advertiserNameCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Indique el nombre del anunciante.')),
+      );
+      return;
+    }
+    if (_isThirdParty &&
+        _actionType == PromoCampaignModel.actionExternalUrl &&
+        _externalUrlCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Indique la URL externa del anuncio.')),
       );
       return;
     }
@@ -457,24 +544,48 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     }
   }
 
+  void _close() => Navigator.of(context).pop();
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, bottom + 20),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, bottom + 20),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              widget.existing == null ? 'Nueva campaña' : 'Editar campaña',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.existing == null ? 'Nueva campaña' : 'Editar campaña',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  onPressed: _saving ? null : _close,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             TextField(
               controller: _internalTitleCtrl,
               decoration: const InputDecoration(
@@ -492,19 +603,76 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
+              value: _sponsorType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Patrocinador',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: PromoCampaignModel.sponsorImportador,
+                  child: _promoDropdownLabel('Proveedor (catálogo aliado)'),
+                ),
+                DropdownMenuItem(
+                  value: PromoCampaignModel.sponsorTercero,
+                  child: _promoDropdownLabel('Tercero (valla publicitaria)'),
+                ),
+              ],
+              onChanged: _onSponsorTypeChanged,
+            ),
+            if (_isThirdParty) ...[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _audience,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Audiencia',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  DropdownMenuItem(
+                    value: PromoCampaignModel.audienceAliado,
+                    child: _promoDropdownLabel('Solo aliados'),
+                  ),
+                  DropdownMenuItem(
+                    value: PromoCampaignModel.audienceImportador,
+                    child: _promoDropdownLabel('Solo importadores'),
+                  ),
+                  DropdownMenuItem(
+                    value: PromoCampaignModel.audienceAmbos,
+                    child: _promoDropdownLabel('Aliados e importadores'),
+                  ),
+                ],
+                onChanged: (v) =>
+                    setState(() => _audience = v ?? _audience),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _advertiserNameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del anunciante',
+                  hintText: 'Ej. Agencia Rápido Express',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
               value: _type,
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Tipo',
                 border: OutlineInputBorder(),
               ),
-              items: const [
+              items: [
                 DropdownMenuItem(
                   value: PromoCampaignModel.typeBanner,
-                  child: Text('Banner'),
+                  child: _promoDropdownLabel('Banner'),
                 ),
                 DropdownMenuItem(
                   value: PromoCampaignModel.typePopup,
-                  child: Text('Pop-up'),
+                  child: _promoDropdownLabel('Pop-up'),
                 ),
               ],
               onChanged: (v) => setState(() => _type = v ?? _type),
@@ -512,43 +680,70 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               value: _actionType,
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Acción al tocar',
                 border: OutlineInputBorder(),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: PromoCampaignModel.actionFilterImporter,
-                  child: Text('Filtrar proveedor'),
-                ),
-                DropdownMenuItem(
-                  value: PromoCampaignModel.actionNone,
-                  child: Text('Solo informativa'),
-                ),
-              ],
+              items: _isThirdParty
+                  ? [
+                      DropdownMenuItem(
+                        value: PromoCampaignModel.actionExternalUrl,
+                        child: _promoDropdownLabel('Abrir enlace externo'),
+                      ),
+                      DropdownMenuItem(
+                        value: PromoCampaignModel.actionNone,
+                        child: _promoDropdownLabel('Solo informativa'),
+                      ),
+                    ]
+                  : [
+                      DropdownMenuItem(
+                        value: PromoCampaignModel.actionFilterImporter,
+                        child: _promoDropdownLabel('Filtrar proveedor'),
+                      ),
+                      DropdownMenuItem(
+                        value: PromoCampaignModel.actionNone,
+                        child: _promoDropdownLabel('Solo informativa'),
+                      ),
+                    ],
               onChanged: (v) => setState(() => _actionType = v ?? _actionType),
             ),
-            if (_actionType == PromoCampaignModel.actionFilterImporter) ...[
+            if (!_isThirdParty &&
+                _actionType == PromoCampaignModel.actionFilterImporter) ...[
               const SizedBox(height: 10),
               DropdownButtonFormField<String?>(
                 value: _importadorId,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Proveedor',
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
-                    child: Text('Seleccione…'),
+                    child: _promoDropdownLabel('Seleccione…'),
                   ),
                   ...widget.importers.map(
                     (o) => DropdownMenuItem<String?>(
                       value: o.id,
-                      child: Text(o.businessName),
+                      child: _promoDropdownLabel(o.businessName),
                     ),
                   ),
                 ],
                 onChanged: (v) => setState(() => _importadorId = v),
+              ),
+            ],
+            if (_isThirdParty &&
+                _actionType == PromoCampaignModel.actionExternalUrl) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _externalUrlCtrl,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'URL externa',
+                  hintText: 'https://…',
+                  border: OutlineInputBorder(),
+                ),
               ),
             ],
             const SizedBox(height: 10),
@@ -620,9 +815,22 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               ),
             ],
             const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'Guardando…' : 'Guardar campaña'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : _close,
+                    child: const Text('Cancelar'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _saving ? null : _save,
+                    child: Text(_saving ? 'Guardando…' : 'Guardar'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

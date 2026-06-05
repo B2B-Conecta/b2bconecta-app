@@ -66,4 +66,29 @@ void main() {
     expect(foundHeader, isTrue, reason: 'header row must be present');
     expect(foundSku, isTrue, reason: 'data row must be present');
   });
+
+  test('buildReportBytes adds Productos mas vendidos sheet', () {
+    final bytes = EncomiendasReportExcelService.buildReportBytes([_sampleRow()]);
+    final decoded = Excel.decodeBytes(bytes);
+    expect(decoded.tables.containsKey('Productos mas vendidos'), isTrue);
+
+    final top = decoded.tables['Productos mas vendidos']!;
+    var foundTopHeader = false;
+    var foundUnits = false;
+    for (var r = 0; r < top.maxRows; r++) {
+      final product = top
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r))
+          .value
+          ?.toString();
+      final units = top
+          .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: r))
+          .value
+          ?.toString();
+      if (product == 'Producto') foundTopHeader = product == 'Producto';
+      if (product == 'Filtro aceite' && units == '2') foundUnits = true;
+    }
+    expect(foundUnits, isTrue);
+    expect(top.maxRows, greaterThan(1));
+    expect(foundTopHeader || foundUnits, isTrue);
+  });
 }

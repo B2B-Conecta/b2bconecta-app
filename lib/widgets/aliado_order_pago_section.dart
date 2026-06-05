@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/profile_model.dart';
@@ -11,6 +12,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/order_payment_pricing.dart';
 import 'aliado_usd_payment_discount_ficha.dart';
+import 'importer_pago_transfer_details_card.dart';
 import 'moroso_order_visual.dart';
 
 /// Método de pago y comprobante. El importador verifica la acreditación (negociación por chat).
@@ -51,6 +53,7 @@ class AliadoOrderPagoSection extends StatefulWidget {
 class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   String? _metodoSeleccionado;
   bool _busy = false;
+  List<AliadoPagoFrecuenteModel> _pagosFrecuentes = [];
 
   List<String> get _metodosPermitidos =>
       widget.request.metodosPagoPermitidos;
@@ -71,13 +74,25 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
-  void _syncMetodoSeleccionado({bool notifyParent = true}) {
+  void _syncMetodoSeleccionado({
+    bool notifyParent = true,
+    bool preferFrecuente = false,
+  }) {
     final permitidos = _metodosPermitidos;
     final m = widget.request.pagoMetodo?.trim();
     if (m != null && m.isNotEmpty && permitidos.contains(m)) {
       _metodoSeleccionado = m;
     } else if (permitidos.isNotEmpty) {
-      _metodoSeleccionado = permitidos.first;
+      String? picked;
+      if (preferFrecuente) {
+        for (final f in _pagosFrecuentes) {
+          if (permitidos.contains(f.pagoMetodo)) {
+            picked = f.pagoMetodo;
+            break;
+          }
+        }
+      }
+      _metodoSeleccionado = picked ?? permitidos.first;
     } else {
       _metodoSeleccionado = null;
     }
@@ -86,20 +101,48 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
+  Future<void> _loadPagosFrecuentes() async {
+    try {
+      final list = await SupabaseService.fetchAliadoPagoFrecuenteImportador(
+        widget.request.ownerId,
+      );
+      if (!mounted) return;
+      setState(() => _pagosFrecuentes = list);
+      _syncMetodoSeleccionado(preferFrecuente: true);
+    } catch (_) {
+      if (!mounted) return;
+      _syncMetodoSeleccionado();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _syncMetodoSeleccionado();
+    _syncMetodoSeleccionado(notifyParent: false);
+    _loadPagosFrecuentes();
   }
 
   @override
   void didUpdateWidget(covariant AliadoOrderPagoSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.request.id != widget.request.id ||
+        oldWidget.request.ownerId != widget.request.ownerId ||
         oldWidget.request.ownerAcceptedPagoMetodos !=
             widget.request.ownerAcceptedPagoMetodos) {
-      _syncMetodoSeleccionado();
+      _loadPagosFrecuentes();
     }
+  }
+
+  List<AliadoPagoFrecuenteModel> get _frecuentesVisibles {
+    final permitidos = _metodosPermitidos.toSet();
+    return _pagosFrecuentes
+        .where((f) => permitidos.contains(f.pagoMetodo))
+        .toList();
+  }
+
+  void _seleccionarMetodo(String metodo) {
+    setState(() => _metodoSeleccionado = metodo);
+    _notifyMetodoPreview(immediate: true);
   }
 
   Future<void> _abrirComprobante(BuildContext context) async {
@@ -358,6 +401,37 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 ),
               ),
             ),
+          if (!referenciaHistorica &&
+              puedeCambiarMetodo &&
+              _frecuentesVisibles.isNotEmpty) ...[
+            Text(
+              'Pagos frecuentes con este importador',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final f in _frecuentesVisibles)
+                  FilterChip(
+                    label: Text(
+                      '${PagoMetodo.labelEs(f.pagoMetodo)} · ${f.useCount}×',
+                      style: const TextStyle(fontSize: 11.5),
+                    ),
+                    selected: _metodoSeleccionado == f.pagoMetodo,
+                    onSelected: (_) => _seleccionarMetodo(f.pagoMetodo),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           if (metodosPermitidos.isEmpty)
             Text(
               'Sin métodos disponibles.',
@@ -379,8 +453,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                   )
                   .toList(),
               onChanged: (v) {
-                setState(() => _metodoSeleccionado = v);
-                _notifyMetodoPreview(immediate: true);
+                if (v != null) _seleccionarMetodo(v);
               },
             )
           else
@@ -390,6 +463,17 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                   : '—',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
             ),
+          if (metodoPreview != null) ...[
+            if (metodoPreview.trim().isNotEmpty &&
+                metodosPermitidos.contains(metodoPreview)) ...[
+              const SizedBox(height: 10),
+              ImporterPagoTransferDetailsCard(
+                metodo: metodoPreview,
+                instrucciones: r.pagoInstruccionesImportadorFor(metodoPreview),
+                importadorNombre: r.ownerBusinessName,
+              ),
+            ],
+          ],
           if (r.hasComprobantePago) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(

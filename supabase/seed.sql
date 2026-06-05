@@ -6,9 +6,13 @@
 -- Carga:
 --   supabase db query --linked -f supabase/seed.sql
 --
+-- Solo datos de pago importadores (sin re-seed):
+--   supabase db query --linked -f supabase/scripts/patch_importer_pago_demo.sql
+--
 -- Contraseña común (todos los seed): SeedPass123!
 --
 -- Incluye: 15 importadores (2 × 15 SKU + 10 × 5 SKU; 13–15 catálogo vacío para carga masiva),
+-- datos de pago demo por método (Zelle, Pago Móvil, Binance, USDT, transferencia, efectivo),
 -- 3 aliados (solo aliado1 con pedidos demo), 2 admins,
 -- pedidos entregados con pago aprobado + método de pago y comprobante,
 -- valoraciones bucket_v2 de demo (admin / reputación importador) y
@@ -629,6 +633,64 @@ set
   rating_avg_received_rolling100 = rating_avg_received,
   rating_count_received_rolling100 = rating_count_received
 where rating_avg_received is not null;
+
+-- Importadores demo: métodos aceptados + datos de cuenta (visible al aliado al pagar).
+-- Requiere migración 20260805120000_importer_pago_metodo_instrucciones.sql
+update public.profiles p
+set
+  accepted_pago_metodos = array[
+    'zelle_divisas',
+    'pago_movil',
+    'binance',
+    'usdt',
+    'transferencia',
+    'efectivo'
+  ]::text[],
+  pago_metodo_instrucciones = jsonb_build_object(
+    'zelle_divisas',
+      format(
+        E'Email Zelle: importador%s@zelle.demo\nTitular: %s\nBanco emisor (opcional): Bank of America',
+        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
+        coalesce(p.business_name, 'Importador demo')
+      ),
+    'pago_movil',
+      format(
+        E'Banco: Banco de Venezuela\nTeléfono: %s\nCédula/RIF del titular: %s\nTitular: %s',
+        coalesce(p.phone, '0414-0000000'),
+        coalesce(p.rif, 'J-000000000'),
+        coalesce(p.business_name, 'Importador demo')
+      ),
+    'transferencia',
+      format(
+        E'Banco: Banco Mercantil\nTipo de cuenta: Corriente\nNúmero: 0105-%s-01-1234567890\nTitular: %s\nRIF: %s',
+        lpad(right(regexp_replace(coalesce(p.phone, ''), '\D', '', 'g'), 4), 4, '0'),
+        coalesce(p.business_name, 'Importador demo'),
+        coalesce(p.rif, 'J-000000000')
+      ),
+    'binance',
+      format(
+        E'Binance ID: %s\nEmail: importador%s@binance.demo\nTitular: %s\nMoneda: USDT',
+        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
+        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
+        coalesce(p.business_name, 'Importador demo')
+      ),
+    'usdt',
+      format(
+        E'Red: TRC20\nWallet: T%sDemoWallet%s\nTitular: %s\nNota: Enviar solo USDT por TRC20',
+        upper(regexp_replace(coalesce(p.rif, 'J000000000'), '[^A-Z0-9]', '', 'g')),
+        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
+        coalesce(p.business_name, 'Importador demo')
+      ),
+    'efectivo',
+      format(
+        E'Entrega en almacén: %s, %s\nHorario: Lun–Vie 8:00 am – 4:00 pm\nContacto: %s · %s',
+        coalesce(p.ciudad, 'Ciudad'),
+        coalesce(p.direccion, 'Dirección fiscal del importador'),
+        coalesce(p.business_name, 'Importador demo'),
+        coalesce(p.phone, '0414-0000000')
+      )
+  )
+where p.role = 'importador';
 
 -- ---------------------------------------------------------------------------
 -- Catálogo: importador1/2 → 15 SKU; importador3–12 → 5 SKU; importador13–15 → vacío (plantilla Excel)
@@ -1563,6 +1625,31 @@ begin
   end loop;
 end;
 $$;
+
+-- Aliado demo: pagos frecuentes por importador (historial entregados con pago).
+insert into public.aliado_importador_pago_frecuente (
+  aliado_id,
+  importador_id,
+  pago_metodo,
+  use_count,
+  last_used_at
+)
+select
+  tr.aliado_id,
+  tr.importador_id,
+  lower(trim(tr.pago_metodo)),
+  count(*)::integer,
+  max(coalesce(tr.comprobante_pago_submitted_at, tr.pago_aprobado_at, tr.updated_at))
+from public.transaction_requests tr
+where tr.aliado_id = 'c2000001-0000-4000-8000-000000000001'::uuid
+  and tr.pago_metodo is not null
+  and trim(tr.pago_metodo) <> ''
+  and tr.status = 'entregado'
+group by tr.aliado_id, tr.importador_id, lower(trim(tr.pago_metodo))
+on conflict (aliado_id, importador_id, pago_metodo) do update
+set
+  use_count = excluded.use_count,
+  last_used_at = excluded.last_used_at;
 
 -- Reconciliar agregados E1 (por si triggers se omitieron en carga masiva)
 select public.refresh_all_importer_catalog_boost ();

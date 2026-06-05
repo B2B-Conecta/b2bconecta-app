@@ -14,6 +14,7 @@ import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
 import '../models/admin_aliado_morosidad_flag.dart';
+import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/admin_order_rating_row_model.dart';
@@ -440,6 +441,59 @@ class SupabaseService {
     );
   }
 
+  /// Importador: solo pagos en divisas/USD (quita Bs y descuentos línea USD del catálogo).
+  static Future<void> importadorSetPagoSoloDivisas(bool enabled) async {
+    await _client.rpc(
+      'importador_set_pago_solo_divisas',
+      params: <String, dynamic>{'p_enabled': enabled},
+    );
+  }
+
+  /// Importador: actualización masiva de `usd_payment_discount_pct` en productos.
+  /// [scope]: `con_descuento` (solo con % previo) o `todos`.
+  static Future<int> importadorBulkSetUsdPaymentDiscount({
+    required double pct,
+    required String scope,
+  }) async {
+    final res = await _client.rpc(
+      'importador_bulk_set_usd_payment_discount',
+      params: <String, dynamic>{
+        'p_pct': pct,
+        'p_scope': scope,
+      },
+    );
+    if (res is int) return res;
+    if (res is num) return res.toInt();
+    return int.tryParse(res?.toString() ?? '') ?? 0;
+  }
+
+  /// Importador: datos de cuenta / instrucciones por método de pago.
+  static Future<void> importadorSetPagoMetodoInstrucciones(
+    Map<String, String> instrucciones,
+  ) async {
+    await _client.rpc(
+      'importador_set_pago_metodo_instrucciones',
+      params: <String, dynamic>{
+        'p_instrucciones': instrucciones,
+      },
+    );
+  }
+
+  /// Aliado: métodos usados con frecuencia con un importador (atajos de pago).
+  static Future<List<AliadoPagoFrecuenteModel>>
+      fetchAliadoPagoFrecuenteImportador(String importadorId) async {
+    final res = await _client.rpc(
+      'aliado_list_pago_frecuente_importador',
+      params: <String, dynamic>{'p_importador_id': importadorId},
+    );
+    final list = res as List<dynamic>;
+    return list
+        .map((row) => AliadoPagoFrecuenteModel.fromJson(
+            Map<String, dynamic>.from(row as Map)))
+        .where((e) => e.pagoMetodo.isNotEmpty)
+        .toList();
+  }
+
   /// URL firmada (1 h) para el logo en `profile-logos`.
   static Future<String> createSignedUrlForProfileLogo(
       String storagePath) async {
@@ -554,8 +608,8 @@ class SupabaseService {
     const rep =
         'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d';
     return _catalogNeedsProfileInner(filters)
-        ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude, $rep)'
-        : 'profiles(business_name, estado, ciudad, latitude, longitude, $rep)';
+        ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)'
+        : 'profiles(business_name, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
   }
 
   /// Métricas del inventario del usuario actual (importador).
@@ -640,6 +694,20 @@ class SupabaseService {
   }
 
   /// ID del producto con ese [sku] para el dueño actual, o `null`.
+  static Future<Map<String, dynamic>?> fetchProductDiscountRulesById(
+    String productId,
+  ) async {
+    final row = await _client
+        .from('products')
+        .select('discount_rules')
+        .eq('id', productId)
+        .maybeSingle();
+    if (row == null) return null;
+    final raw = row['discount_rules'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
   static Future<String?> findProductIdByOwnerSku(String sku) async {
     final uid = _currentUserId;
     if (uid == null) return null;
@@ -892,7 +960,7 @@ class SupabaseService {
     created_at,
     updated_at,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status ),
-    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, accepted_pago_metodos )
+    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, accepted_pago_metodos, pago_metodo_instrucciones, pago_solo_divisas )
   ''';
 
   static String get _trSelectForListWithSubs => _trSelectMotoconecta;
@@ -2614,6 +2682,20 @@ class SupabaseService {
               Map<String, dynamic>.from(e as Map),
             ))
         .where((c) => c.id.isNotEmpty)
+        .toList();
+  }
+
+  /// Vallas publicitarias de terceros visibles para importadores.
+  static Future<List<PromoCampaignModel>>
+      fetchActivePromoCampaignsForImportadorAds() async {
+    final res =
+        await _client.rpc('get_active_promo_campaigns_for_importador_ads');
+    final list = _decodeRpcJsonArray(res);
+    return list
+        .map((e) => PromoCampaignModel.fromAliadoRpcJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .where((c) => c.id.isNotEmpty && c.imagePublicUrl.trim().isNotEmpty)
         .toList();
   }
 

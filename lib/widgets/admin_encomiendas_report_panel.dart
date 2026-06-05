@@ -11,6 +11,7 @@ import '../services/encomiendas_report_excel_service.dart';
 import '../utils/excel_file_export.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/admin_product_sales_ranking.dart';
 import '../utils/app_date_format.dart';
 import '../utils/transaction_request_filter_utils.dart';
 
@@ -43,8 +44,12 @@ class _AdminEncomiendasReportPanelState
   bool _soloConValoracion = false;
   bool _soloPagosAprobados = false;
   bool _soloEntregados = false;
+  /// `null` = todos; 10/20/50 = solo pedidos de los productos más vendidos.
+  int? _topSoldLimit;
   int _sectionIndex = 0;
   bool _exporting = false;
+
+  static const _topSoldOptions = <int>[10, 20, 50];
 
   static const _docOptions = <_DocOpt>[
     _DocOpt('all', 'Todas las preferencias'),
@@ -108,7 +113,9 @@ class _AdminEncomiendasReportPanelState
     }
   }
 
-  void _applyLocalFilters() {
+  List<TransactionRequestModel> _applyLocalFiltersCore({
+    bool applyTopSold = true,
+  }) {
     var list = List<TransactionRequestModel>.from(_raw);
 
     if (_soloEntregados) {
@@ -154,7 +161,21 @@ class _AdminEncomiendasReportPanelState
       statusFilter: null,
     );
 
-    setState(() => _filtered = list);
+    if (applyTopSold && _topSoldLimit != null) {
+      final keys = topProductKeys(list, limit: _topSoldLimit!);
+      list = list
+          .where((r) => keys.contains(adminProductSalesKey(r)))
+          .toList();
+    }
+
+    return list;
+  }
+
+  List<AdminProductSalesStat> get _productSalesRanking =>
+      aggregateProductSales(_applyLocalFiltersCore(applyTopSold: false));
+
+  void _applyLocalFilters() {
+    setState(() => _filtered = _applyLocalFiltersCore());
   }
 
   void _setDocPrefFilter(String value) {
@@ -170,6 +191,7 @@ class _AdminEncomiendasReportPanelState
       _soloConValoracion = false;
       _soloPagosAprobados = false;
       _soloEntregados = false;
+      _topSoldLimit = null;
       _searchCtrl.clear();
     });
     _load();
@@ -186,6 +208,7 @@ class _AdminEncomiendasReportPanelState
     if (_soloConValoracion) n++;
     if (_soloPagosAprobados) n++;
     if (_soloEntregados) n++;
+    if (_topSoldLimit != null) n++;
     if (_searchCtrl.text.trim().isNotEmpty) n++;
     return n;
   }
@@ -364,6 +387,60 @@ class _AdminEncomiendasReportPanelState
                         _applyLocalFilters();
                         refreshSheet();
                       },
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Productos más vendidos',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Limita el detalle y el Excel a los productos con más unidades '
+                      'en el rango y filtros actuales (excepto este tope).',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade700,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        FilterChip(
+                          label: const Text(
+                            'Todos',
+                            style: TextStyle(fontSize: 11.5),
+                          ),
+                          selected: _topSoldLimit == null,
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) {
+                            setState(() => _topSoldLimit = null);
+                            _applyLocalFilters();
+                            refreshSheet();
+                          },
+                        ),
+                        for (final n in _topSoldOptions)
+                          FilterChip(
+                            label: Text(
+                              'Top $n',
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                            selected: _topSoldLimit == n,
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (_) {
+                              setState(() {
+                                _topSoldLimit = _topSoldLimit == n ? null : n;
+                              });
+                              _applyLocalFilters();
+                              refreshSheet();
+                            },
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -597,6 +674,9 @@ class _AdminEncomiendasReportPanelState
     if (_soloConValoracion) lines.add('Solo con valoración del aliado');
     if (_soloPagosAprobados) lines.add('Solo pagos aprobados');
     if (_soloEntregados) lines.add('Solo entregados');
+    if (_topSoldLimit != null) {
+      lines.add('Productos más vendidos: top ${_topSoldLimit!}');
+    }
     final q = _searchCtrl.text.trim();
     if (q.isNotEmpty) lines.add('Búsqueda: «$q»');
     lines.add('Filas exportadas: ${_filtered.length}');
@@ -634,6 +714,7 @@ class _AdminEncomiendasReportPanelState
       final bytes = EncomiendasReportExcelService.buildReportBytes(
         _filtered,
         meta: _exportMeta(),
+        topProducts: _productSalesRanking,
       );
       final stamp = DateTime.now().toIso8601String().split('T').first;
       final result = await saveExcelForExport(
@@ -654,7 +735,8 @@ class _AdminEncomiendasReportPanelState
         SnackBar(
           content: Text(
             excelExportSavedMessage(
-              'Excel listo: ${_filtered.length} pedidos en la hoja «Encomiendas».',
+              'Excel listo: ${_filtered.length} pedidos («Encomiendas») '
+              'y ranking de productos («Productos mas vendidos»).',
             ),
           ),
           behavior: SnackBarBehavior.floating,
@@ -721,6 +803,12 @@ class _AdminEncomiendasReportPanelState
         visualDensity: VisualDensity.compact,
       ));
     }
+    if (_topSoldLimit != null) {
+      chips.add(Chip(
+        label: Text('Top ${_topSoldLimit!} más vendidos'),
+        visualDensity: VisualDensity.compact,
+      ));
+    }
     if (_searchCtrl.text.trim().isNotEmpty) {
       chips.add(Chip(
         label: Text('«${_searchCtrl.text.trim()}»'),
@@ -735,6 +823,94 @@ class _AdminEncomiendasReportPanelState
       );
     }
     return Wrap(spacing: 6, runSpacing: 6, children: chips);
+  }
+
+  Widget _topSoldProductsSection() {
+    final ranking = _productSalesRanking;
+    if (ranking.isEmpty) {
+      return Text(
+        'Sin ventas en el período con los filtros actuales.',
+        style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+      );
+    }
+
+    final displayLimit = _topSoldLimit ?? 10;
+    final shown = ranking.take(displayLimit).toList();
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          children: [
+            for (var i = 0; i < shown.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: Colors.grey.shade200),
+              ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                leading: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: i < 3
+                      ? AppColors.brandOrange.withOpacity(0.15)
+                      : Colors.grey.shade200,
+                  child: Text(
+                    '${i + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: i < 3
+                          ? AppColors.brandOrange
+                          : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  shown[i].productName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                subtitle: Text(
+                  [
+                    if ((shown[i].productSku ?? '').isNotEmpty)
+                      'SKU ${shown[i].productSku}',
+                    if ((shown[i].importerName ?? '').isNotEmpty)
+                      shown[i].importerName!,
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${shown[i].unitsSold} uds.',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '${shown[i].totalRefUsd.toStringAsFixed(2)} REF',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _summary() {
@@ -945,8 +1121,8 @@ class _AdminEncomiendasReportPanelState
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'La hoja «Encomiendas» incluye filtros aplicados, cabeceras y '
-                          'una fila por pedido visible en pantalla.',
+                          'Incluye hoja «Encomiendas» (pedidos filtrados) y '
+                          '«Productos mas vendidos» (ranking por unidades).',
                           style: TextStyle(
                             fontSize: 11.5,
                             height: 1.35,
@@ -988,6 +1164,28 @@ class _AdminEncomiendasReportPanelState
                 ),
                 const SizedBox(height: 8),
                 _summary(),
+                const SizedBox(height: 20),
+                const Text(
+                  'Productos más vendidos',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _topSoldLimit != null
+                      ? 'Ranking según filtros actuales; el detalle muestra solo el top $_topSoldLimit.'
+                      : 'Ranking por unidades en el rango y filtros actuales (sin tope).',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _topSoldProductsSection(),
                 const SizedBox(height: 20),
                 Row(
                   children: [

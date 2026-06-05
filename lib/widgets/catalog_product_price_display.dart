@@ -15,6 +15,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.catalogGrid = false,
     this.showUsd = true,
     this.showPromotionChips = true,
+    this.ownerPagoSoloDivisas = false,
   });
 
   final double listPriceUsd;
@@ -25,6 +26,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool catalogGrid;
   final bool showUsd;
   final bool showPromotionChips;
+  final bool ownerPagoSoloDivisas;
 
   bool get _onSale => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: listPriceUsd,
@@ -59,6 +61,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             discountRules: discountRules,
             refUnitUsd: refUnit,
             compact: false,
+            ownerPagoSoloDivisas: ownerPagoSoloDivisas,
           )
         : const SizedBox.shrink();
 
@@ -98,10 +101,14 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             quantity: quantity,
           )
         : null;
-    final usdPct = ProductCatalogPricing.usdPaymentDiscountPct(discountRules);
+    final usdPct = ProductCatalogPricing.effectiveUsdPaymentDiscountPct(
+      discountRules: discountRules,
+      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
+    );
     final usdUnit = ProductCatalogPricing.aliadoUnitUsdPaymentLine(
       refUnitUsd: refUnit,
       discountRules: discountRules,
+      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
     );
 
     return Column(
@@ -178,6 +185,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             discountRules: discountRules,
             refUnitUsd: refUnit,
             compact: false,
+            ownerPagoSoloDivisas: ownerPagoSoloDivisas,
           ),
         ],
       ],
@@ -230,6 +238,7 @@ class CatalogProductOfferChips extends StatelessWidget {
     this.discountRules,
     required this.refUnitUsd,
     this.compact = false,
+    this.ownerPagoSoloDivisas = false,
   });
 
   final double listPriceUsd;
@@ -237,6 +246,7 @@ class CatalogProductOfferChips extends StatelessWidget {
   final Map<String, dynamic>? discountRules;
   final double refUnitUsd;
   final bool compact;
+  final bool ownerPagoSoloDivisas;
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +281,7 @@ class CatalogProductOfferChips extends StatelessWidget {
     final zelle = ProductCatalogPricing.usdPaymentChipEs(
       refUnitUsd: refUnitUsd,
       discountRules: discountRules,
+      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
     );
     if (zelle != null) {
       chips.add(

@@ -97,7 +97,7 @@ Map<String, dynamic>? buildProductDiscountRules({
     ..sort((a, b) => a.minUnits.compareTo(b.minUnits));
   final hasTiers = sorted.isNotEmpty;
   final pct = usdPaymentDiscountPct;
-  final hasUsdPct = pct != null && pct > 0 && pct < 100;
+  final hasUsdPct = pct != null && pct > 0;
   if (!hasTiers && !hasUsdPct) return null;
 
   final map = <String, dynamic>{};

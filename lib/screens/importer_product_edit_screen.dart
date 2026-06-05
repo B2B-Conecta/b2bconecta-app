@@ -40,6 +40,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
   late final TextEditingController _imageController;
   bool _isActive = true;
   bool _saving = false;
+  bool _pagoSoloDivisas = false;
   Uint8List? _pickedImageBytes;
   String? _pickedImageExt;
 
@@ -121,6 +122,15 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
       length: _isEdit ? 2 : 1,
       vsync: this,
     );
+    _loadImporterPagoPolicy();
+  }
+
+  Future<void> _loadImporterPagoPolicy() async {
+    try {
+      final profile = await SupabaseService.fetchMyProfile();
+      if (!mounted) return;
+      setState(() => _pagoSoloDivisas = profile?.pagoSoloDivisas ?? false);
+    } catch (_) {}
   }
 
   @override
@@ -178,7 +188,9 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
         return;
       }
     }
-    final usdPctRaw = _usdPaymentDiscountController.text.trim();
+    final usdPctRaw = _pagoSoloDivisas
+        ? ''
+        : _usdPaymentDiscountController.text.trim();
     double? usdPaymentDiscountPct;
     if (usdPctRaw.isNotEmpty) {
       usdPaymentDiscountPct = parseUsdPaymentDiscountPctField(usdPctRaw);
@@ -369,6 +381,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
             volumeTiers: _volumeTiers,
             onVolumeTiersChanged: (t) => setState(() => _volumeTiers = t),
             enabled: !_saving,
+            showUsdPaymentDiscount: !_pagoSoloDivisas,
           ),
           const SizedBox(height: 16),
           TextFormField(

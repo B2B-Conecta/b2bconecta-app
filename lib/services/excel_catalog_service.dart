@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -38,12 +37,23 @@ class ExcelInventoryRow {
   final String? tramosVolumenJson;
 
   /// `discount_rules` listo para Supabase.
-  Map<String, dynamic>? get discountRules => buildProductDiscountRules(
-        volumeTiers: parseProductVolumeTiers(
-          parseVolumeTiersJsonCell(tramosVolumenJson),
-        ),
-        usdPaymentDiscountPct: usdPaymentDiscountPct,
-      );
+  /// Si no hay columna de tramos en el Excel, conserva volumen ya configurado en app.
+  Map<String, dynamic>? discountRules({
+    bool pagoSoloDivisas = false,
+    Map<String, dynamic>? preserveVolumeTiersFrom,
+  }) {
+    var tiers = parseProductVolumeTiers(
+      parseVolumeTiersJsonCell(tramosVolumenJson),
+    );
+    if (tiers.isEmpty && preserveVolumeTiersFrom != null) {
+      tiers = parseProductVolumeTiers(preserveVolumeTiersFrom);
+    }
+    return buildProductDiscountRules(
+      volumeTiers: tiers,
+      usdPaymentDiscountPct:
+          pagoSoloDivisas ? null : usdPaymentDiscountPct,
+    );
+  }
 }
 
 /// Genera y lee plantillas Excel para carga masiva de inventario.
@@ -60,11 +70,9 @@ class ExcelCatalogService {
     'precio',
     'precio_oferta_usd (opcional)',
     'descuento_pago_usd_pct (opcional)',
-    'tramos_volumen_json (opcional)',
     'stock',
     'categoria (opcional)',
     'compatibilidad (opcional)',
-    'url_imagen (opcional)',
   ];
 
   /// Bytes de un .xlsx con cabeceras (columnas alineadas al formulario y a BD).
@@ -83,13 +91,9 @@ class ExcelCatalogService {
         TextCellValue('12.50'),
         TextCellValue('10.99'),
         TextCellValue('2'),
-        TextCellValue(
-          '{"volume_tiers":[{"min_units":12,"percent_discount":5}]}',
-        ),
         TextCellValue('10'),
         TextCellValue('Motor'),
         TextCellValue('CG150, CG125'),
-        TextCellValue(''),
       ],
     );
     final bytes = excel.encode();
@@ -109,12 +113,6 @@ class ExcelCatalogService {
     );
 
     for (final p in parts) {
-      final tiers = parseProductVolumeTiers(p.discountRules);
-      final tiersJson = tiers.isEmpty
-          ? ''
-          : jsonEncode({
-              'volume_tiers': tiers.map((t) => t.toJson()).toList(),
-            });
       final usdPct = parseUsdPaymentDiscountPct(p.discountRules);
       sheet.appendRow(
         [
@@ -132,11 +130,9 @@ class ExcelCatalogService {
                     usdPct.truncateToDouble() == usdPct ? 0 : 1,
                   ),
           ),
-          TextCellValue(tiersJson),
           TextCellValue('${p.stock}'),
           TextCellValue(p.category ?? ''),
           TextCellValue(p.compatibilidad ?? ''),
-          TextCellValue(p.imagenUrl ?? ''),
         ],
       );
     }
@@ -298,12 +294,15 @@ class ExcelCatalogService {
           usdPaymentDiscountPct =
               double.tryParse(pctStr.replaceAll(',', '.'));
           if (usdPaymentDiscountPct == null ||
-              usdPaymentDiscountPct <= 0 ||
+              usdPaymentDiscountPct < 0 ||
               usdPaymentDiscountPct >= 100) {
             throw FormatException(
               'Fila ${r + 1}: descuento_pago_usd_pct inválido para SKU $sku '
-              '(use un número entre 0 y 100, sin incluir los extremos).',
+              '(use 0 para quitar descuento o un % entre 0 y 100, sin incluir 100).',
             );
+          }
+          if (usdPaymentDiscountPct == 0) {
+            usdPaymentDiscountPct = null;
           }
         }
       }

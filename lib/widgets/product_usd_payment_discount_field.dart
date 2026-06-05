@@ -38,7 +38,8 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'Opcional. El aliado verá el precio REF y, aparte, un precio USD '
-          'con este porcentaje de rebaja (ej. 2 → paga 2 % menos en USD).',
+          'con este porcentaje de rebaja (ej. 2 → paga 2 % menos en USD). '
+          'Use 0 para quitar el descuento USD del producto.',
           style: TextStyle(
             fontSize: 11.5,
             height: 1.35,
@@ -75,11 +76,12 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
   }
 }
 
-/// Parsea el texto del campo; vacío → sin descuento.
+/// Parsea el texto del campo.
+/// Vacío → no se envía %; `0` → quitar descuento USD; `>0` → aplicar %.
 double? parseUsdPaymentDiscountPctField(String raw) {
   final t = raw.trim();
   if (t.isEmpty) return null;
   final pct = double.tryParse(t.replaceAll(',', '.'));
-  if (pct == null || pct <= 0 || pct >= 100) return null;
+  if (pct == null || pct < 0 || pct >= 100) return null;
   return pct;
 }

@@ -30,6 +30,12 @@ abstract final class PagoMetodo {
     efectivo,
   ];
 
+  /// Métodos en bolívares (Bs) que se deshabilitan en modo «solo divisas».
+  static const valuesBolivares = [
+    pagoMovil,
+    transferencia,
+  ];
+
   static const values = [
     pagoMovil,
     zelleDivisas,
@@ -45,12 +51,25 @@ abstract final class PagoMetodo {
     return valuesUsdDiscount.contains(m);
   }
 
-  static List<String> filterByImporterAccepted(List<String>? accepted) {
-    if (accepted == null || accepted.isEmpty) {
-      return List<String>.from(valuesMotoconecta);
+  static bool isBolivares(String? metodo) {
+    final m = metodo?.trim();
+    if (m == null || m.isEmpty) return false;
+    return valuesBolivares.contains(m);
+  }
+
+  static List<String> filterByImporterAccepted(
+    List<String>? accepted, {
+    bool pagoSoloDivisas = false,
+  }) {
+    var list = valuesMotoconecta;
+    if (accepted != null && accepted.isNotEmpty) {
+      final allowed = accepted.map((e) => e.trim()).where((e) => e.isNotEmpty);
+      list = valuesMotoconecta.where(allowed.contains).toList();
     }
-    final allowed = accepted.map((e) => e.trim()).where((e) => e.isNotEmpty);
-    return valuesMotoconecta.where(allowed.contains).toList();
+    if (pagoSoloDivisas) {
+      list = list.where((m) => !isBolivares(m)).toList();
+    }
+    return List<String>.from(list);
   }
 
   static String labelEs(String code) {
@@ -71,6 +90,38 @@ abstract final class PagoMetodo {
         return 'Crédito del sistema (legado)';
       default:
         return code;
+    }
+  }
+
+  /// Guía para que el importador complete los datos de transferencia.
+  static String instructionHintEs(String code) {
+    switch (code.trim()) {
+      case zelleDivisas:
+        return 'Email Zelle: cuenta@correo.com\n'
+            'Titular: Nombre Apellido\n'
+            'Nota opcional (banco emisor, etc.)';
+      case pagoMovil:
+        return 'Banco: Banco de Venezuela\n'
+            'Teléfono: 0414-1234567\n'
+            'Cédula/RIF del titular: V-12.345.678';
+      case transferencia:
+        return 'Banco: Mercantil\n'
+            'Tipo de cuenta: Corriente\n'
+            'Número: 0105-...\n'
+            'Titular: Razón social o nombre';
+      case binance:
+        return 'Binance ID o email: 123456789\n'
+            'Titular: Nombre en la cuenta\n'
+            'Red/moneda si aplica: USDT';
+      case usdt:
+        return 'Red: TRC20 (o ERC20)\n'
+            'Wallet: Txxxxxxxx...\n'
+            'Titular / nota: ...';
+      case efectivo:
+        return 'Dónde y cuándo entregar el efectivo\n'
+            'Persona de contacto y teléfono';
+      default:
+        return 'Datos que el aliado necesita para realizar el pago';
     }
   }
 }

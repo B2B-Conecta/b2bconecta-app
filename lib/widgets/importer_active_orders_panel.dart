@@ -487,6 +487,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const ImporterThirdPartyAdsCarousel(),
               const ImporterActivePromoBanner(),
               OrderListFilterBar(
                 searchController: _searchCtrl,

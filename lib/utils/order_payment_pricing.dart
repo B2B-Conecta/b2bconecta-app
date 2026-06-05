@@ -47,8 +47,10 @@ abstract final class OrderPaymentPricing {
     required double refBaseTotal,
     Map<String, dynamic>? discountRules,
     required String? pagoMetodo,
+    bool ownerPagoSoloDivisas = false,
   }) {
-    if (!PagoMetodo.qualifiesForUsdDiscount(pagoMetodo)) {
+    if (ownerPagoSoloDivisas ||
+        !PagoMetodo.qualifiesForUsdDiscount(pagoMetodo)) {
       return refBaseTotal;
     }
     return ProductCatalogPricing.aliadoUnitUsdPaymentLine(
@@ -60,8 +62,12 @@ abstract final class OrderPaymentPricing {
   static String? discountHintEs({
     Map<String, dynamic>? discountRules,
     required String? pagoMetodo,
+    bool ownerPagoSoloDivisas = false,
   }) {
-    if (!PagoMetodo.qualifiesForUsdDiscount(pagoMetodo)) return null;
+    if (ownerPagoSoloDivisas ||
+        !PagoMetodo.qualifiesForUsdDiscount(pagoMetodo)) {
+      return null;
+    }
     final pct = ProductCatalogPricing.usdPaymentDiscountPct(discountRules);
     if (pct == null) return null;
     final label = pct.truncateToDouble() == pct
@@ -80,12 +86,15 @@ abstract final class OrderPaymentPricing {
       refBaseTotal: base,
       discountRules: rules,
       pagoMetodo: pagoMetodo,
+      ownerPagoSoloDivisas: request.ownerPagoSoloDivisas,
     );
     return UsdPaymentDiscountPreview(
       baseRef: base,
       total: total,
       metodo: pagoMetodo,
-      pct: parseUsdPaymentDiscountPct(rules),
+      pct: request.ownerPagoSoloDivisas
+          ? null
+          : parseUsdPaymentDiscountPct(rules),
     );
   }
 
@@ -104,8 +113,11 @@ abstract final class OrderPaymentPricing {
         refBaseTotal: lineBase,
         discountRules: rules,
         pagoMetodo: pagoMetodo,
+        ownerPagoSoloDivisas: r.ownerPagoSoloDivisas,
       );
-      pct ??= parseUsdPaymentDiscountPct(rules);
+      if (!r.ownerPagoSoloDivisas) {
+        pct ??= parseUsdPaymentDiscountPct(rules);
+      }
     }
     return UsdPaymentDiscountPreview(
       baseRef: base,

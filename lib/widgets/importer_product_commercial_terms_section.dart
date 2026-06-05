@@ -14,6 +14,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
     required this.volumeTiers,
     required this.onVolumeTiersChanged,
     this.enabled = true,
+    this.showUsdPaymentDiscount = true,
   });
 
   final TextEditingController salePriceController;
@@ -21,6 +22,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
   final List<ProductVolumeTier> volumeTiers;
   final ValueChanged<List<ProductVolumeTier>> onVolumeTiersChanged;
   final bool enabled;
+  final bool showUsdPaymentDiscount;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +62,9 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Oferta, descuento por cantidad y precio en USD que verán en el catálogo.',
+                        showUsdPaymentDiscount
+                            ? 'Oferta, descuento por cantidad y precio en USD que verán en el catálogo.'
+                            : 'Oferta y descuento por cantidad. Con pagos solo en USD no aplica descuento línea USD.',
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.35,
@@ -99,13 +103,15 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
               tiers: volumeTiers,
               onChanged: onVolumeTiersChanged,
             ),
-            const SizedBox(height: 16),
-            Divider(color: Colors.grey.shade300, height: 1),
-            const SizedBox(height: 12),
-            ProductUsdPaymentDiscountField(
-              controller: usdPaymentDiscountController,
-              enabled: enabled,
-            ),
+            if (showUsdPaymentDiscount) ...[
+              const SizedBox(height: 16),
+              Divider(color: Colors.grey.shade300, height: 1),
+              const SizedBox(height: 12),
+              ProductUsdPaymentDiscountField(
+                controller: usdPaymentDiscountController,
+                enabled: enabled,
+              ),
+            ],
           ],
         ),
       ),

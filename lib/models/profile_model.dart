@@ -1,4 +1,4 @@
-import 'cash_phase_policy.dart';
+import 'pago_metodo.dart';
 import 'rating_dimension_stat_model.dart';
 
 /// Perfil B2B en Supabase (`profiles`), alineado a `auth.users.id`.
@@ -35,6 +35,7 @@ class ProfileModel {
     this.ratingAsPayerAvgRolling100,
     this.ratingAsPayerCountRolling100,
     this.ratingDimensionsAsPayerRolling100 = const {},
+    this.acceptedPagoMetodos,
   });
 
   final String id;
@@ -53,7 +54,7 @@ class ProfileModel {
   /// Verificación documental MotoLink (`pendiente` … `aprobado`); solo aliados.
   final String? kycStatus;
 
-  /// Entregas completadas contadas hacia la fase “primeros 3 pedidos contado” (0–3).
+  /// Legado en base de datos (`primeros_pedidos_contado_entregados`); ya no usado en reglas de negocio.
   final int? primerosPedidosContadoEntregados;
 
   /// Legado en base de datos; ya no se usa para cupo en plataforma.
@@ -105,6 +106,13 @@ class ProfileModel {
   /// Dimensiones Comunicación / Pagos (aliado ratee, bucket_v2).
   final Map<String, RatingDimensionStatModel> ratingDimensionsAsPayerRolling100;
 
+  /// Importador: métodos que el aliado puede elegir al pagar (`profiles.accepted_pago_metodos`).
+  final List<String>? acceptedPagoMetodos;
+
+  /// Métodos visibles para aliados según configuración del importador.
+  List<String> get effectiveAcceptedPagoMetodos =>
+      PagoMetodo.filterByImporterAccepted(acceptedPagoMetodos);
+
   /// Estado, ciudad y dirección fiscal (domicilio) — requisito para pedidos y perfil completo.
   bool get hasRegisteredLocation {
     final e = estado?.trim();
@@ -126,13 +134,6 @@ class ProfileModel {
     return uri != null &&
         uri.hasScheme &&
         (uri.scheme == 'http' || uri.scheme == 'https');
-  }
-
-  /// `true` mientras no haya completado las primeras [CashPhasePolicy.entregasRequeridas] entregas
-  /// en modalidad contado (onboarding). Tras esa fase negocia pago y cuotas con cada importador.
-  bool get esAliadoEnFaseContado {
-    if (role?.trim().toLowerCase() != 'aliado') return false;
-    return (primerosPedidosContadoEntregados ?? 0) < CashPhasePolicy.entregasRequeridas;
   }
 
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
@@ -241,7 +242,20 @@ class ProfileModel {
           RatingDimensionStatModel.mapFromProfileJson(
         json['rating_dimensions_as_payer_rolling100'],
       ),
+      acceptedPagoMetodos: parseStringList(json['accepted_pago_metodos']),
     );
+  }
+
+  static List<String>? parseStringList(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is List) {
+      final out = raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      return out.isEmpty ? null : out;
+    }
+    return null;
   }
 
   static int? _asIntNullable(dynamic v) {

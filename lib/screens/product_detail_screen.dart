@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../models/cash_phase_exception.dart';
-import '../models/kyc_verification_exception.dart';
-import '../models/pedidos_suspendidos_morosidad_exception.dart';
-import '../models/profile_location_exception.dart';
-import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
 import '../models/profile_model.dart';
 import '../services/cart_service.dart';
@@ -14,6 +7,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/product_catalog_pricing.dart';
 import '../widgets/catalog_product_price_display.dart';
+import 'cart_screen.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -28,7 +22,6 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  bool _submitting = false;
   ProfileModel? _profile;
 
   PartModel get part => widget.part;
@@ -44,29 +37,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (mounted) setState(() => _profile = p);
   }
 
-  bool get _faseContado => _profile?.esAliadoEnFaseContado ?? false;
-
   bool get _pedidosSuspendidosMorosidad =>
       _profile?.pedidosSuspendidosMorosidad ?? false;
 
   double _precioVentaUnit({int quantity = 1}) =>
-      part.precioUnitarioParaAliado(
-        faseContado: _faseContado,
-        quantity: quantity,
-      );
-
-  String get _direccionFiscalParaDialogo {
-    final p = _profile;
-    if (p == null) return '';
-    final e = p.estado?.trim();
-    final c = p.ciudad?.trim();
-    final d = p.direccion?.trim();
-    final parts = <String>[];
-    if (e != null && e.isNotEmpty) parts.add(e);
-    if (c != null && c.isNotEmpty) parts.add(c);
-    if (d != null && d.isNotEmpty) parts.add(d);
-    return parts.join(', ');
-  }
+      part.precioUnitarioParaAliado(quantity: quantity);
 
   String get _skuDisplay {
     final sku = part.sku?.trim();
@@ -76,7 +51,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return id.substring(0, 12);
   }
 
-  Future<void> _addToCart() async {
+  Future<void> _openCartScreen() async {
+    var profile = _profile;
+    if (profile == null) {
+      profile = await SupabaseService.fetchMyProfile();
+      if (mounted) setState(() => _profile = profile);
+    }
+    if (!mounted) return;
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complete su perfil para confirmar el pedido.'),
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => CartScreen(profile: profile!, liveTasaBcv: null),
+      ),
+    );
+  }
+
+  Future<void> _addToCart({bool navigateToCartAfter = false}) async {
     final ownerId = part.ownerId?.trim();
     if (ownerId == null || ownerId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,14 +108,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         context: context,
         builder: (ctx) {
           return AlertDialog(
-            title: const Text('Agregar al carrito'),
+            title: Text(
+              navigateToCartAfter
+                  ? 'Solicitar este ítem'
+                  : 'Agregar al carrito',
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Indique cuántas unidades desea añadir (disponibles: $maxQty).',
+                    navigateToCartAfter
+                        ? 'Indique la cantidad; luego revisará el carrito antes de confirmar el pedido (disponibles: $maxQty).'
+                        : 'Indique cuántas unidades desea añadir (disponibles: $maxQty).',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.35,
@@ -151,7 +154,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Agregar'),
+                child: Text(navigateToCartAfter ? 'Ir al carrito' : 'Agregar'),
               ),
             ],
           );
@@ -196,10 +199,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     CartService.instance.addOrIncrement(
       part,
-      precioUnitarioAliadoRef: _precioVentaUnit(),
+      precioUnitarioAliadoRef: _precioVentaUnit(quantity: q),
       delta: q,
     );
     if (!mounted) return;
+
+    if (navigateToCartAfter) {
+      await _openCartScreen();
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -212,431 +221,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Future<void> _openRequestDialog() async {
-    final ownerId = part.ownerId?.trim();
-    if (ownerId == null || ownerId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo identificar al importador.')),
-      );
-      return;
-    }
-
-    if (_pedidosSuspendidosMorosidad) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'MotoLink suspendió nuevos pedidos en su cuenta por morosidad. '
-            'Regularice los pagos de entregas pendientes; cuando reactivemos su cuenta, podrá solicitar de nuevo.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    if (part.stock < 1) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No hay unidades disponibles. El importador debe actualizar el inventario.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final qtyController = TextEditingController(text: '1');
-    final destinoCtrl = TextEditingController();
-    final mapsCtrl = TextEditingController();
-    final messenger = ScaffoldMessenger.of(context);
-    final maxQty = part.stock;
-
-    bool? ok;
-    var qtyText = '1';
-    var usaDestinoPerfil = true;
-    var savedDestinoTexto = '';
-    var savedMapsUrl = '';
-    try {
-      ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) {
-          return StatefulBuilder(
-            builder: (ctx, setDialogState) {
-              final fiscal = _direccionFiscalParaDialogo;
-              return AlertDialog(
-                title: const Text('Solicitar pedido'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        part.nombre,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: qtyController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: InputDecoration(
-                          labelText: 'Cantidad (máx. $maxQty)',
-                          filled: true,
-                          fillColor: AppColors.fieldFill,
-                          border: OutlineInputBorder(
-                            borderRadius: AppDecorations.radius12,
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: qtyController,
-                        builder: (context, v, _) {
-                          final q = int.tryParse(v.text) ?? 0;
-                          final safe = q.clamp(1, maxQty);
-                          final unit = _precioVentaUnit(quantity: safe);
-                          final total = unit * safe;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                '${unit.toStringAsFixed(2)} REF / u.',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.brandBlue,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Total: ${total.toStringAsFixed(2)} REF',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 16,
-                                  color: AppColors.brandOrange,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '¿Dónde entregar?',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: Colors.grey.shade900,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      RadioListTile<bool>(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: true,
-                        groupValue: usaDestinoPerfil,
-                        onChanged: (v) {
-                          if (v != null) setDialogState(() => usaDestinoPerfil = v);
-                        },
-                        title: const Text(
-                          'Dirección fiscal de Mi perfil',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (fiscal.isNotEmpty)
-                              Text(
-                                fiscal,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade700,
-                                  height: 1.25,
-                                ),
-                              ),
-                            if (_profile != null &&
-                                !_profile!.hasFiscalMapsShareLink)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  'Debe guardar el enlace «Compartir» de Google Maps en Mi perfil para solicitar el pedido.',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.orange.shade900,
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      RadioListTile<bool>(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: false,
-                        groupValue: usaDestinoPerfil,
-                        onChanged: (v) {
-                          if (v != null) setDialogState(() => usaDestinoPerfil = v);
-                        },
-                        title: const Text(
-                          'Otro destino (esta orden)',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                      ),
-                      if (!usaDestinoPerfil) ...[
-                        TextField(
-                          controller: destinoCtrl,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            labelText: 'Dirección o referencia de entrega',
-                            hintText:
-                                'Ej.: Av. Principal, local, zona, punto de referencia',
-                            filled: true,
-                            fillColor: AppColors.fieldFill,
-                            border: OutlineInputBorder(
-                              borderRadius: AppDecorations.radius12,
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: mapsCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'Enlace Google Maps (obligatorio)',
-                            hintText: 'https://maps.google.com/...',
-                            filled: true,
-                            fillColor: AppColors.fieldFill,
-                            border: OutlineInputBorder(
-                              borderRadius: AppDecorations.radius12,
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () async {
-                              final q = destinoCtrl.text.trim();
-                              if (q.isEmpty) {
-                                messenger.showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Escriba primero una dirección o referencia.',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-                              final uri = Uri.parse(
-                                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(q)}',
-                              );
-                              await launchUrl(
-                                uri,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            },
-                            icon: const Icon(Icons.map_outlined, size: 18),
-                            label: const Text('Buscar en Google Maps'),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        'La cantidad quedará fija para todo el pedido; el stock se descuenta cuando el aliado confirma la entrega.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade700,
-                          height: 1.25,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'La solicitud quedará pendiente de aprobación por MotoLink. '
-                        'El importador solo la verá tras validación.',
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancelar'),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      if (usaDestinoPerfil) {
-                        if (_profile == null ||
-                            !_profile!.hasFiscalMapsShareLink) {
-                          messenger.showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Complete el enlace de Google Maps de su domicilio fiscal en Mi perfil.',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                      } else {
-                        if (destinoCtrl.text.trim().isEmpty) {
-                          messenger.showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Indique la dirección cuando el destino no es el del perfil.',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                        final m = mapsCtrl.text.trim();
-                        final u = Uri.tryParse(m);
-                        if (m.isEmpty ||
-                            u == null ||
-                            !u.hasScheme ||
-                            (u.scheme != 'http' && u.scheme != 'https')) {
-                          messenger.showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Indique un enlace válido de Google Maps (http o https) para la entrega alterna.',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                      }
-                      Navigator.pop(ctx, true);
-                    },
-                    child: const Text('Enviar solicitud'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-      qtyText = qtyController.text;
-      savedDestinoTexto = destinoCtrl.text.trim();
-      savedMapsUrl = mapsCtrl.text.trim();
-    } finally {
-      qtyController.dispose();
-      destinoCtrl.dispose();
-      mapsCtrl.dispose();
-    }
-
-    if (ok != true || !mounted) return;
-
-    var requested = int.tryParse(qtyText.trim()) ?? 1;
-    if (requested < 1) requested = 1;
-
-    var q = requested;
-    if (requested > maxQty) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Stock limitado'),
-          content: Text(
-            'Actualmente hay $maxQty unidad(es) disponible(s). '
-            'Indicó $requested. La solicitud se enviará solo por $maxQty unidades.',
-            style: const TextStyle(height: 1.35),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Volver'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Continuar con $maxQty'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
-      q = maxQty;
-    } else {
-      q = requested;
-    }
-
-    setState(() => _submitting = true);
-    try {
-      await SupabaseService.insertTransactionRequest(
-        productId: part.id,
-        ownerId: ownerId,
-        cantidad: q,
-        precioUnitarioProveedor: part.precio,
-        destinoEntregaUsaPerfil: usaDestinoPerfil,
-        destinoEntregaTexto:
-            usaDestinoPerfil ? null : savedDestinoTexto,
-        destinoEntregaMapsUrl:
-            usaDestinoPerfil ? null : savedMapsUrl,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Pedido registrado. El importador confirmará stock y preparación.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } on PedidosSuspendidosMorosidadException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      await _loadProfile();
-    } on KycVerificationException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } on CashPhaseException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } on ProfileLocationException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } on StockInsufficientException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
+  Future<void> _solicitarItemViaCarrito() => _addToCart(navigateToCartAfter: true);
 
   @override
   Widget build(BuildContext context) {
@@ -728,7 +313,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         listPriceUsd: part.precio,
                         salePriceUsd: part.salePriceUsd,
                         discountRules: part.discountRules,
-                        faseContado: _faseContado,
                         showPromotionChips: false,
                       ),
                       if (ProductCatalogPricing.volumeIncentiveBadgeEs(
@@ -908,30 +492,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(height: 8),
                 ],
                 OutlinedButton(
-                  onPressed: (_submitting ||
-                          part.stock < 1 ||
-                          _pedidosSuspendidosMorosidad)
+                  onPressed: (part.stock < 1 || _pedidosSuspendidosMorosidad)
                       ? null
                       : _addToCart,
                   child: const Text('Agregar al carrito'),
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(
-                  onPressed: (_submitting ||
-                          part.stock < 1 ||
-                          _pedidosSuspendidosMorosidad)
+                  onPressed: (part.stock < 1 || _pedidosSuspendidosMorosidad)
                       ? null
-                      : _openRequestDialog,
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Solicitar solo este ítem'),
+                      : _solicitarItemViaCarrito,
+                  child: const Text('Solicitar solo este ítem'),
                 ),
               ],
             ),

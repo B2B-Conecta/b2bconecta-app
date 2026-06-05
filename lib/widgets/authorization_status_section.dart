@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/aliado_doc_type.dart';
-import '../models/cash_phase_policy.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
@@ -37,8 +36,6 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile?.id != widget.profile?.id ||
         oldWidget.profile?.kycStatus != widget.profile?.kycStatus ||
-        oldWidget.profile?.primerosPedidosContadoEntregados !=
-            widget.profile?.primerosPedidosContadoEntregados ||
         oldWidget.profile?.pedidosSuspendidosMorosidad !=
             widget.profile?.pedidosSuspendidosMorosidad) {
       _reloadDocs();
@@ -62,7 +59,10 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
     if (p == null) return const SizedBox.shrink();
 
     final role = p.role?.trim().toLowerCase();
-    if (role == 'importador' || role == 'aliado') {
+    if (role == 'importador') {
+      return _ImportadorAuthorizationCard(profile: p);
+    }
+    if (role == 'aliado') {
       return FutureBuilder<List<ProfileDocumentModel>>(
         future: _docsFuture,
         builder: (context, snap) {
@@ -78,16 +78,9 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
               ),
             );
           }
-          final docs = snap.data ?? [];
-          if (role == 'importador') {
-            return _ImportadorAuthorizationCard(
-              profile: p,
-              documents: docs,
-            );
-          }
           return _AliadoAuthorizationCard(
             profile: p,
-            documents: docs,
+            documents: snap.data ?? [],
           );
         },
       );
@@ -97,35 +90,16 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
 }
 
 class _ImportadorAuthorizationCard extends StatelessWidget {
-  const _ImportadorAuthorizationCard({
-    required this.profile,
-    required this.documents,
-  });
+  const _ImportadorAuthorizationCard({required this.profile});
 
   final ProfileModel profile;
-  final List<ProfileDocumentModel> documents;
-
-  ProfileDocumentModel? _docFor(String type) {
-    for (final d in documents) {
-      if (d.docType == type) return d;
-    }
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
     final complete = profile.isComplete;
-    final kycGlobal = profile.kycStatus?.trim();
-    final kycOk = kycGlobal == KycStatus.aprobado;
-
     final operacionLabelEs = complete
         ? 'Perfil B2B completo: puede gestionar inventario y pedidos.'
         : 'Complete nombre, RIF, domicilio fiscal y enlace Google Maps.';
-
-    final kycLabelEs = kycOk
-        ? 'Verificación documental aprobada.'
-        : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
-            'Suba el expediente en la sección de documentación.';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -141,7 +115,7 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  complete && kycOk
+                  complete
                       ? Icons.check_circle_outline
                       : Icons.info_outline,
                   size: 22,
@@ -162,50 +136,6 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _CheckRow(ok: complete, label: operacionLabelEs),
-            const SizedBox(height: 6),
-            _CheckRow(ok: kycOk, label: kycLabelEs),
-            const SizedBox(height: 10),
-            const Text(
-              'Documentos (revisión individual)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ...AliadoDocType.all.map((type) {
-              final d = _docFor(type);
-              final st = d?.reviewStatus?.trim();
-              final line = d == null
-                  ? 'Sin archivo — ${AliadoDocType.labelEs(type)}'
-                  : '${AliadoDocType.labelEs(type)}: ${DocumentReviewStatus.labelEs(st ?? DocumentReviewStatus.pendiente)}';
-              final docOk = st == DocumentReviewStatus.aprobado;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      docOk ? Icons.check_circle : Icons.radio_button_off,
-                      size: 16,
-                      color: docOk ? AppColors.successGreen : Colors.grey.shade600,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        line,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          height: 1.35,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
           ],
         ),
       ),
@@ -231,26 +161,26 @@ class _AliadoAuthorizationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final faseContado = profile.esAliadoEnFaseContado;
     final kycGlobal = profile.kycStatus?.trim();
     final kycOk = kycGlobal == KycStatus.aprobado;
 
-    final operacionLabelEs = faseContado
-        ? 'Primeros pedidos (contado): con RIF, domicilio fiscal y enlace Google Maps puede solicitar hasta '
-            '${CashPhasePolicy.entregasRequeridas} entregas en esa modalidad (un pedido activo a la vez). '
-            'Tras esa fase, los plazos y cuotas se acuerdan directamente con cada importador en el chat del pedido.'
-        : 'Puede solicitar repuestos en el catálogo. El pago al contado o en cuotas se negocia con cada importador '
-            '(Zelle, Pago Móvil, transferencia, efectivo, etc.).';
-
-    final kycLabelEs = faseContado && !kycOk
-        ? 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}. '
-            'No bloquea pedidos en contado mientras tenga RIF, domicilio fiscal y enlace Maps.'
-        : (kycOk
-            ? 'Verificación documental aprobada (todos los documentos requeridos).'
-            : 'Verificación documental: ${KycStatus.labelEs(kycGlobal)}.');
+    final kycLabelEs = kycOk
+        ? 'Verificación documental aprobada.'
+        : 'Verificación: ${KycStatus.labelEs(kycGlobal)}.';
 
     const operacionRowOk = true;
-    final kycRowOk = faseContado || kycOk;
+    final kycRowOk = kycOk;
+    final docTypes = AliadoDocType.forRole('aliado');
+
+    ProfileDocumentModel? docForType(String type) {
+      if (type == AliadoDocType.cedulaPropietario) {
+        for (final d in documents) {
+          if (AliadoDocType.isCedulaAliadoDoc(d.docType)) return d;
+        }
+        return null;
+      }
+      return _docFor(type);
+    }
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -259,25 +189,25 @@ class _AliadoAuthorizationCard extends StatelessWidget {
         border: Border.all(color: AppColors.brandBlue.withOpacity(0.22)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(
-                  kycRowOk && operacionRowOk
+                  kycRowOk && operacionRowOk && profile.isComplete
                       ? Icons.check_circle_outline
                       : Icons.info_outline,
-                  size: 22,
+                  size: 20,
                   color: AppColors.brandBlue,
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Estado para pedir repuestos (aliado)',
+                    'Estado del aliado',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                       color: AppColors.brandBlue,
                     ),
@@ -285,7 +215,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             if (profile.pedidosSuspendidosMorosidad) ...[
               Material(
                 color: Colors.red.shade50,
@@ -319,74 +249,36 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             _CheckRow(
               ok: profile.isComplete,
               label: profile.isComplete
-                  ? 'Perfil B2B completo.'
-                  : 'Complete los datos fiscales y de contacto del perfil.',
+                  ? 'RIF, dirección fiscal y Maps completos.'
+                  : 'Complete RIF, dirección fiscal y enlace Google Maps.',
             ),
-            const SizedBox(height: 6),
-            _CheckRow(
-              ok: operacionRowOk,
-              label: operacionLabelEs,
-            ),
-            const SizedBox(height: 6),
-            _CheckRow(
-              ok: kycRowOk,
-              label: kycLabelEs,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Documentos (revisión individual)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ...AliadoDocType.all.map((type) {
-              final d = _docFor(type);
+            const SizedBox(height: 4),
+            _CheckRow(ok: kycRowOk, label: kycLabelEs),
+            const SizedBox(height: 8),
+            ...docTypes.map((type) {
+              final d = docForType(type);
               final st = d?.reviewStatus?.trim();
-              final line = d == null
-                  ? 'Sin archivo — ${AliadoDocType.labelEs(type)}'
-                  : '${AliadoDocType.labelEs(type)}: ${DocumentReviewStatus.labelEs(st ?? DocumentReviewStatus.pendiente)}';
               final docOk = st == DocumentReviewStatus.aprobado;
-              final note = d?.reviewNote?.trim();
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       docOk ? Icons.check_circle : Icons.radio_button_off,
-                      size: 16,
+                      size: 15,
                       color: docOk ? AppColors.successGreen : Colors.grey.shade600,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            line,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.35,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (note != null && note.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'MotoLink: $note',
-                              style: TextStyle(
-                                fontSize: 11,
-                                height: 1.35,
-                                fontStyle: FontStyle.italic,
-                                color: Colors.orange.shade900,
-                              ),
-                            ),
-                          ],
-                        ],
+                      child: Text(
+                        d == null
+                            ? AliadoDocType.labelEs(type)
+                            : '${AliadoDocType.labelEs(type)} · ${DocumentReviewStatus.labelEs(st ?? DocumentReviewStatus.pendiente)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],

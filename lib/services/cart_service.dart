@@ -13,7 +13,7 @@ class CartLine {
   final PartModel part;
   int quantity;
 
-  /// Precio unitario REF acordado al añadir (fase contado / cupo según perfil en ese momento).
+  /// Precio unitario REF acordado al añadir al carrito.
   final double precioUnitarioAliadoRef;
 }
 

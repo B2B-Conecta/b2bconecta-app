@@ -1,4 +1,3 @@
-import '../models/cash_phase_policy.dart';
 import 'broker_pricing.dart';
 import 'product_volume_tiers.dart';
 
@@ -66,7 +65,6 @@ abstract final class ProductCatalogPricing {
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     int quantity = 1,
-    required bool faseContado,
   }) {
     final wholesale = wholesaleUnitUsd(
       listPriceUsd: listPriceUsd,
@@ -74,11 +72,7 @@ abstract final class ProductCatalogPricing {
     );
     final pct = volumeDiscountPercent(discountRules, quantity);
     final afterVolume = wholesale * (1 - pct / 100.0);
-    var unit = afterVolume * (1 + motolinkFeeRate);
-    if (faseContado) {
-      unit *= (1 - CashPhasePolicy.descuentoContadoSobrePrecioMotoLink);
-    }
-    return unit;
+    return afterVolume * (1 + motolinkFeeRate);
   }
 
   /// Precio tachado: lista regular sin oferta directa (sin tramo volumen en grid).
@@ -86,14 +80,12 @@ abstract final class ProductCatalogPricing {
     required double listPriceUsd,
     Map<String, dynamic>? discountRules,
     int quantity = 1,
-    required bool faseContado,
   }) =>
       aliadoUnitUsd(
         listPriceUsd: listPriceUsd,
         salePriceUsd: null,
         discountRules: discountRules,
         quantity: quantity,
-        faseContado: faseContado,
       );
 
   static String? volumeIncentiveBadgeEs(

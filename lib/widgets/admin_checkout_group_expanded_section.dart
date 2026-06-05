@@ -271,7 +271,6 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
               direccion: anchor.ownerDireccion,
               fiscalMapsUrl: anchor.ownerFiscalMapsUrl,
               logoStoragePath: anchor.ownerLogoStoragePath,
-              kycStatus: anchor.ownerKycStatus,
             ),
             const SizedBox(height: 6),
             Wrap(

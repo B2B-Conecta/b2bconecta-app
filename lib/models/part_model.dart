@@ -91,16 +91,12 @@ class PartModel {
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
   /// Precio de venta al aliado (cascada E4; sin tramo volumen si [quantity] = 1 en grid).
-  double precioUnitarioParaAliado({
-    required bool faseContado,
-    int quantity = 1,
-  }) =>
+  double precioUnitarioParaAliado({int quantity = 1}) =>
       ProductCatalogPricing.aliadoUnitUsd(
         listPriceUsd: precio,
         salePriceUsd: salePriceUsd,
         discountRules: discountRules,
         quantity: quantity,
-        faseContado: faseContado,
       );
 
   factory PartModel.fromJson(Map<String, dynamic> json) {

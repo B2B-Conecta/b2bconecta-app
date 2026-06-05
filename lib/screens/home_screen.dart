@@ -88,8 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late final Future<List<PromoCampaignModel>> _promoFuture;
   bool _promoPopupCheckScheduled = false;
 
-  /// Alineado con el precio en ficha (descuento en fase contado).
-  bool _aliadoFaseContado = false;
 
   CatalogSortMode _catalogSortMode = CatalogSortMode.recommended;
   double? _minOwnerRatingAvg;
@@ -118,13 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _searchController.addListener(_onAliadoSearchTextChanged);
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
-      _aliadoFaseContado = widget.profile.esAliadoEnFaseContado;
-      SupabaseService.fetchMyProfile().then((p) {
-        if (!mounted) return;
-        setState(() {
-          _aliadoFaseContado = p?.esAliadoEnFaseContado ?? false;
-        });
-      });
     } else if (widget.homeRole == AppHomeRole.administrador) {
       _importersFuture = Future.value(const []);
       _promoFuture = Future.value(const []);
@@ -928,7 +919,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             profile: widget.profile,
                             showDistanceChips:
                                 _activeFilters.sortByDistanceFromReference,
-                            faseContadoAliado: _aliadoFaseContado,
                             onTap: () {
                               Navigator.of(context).push<void>(
                                 MaterialPageRoute<void>(
@@ -980,14 +970,12 @@ class _ProductGridCard extends StatelessWidget {
     required this.part,
     required this.profile,
     this.showDistanceChips = false,
-    this.faseContadoAliado = false,
     this.onTap,
   });
 
   final PartModel part;
   final ProfileModel profile;
   final bool showDistanceChips;
-  final bool faseContadoAliado;
   final VoidCallback? onTap;
 
   @override
@@ -1126,7 +1114,6 @@ class _ProductGridCard extends StatelessWidget {
                         listPriceUsd: part.precio,
                         salePriceUsd: part.salePriceUsd,
                         discountRules: part.discountRules,
-                        faseContado: faseContadoAliado,
                         catalogGrid: true,
                       ),
                       const Spacer(),

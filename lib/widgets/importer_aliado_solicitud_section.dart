@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/order_item_model.dart';
+import '../models/pago_metodo.dart';
 import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -249,7 +250,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           ],
           Text(
             '$nPart ${nPart == 1 ? 'línea' : 'líneas'} · $uds uds · '
-            '${formatRefAmount(r.precioTotal)} REF'
+            '${_totalRefEtiquetaPedidoAliado(r)}'
             '${r.precioTotalBsUi != null ? ' · ~${formatVesAmount(r.precioTotalBsUi!)} Bs' : ''}',
             style: TextStyle(
               fontSize: bodySize * 0.95,
@@ -257,6 +258,27 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
               height: 1.3,
             ),
           ),
+          if (r.tieneDescuentoDivisasAplicadoEnPedido) ...[
+            SizedBox(height: compact ? 4 : 6),
+            Text(
+              'Incluye descuento por pago en ${PagoMetodo.labelEs(r.pagoMetodo!)}.',
+              style: TextStyle(
+                fontSize: compact ? 10 : 10.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.green.shade800,
+              ),
+            ),
+          ] else if (r.tieneDescuentoDivisasDisponible) ...[
+            SizedBox(height: compact ? 4 : 6),
+            Text(
+              'Zelle, Binance, USDT o efectivo aplican descuento en divisas al registrar el pago.',
+              style: TextStyle(
+                fontSize: compact ? 10 : 10.5,
+                color: Colors.grey.shade700,
+                height: 1.25,
+              ),
+            ),
+          ],
           if (!embedInOrderCard) ...[
             const SizedBox(height: 2),
             Text(
@@ -394,4 +416,15 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
       ],
     );
   }
+}
+
+String _totalRefEtiquetaPedidoAliado(TransactionRequestModel r) {
+  final total = r.tieneDescuentoDivisasAplicadoEnPedido
+      ? r.precioTotal
+      : r.refBaseTotalForPago;
+  final buf = StringBuffer('${formatRefAmount(total)} REF');
+  if (r.tieneDescuentoDivisasAplicadoEnPedido) {
+    buf.write(' (antes ${formatRefAmount(r.refBaseTotalForPago)})');
+  }
+  return buf.toString();
 }

@@ -134,7 +134,7 @@ Migración `20260709120000_e4_sale_price_volume_pricing.sql`:
 
 - **`products.sale_price_usd`:** precio mayorista promocional (columna indexable). En catálogo: precio lista tachado + precio oferta en verde (REF); línea USD con % adicional si `usd_payment_discount_pct` en `discount_rules`.
 - **`products.discount_rules`:** tramos por volumen (`volume_tiers`) y opcional `usd_payment_discount_pct` (% sobre precio REF en línea USD del catálogo).
-- **Checkout (cascada):** oferta → % volumen por unidades → +10 % MotoLink → −5 % contado si aplica. Snapshot en `discount_rules` incluye `applied_volume_*`.
+- **Checkout (cascada):** oferta → % volumen por unidades → +10 % MotoLink. Snapshot en `discount_rules` incluye `applied_volume_*`.
 - **`promo_campaigns`:** no alteran precio (solo visibilidad / ranking).
 - **Importador:** ficha de producto + Excel (`precio_oferta_usd`, `descuento_pago_usd_pct`, `tramos_volumen_json`).
 - **Seed demo:** importadores 1–12 con oferta, tramos por volumen y `usd_payment_discount_pct` (1,5 %–4 % según SKU).

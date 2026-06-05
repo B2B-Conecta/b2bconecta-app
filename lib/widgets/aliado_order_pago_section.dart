@@ -9,6 +9,8 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/order_payment_pricing.dart';
+import 'aliado_usd_payment_discount_ficha.dart';
 import 'moroso_order_visual.dart';
 
 /// Método de pago y comprobante. El importador verifica la acreditación (negociación por chat).
@@ -23,6 +25,7 @@ class AliadoOrderPagoSection extends StatefulWidget {
     /// Si hay varias líneas del mismo importador en el carrito: un solo comprobante
     /// replica el archivo en todas (vía [SupabaseService.aliadoSubmitComprobantePagoBundle]).
     this.pagoBundleLines,
+    this.onPagoMetodoPreviewChanged,
   });
 
   final TransactionRequestModel request;
@@ -31,6 +34,9 @@ class AliadoOrderPagoSection extends StatefulWidget {
 
   /// Líneas del mismo proveedor a actualizar con el mismo comprobante.
   final List<TransactionRequestModel>? pagoBundleLines;
+
+  /// Notifica al contenedor de la ficha (pasarela) el método elegido para el banner.
+  final ValueChanged<String?>? onPagoMetodoPreviewChanged;
 
   /// El padre muestra un título grupal («Pago al importador») cuando hay varias líneas del mismo almacén.
   final bool suppressPrimaryTitle;
@@ -46,16 +52,37 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   String? _metodoSeleccionado;
   bool _busy = false;
 
-  /// MotoConecta: Zelle, Pago Móvil, Binance, transferencia y efectivo (verificación por el importador).
-  List<String> get _metodosPermitidos => PagoMetodo.valuesMotoconecta;
+  List<String> get _metodosPermitidos =>
+      widget.request.metodosPagoPermitidos;
 
-  void _syncMetodoSeleccionado() {
+  void _notifyMetodoPreview({bool immediate = false}) {
+    final cb = widget.onPagoMetodoPreviewChanged;
+    if (cb == null) return;
+    final metodo = _metodoSeleccionado;
+    void fire() {
+      if (!mounted) return;
+      cb(metodo);
+    }
+    // Evita setState en el padre durante build (!_dirty is not true).
+    if (immediate) {
+      fire();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => fire());
+    }
+  }
+
+  void _syncMetodoSeleccionado({bool notifyParent = true}) {
     final permitidos = _metodosPermitidos;
     final m = widget.request.pagoMetodo?.trim();
     if (m != null && m.isNotEmpty && permitidos.contains(m)) {
       _metodoSeleccionado = m;
-    } else {
+    } else if (permitidos.isNotEmpty) {
       _metodoSeleccionado = permitidos.first;
+    } else {
+      _metodoSeleccionado = null;
+    }
+    if (notifyParent) {
+      _notifyMetodoPreview();
     }
   }
 
@@ -69,8 +96,8 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   void didUpdateWidget(covariant AliadoOrderPagoSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.request.id != widget.request.id ||
-        oldWidget.profile?.primerosPedidosContadoEntregados !=
-            widget.profile?.primerosPedidosContadoEntregados) {
+        oldWidget.request.ownerAcceptedPagoMetodos !=
+            widget.request.ownerAcceptedPagoMetodos) {
       _syncMetodoSeleccionado();
     }
   }
@@ -189,6 +216,20 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             pe == PagoRevisionEstado.aprobado;
     final puedeCambiarMetodo =
         puedeModificarComprobante && _puedeCambiarMetodo(r);
+    final metodosPermitidos = _metodosPermitidos;
+    final metodoPreview = r.hasComprobantePago && !puedeCambiarMetodo
+        ? r.pagoMetodo
+        : _metodoSeleccionado;
+    final bundle = widget.pagoBundleLines;
+    final discountPreview = bundle != null && bundle.length > 1
+        ? OrderPaymentPricing.previewForLines(
+            lines: bundle,
+            pagoMetodo: metodoPreview,
+          )
+        : OrderPaymentPricing.previewForRequest(
+            request: r,
+            pagoMetodo: metodoPreview,
+          );
     final mostrarGestionPago = !referenciaHistorica
         ? (_estadoPermiteDeclaracionPago(r) ||
             r.hasComprobantePago ||
@@ -268,6 +309,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
             const SizedBox(height: 8),
           ],
+          if (discountPreview.applies) ...[
+            AliadoUsdPaymentDiscountFichaBanner(preview: discountPreview),
+            const SizedBox(height: 8),
+          ],
           OutlinedButton.icon(
             onPressed: () => _abrirComprobante(context),
             icon: const Icon(Icons.receipt_long_outlined, size: 18),
@@ -284,6 +329,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
           ),
         if (mostrarGestionPago && !referenciaHistorica) ...[
+          if (discountPreview.applies) ...[
+            const SizedBox(height: 10),
+            AliadoUsdPaymentDiscountFichaBanner(preview: discountPreview),
+            const SizedBox(height: 12),
+          ],
           const SizedBox(height: 14),
           const Text(
             'Método de pago',
@@ -298,7 +348,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Zelle, Pago Móvil, Binance, transferencia o efectivo; el importador verifica.',
+                metodosPermitidos.isEmpty
+                    ? 'Este importador no tiene métodos de pago configurados. Acuerde con él por chat.'
+                    : 'Métodos habilitados por el importador; Zelle, Binance, USDT y efectivo pueden aplicar descuento en divisas.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,
@@ -306,14 +358,19 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 ),
               ),
             ),
-          if (puedeCambiarMetodo)
+          if (metodosPermitidos.isEmpty)
+            Text(
+              'Sin métodos disponibles.',
+              style: TextStyle(fontSize: 12, color: Colors.red.shade800),
+            )
+          else if (puedeCambiarMetodo)
             DropdownButtonFormField<String>(
               value: _metodoSeleccionado,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
-              items: _metodosPermitidos
+              items: metodosPermitidos
                   .map(
                     (c) => DropdownMenuItem(
                       value: c,
@@ -321,7 +378,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                     ),
                   )
                   .toList(),
-              onChanged: (v) => setState(() => _metodoSeleccionado = v),
+              onChanged: (v) {
+                setState(() => _metodoSeleccionado = v);
+                _notifyMetodoPreview(immediate: true);
+              },
             )
           else
             Text(
@@ -338,7 +398,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               label: const Text('Ver comprobante de pago'),
             ),
           ],
-          if (puedeModificarComprobante && _metodoSeleccionado != null) ...[
+          if (puedeModificarComprobante &&
+              _metodoSeleccionado != null &&
+              metodosPermitidos.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
               pe == PagoRevisionEstado.enRevision

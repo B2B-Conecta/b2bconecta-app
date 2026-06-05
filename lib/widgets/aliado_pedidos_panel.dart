@@ -17,6 +17,7 @@ import 'aliado_expandable_order_card.dart';
 import 'aliado_confirmar_recepcion_section.dart';
 import '../utils/aliado_experience_utils.dart';
 import 'aliado_order_pago_section.dart';
+import '../utils/order_payment_pricing.dart';
 import 'order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
 import '../utils/aliado_multi_importer_payment.dart';
@@ -622,11 +623,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           _PasarelaPagoMotoLinkCard(
             lineCount: 1,
             importerName: r.ownerBusinessName,
-            montoRef: r.precioTotal,
-            child: AliadoOrderPagoSection(
+            montoRef: r.refBaseTotalForPago > 0
+                ? r.refBaseTotalForPago
+                : r.precioTotal,
+            previewLines: [r],
+            childBuilder: (onMetodoPreview) => AliadoOrderPagoSection(
+              key: ValueKey<String>('pago-${r.id}'),
               request: r,
               profile: _profile,
               onChanged: _load,
+              onPagoMetodoPreviewChanged: onMetodoPreview,
               suppressPrimaryTitle: true,
               suppressNegotiationIntro: false,
             ),
@@ -654,7 +660,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     required String? bundleCheckoutGroupId,
   }) {
     final name = chunk.first.ownerBusinessName ?? 'Importador';
-    final subtotal = subtotalBloqueImportador(chunk);
+    final subtotal = refSubtotalBloqueImportador(chunk);
     final disc = computeVolumeDiscountForLines(chunk);
     final cg = chunk.first.checkoutGroupId?.trim() ?? '';
     final usePagoUnificado = chunk.length > 1 &&
@@ -702,8 +708,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           pagoIndex: importerIndex,
           pagoTotal: importerTotal,
           montoRef: subtotal,
+          previewLines: usePagoUnificado ? chunk : null,
+          childBuilder: usePagoUnificado
+              ? (onMetodoPreview) =>
+                  _columnPagoUnificadoImportador(chunk, onMetodoPreview)
+              : null,
           child: usePagoUnificado
-              ? _columnPagoUnificadoImportador(chunk)
+              ? null
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -872,7 +883,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   }
 
   /// Una pasarela de pago y un comprobante para todas las líneas de este importador (sin plan de cuotas).
-  Widget _columnPagoUnificadoImportador(List<TransactionRequestModel> chunk) {
+  Widget _columnPagoUnificadoImportador(
+    List<TransactionRequestModel> chunk,
+    ValueChanged<String?> onMetodoPreview,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -880,6 +894,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           request: chunk.first,
           profile: _profile,
           onChanged: _load,
+          onPagoMetodoPreviewChanged: onMetodoPreview,
           pagoBundleLines: chunk,
           suppressPrimaryTitle: true,
           suppressNegotiationIntro: false,
@@ -1105,7 +1120,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 }
 
 /// Contenedor único de pasarela MotoLink por bloque importador–aliado en el pie del pedido.
-class _PasarelaPagoMotoLinkCard extends StatelessWidget {
+class _PasarelaPagoMotoLinkCard extends StatefulWidget {
   const _PasarelaPagoMotoLinkCard({
     required this.lineCount,
     this.singleComprobantePorProveedor = false,
@@ -1113,20 +1128,83 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
     this.pagoIndex,
     this.pagoTotal,
     this.montoRef,
-    required this.child,
+    this.previewLines,
+    this.childBuilder,
+    this.child,
   });
 
   final int lineCount;
-  /// Varios ítems mismo importador: un archivo para todas las líneas (sin duplicar UI).
   final bool singleComprobantePorProveedor;
   final String? importerName;
   final int? pagoIndex;
   final int? pagoTotal;
   final double? montoRef;
-  final Widget child;
+  final List<TransactionRequestModel>? previewLines;
+  final Widget Function(ValueChanged<String?> onMetodoPreview)? childBuilder;
+  final Widget? child;
+
+  @override
+  State<_PasarelaPagoMotoLinkCard> createState() =>
+      _PasarelaPagoMotoLinkCardState();
+}
+
+class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
+  String? _metodoPreview;
+
+  @override
+  void initState() {
+    super.initState();
+    _metodoPreview = _initialMetodoPreview(widget.previewLines);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PasarelaPagoMotoLinkCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.previewLines != widget.previewLines) {
+      _metodoPreview = _initialMetodoPreview(widget.previewLines);
+    }
+  }
+
+  static String? _initialMetodoPreview(
+    List<TransactionRequestModel>? lines,
+  ) {
+    if (lines == null || lines.isEmpty) return null;
+    final r = lines.first;
+    final guardado = r.pagoMetodo?.trim();
+    final permitidos = r.metodosPagoPermitidos;
+    if (guardado != null &&
+        guardado.isNotEmpty &&
+        permitidos.contains(guardado)) {
+      return guardado;
+    }
+    return permitidos.isNotEmpty ? permitidos.first : null;
+  }
+
+  void _onMetodoPreview(String? metodo) {
+    if (_metodoPreview == metodo) return;
+    setState(() => _metodoPreview = metodo);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final lines = widget.previewLines;
+    UsdPaymentDiscountPreview? discountPreview;
+    if (lines != null && lines.isNotEmpty && _metodoPreview != null) {
+      discountPreview = OrderPaymentPricing.previewForLines(
+        lines: lines,
+        pagoMetodo: _metodoPreview,
+      );
+    }
+
+    final montoBase = widget.montoRef;
+    final montoMostrar = discountPreview != null && discountPreview.applies
+        ? discountPreview.total
+        : montoBase;
+
+    final body = widget.childBuilder != null
+        ? widget.childBuilder!(_onMetodoPreview)
+        : widget.child ?? const SizedBox.shrink();
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceTinted.withOpacity(0.45),
@@ -1152,8 +1230,10 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        pagoIndex != null && pagoTotal != null && pagoTotal! > 1
-                            ? 'Su pago $pagoIndex de $pagoTotal'
+                        widget.pagoIndex != null &&
+                                widget.pagoTotal != null &&
+                                widget.pagoTotal! > 1
+                            ? 'Su pago ${widget.pagoIndex} de ${widget.pagoTotal}'
                             : 'Pasarela de pago MotoLink',
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
@@ -1161,11 +1241,11 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      if (importerName != null &&
-                          importerName!.trim().isNotEmpty) ...[
+                      if (widget.importerName != null &&
+                          widget.importerName!.trim().isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          importerName!.trim(),
+                          widget.importerName!.trim(),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -1173,23 +1253,42 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (montoRef != null) ...[
+                      if (montoMostrar != null) ...[
                         const SizedBox(height: 2),
                         Text(
-                          'Monto de este proveedor: ${formatRefAmount(montoRef!)} REF',
-                          style: const TextStyle(
+                          discountPreview != null && discountPreview.applies
+                              ? 'Monto con descuento: ${formatRefAmount(montoMostrar)} REF'
+                              : 'Monto de este proveedor: ${formatRefAmount(montoMostrar)} REF',
+                          style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.brandBlue,
+                            color: discountPreview != null &&
+                                    discountPreview.applies
+                                ? Colors.green.shade800
+                                : AppColors.brandBlue,
                           ),
                         ),
+                        if (discountPreview != null &&
+                            discountPreview.applies &&
+                            montoBase != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Antes del descuento: ${formatRefAmount(montoBase)} REF',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: Colors.grey.shade600,
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 4),
                       Text(
-                        singleComprobantePorProveedor
+                        widget.singleComprobantePorProveedor
                             ? 'Un solo comprobante cubre todas las líneas de este proveedor; '
                                 'el importador lo revisa una vez.'
-                            : lineCount > 1
+                            : widget.lineCount > 1
                                 ? 'Registre el pago de cada línea de este proveedor.'
                                 : 'Método y comprobante para este proveedor.',
                         style: TextStyle(
@@ -1204,7 +1303,7 @@ class _PasarelaPagoMotoLinkCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            child,
+            body,
           ],
         ),
       ),

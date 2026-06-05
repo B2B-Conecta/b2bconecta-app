@@ -3,8 +3,6 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/cash_phase_exception.dart';
-import '../models/cash_phase_policy.dart';
 import '../models/catalog_filters.dart';
 import '../models/catalog_sort_mode.dart';
 import '../models/commission_settlement_model.dart';
@@ -56,14 +54,8 @@ class SupabaseService {
   /// Comisión MotoLink sobre precio mayorista (misma base que [BrokerPricing.feeRate]).
   static double get logisticFeeRate => BrokerPricing.feeRate;
 
-  static double calculateAliadoUnitPrice(
-    double precioUnitarioProveedor, {
-    bool faseContado = false,
-  }) {
-    return BrokerPricing.unitPriceForAliado(
-      precioUnitarioProveedor,
-      faseContado: faseContado,
-    );
+  static double calculateAliadoUnitPrice(double precioUnitarioProveedor) {
+    return BrokerPricing.unitPriceForAliado(precioUnitarioProveedor);
   }
 
   static SupabaseClient get _client => Supabase.instance.client;
@@ -436,6 +428,16 @@ class SupabaseService {
     }
 
     await _client.from('profiles').upsert(payload);
+  }
+
+  /// Importador: métodos de pago que el aliado puede elegir al registrar comprobante.
+  static Future<void> importadorSetAcceptedPagoMetodos(
+    List<String> metodos,
+  ) async {
+    await _client.rpc(
+      'importador_set_accepted_pago_metodos',
+      params: <String, dynamic>{'p_metodos': metodos},
+    );
   }
 
   /// URL firmada (1 h) para el logo en `profile-logos`.
@@ -836,10 +838,13 @@ class SupabaseService {
     aliado_id,
     importador_id,
     product_id,
-    products ( name, sku ),
+    products ( name, sku, discount_rules ),
     status,
     cantidad,
     precio_total_usd,
+    precio_base_aliado_total,
+    precio_unitario_proveedor,
+    precio_unitario_aliado,
     commission_rate_snapshot,
     comision_devengada_usd,
     comision_devengada_at,
@@ -887,7 +892,7 @@ class SupabaseService {
     created_at,
     updated_at,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status ),
-    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status )
+    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, accepted_pago_metodos )
   ''';
 
   static String get _trSelectForListWithSubs => _trSelectMotoconecta;
@@ -1112,13 +1117,13 @@ class SupabaseService {
         .toList();
   }
 
-  /// Perfiles B2B (aliado e importador) para cola KYC admin.
+  /// Perfiles aliado para cola KYC admin.
   static Future<List<ProfileModel>> fetchB2BProfilesForAdminKycReview() async {
     final response = await _client
         .from('profiles')
         .select()
-        .inFilter('role', ['aliado', 'importador']).order('business_name',
-            ascending: true);
+        .eq('role', 'aliado')
+        .order('business_name', ascending: true);
 
     final list = response as List<dynamic>;
     return list
@@ -1127,7 +1132,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Broker: actualiza estado KYC global del perfil (aliado o importador).
+  /// Broker: actualiza estado KYC global del perfil aliado.
   static Future<void> adminSetProfileKycStatus({
     required String profileId,
     required String status,
@@ -1394,9 +1399,6 @@ class SupabaseService {
       );
     }
 
-    final pce = profile.primerosPedidosContadoEntregados ?? 0;
-    final enFaseContado = pce < CashPhasePolicy.entregasRequeridas;
-
     // Misma regla en toda la vida del aliado: RIF + domicilio (ya validado arriba); solo
     // documentación explícitamente rechazada bloquea pedidos al contado. KYC completo no es
     // requisito para generar pedidos.
@@ -1413,10 +1415,7 @@ class SupabaseService {
       );
     }
 
-    final unitAliado = calculateAliadoUnitPrice(
-      precioUnitarioProveedor,
-      faseContado: enFaseContado,
-    );
+    final unitAliado = calculateAliadoUnitPrice(precioUnitarioProveedor);
     final total = unitAliado * cantidad;
 
     final prodRes = await _client
@@ -1444,17 +1443,6 @@ class SupabaseService {
       throw ArgumentError(
         'Indique la dirección de entrega cuando el destino no es el del perfil.',
       );
-    }
-
-    if (enFaseContado) {
-      final openCnt = await fetchOpenTransactionRequestCountForCurrentAliado();
-      if (openCnt >= 1) {
-        throw CashPhaseException(
-          'En los primeros ${CashPhasePolicy.entregasRequeridas} pedidos en contado solo puede '
-          'tener un pedido activo a la vez. Cuando el actual se entregue o lo cancele con MotoLink, '
-          'podrá solicitar otro.',
-        );
-      }
     }
 
     try {

@@ -55,10 +55,32 @@ Map<String, dynamic> productVolumeTiersToDiscountRules(
   return buildProductDiscountRules(volumeTiers: tiers) ?? {};
 }
 
+/// Parsea `discount_rules` desde Map o JSON string (PostgREST / legacy).
+Map<String, dynamic>? parseDiscountRulesMap(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is Map) {
+    final m = Map<String, dynamic>.from(raw);
+    return m.isEmpty ? null : m;
+  }
+  if (raw is String) {
+    final t = raw.trim();
+    if (t.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(t);
+      if (decoded is Map) {
+        final m = Map<String, dynamic>.from(decoded);
+        return m.isEmpty ? null : m;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
 /// % adicional en línea USD del catálogo (pago Zelle/divisas), sobre precio REF.
 double? parseUsdPaymentDiscountPct(Map<String, dynamic>? rules) {
   if (rules == null || rules.isEmpty) return null;
-  final raw = rules['usd_payment_discount_pct'];
+  final raw =
+      rules['usd_payment_discount_pct'] ?? rules['applied_usd_payment_discount_pct'];
   final pct = raw is num
       ? raw.toDouble()
       : double.tryParse(raw?.toString() ?? '');

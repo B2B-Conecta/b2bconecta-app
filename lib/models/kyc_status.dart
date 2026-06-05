@@ -1,4 +1,4 @@
-/// Estado de verificación documental (`profiles.kyc_status`) para aliados e importadores.
+/// Estado de verificación documental (`profiles.kyc_status`) para aliados.
 abstract final class KycStatus {
   static const pendiente = 'pendiente';
   static const enRevision = 'en_revision';

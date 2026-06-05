@@ -77,6 +77,10 @@ String fasePagoBloqueLabelEs(AliadoImportadorPagoFase fase) {
 double subtotalBloqueImportador(List<TransactionRequestModel> chunk) =>
     chunk.fold<double>(0, (s, r) => s + r.precioTotal);
 
+/// Subtotal REF base (sin descuento divisas) para la pasarela de pago.
+double refSubtotalBloqueImportador(List<TransactionRequestModel> chunk) =>
+    chunk.fold<double>(0, (s, r) => s + r.refBaseTotalForPago);
+
 /// Cuántos importadores del carrito ya tienen el pago confirmado por el importador.
 int importadoresConPagoConfirmado(
   List<List<TransactionRequestModel>> porImportador,

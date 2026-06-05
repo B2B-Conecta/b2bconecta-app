@@ -1,9 +1,12 @@
 import 'order_item_model.dart';
+import 'profile_model.dart';
 import 'qty_adjustment_status.dart';
 import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
 import '../utils/business_calendar.dart';
+import '../utils/order_payment_pricing.dart';
+import '../utils/product_volume_tiers.dart';
 
 /// Fila de `transaction_requests` con joins opcionales (producto, aliado, importador).
 class TransactionRequestModel {
@@ -89,6 +92,7 @@ class TransactionRequestModel {
     this.originalCheckoutGroupId,
     this.confirmadoPor,
     this.discountRules,
+    this.productDiscountRules,
     this.commissionRateSnapshot = 0.05,
     this.comisionDevengadaUsd,
     this.comisionDevengadaAt,
@@ -99,6 +103,7 @@ class TransactionRequestModel {
     this.qtyAdjustmentSolicitadaSnapshot,
     this.promoCampaignId,
     this.promoCampaignDisplayTitle,
+    this.ownerAcceptedPagoMetodos,
   });
 
   final String id;
@@ -111,7 +116,7 @@ class TransactionRequestModel {
   final double precioUnitarioAliado;
   final double precioTotal;
 
-  /// Total sin recargo por efectivo; [precioTotal] puede incluir +4 % si el método es efectivo.
+  /// Total REF al checkout (sin descuento divisas; se aplica al declarar método de pago).
   final double precioBaseAliadoTotal;
 
   /// Inventario descontado al avanzar el pedido (referencia operativa).
@@ -159,6 +164,9 @@ class TransactionRequestModel {
   final double? ownerLongitude;
   final String? ownerLogoStoragePath;
   final String? ownerKycStatus;
+
+  /// Métodos de pago que acepta el importador de este pedido.
+  final List<String>? ownerAcceptedPagoMetodos;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -232,8 +240,46 @@ class TransactionRequestModel {
   final String? promoCampaignId;
   final String? promoCampaignDisplayTitle;
 
+  /// Reglas comerciales vigentes del producto (join `products.discount_rules`).
+  final Map<String, dynamic>? productDiscountRules;
+
   bool get bajoPromocionCatalogo =>
       promoCampaignId != null && promoCampaignId!.trim().isNotEmpty;
+
+  double get refBaseTotalForPago => OrderPaymentPricing.refBaseTotal(
+        precioTotal: precioTotal,
+        precioBaseAliadoTotal: precioBaseAliadoTotal,
+      );
+
+  List<String> get metodosPagoPermitidos =>
+      PagoMetodo.filterByImporterAccepted(ownerAcceptedPagoMetodos);
+
+  /// Snapshot del pedido o, si falta el % divisas, reglas actuales del producto.
+  Map<String, dynamic>? get effectiveDiscountRulesForPago {
+    if (parseUsdPaymentDiscountPct(discountRules) != null) {
+      return discountRules;
+    }
+    if (parseUsdPaymentDiscountPct(productDiscountRules) != null) {
+      return productDiscountRules;
+    }
+    return discountRules ?? productDiscountRules;
+  }
+
+  bool get tieneDescuentoDivisasDisponible =>
+      parseUsdPaymentDiscountPct(effectiveDiscountRulesForPago) != null;
+
+  double totalForPagoMetodo(String? metodo) =>
+      OrderPaymentPricing.totalForPagoMetodo(
+        refBaseTotal: refBaseTotalForPago,
+        discountRules: effectiveDiscountRulesForPago,
+        pagoMetodo: metodo,
+      );
+
+  /// Tras registrar comprobante con método en divisas/efectivo con descuento.
+  bool get tieneDescuentoDivisasAplicadoEnPedido {
+    if (!PagoMetodo.qualifiesForUsdDiscount(pagoMetodo)) return false;
+    return precioTotal < refBaseTotalForPago - 0.0001;
+  }
 
   String get promoCampaignEtiqueta {
     final t = promoCampaignDisplayTitle?.trim();
@@ -660,11 +706,13 @@ class TransactionRequestModel {
     final products = json['products'];
     String? productName;
     String? productSku;
+    Map<String, dynamic>? productDiscountRules;
     if (products is Map) {
       final pm = Map<String, dynamic>.from(products);
       productName = pm['name']?.toString();
       final s = pm['sku']?.toString().trim();
       productSku = (s != null && s.isNotEmpty) ? s : null;
+      productDiscountRules = parseDiscountRulesMap(pm['discount_rules']);
     }
 
     Map<String, dynamic>? aliadoMap;
@@ -769,6 +817,8 @@ class TransactionRequestModel {
       ownerLongitude: _asNullableDouble(ownerMap?['longitude']),
       ownerLogoStoragePath: _nullableText(ownerMap?['logo_storage_path']),
       ownerKycStatus: _nullableText(ownerMap?['kyc_status']),
+      ownerAcceptedPagoMetodos:
+          ProfileModel.parseStringList(ownerMap?['accepted_pago_metodos']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:
@@ -811,11 +861,8 @@ class TransactionRequestModel {
       checkoutGroupId: _nullableText(json['checkout_group_id']),
       originalCheckoutGroupId: _nullableText(json['original_checkout_group_id']),
       confirmadoPor: _nullableText(json['confirmado_por']),
-      discountRules: () {
-        final dr = json['discount_rules'];
-        if (dr is Map) return Map<String, dynamic>.from(dr);
-        return null;
-      }(),
+      discountRules: parseDiscountRulesMap(json['discount_rules']),
+      productDiscountRules: productDiscountRules,
       commissionRateSnapshot: () {
         final v = json['commission_rate_snapshot'];
         if (v is num) return v.toDouble();

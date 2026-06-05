@@ -7,7 +7,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'kyc_status_highlight_widgets.dart';
 
-/// Perfil fiscal y KYC de la contraparte en un pedido (Minuta #7 C2).
+/// Perfil fiscal de la contraparte en un pedido; KYC solo para aliados.
 class TransactionRequestCounterpartyProfileSection extends StatefulWidget {
   const TransactionRequestCounterpartyProfileSection({
     super.key,
@@ -49,6 +49,9 @@ class _TransactionRequestCounterpartyProfileSectionState
   bool _loadingDocs = false;
   String? _logoUrl;
 
+  bool get _isImportador =>
+      widget.partyLabel.trim().toLowerCase() == 'importador';
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +83,7 @@ class _TransactionRequestCounterpartyProfileSectionState
       setState(() => _logoUrl = null);
     }
 
-    if (!widget.loadApprovedDocuments) {
+    if (!widget.loadApprovedDocuments || _isImportador) {
       if (mounted) setState(() => _docs = []);
       return;
     }
@@ -187,10 +190,12 @@ class _TransactionRequestCounterpartyProfileSectionState
                           fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      KycAliadoGlobalStatusHighlight(
-                        kycStatus: widget.kycStatus,
-                      ),
+                      if (!_isImportador) ...[
+                        const SizedBox(height: 6),
+                        KycAliadoGlobalStatusHighlight(
+                          kycStatus: widget.kycStatus,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -224,7 +229,7 @@ class _TransactionRequestCounterpartyProfileSectionState
                 ),
               ),
             ],
-            if (widget.loadApprovedDocuments) ...[
+            if (widget.loadApprovedDocuments && !_isImportador) ...[
               const SizedBox(height: 10),
               Text(
                 'Documentación verificada',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
+import '../models/pago_metodo.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
@@ -183,15 +184,18 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           Text(
                             isCheckoutGroup
                                 ? _checkoutGroupResumen(lines)
-                                : '${r.cantidad} uds · '
-                                    '${formatRefAmount(r.precioTotal)} REF'
-                                    '${r.precioTotalBsUi != null ? " · ~${formatVesAmount(r.precioTotalBsUi!)} Bs" : ""}',
+                                : _lineaPrecioResumenAliado(r),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade800,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (!isCheckoutGroup &&
+                              r.tieneDescuentoDivisasAplicadoEnPedido) ...[
+                            const SizedBox(height: 4),
+                            _DescuentoDivisasFichaChip(request: r),
+                          ],
                           if (!expanded) ...[
                             const SizedBox(height: 4),
                             Text(
@@ -547,6 +551,52 @@ class _MultiImporterPagoResumenChip extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+
+String _lineaPrecioResumenAliado(TransactionRequestModel r) {
+  final buf = StringBuffer(
+    '${r.cantidad} uds · ${formatRefAmount(r.precioTotal)} REF',
+  );
+  if (r.tieneDescuentoDivisasAplicadoEnPedido) {
+    buf.write(' (antes ${formatRefAmount(r.refBaseTotalForPago)})');
+  }
+  if (r.precioTotalBsUi != null) {
+    buf.write(' · ~${formatVesAmount(r.precioTotalBsUi!)} Bs');
+  }
+  return buf.toString();
+}
+
+class _DescuentoDivisasFichaChip extends StatelessWidget {
+  const _DescuentoDivisasFichaChip({required this.request});
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = request;
+    final metodo = r.pagoMetodo?.trim();
+    if (metodo == null || metodo.isEmpty) return const SizedBox.shrink();
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Chip(
+        avatar: Icon(Icons.savings_outlined, size: 16, color: Colors.green.shade800),
+        label: Text(
+          'Descuento divisas · ${PagoMetodo.labelEs(metodo)}',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.green.shade900,
+          ),
+        ),
+        backgroundColor: Colors.green.shade50,
+        side: BorderSide(color: Colors.green.shade200),
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }

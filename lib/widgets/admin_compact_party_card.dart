@@ -79,7 +79,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
   }
 }
 
-/// Importador activo: una línea; fiscal y KYC solo si se expande.
+/// Importador activo: una línea; datos fiscales si se expande (sin KYC).
 class AdminCompactImportadorCard extends StatelessWidget {
   const AdminCompactImportadorCard({
     super.key,
@@ -92,7 +92,6 @@ class AdminCompactImportadorCard extends StatelessWidget {
     this.direccion,
     this.fiscalMapsUrl,
     this.logoStoragePath,
-    this.kycStatus,
     this.initiallyExpanded = false,
   });
 
@@ -105,7 +104,6 @@ class AdminCompactImportadorCard extends StatelessWidget {
   final String? direccion;
   final String? fiscalMapsUrl;
   final String? logoStoragePath;
-  final String? kycStatus;
   final bool initiallyExpanded;
 
   @override
@@ -115,7 +113,6 @@ class AdminCompactImportadorCard extends StatelessWidget {
       title: _CompactPartyHeader(
         label: 'Importador',
         name: businessName,
-        kycStatus: kycStatus,
       ),
       subtitle: _subtitleWidget(),
       child: TransactionRequestCounterpartyProfileSection(
@@ -129,8 +126,7 @@ class AdminCompactImportadorCard extends StatelessWidget {
         direccion: direccion,
         fiscalMapsUrl: fiscalMapsUrl,
         logoStoragePath: logoStoragePath,
-        kycStatus: kycStatus,
-        loadApprovedDocuments: true,
+        loadApprovedDocuments: false,
       ),
     );
   }

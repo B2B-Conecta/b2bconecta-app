@@ -72,10 +72,7 @@ class ProfileKycDocumentsInfo extends StatelessWidget {
             ),
             SizedBox(height: 8),
             _KycBullet(
-              'Copia del acta constitutiva y estatutos, o RIF empresarial.',
-            ),
-            _KycBullet(
-              'Certificado de registro mercantil o de la Cámara de Comercio (si aplica), con fecha reciente.',
+              'RIF empresarial y certificado de registro mercantil o de la Cámara de Comercio, con fecha reciente.',
             ),
             _KycBullet(
               'Copia de la cédula de identidad del representante legal y, en algunos casos, poder notarial.',

@@ -13,9 +13,7 @@ import 'main_shell_tab.dart';
 
 enum _KycQueueFilter { todos, enRevision, conPendientes }
 
-enum _KycRoleFilter { todos, aliado, importador }
-
-/// Admin: cola de verificación KYC (aliados e importadores).
+/// Admin: cola de verificación KYC (solo aliados).
 class AdminKycReviewPanel extends StatefulWidget {
   const AdminKycReviewPanel({super.key});
 
@@ -32,7 +30,6 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   String? _busyProfileId;
   String? _busyDocKey;
   _KycQueueFilter _filter = _KycQueueFilter.enRevision;
-  _KycRoleFilter _roleFilter = _KycRoleFilter.todos;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -115,17 +112,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   List<ProfileModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
     return _profiles.where((p) {
-      final role = p.role?.trim().toLowerCase();
-      switch (_roleFilter) {
-        case _KycRoleFilter.aliado:
-          if (role != 'aliado') return false;
-          break;
-        case _KycRoleFilter.importador:
-          if (role != 'importador') return false;
-          break;
-        case _KycRoleFilter.todos:
-          break;
-      }
+      if (p.role?.trim().toLowerCase() != 'aliado') return false;
       if (q.isNotEmpty) {
         final name = (p.businessName ?? '').toLowerCase();
         final rif = (p.rif ?? '').toLowerCase();
@@ -338,35 +325,6 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
           child: Row(
             children: [
               ChoiceChip(
-                label: const Text('Aliados'),
-                selected: _roleFilter == _KycRoleFilter.aliado,
-                onSelected: (_) =>
-                    setState(() => _roleFilter = _KycRoleFilter.aliado),
-              ),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: const Text('Importadores'),
-                selected: _roleFilter == _KycRoleFilter.importador,
-                onSelected: (_) =>
-                    setState(() => _roleFilter = _KycRoleFilter.importador),
-              ),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: const Text('Todos los roles'),
-                selected: _roleFilter == _KycRoleFilter.todos,
-                onSelected: (_) =>
-                    setState(() => _roleFilter = _KycRoleFilter.todos),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              ChoiceChip(
                 label: const Text('En revisión'),
                 selected: _filter == _KycQueueFilter.enRevision,
                 onSelected: (_) =>
@@ -516,7 +474,10 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                             ],
                                           ),
                                           const SizedBox(height: 12),
-                                          ...AliadoDocType.all.map((type) {
+                                          ...AliadoDocType.forAdminReview(
+                                            role: role,
+                                            uploadedTypes: currentByType.keys,
+                                          ).map((type) {
                                             final doc = currentByType[type];
                                             final has = doc != null;
                                             final st = doc?.reviewStatus?.trim();

@@ -10,9 +10,9 @@ import '../theme/app_theme.dart';
 import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'profile_kyc_documents_section.dart';
+import 'importer_accepted_pago_metodos_section.dart';
 import 'importer_commission_settlements_section.dart';
 import 'authorization_status_section.dart';
-import 'profile_kyc_documents_info.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -227,9 +227,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             'MotoLink lo usa como origen al armar la ruta en vivo hacia el taller del aliado cuando el pedido '
             'está en tránsito (junto con el enlace del aliado en su perfil).';
       case 'aliado':
-        return 'Pegue el enlace «Compartir» de Google Maps apuntando a su taller o domicilio fiscal. '
-            'MotoLink lo usa como destino al armar la ruta en vivo desde el importador cuando el pedido '
-            'está en tránsito (junto con el enlace del importador en su perfil).';
+        return 'Enlace «Compartir» de Google Maps de su taller (requisito mínimo junto con RIF y dirección fiscal).';
       default:
         return 'Pegue un enlace público (compartir ubicación) para que MotoLink y los participantes '
             'abran su domicilio fiscal en el mapa.';
@@ -238,8 +236,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   String _ubicacionFiscalIntroText() {
     switch (_role.trim().toLowerCase()) {
-      case 'importador':
       case 'aliado':
+        return 'Estado, ciudad y domicilio fiscal son obligatorios para ingresar y solicitar pedidos.';
+      case 'importador':
         return 'Visible en el catálogo para ubicar proveedores y talleres. '
             'Complete también la dirección fiscal más abajo: estado, ciudad y domicilio '
             'son obligatorios para solicitar pedidos.';
@@ -621,8 +620,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ),
             ),
           ],
-          if (_roleLocked && (_persistedAsAliado || _persistedAsImportador)) ...[
-            const SizedBox(height: 20),
+          if (_roleLocked && _persistedAsImportador) ...[
+            const SizedBox(height: 14),
             AuthorizationStatusSection(
               key: ValueKey<int>(_authSectionTick),
               profile: widget.initial,
@@ -630,36 +629,30 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ],
           if (_persistedAsImportador && widget.initial != null) ...[
             const SizedBox(height: 20),
+            ImporterAcceptedPagoMetodosSection(
+              profile: widget.initial!,
+              onSaved: widget.onRelatedDataChanged,
+            ),
+            const SizedBox(height: 20),
             const ImporterCommissionSettlementsSection(),
             const SizedBox(height: 12),
             _reputationTabHint(context),
           ],
-          if (_persistedAsAliado && widget.initial != null) ...[
-            const SizedBox(height: 12),
-            _reputationTabHint(context),
-          ],
-          if (_persistedAsAliado || _persistedAsImportador) ...[
-            const SizedBox(height: 20),
-            _sectionLabel('DOCUMENTACIÓN KYC'),
+          if (_persistedAsAliado) ...[
+            const SizedBox(height: 14),
+            _sectionLabel('VERIFICACIÓN'),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
               child: ProfileKycDocumentsSection(
-                role: _persistedAsImportador ? 'importador' : 'aliado',
+                role: 'aliado',
+                profile: widget.initial,
                 kycStatus: widget.initial?.kycStatus,
-                esAliadoEnFaseContado:
-                    widget.initial?.esAliadoEnFaseContado ?? false,
-                primerosPedidosContadoEntregados:
-                    widget.initial?.primerosPedidosContadoEntregados,
                 onChanged: () {
                   _bumpAuthorizationSection();
                   widget.onRelatedDataChanged?.call();
                 },
               ),
             ),
-          ],
-          if (!_showAdministradorRoleOption) ...[
-            const SizedBox(height: 20),
-            const ProfileKycDocumentsInfo(),
           ],
           const SizedBox(height: 24),
           ElevatedButton(

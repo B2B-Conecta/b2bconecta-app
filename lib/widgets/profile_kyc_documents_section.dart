@@ -2,34 +2,30 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/aliado_doc_type.dart';
-import '../models/cash_phase_policy.dart';
+import '../models/profile_model.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'aliado_profile_requirements_banner.dart';
 import 'kyc_status_highlight_widgets.dart';
+import 'profile_kyc_document_tile.dart';
 
-/// Subida de documentos KYC y envío a revisión MotoLink (aliado o importador).
+/// Subida de documentos KYC y envío a revisión MotoLink (solo aliados).
 class ProfileKycDocumentsSection extends StatefulWidget {
   const ProfileKycDocumentsSection({
     super.key,
     required this.kycStatus,
     required this.role,
+    this.profile,
     this.onChanged,
-    this.esAliadoEnFaseContado = false,
-    this.primerosPedidosContadoEntregados,
   });
 
   final String? kycStatus;
-
-  /// `aliado` o `importador`.
   final String role;
+  final ProfileModel? profile;
   final VoidCallback? onChanged;
-
-  /// Solo aliado: bloquea envío oficial durante fase contado inicial.
-  final bool esAliadoEnFaseContado;
-  final int? primerosPedidosContadoEntregados;
 
   bool get _isAliado => role.trim().toLowerCase() == 'aliado';
 
@@ -79,6 +75,13 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   ProfileDocumentModel? _docFor(String type) {
     for (final d in _docs) {
       if (d.docType == type) return d;
+    }
+    return null;
+  }
+
+  ProfileDocumentModel? _cedulaAliadoDoc() {
+    for (final d in _docs) {
+      if (AliadoDocType.isCedulaAliadoDoc(d.docType)) return d;
     }
     return null;
   }
@@ -137,32 +140,6 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   }
 
   Future<void> _submitReview() async {
-    if (widget._isAliado && widget.esAliadoEnFaseContado) {
-      final pce = widget.primerosPedidosContadoEntregados ?? 0;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Fase inicial pendiente'),
-          content: SingleChildScrollView(
-            child: Text(
-              'Aún está en la fase de contado (primeros '
-              '${CashPhasePolicy.entregasRequeridas} pedidos). '
-              'Lleva $pce de ${CashPhasePolicy.entregasRequeridas} entregas registradas.\n\n'
-              'Complete esa fase antes de enviar la documentación a revisión MotoLink. '
-              'Puede seguir subiendo archivos aquí como borrador.',
-              style: const TextStyle(height: 1.4),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
     setState(() => _submittingReview = true);
     try {
       await SupabaseService.profileSubmitKycForReview();
@@ -184,53 +161,90 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     }
   }
 
+  Widget _buildDocTile(String type) {
+    final doc = type == AliadoDocType.cedulaPropietario && widget._isAliado
+        ? _cedulaAliadoDoc()
+        : _docFor(type);
+    final has = doc != null;
+    final rs = doc?.reviewStatus?.trim();
+    final busy = _busyDocType == type;
+    final statusLine = !has
+        ? 'Sin archivo'
+        : DocumentReviewStatus.labelEs(
+            (rs == null || rs.isEmpty)
+                ? DocumentReviewStatus.pendiente
+                : rs,
+          );
+    final effectiveStatus = !has
+        ? null
+        : ((rs == null || rs.isEmpty)
+            ? DocumentReviewStatus.pendiente
+            : rs);
+    final reviewer = doc?.reviewerBusinessName?.trim();
+    final reviewedHint = (doc != null && doc.reviewedAt != null)
+        ? 'Revisión: ${_formatReviewedAt(doc.reviewedAt)}'
+            '${reviewer != null && reviewer.isNotEmpty ? ' · $reviewer' : ''}'
+        : null;
+    final note = doc?.reviewNote?.trim();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ProfileKycDocumentTile(
+        title: AliadoDocType.labelEs(type),
+        hasFile: has,
+        statusLabel: statusLine,
+        effectiveStatus: effectiveStatus,
+        busy: busy,
+        reviewedHint: reviewedHint,
+        reviewNote: note,
+        onUpload: () => _pickAndUpload(type),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final st = widget.kycStatus?.trim();
     final canSendReview = st == KycStatus.pendiente ||
         st == KycStatus.rechazado ||
         st == KycStatus.enRevision;
-    final pce = widget.primerosPedidosContadoEntregados ?? 0;
-    final bloqueoFaseInicial = widget._isAliado && widget.esAliadoEnFaseContado;
-    final roleLabel = widget._isAliado ? 'aliado' : 'importador';
+    final requiredTypes = AliadoDocType.forRole(widget.role);
+    final supplementaryTypes = widget._isAliado
+        ? AliadoDocType.supplementaryForRole(widget.role)
+        : const <String>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Documentación para verificación ($roleLabel)',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        KycAliadoGlobalStatusHighlight(kycStatus: st),
-        if (bloqueoFaseInicial) ...[
-          const SizedBox(height: 12),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade300),
+        if (!widget._isAliado)
+          Text(
+            'Documentación (${widget.role})',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
+          ),
+        if (widget._isAliado &&
+            widget.profile?.pedidosSuspendidosMorosidad == true) ...[
+          Material(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.amber.shade900, size: 22),
-                  const SizedBox(width: 10),
+                  Icon(Icons.block, color: Colors.red.shade800, size: 18),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Fase inicial: $pce / ${CashPhasePolicy.entregasRequeridas} entregas en contado. '
-                      'El envío a revisión se habilita al completar esa fase.',
+                      'MotoLink suspendió nuevos pedidos por morosidad. Regularice pagos en pedidos entregados.',
                       style: TextStyle(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: Colors.grey.shade900,
+                        fontSize: 11,
+                        height: 1.35,
                         fontWeight: FontWeight.w600,
+                        color: Colors.red.shade900,
                       ),
                     ),
                   ),
@@ -238,177 +252,86 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
               ),
             ),
           ),
+          const SizedBox(height: 8),
         ],
-        const SizedBox(height: 12),
+        if (!widget._isAliado) const SizedBox(height: 8),
+        KycAliadoGlobalStatusHighlight(kycStatus: st),
+        if (widget._isAliado && widget.profile != null) ...[
+          const SizedBox(height: 8),
+          AliadoProfileRequirementsBanner(
+            profile: widget.profile,
+            documents: _docs,
+          ),
+        ],
+        const SizedBox(height: 10),
         if (_loading)
           const Padding(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(vertical: 12),
             child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.brand,
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.brand,
+                ),
               ),
             ),
           )
-        else
-          ...AliadoDocType.all.map((type) {
-            final doc = _docFor(type);
-            final has = doc != null;
-            final rs = doc?.reviewStatus?.trim();
-            final busy = _busyDocType == type;
-            final statusLine = !has
-                ? 'Sin archivo'
-                : DocumentReviewStatus.labelEs(
-                    (rs == null || rs.isEmpty)
-                        ? DocumentReviewStatus.pendiente
-                        : rs,
-                  );
-            final effectiveStatus = !has
-                ? null
-                : ((rs == null || rs.isEmpty)
-                    ? DocumentReviewStatus.pendiente
-                    : rs);
-            final esAprobado = effectiveStatus == DocumentReviewStatus.aprobado;
-            final note = doc?.reviewNote?.trim();
-            final reviewer = doc?.reviewerBusinessName?.trim();
-            final reviewedHint = (doc != null && doc.reviewedAt != null)
-                ? 'Revisión MotoLink: ${_formatReviewedAt(doc.reviewedAt)}'
-                    '${reviewer != null && reviewer.isNotEmpty ? ' · $reviewer' : ''}'
-                : null;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Material(
-                color: Colors.white,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppDecorations.radius12,
-                  side: BorderSide(
-                    color: kycDocumentReviewTileBorderColor(
-                      has: has,
-                      status: effectiveStatus,
-                    ),
-                    width: 1.4,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  AliadoDocType.labelEs(type),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                KycDocumentReviewStatusHighlight(
-                                  statusLabel: statusLine,
-                                  hasFile: has,
-                                  effectiveStatus: effectiveStatus,
-                                ),
-                                if (reviewedHint != null) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    reviewedHint,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                                if (note != null && note.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Colors.orange.shade200,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(10),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Icon(
-                                            Icons.feedback_outlined,
-                                            size: 18,
-                                            color: Colors.orange.shade900,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              note,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                height: 1.4,
-                                                color: Colors.grey.shade900,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (busy)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 4, top: 4),
-                              child: SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
-                          else
-                            TextButton(
-                              onPressed: () => _pickAndUpload(type),
-                              child: Text(
-                                !has
-                                    ? 'Subir'
-                                    : esAprobado
-                                        ? 'Actualizar'
-                                        : 'Cambiar',
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+        else ...[
+          if (widget._isAliado) ...[
+            const Text(
+              'Registro inicial',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
               ),
-            );
-          }),
+            ),
+            const SizedBox(height: 6),
+          ],
+          ...requiredTypes.map(_buildDocTile),
+          if (supplementaryTypes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Documentación complementaria',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Opcional. Puede completarla después de ingresar a la plataforma.',
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.3,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...supplementaryTypes.map(_buildDocTile),
+          ],
+        ],
         if (canSendReview) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           FilledButton(
             onPressed: _submittingReview ? null : _submitReview,
             child: _submittingReview
                 ? const SizedBox(
-                    height: 22,
-                    width: 22,
+                    height: 20,
+                    width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
                       color: Colors.white,
                     ),
                   )
-                : const Text('Enviar documentación a revisión MotoLink'),
+                : Text(
+                    widget._isAliado
+                        ? 'Enviar registro inicial a revisión'
+                        : 'Enviar a revisión MotoLink',
+                  ),
           ),
         ],
       ],

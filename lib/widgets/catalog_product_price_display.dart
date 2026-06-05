@@ -11,7 +11,6 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.salePriceUsd,
     this.discountRules,
     this.quantity = 1,
-    required this.faseContado,
     this.compact = false,
     this.catalogGrid = false,
     this.showUsd = true,
@@ -22,7 +21,6 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final double? salePriceUsd;
   final Map<String, dynamic>? discountRules;
   final int quantity;
-  final bool faseContado;
   final bool compact;
   final bool catalogGrid;
   final bool showUsd;
@@ -45,14 +43,12 @@ class CatalogProductPriceDisplay extends StatelessWidget {
       salePriceUsd: salePriceUsd,
       discountRules: discountRules,
       quantity: quantity,
-      faseContado: faseContado,
     );
     final strikeRef = _onSale
         ? ProductCatalogPricing.aliadoUnitRegularListUsd(
             listPriceUsd: listPriceUsd,
             discountRules: discountRules,
             quantity: quantity,
-            faseContado: faseContado,
           )
         : null;
 
@@ -94,14 +90,12 @@ class CatalogProductPriceDisplay extends StatelessWidget {
       salePriceUsd: salePriceUsd,
       discountRules: discountRules,
       quantity: quantity,
-      faseContado: faseContado,
     );
     final strikeRef = _onSale
         ? ProductCatalogPricing.aliadoUnitRegularListUsd(
             listPriceUsd: listPriceUsd,
             discountRules: discountRules,
             quantity: quantity,
-            faseContado: faseContado,
           )
         : null;
     final usdPct = ProductCatalogPricing.usdPaymentDiscountPct(discountRules);

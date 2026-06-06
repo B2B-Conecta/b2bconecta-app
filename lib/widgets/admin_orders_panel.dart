@@ -21,6 +21,7 @@ import 'admin_aliado_morosidad_actions.dart';
 import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import 'main_shell_tab.dart';
+import 'order_card_collapsible_layout.dart';
 import 'order_list_filter_bar.dart';
 import 'order_motolink_thread_section.dart';
 
@@ -341,13 +342,18 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                   r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.aprobado,
             ),
           ),
-        const Divider(height: 20),
-        OrderMotolinkThreadSection(
-          key: ValueKey<String>('trm-admin-${r.id}'),
-          transactionRequestId: r.id,
-          allowReplyAsAliado: false,
-          allowReplyAsAdmin: true,
-          onThreadChanged: _load,
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Mensajes',
+          subtitle: 'Hilo con aliado, importador y supervisión MotoLink',
+          child: OrderMotolinkThreadSection(
+            key: ValueKey<String>('trm-admin-${r.id}'),
+            transactionRequestId: r.id,
+            allowReplyAsAliado: false,
+            allowReplyAsAdmin: true,
+            onThreadChanged: _load,
+            suppressBuiltinTitle: true,
+          ),
         ),
       ],
     );
@@ -384,13 +390,18 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           request: primary,
           onRegistered: _load,
         ),
-        const Divider(height: 20),
-        OrderMotolinkThreadSection(
-          key: ValueKey<String>('trm-admin-closed-${primary.id}'),
-          transactionRequestId: primary.id,
-          allowReplyAsAliado: false,
-          allowReplyAsAdmin: true,
-          onThreadChanged: _load,
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Mensajes',
+          subtitle: 'Hilo con aliado, importador y supervisión MotoLink',
+          child: OrderMotolinkThreadSection(
+            key: ValueKey<String>('trm-admin-closed-${primary.id}'),
+            transactionRequestId: primary.id,
+            allowReplyAsAliado: false,
+            allowReplyAsAdmin: true,
+            onThreadChanged: _load,
+            suppressBuiltinTitle: true,
+          ),
         ),
       ],
     );

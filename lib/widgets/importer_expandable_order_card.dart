@@ -10,6 +10,8 @@ import 'importer_aliado_solicitud_section.dart';
 import 'importer_promo_widgets.dart';
 import 'moroso_order_visual.dart';
 import 'order_motolink_thread_section.dart';
+import 'importer_kyc_approved_aliados_panel.dart';
+import 'order_card_collapsible_layout.dart';
 import 'order_commission_summary.dart';
 import 'transaction_request_admin_sections.dart';
 
@@ -185,28 +187,12 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 height: 1.25,
                               ),
                             ),
-                          if (anyEntregadoPago) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border:
-                                    Border.all(color: Colors.green.shade200),
-                              ),
-                              child: Text(
-                                isCheckoutGroup
-                                    ? 'Entregado y pagado (al menos una línea validada por MotoLink).'
-                                    : 'Entregado y pagado (pago validado por MotoLink).',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.green.shade900,
-                                ),
-                              ),
+                          if (!expanded && anyEntregadoPago) ...[
+                            const SizedBox(height: 6),
+                            OrderCardCompactNoticeChip(
+                              label: 'Entregado y pagado',
+                              icon: Icons.check_circle_outline,
+                              color: Colors.green.shade800,
                             ),
                           ] else if (anyPagoPendienteTrasEntrega) ...[
                             const SizedBox(height: 8),
@@ -241,30 +227,13 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                     )
                                   : null,
                             ),
-                          ] else if (lines
-                              .any((l) => l.qtyAdjustmentPendienteAliado)) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.amber.shade200),
-                              ),
-                              child: Text(
-                                isCheckoutGroup
-                                    ? 'Hay una propuesta de cantidad pendiente de respuesta del aliado; '
-                                        'no puede avanzar el pedido hasta que el aliado responda.'
-                                    : 'Propuesta de cantidad pendiente: el aliado debe aceptar o rechazar '
-                                        'antes de marcar «En preparación».',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.amber.shade900,
-                                ),
-                              ),
+                          ] else if (!expanded &&
+                              lines.any((l) => l.qtyAdjustmentPendienteAliado)) ...[
+                            const SizedBox(height: 6),
+                            OrderCardCompactNoticeChip(
+                              label: 'Ajuste de cantidad pendiente',
+                              icon: Icons.inventory_2_outlined,
+                              color: Colors.amber.shade900,
                             ),
                           ],
                         ],
@@ -347,102 +316,201 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        TransactionRequestAliadoContactSection(
-                            request: lines.first),
-                        const SizedBox(height: 12),
-                        TransactionRequestDestinoEntregaSection(
-                          request: lines.first,
-                        ),
-                        const SizedBox(height: 12),
-                        TransactionRequestProductosDesgloseSection(
-                          lines: lines,
-                          compact: true,
-                          viewer: PedidoDesgloseViewer.importador,
-                        ),
-                        OrderCommissionSummary(
-                          lines: orderLinesEligibleForCommission(lines),
-                        ),
-                        const SizedBox(height: 12),
-                        if (isCheckoutGroup) ...[
-                          if (checkoutGroupMismoEstadoEnvio(lines)) ...[
-                            CourierTimelineWidget(
-                              request: lines.first,
-                              compact: true,
-                              viewerRole: AppHomeRole.importador,
-                              showHeading: true,
+                        if (anyEntregadoPago) ...[
+                          OrderCardCompactNoticeChip(
+                            label: isCheckoutGroup
+                                ? 'Entregado y pagado (línea validada)'
+                                : 'Entregado y pagado',
+                            icon: Icons.check_circle_outline,
+                            color: Colors.green.shade800,
+                          ),
+                          const SizedBox(height: kOrderCardSectionGap),
+                        ],
+                        if (lines.any((l) => l.qtyAdjustmentPendienteAliado)) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade200),
                             ),
-                          ] else ...[
-                            const Text(
-                              'Seguimiento del envío',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12.5,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            for (var li = 0; li < lines.length; li++) ...[
-                              if (li > 0) const Divider(height: 20),
-                              Text(
-                                lines[li].etiquetaGestionLineaImportador(uid),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              CourierTimelineWidget(
-                                request: lines[li],
-                                compact: true,
-                                viewerRole: AppHomeRole.importador,
-                                showHeading: false,
-                              ),
-                            ],
-                          ],
-                        ] else ...[
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
                             child: Text(
-                              'Ítem a gestionar: '
-                              '${r.etiquetaGestionLineaImportador(uid)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12.5,
-                                color: AppColors.textPrimary,
+                              isCheckoutGroup
+                                  ? 'Propuesta de cantidad pendiente de respuesta del aliado.'
+                                  : 'Propuesta de cantidad pendiente: el aliado debe responder '
+                                      'antes de marcar «En preparación».',
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.amber.shade900,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          CourierTimelineWidget(
-                            request: r,
+                          const SizedBox(height: kOrderCardSectionGap),
+                        ],
+                        OrderCardCollapsibleSection(
+                          title: 'Aliado',
+                          subtitle: orderCardPartySubtitle(
+                            businessName: lines.first.aliadoBusinessName,
+                            ciudad: lines.first.aliadoCiudad,
+                            estado: lines.first.aliadoEstado,
+                          ),
+                          infoMessage:
+                              'Datos fiscales del taller. Use el expediente KYC para evaluar crédito.',
+                          trailingActions: [
+                            if (TransactionRequestAliadoContactSection
+                                .kycAprobadoPara(lines.first))
+                              IconButton(
+                                onPressed: () => showImporterAliadoKycDetailSheet(
+                                  context,
+                                  aliado:
+                                      TransactionRequestAliadoContactSection
+                                          .kycModelPara(lines.first),
+                                ),
+                                icon: const Icon(
+                                  Icons.verified_user_outlined,
+                                  size: 18,
+                                ),
+                                tooltip: 'Expediente KYC',
+                                visualDensity: VisualDensity.compact,
+                              ),
+                          ],
+                          child: TransactionRequestAliadoContactSection(
+                            request: lines.first,
+                            embedded: true,
+                          ),
+                        ),
+                        const SizedBox(height: kOrderCardSectionGap),
+                        OrderCardCollapsibleSection(
+                          title: 'Entrega',
+                          subtitle: lines.first.destinoEntregaLineaCompactaEs,
+                          child: TransactionRequestDestinoEntregaSection(
+                            request: lines.first,
+                            hideSectionTitle: true,
+                          ),
+                        ),
+                        const SizedBox(height: kOrderCardSectionGap),
+                        OrderCardCollapsibleSection(
+                          title: 'Productos',
+                          subtitle: orderCardProductosSubtitle(
+                            lines,
+                            viewer: PedidoDesgloseViewer.importador,
+                          ),
+                          initiallyExpanded: true,
+                          infoMessage:
+                              'Precios en REF = oferta MotoLink al aliado (alistamiento).',
+                          child: TransactionRequestProductosDesgloseSection(
+                            lines: lines,
                             compact: true,
-                            viewerRole: AppHomeRole.importador,
-                            showHeading: true,
+                            viewer: PedidoDesgloseViewer.importador,
+                            hideSectionTitle: true,
+                            showPrecioHelp: false,
+                          ),
+                        ),
+                        if (orderCardCommissionSubtitle(lines) != null) ...[
+                          const SizedBox(height: kOrderCardSectionGap),
+                          OrderCardCollapsibleSection(
+                            title: 'Comisión MotoLink',
+                            subtitle: orderCardCommissionSubtitle(lines),
+                            infoMessage:
+                                'Comisión devengada o estimada según el estado del pedido.',
+                            child: OrderCommissionSummary(
+                              lines: orderLinesEligibleForCommission(lines),
+                              suppressOuterTitle: true,
+                            ),
                           ),
                         ],
-                        const SizedBox(height: 12),
-                        OrderMotolinkThreadSection(
-                          key: ValueKey<String>(
-                            isCheckoutGroup
-                                ? 'trm-imp-merge-${lines.map((e) => e.id).join("-")}'
-                                : 'trm-imp-${r.id}',
+                        const SizedBox(height: kOrderCardSectionGap),
+                        OrderCardCollapsibleSection(
+                          title: 'Seguimiento',
+                          subtitle: orderCardTimelineSubtitle(
+                            isCheckoutGroup ? lines.first : r,
                           ),
-                          transactionRequestId: lines.first.id,
-                          mergedThreadRequestIds: isCheckoutGroup
-                              ? lines.map((e) => e.id).toList()
-                              : null,
-                          allowReplyAsAliado: false,
-                          allowReplyAsAdmin: false,
-                          allowReplyAsImportador: lines.any(
-                            (l) =>
-                                l.status !=
-                                    TransactionRequestStatus.entregado &&
-                                l.status != TransactionRequestStatus.rechazado,
+                          initiallyExpanded: orderCardTimelineInitiallyExpanded(
+                            isCheckoutGroup ? lines.first : r,
                           ),
-                          onThreadChanged: onThreadChanged,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (isCheckoutGroup) ...[
+                                if (checkoutGroupMismoEstadoEnvio(lines))
+                                  CourierTimelineWidget(
+                                    request: lines.first,
+                                    compact: true,
+                                    viewerRole: AppHomeRole.importador,
+                                    showHeading: false,
+                                  )
+                                else
+                                  for (var li = 0; li < lines.length; li++) ...[
+                                    if (li > 0) const Divider(height: 16),
+                                    Text(
+                                      lines[li]
+                                          .etiquetaGestionLineaImportador(uid),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    CourierTimelineWidget(
+                                      request: lines[li],
+                                      compact: true,
+                                      viewerRole: AppHomeRole.importador,
+                                      showHeading: false,
+                                    ),
+                                  ],
+                              ] else ...[
+                                Text(
+                                  lines.first
+                                      .etiquetaGestionLineaImportador(uid),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                CourierTimelineWidget(
+                                  request: r,
+                                  compact: true,
+                                  viewerRole: AppHomeRole.importador,
+                                  showHeading: false,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: kOrderCardSectionGap),
+                        OrderCardCollapsibleSection(
+                          title: 'Mensajes',
+                          subtitle: 'Hilo con el aliado y supervisión MotoLink',
+                          child: OrderMotolinkThreadSection(
+                            key: ValueKey<String>(
+                              isCheckoutGroup
+                                  ? 'trm-imp-merge-${lines.map((e) => e.id).join("-")}'
+                                  : 'trm-imp-${r.id}',
+                            ),
+                            transactionRequestId: lines.first.id,
+                            mergedThreadRequestIds: isCheckoutGroup
+                                ? lines.map((e) => e.id).toList()
+                                : null,
+                            allowReplyAsAliado: false,
+                            allowReplyAsAdmin: false,
+                            allowReplyAsImportador: lines.any(
+                              (l) =>
+                                  l.status !=
+                                      TransactionRequestStatus.entregado &&
+                                  l.status !=
+                                      TransactionRequestStatus.rechazado,
+                            ),
+                            onThreadChanged: onThreadChanged,
+                            suppressBuiltinTitle: true,
+                          ),
                         ),
                         if (expandedFooter != null) ...[
                           const SizedBox(height: 12),

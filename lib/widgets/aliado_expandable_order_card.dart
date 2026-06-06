@@ -13,6 +13,7 @@ import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
 import 'moroso_order_visual.dart';
+import 'order_card_collapsible_layout.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
@@ -222,26 +223,14 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (!isCheckoutGroup && r.pedidoEntregadoYPagado) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border:
-                                    Border.all(color: Colors.green.shade200),
-                              ),
-                              child: Text(
-                                'Entregado y pagado.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.3,
-                                  color: Colors.green.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                          if (!expanded &&
+                              !isCheckoutGroup &&
+                              r.pedidoEntregadoYPagado) ...[
+                            const SizedBox(height: 6),
+                            OrderCardCompactNoticeChip(
+                              label: 'Entregado y pagado',
+                              icon: Icons.check_circle_outline,
+                              color: Colors.green.shade800,
                             ),
                           ] else if (!isCheckoutGroup && r.esPedidoMoroso) ...[
                             const SizedBox(height: 8),
@@ -374,87 +363,154 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               allLines: lines,
                               porImportador: porImportador,
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: kOrderCardSectionGap),
                           ],
-                          TransactionRequestDestinoEntregaSection(
-                            request: lines.first,
+                          OrderCardCollapsibleSection(
+                            title: 'Entrega',
+                            subtitle: lines.first.destinoEntregaLineaCompactaEs,
+                            child: TransactionRequestDestinoEntregaSection(
+                              request: lines.first,
+                              hideSectionTitle: true,
+                            ),
                           ),
                           if (!useMultiImporterTabs) ...[
-                            const SizedBox(height: 12),
-                            TransactionRequestProductosDesgloseSection(
-                              lines: lines,
-                              compact: true,
-                              viewer: PedidoDesgloseViewer.aliado,
-                              showPrecioHelp: false,
-                              showImporterGroupHeaders: true,
+                            const SizedBox(height: kOrderCardSectionGap),
+                            if (consolidarDatosImportador)
+                              OrderCardCollapsibleSection(
+                                title: 'Importador',
+                                subtitle: orderCardPartySubtitle(
+                                  businessName: lines.first.ownerBusinessName,
+                                  ciudad: lines.first.ownerCiudad,
+                                  estado: lines.first.ownerEstado,
+                                ),
+                                child: TransactionRequestImporterContactSection(
+                                  request: lines.first,
+                                  embedded: true,
+                                ),
+                              ),
+                            if (consolidarDatosImportador)
+                              const SizedBox(height: kOrderCardSectionGap),
+                            OrderCardCollapsibleSection(
+                              title: 'Productos',
+                              subtitle: orderCardProductosSubtitle(
+                                lines,
+                                viewer: PedidoDesgloseViewer.aliado,
+                              ),
+                              initiallyExpanded: true,
+                              child: TransactionRequestProductosDesgloseSection(
+                                lines: lines,
+                                compact: true,
+                                viewer: PedidoDesgloseViewer.aliado,
+                                showPrecioHelp: false,
+                                showImporterGroupHeaders: true,
+                                hideSectionTitle: true,
+                              ),
                             ),
-                          ],
-                          const SizedBox(height: 12),
-                          if (useMultiImporterTabs) ...[
+                            const SizedBox(height: kOrderCardSectionGap),
+                            OrderCardCollapsibleSection(
+                              title: 'Seguimiento',
+                              subtitle: orderCardTimelineSubtitle(
+                                lines.first,
+                                aliadoViewer: true,
+                              ),
+                              initiallyExpanded:
+                                  orderCardTimelineInitiallyExpanded(
+                                lines.first,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (checkoutGroupMismoEstadoEnvio(lines)) ...[
+                                    ..._checkoutGroupEtaBanners(lines),
+                                    CourierTimelineWidget(
+                                      request: lines.first,
+                                      compact: true,
+                                      viewerRole: AppHomeRole.aliado,
+                                      showHeading: false,
+                                    ),
+                                    ..._postTimelineBloquesAliado(
+                                      lines: lines,
+                                      consolidarDatosImportador:
+                                          consolidarDatosImportador,
+                                    ),
+                                  ] else
+                                    ..._postTimelineBloquesAliado(
+                                      lines: lines,
+                                      consolidarDatosImportador:
+                                          consolidarDatosImportador,
+                                      timelinePorLinea: true,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: kOrderCardSectionGap),
                             AliadoMultiImporterOrderTabs(
                               allLines: lines,
                               porImportador: porImportador,
                               importerPanelBuilder: multiImporterPanelBuilder!,
                             ),
-                          ] else ...[
-                            if (consolidarDatosImportador) ...[
-                              TransactionRequestImporterContactSection(
-                                request: lines.first,
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            if (checkoutGroupMismoEstadoEnvio(lines)) ...[
-                              ..._checkoutGroupEtaBanners(lines),
-                              CourierTimelineWidget(
-                                request: lines.first,
-                                compact: true,
-                                viewerRole: AppHomeRole.aliado,
-                                showHeading: true,
-                              ),
-                              ..._postTimelineBloquesAliado(
-                                lines: lines,
-                                consolidarDatosImportador:
-                                    consolidarDatosImportador,
-                              ),
-                            ] else ...[
-                              const Text(
-                                'Seguimiento del envío',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12.5,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              ..._postTimelineBloquesAliado(
-                                lines: lines,
-                                consolidarDatosImportador:
-                                    consolidarDatosImportador,
-                                timelinePorLinea: true,
-                              ),
-                            ],
                           ],
                         ] else ...[
-                          TransactionRequestImporterContactSection(request: r),
-                          const SizedBox(height: 12),
-                          TransactionRequestDestinoEntregaSection(
-                            request: r,
+                          OrderCardCollapsibleSection(
+                            title: 'Importador',
+                            subtitle: orderCardPartySubtitle(
+                              businessName: r.ownerBusinessName,
+                              ciudad: r.ownerCiudad,
+                              estado: r.ownerEstado,
+                            ),
+                            child: TransactionRequestImporterContactSection(
+                              request: r,
+                              embedded: true,
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          TransactionRequestProductosDesgloseSection(
-                            lines: <TransactionRequestModel>[r],
-                            compact: true,
-                            viewer: PedidoDesgloseViewer.aliado,
-                            showPrecioHelp: false,
+                          const SizedBox(height: kOrderCardSectionGap),
+                          OrderCardCollapsibleSection(
+                            title: 'Entrega',
+                            subtitle: r.destinoEntregaLineaCompactaEs,
+                            child: TransactionRequestDestinoEntregaSection(
+                              request: r,
+                              hideSectionTitle: true,
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          AliadoTransitEtaBanner(request: r),
-                          const SizedBox(height: 10),
-                          CourierTimelineWidget(
-                            request: r,
-                            compact: true,
-                            viewerRole: AppHomeRole.aliado,
-                            showHeading: true,
+                          const SizedBox(height: kOrderCardSectionGap),
+                          OrderCardCollapsibleSection(
+                            title: 'Productos',
+                            subtitle: orderCardProductosSubtitle(
+                              [r],
+                              viewer: PedidoDesgloseViewer.aliado,
+                            ),
+                            initiallyExpanded: true,
+                            child: TransactionRequestProductosDesgloseSection(
+                              lines: <TransactionRequestModel>[r],
+                              compact: true,
+                              viewer: PedidoDesgloseViewer.aliado,
+                              showPrecioHelp: false,
+                              hideSectionTitle: true,
+                            ),
+                          ),
+                          const SizedBox(height: kOrderCardSectionGap),
+                          OrderCardCollapsibleSection(
+                            title: 'Seguimiento',
+                            subtitle: orderCardTimelineSubtitle(
+                              r,
+                              aliadoViewer: true,
+                            ),
+                            initiallyExpanded:
+                                orderCardTimelineInitiallyExpanded(r),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AliadoTransitEtaBanner(request: r),
+                                const SizedBox(height: 8),
+                                CourierTimelineWidget(
+                                  request: r,
+                                  compact: true,
+                                  viewerRole: AppHomeRole.aliado,
+                                  showHeading: false,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                         if (!useMultiImporterTabs &&
@@ -488,7 +544,10 @@ List<Widget> _postTimelineBloquesAliado({
         out.add(const SizedBox(height: 12));
       }
       if (!consolidarDatosImportador) {
-        out.add(TransactionRequestImporterContactSection(request: lines[i]));
+        out.add(TransactionRequestImporterContactSection(
+          request: lines[i],
+          embedded: true,
+        ));
         out.add(const SizedBox(height: 12));
       }
       out.add(AliadoTransitEtaBanner(request: lines[i]));
@@ -509,7 +568,10 @@ List<Widget> _postTimelineBloquesAliado({
           out.add(Divider(height: 1, color: Colors.grey.shade300));
           out.add(const SizedBox(height: 12));
         }
-        out.add(TransactionRequestImporterContactSection(request: lines[i]));
+        out.add(TransactionRequestImporterContactSection(
+          request: lines[i],
+          embedded: true,
+        ));
       }
       if (lines.isNotEmpty) {
         out.add(const SizedBox(height: 12));

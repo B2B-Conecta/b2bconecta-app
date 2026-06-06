@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../models/transaction_request_model.dart';
 import '../utils/admin_order_panel_utils.dart';
-import 'admin_compact_party_card.dart';
+import 'order_card_collapsible_layout.dart';
 import 'transaction_request_admin_sections.dart';
+import 'transaction_request_counterparty_profile_section.dart';
 
-/// Cabecera unificada de un carrito admin: aliado, destino (comisión en panel por proveedor).
+/// Cabecera unificada de un carrito admin: aliado, destino y valoración (comisión por proveedor).
 class AdminCheckoutGroupMasterHeader extends StatelessWidget {
   const AdminCheckoutGroupMasterHeader({
     super.key,
@@ -39,33 +40,50 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          lines.first.destinoEntregaLineaCompactaEs,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade700,
-            height: 1.25,
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Aliado',
+          subtitle: orderCardPartySubtitle(
+            businessName: r.aliadoBusinessName,
+            ciudad: r.aliadoCiudad,
+            estado: r.aliadoEstado,
+          ),
+          infoMessage: 'Taller solicitante del carrito y estado KYC.',
+          child: TransactionRequestCounterpartyProfileSection(
+            profileId: r.aliadoId,
+            partyLabel: 'Aliado',
+            businessName: r.aliadoBusinessName,
+            rif: r.aliadoRif,
+            phone: r.aliadoPhone,
+            estado: r.aliadoEstado,
+            ciudad: r.aliadoCiudad,
+            direccion: r.aliadoDireccion,
+            fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+            logoStoragePath: r.aliadoLogoStoragePath,
+            kycStatus: r.aliadoKycStatus,
           ),
         ),
-        const SizedBox(height: 12),
-        AdminCompactAliadoCard(
-          profileId: r.aliadoId,
-          businessName: r.aliadoBusinessName,
-          rif: r.aliadoRif,
-          phone: r.aliadoPhone,
-          estado: r.aliadoEstado,
-          ciudad: r.aliadoCiudad,
-          direccion: r.aliadoDireccion,
-          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
-          logoStoragePath: r.aliadoLogoStoragePath,
-          kycStatus: r.aliadoKycStatus,
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Entrega',
+          subtitle: r.destinoEntregaLineaCompactaEs,
+          child: TransactionRequestDestinoEntregaSection(
+            request: r,
+            hideSectionTitle: true,
+          ),
         ),
-        const SizedBox(height: 12),
-        TransactionRequestDestinoEntregaSection(request: r),
         if (expLine != null) ...[
-          const SizedBox(height: 12),
-          TransactionRequestAliadoExperienceAdminSection(request: expLine),
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Valoración del aliado',
+            subtitle: expLine.aliadoExperienceStars != null
+                ? '${expLine.aliadoExperienceStars}/5 post-entrega'
+                : 'Sin estrellas',
+            child: TransactionRequestAliadoExperienceAdminSection(
+              request: expLine,
+              hideSectionTitle: true,
+            ),
+          ),
         ],
       ],
     );

@@ -8,14 +8,15 @@ import '../theme/app_theme.dart';
 import '../utils/admin_order_panel_utils.dart';
 import '../utils/aliado_order_grouping.dart';
 import 'order_commission_summary.dart';
-import 'admin_compact_party_card.dart';
 import 'admin_order_pre_transit_section.dart';
 import 'admin_pago_revision_section.dart';
 import 'courier_timeline_widget.dart';
 import 'efectivo_respaldo_registrar.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'moroso_order_visual.dart';
+import 'order_card_collapsible_layout.dart';
 import 'order_motolink_thread_section.dart';
+import 'transaction_request_admin_sections.dart';
 
 /// Detalle admin de carrito: un proveedor a la vez (timeline, pago, chat único).
 class AdminCheckoutGroupExpandedSection extends StatefulWidget {
@@ -239,74 +240,96 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
     final anchor = chunk.first;
     final impName = anchor.ownerBusinessName ?? 'Importador';
 
-    return Material(
-      color: Colors.grey.shade50,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (total > 1)
-              Text(
-                'Proveedor $index de $total · $impName',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
-                ),
+    final commissionSubtitle = showImporterCommission
+        ? orderCardCommissionSubtitle(chunk)
+        : null;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (total > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Proveedor $index de $total · $impName',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
               ),
-            AdminCompactImportadorCard(
-              profileId: anchor.ownerId,
-              businessName: anchor.ownerBusinessName,
-              rif: anchor.ownerRif,
-              phone: anchor.ownerPhone,
-              estado: anchor.ownerEstado,
-              ciudad: anchor.ownerCiudad,
-              direccion: anchor.ownerDireccion,
-              fiscalMapsUrl: anchor.ownerFiscalMapsUrl,
-              logoStoragePath: anchor.ownerLogoStoragePath,
             ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final r in chunk)
-                  OrderStatusHeaderChips(
-                    statusLabel: adminLineStatusChipLabel(r),
-                    showMoroso: r.esPedidoMoroso,
-                  ),
-              ],
-            ),
-            if (showImporterCommission) ...[
-              const SizedBox(height: 10),
-              AdminCheckoutGroupCommissionSummary(
-                lines: allLines,
-                importerChunk: chunk,
+          ),
+        OrderCardCollapsibleSection(
+          title: 'Importador',
+          subtitle: orderCardPartySubtitle(
+            businessName: anchor.ownerBusinessName,
+            ciudad: anchor.ownerCiudad,
+            estado: anchor.ownerEstado,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TransactionRequestImporterContactSection(
+                request: anchor,
+                embedded: true,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final r in chunk)
+                    OrderStatusHeaderChips(
+                      statusLabel: adminLineStatusChipLabel(r),
+                      showMoroso: r.esPedidoMoroso,
+                    ),
+                ],
               ),
             ],
-            const SizedBox(height: 10),
-            TransactionRequestProductosDesgloseSection(
-              lines: chunk,
-              compact: true,
-              viewer: PedidoDesgloseViewer.importador,
-              sectionTitle:
-                  total > 1 ? 'Productos de este proveedor' : 'Partidas del pedido',
-              showImporterGroupHeaders: false,
+          ),
+        ),
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Productos',
+          subtitle: orderCardProductosSubtitle(
+            chunk,
+            viewer: PedidoDesgloseViewer.importador,
+          ),
+          initiallyExpanded: true,
+          child: TransactionRequestProductosDesgloseSection(
+            lines: chunk,
+            compact: true,
+            viewer: PedidoDesgloseViewer.importador,
+            showImporterGroupHeaders: false,
+            hideSectionTitle: true,
+          ),
+        ),
+        if (commissionSubtitle != null) ...[
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Comisión MotoLink',
+            subtitle: commissionSubtitle,
+            child: AdminCheckoutGroupCommissionSummary(
+              lines: allLines,
+              importerChunk: chunk,
+              suppressOuterTitle: true,
             ),
-            const SizedBox(height: 8),
-            CourierTimelineWidget(
-              request: anchor,
-              compact: true,
-              viewerRole: AppHomeRole.administrador,
-            ),
-            if (onAnularMotolink != null &&
+          ),
+        ],
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Seguimiento',
+          subtitle: orderCardTimelineSubtitle(anchor),
+          initiallyExpanded: orderCardTimelineInitiallyExpanded(anchor),
+          child: CourierTimelineWidget(
+            request: anchor,
+            compact: true,
+            viewerRole: AppHomeRole.administrador,
+            showHeading: false,
+          ),
+        ),
+        const SizedBox(height: kOrderCardSectionGap),
+        if (onAnularMotolink != null &&
                 chunk.any((r) => r.motolinkPuedeAnularComoAdmin)) ...[
               const SizedBox(height: 8),
               for (final r in chunk.where((x) => x.motolinkPuedeAnularComoAdmin))
@@ -401,21 +424,23 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                   ),
                 ),
             ],
-            const Divider(height: 20),
-            OrderMotolinkThreadSection(
-              key: ValueKey<String>(
-                'trm-admin-grp-${anchor.ownerId}-${chunk.map((e) => e.id).join("-")}',
-              ),
-              transactionRequestId: anchor.id,
-              mergedThreadRequestIds:
-                  chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
-              allowReplyAsAliado: false,
-              allowReplyAsAdmin: true,
-              onThreadChanged: onRefresh,
+        OrderCardCollapsibleSection(
+          title: 'Mensajes',
+          subtitle: 'Hilo con aliado, importador y MotoLink',
+          child: OrderMotolinkThreadSection(
+            key: ValueKey<String>(
+              'trm-admin-grp-${anchor.ownerId}-${chunk.map((e) => e.id).join("-")}',
             ),
-          ],
+            transactionRequestId: anchor.id,
+            mergedThreadRequestIds:
+                chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
+            allowReplyAsAliado: false,
+            allowReplyAsAdmin: true,
+            onThreadChanged: onRefresh,
+            suppressBuiltinTitle: true,
+          ),
         ),
-      ),
+      ],
     );
   }
 }

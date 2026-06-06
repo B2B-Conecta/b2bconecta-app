@@ -8,7 +8,9 @@ import '../utils/admin_order_panel_utils.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
+import 'order_card_collapsible_layout.dart';
 import 'order_commission_summary.dart';
+import 'importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
@@ -152,14 +154,22 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           if (!expanded &&
                               r.status ==
                                   TransactionRequestStatus.pedidoListo) ...[
-                            const SizedBox(height: 8),
-                            _PedidoListoBanner(),
+                            const SizedBox(height: 6),
+                            OrderCardCompactNoticeChip(
+                              label: 'Listo para recolección',
+                              icon: Icons.notifications_active_outlined,
+                              color: Colors.teal.shade900,
+                            ),
                           ],
                           if (!expanded &&
                               !isCheckoutGroup &&
                               lines.every((x) => x.pedidoEntregadoYPagado)) ...[
-                            const SizedBox(height: 8),
-                            _EntregadoPagadoBanner(),
+                            const SizedBox(height: 6),
+                            OrderCardCompactNoticeChip(
+                              label: 'Entregado y pagado',
+                              icon: Icons.check_circle_outline,
+                              color: Colors.green.shade800,
+                            ),
                           ] else if (!expanded && groupMoroso) ...[
                             const SizedBox(height: 8),
                             MorosoOrderCardNotice(
@@ -207,20 +217,80 @@ class AdminExpandableOrderCard extends StatelessWidget {
                   if (isCheckoutGroup)
                     AdminCheckoutGroupMasterHeader(lines: lines)
                   else ...[
-                    TransactionRequestPartiesContactSection(request: r),
-                    const SizedBox(height: 12),
-                    OrderCommissionSummary(
-                      lines: orderLinesEligibleForCommission([r]),
+                    OrderCardCollapsibleSection(
+                      title: 'Partes del pedido',
+                      subtitle:
+                          TransactionRequestPartiesContactSection.partiesSubtitle(
+                        r,
+                      ),
+                      infoMessage:
+                          'Aliado solicitante e importador proveedor del pedido.',
+                      child: TransactionRequestPartiesContactSection(
+                        request: r,
+                        embedded: true,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    TransactionRequestDestinoEntregaSection(request: r),
-                    const SizedBox(height: 12),
-                    TransactionRequestAliadoExperienceAdminSection(request: r),
-                    const SizedBox(height: 12),
-                    CourierTimelineWidget(
-                      request: r,
-                      compact: true,
-                      viewerRole: AppHomeRole.administrador,
+                    const SizedBox(height: kOrderCardSectionGap),
+                    OrderCardCollapsibleSection(
+                      title: 'Entrega',
+                      subtitle: r.destinoEntregaLineaCompactaEs,
+                      child: TransactionRequestDestinoEntregaSection(
+                        request: r,
+                        hideSectionTitle: true,
+                      ),
+                    ),
+                    const SizedBox(height: kOrderCardSectionGap),
+                    OrderCardCollapsibleSection(
+                      title: 'Productos',
+                      subtitle: orderCardProductosSubtitle(
+                        [r],
+                        viewer: PedidoDesgloseViewer.importador,
+                      ),
+                      initiallyExpanded: true,
+                      child: TransactionRequestProductosDesgloseSection(
+                        lines: [r],
+                        compact: true,
+                        viewer: PedidoDesgloseViewer.importador,
+                        hideSectionTitle: true,
+                        showPrecioHelp: false,
+                      ),
+                    ),
+                    if (orderCardCommissionSubtitle([r]) != null) ...[
+                      const SizedBox(height: kOrderCardSectionGap),
+                      OrderCardCollapsibleSection(
+                        title: 'Comisión MotoLink',
+                        subtitle: orderCardCommissionSubtitle([r]),
+                        child: OrderCommissionSummary(
+                          lines: orderLinesEligibleForCommission([r]),
+                          suppressOuterTitle: true,
+                        ),
+                      ),
+                    ],
+                    if (r.aliadoExperienceSubmittedAt != null) ...[
+                      const SizedBox(height: kOrderCardSectionGap),
+                      OrderCardCollapsibleSection(
+                        title: 'Valoración del aliado',
+                        subtitle: r.aliadoExperienceStars != null
+                            ? '${r.aliadoExperienceStars}/5 post-entrega'
+                            : 'Comentario registrado',
+                        child: TransactionRequestAliadoExperienceAdminSection(
+                          request: r,
+                          hideSectionTitle: true,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: kOrderCardSectionGap),
+                    OrderCardCollapsibleSection(
+                      title: 'Seguimiento',
+                      subtitle: orderCardTimelineSubtitle(r),
+                      initiallyExpanded:
+                          orderCardTimelineInitiallyExpanded(r),
+                      child: CourierTimelineWidget(
+                        request: r,
+                        compact: true,
+                        viewerRole: AppHomeRole.administrador,
+                        showHeading: false,
+                      ),
                     ),
                   ],
                   if (expandedFooter != null) ...[
@@ -231,79 +301,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PedidoListoBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.teal.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.notifications_active_outlined,
-            size: 18,
-            color: Colors.teal.shade900,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Listo en despacho: al retirar la carga, marque en tránsito.',
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-                color: Colors.teal.shade900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EntregadoPagadoBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 18,
-            color: Colors.green.shade800,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Entregado y pagado (MotoLink).',
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-                color: Colors.green.shade900,
-              ),
-            ),
-          ),
         ],
       ),
     );

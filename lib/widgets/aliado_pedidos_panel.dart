@@ -22,6 +22,7 @@ import 'order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
+import 'order_card_collapsible_layout.dart';
 import 'order_motolink_thread_section.dart';
 import 'moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
@@ -611,39 +612,57 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
     if (!isMulti) {
       final r = g.single;
+      final pagoSubtitle = r.aliadoPagoEstadoResumenEs?.trim();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (r.qtyAdjustmentPendienteAliado) ...[
             AliadoQtyAdjustmentActions(request: r, onChanged: _load),
-            const SizedBox(height: 12),
+            const SizedBox(height: kOrderCardSectionGap),
           ],
-          AliadoImportadorFacturaSection(lines: [r], compact: true),
-          const SizedBox(height: 10),
-          _PasarelaPagoMotoLinkCard(
-            lineCount: 1,
-            importerName: r.ownerBusinessName,
-            montoRef: r.refBaseTotalForPago > 0
-                ? r.refBaseTotalForPago
-                : r.precioTotal,
-            previewLines: [r],
-            childBuilder: (onMetodoPreview) => AliadoOrderPagoSection(
-              key: ValueKey<String>('pago-${r.id}'),
-              request: r,
-              profile: _profile,
-              onChanged: _load,
-              onPagoMetodoPreviewChanged: onMetodoPreview,
-              suppressPrimaryTitle: true,
-              suppressNegotiationIntro: false,
+          OrderCardCollapsibleSection(
+            title: 'Pago e factura',
+            subtitle: pagoSubtitle?.isNotEmpty == true
+                ? pagoSubtitle!
+                : 'Factura del importador y comprobante',
+            initiallyExpanded: !r.pedidoEntregadoYPagado,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AliadoImportadorFacturaSection(lines: [r], compact: true),
+                const SizedBox(height: 10),
+                _PasarelaPagoMotoLinkCard(
+                  lineCount: 1,
+                  importerName: r.ownerBusinessName,
+                  montoRef: r.refBaseTotalForPago > 0
+                      ? r.refBaseTotalForPago
+                      : r.precioTotal,
+                  previewLines: [r],
+                  childBuilder: (onMetodoPreview) => AliadoOrderPagoSection(
+                    key: ValueKey<String>('pago-${r.id}'),
+                    request: r,
+                    profile: _profile,
+                    onChanged: _load,
+                    onPagoMetodoPreviewChanged: onMetodoPreview,
+                    suppressPrimaryTitle: true,
+                    suppressNegotiationIntro: false,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          OrderMotolinkThreadSection(
-            key: ValueKey<String>('trm-aliado-${r.id}'),
-            transactionRequestId: r.id,
-            allowReplyAsAliado: _esEnCurso(r.status),
-            allowReplyAsAdmin: false,
-            onThreadChanged: _load,
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Mensajes',
+            subtitle: 'Hilo con el importador y MotoLink',
+            child: OrderMotolinkThreadSection(
+              key: ValueKey<String>('trm-aliado-${r.id}'),
+              transactionRequestId: r.id,
+              allowReplyAsAliado: _esEnCurso(r.status),
+              allowReplyAsAdmin: false,
+              onThreadChanged: _load,
+              suppressBuiltinTitle: true,
+            ),
           ),
         ],
       );
@@ -699,9 +718,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ),
           const SizedBox(height: 10),
         ],
-        AliadoImportadorFacturaSection(lines: chunk, compact: true),
-        const SizedBox(height: 10),
-        _PasarelaPagoMotoLinkCard(
+        OrderCardCollapsibleSection(
+          title: 'Pago e factura',
+          subtitle: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),
+          initiallyExpanded: !chunk.every((l) => l.pedidoEntregadoYPagado),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AliadoImportadorFacturaSection(lines: chunk, compact: true),
+              const SizedBox(height: 10),
+              _PasarelaPagoMotoLinkCard(
           lineCount: chunk.length,
           singleComprobantePorProveedor: usePagoUnificado,
           importerName: name,
@@ -745,8 +771,11 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     ],
                   ],
                 ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: kOrderCardSectionGap),
         if (chunk.any((l) => l.qtyAdjustmentPendienteAliado)) ...[
           for (final line in chunk.where((l) => l.qtyAdjustmentPendienteAliado))
             Padding(
@@ -758,38 +787,26 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ),
             ),
         ],
-        if (chunk.length > 1) ...[
-          Text(
-            'Mensajes con MotoLink — un hilo por proveedor en este carrito.',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 11.5,
-              color: Colors.grey.shade800,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 10),
-          OrderMotolinkThreadSection(
+        OrderCardCollapsibleSection(
+          title: 'Mensajes',
+          subtitle: chunk.length > 1
+              ? 'Hilo con este proveedor en el carrito'
+              : 'Hilo con el importador y MotoLink',
+          child: OrderMotolinkThreadSection(
             key: ValueKey<String>(
-              'trm-aliado-merge-${chunk.first.ownerId}-${chunk.map((e) => e.id).join("-")}',
+              chunk.length > 1
+                  ? 'trm-aliado-merge-${chunk.first.ownerId}-${chunk.map((e) => e.id).join("-")}'
+                  : 'trm-aliado-${chunk.single.id}',
             ),
             transactionRequestId: chunk.first.id,
-            mergedThreadRequestIds: chunk.map((e) => e.id).toList(),
-            allowReplyAsAliado:
-                chunk.any((l) => _esEnCurso(l.status)),
+            mergedThreadRequestIds:
+                chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
+            allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
             allowReplyAsAdmin: false,
             onThreadChanged: _load,
             suppressBuiltinTitle: true,
           ),
-        ] else ...[
-          OrderMotolinkThreadSection(
-            key: ValueKey<String>('trm-aliado-${chunk.single.id}'),
-            transactionRequestId: chunk.single.id,
-            allowReplyAsAliado: _esEnCurso(chunk.single.status),
-            allowReplyAsAdmin: false,
-            onThreadChanged: _load,
-          ),
-        ],
+        ),
       ],
     );
   }

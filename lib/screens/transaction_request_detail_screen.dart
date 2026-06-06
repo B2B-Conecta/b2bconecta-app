@@ -10,6 +10,8 @@ import '../widgets/courier_timeline_widget.dart';
 import '../widgets/aliado_transit_eta_banner.dart';
 import '../widgets/importer_aliado_solicitud_section.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../widgets/order_card_collapsible_layout.dart';
+import '../widgets/order_commission_summary.dart';
 import '../widgets/transaction_request_admin_sections.dart';
 
 class TransactionRequestDetailScreen extends StatefulWidget {
@@ -102,23 +104,64 @@ class _TransactionRequestDetailScreenState
             (x) => x.pagoPendienteRiesgoCuentaTresDiasHabiles,
           );
           final anyPedidoListo = lines.any(_mostrarBannerPedidoListo);
+          final isAliadoOrAdmin = widget.homeRole == AppHomeRole.aliado ||
+              widget.homeRole == AppHomeRole.administrador;
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
             children: [
-              if (anyEntregadoPagado) ...[
-                _pagoCompletadoBanner(),
-                const SizedBox(height: 12),
-              ] else if (anyPagoPendienteTrasEntrega) ...[
-                _pagoPendienteBanner(),
-                if (anyPagoRiesgo) ...[
-                  const SizedBox(height: 10),
-                  _pagoAtrasoCuentaBanner(),
+              if (isAliadoOrAdmin) ...[
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (anyEntregadoPagado)
+                      OrderCardCompactNoticeChip(
+                        label: 'Entregado y pagado',
+                        icon: Icons.check_circle_outline,
+                        color: Colors.green.shade800,
+                      ),
+                    if (anyPagoPendienteTrasEntrega)
+                      OrderCardCompactNoticeChip(
+                        label: 'Pago pendiente',
+                        icon: Icons.payments_outlined,
+                        color: Colors.deepOrange.shade800,
+                      ),
+                    if (anyPagoRiesgo)
+                      OrderCardCompactNoticeChip(
+                        label: 'Riesgo de restricción',
+                        icon: Icons.warning_amber_rounded,
+                        color: Colors.red.shade800,
+                      ),
+                    if (anyPedidoListo)
+                      OrderCardCompactNoticeChip(
+                        label: 'Listo para recolección',
+                        icon: Icons.notifications_active_outlined,
+                        color: Colors.teal.shade900,
+                      ),
+                  ],
+                ),
+                if (anyEntregadoPagado ||
+                    anyPagoPendienteTrasEntrega ||
+                    anyPagoRiesgo ||
+                    anyPedidoListo)
+                  const SizedBox(height: 12),
+              ] else ...[
+                if (anyEntregadoPagado) ...[
+                  _pagoCompletadoBanner(),
+                  const SizedBox(height: 12),
+                ] else if (anyPagoPendienteTrasEntrega) ...[
+                  _pagoPendienteBanner(),
+                  if (anyPagoRiesgo) ...[
+                    const SizedBox(height: 10),
+                    _pagoAtrasoCuentaBanner(),
+                  ],
+                  const SizedBox(height: 12),
                 ],
-                const SizedBox(height: 12),
-              ],
-              if (anyPedidoListo) ...[
-                _pedidoListoPickupBanner(),
-                const SizedBox(height: 12),
+                if (anyPedidoListo) ...[
+                  _pedidoListoPickupBanner(),
+                  const SizedBox(height: 12),
+                ],
               ],
               if (lines.any(
                 (x) =>
@@ -181,29 +224,25 @@ class _TransactionRequestDetailScreenState
                 const SizedBox(height: 12),
               ],
               _summaryCardCompact(r, lines),
-              if (widget.homeRole == AppHomeRole.importador) ...[
+              if (isAliadoOrAdmin) ...[
+                const SizedBox(height: kOrderCardSectionGap),
+                ..._detailCollapsibleSections(r, lines),
+              ] else ...[
+                if (widget.homeRole == AppHomeRole.importador) ...[
+                  const SizedBox(height: 12),
+                  isGroup
+                      ? ImporterCheckoutBundleSolicitudSection(
+                          lines: lines,
+                          compact: false,
+                        )
+                      : ImporterAliadoSolicitudSection(
+                          request: r, compact: false),
+                ],
                 const SizedBox(height: 12),
-                isGroup
-                    ? ImporterCheckoutBundleSolicitudSection(
-                        lines: lines,
-                        compact: false,
-                      )
-                    : ImporterAliadoSolicitudSection(
-                        request: r, compact: false),
-              ],
-              if (widget.homeRole == AppHomeRole.aliado) ...[
+                _contactByRole(r),
                 const SizedBox(height: 12),
-                TransactionRequestProductosDesgloseSection(
-                  lines: lines,
-                  compact: false,
-                  viewer: PedidoDesgloseViewer.aliado,
-                  showPrecioHelp: false,
-                ),
+                _masInformacionSection(context, r, lines),
               ],
-              const SizedBox(height: 12),
-              _contactByRole(r),
-              const SizedBox(height: 12),
-              _masInformacionSection(context, r, lines),
             ],
           );
         },
@@ -416,6 +455,230 @@ class _TransactionRequestDetailScreenState
           ],
         ),
       ),
+    );
+  }
+
+  List<Widget> _detailCollapsibleSections(
+    TransactionRequestModel r,
+    List<TransactionRequestModel> lines,
+  ) {
+    final isGroup = lines.length > 1;
+    final isAliado = widget.homeRole == AppHomeRole.aliado;
+    final isAdmin = widget.homeRole == AppHomeRole.administrador;
+    final aliadoViewer = isAliado;
+    final refLine = lines.first;
+    final hasNota = r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty;
+    TransactionRequestModel? expLine;
+    for (final x in lines) {
+      if (x.aliadoExperienceSubmittedAt != null) {
+        expLine = x;
+        break;
+      }
+    }
+
+    final out = <Widget>[
+      if (isAliado) ...[
+        OrderCardCollapsibleSection(
+          title: 'Productos',
+          subtitle: orderCardProductosSubtitle(
+            lines,
+            viewer: PedidoDesgloseViewer.aliado,
+          ),
+          initiallyExpanded: true,
+          child: TransactionRequestProductosDesgloseSection(
+            lines: lines,
+            compact: true,
+            viewer: PedidoDesgloseViewer.aliado,
+            showPrecioHelp: false,
+            hideSectionTitle: true,
+            showImporterGroupHeaders: isGroup,
+          ),
+        ),
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Importador',
+          subtitle: orderCardPartySubtitle(
+            businessName: r.ownerBusinessName,
+            ciudad: r.ownerCiudad,
+            estado: r.ownerEstado,
+          ),
+          child: TransactionRequestImporterContactSection(
+            request: r,
+            embedded: true,
+          ),
+        ),
+      ],
+      if (isAdmin) ...[
+        OrderCardCollapsibleSection(
+          title: 'Partes del pedido',
+          subtitle: TransactionRequestPartiesContactSection.partiesSubtitle(r),
+          infoMessage: 'Aliado e importador involucrados en el pedido.',
+          child: TransactionRequestPartiesContactSection(
+            request: r,
+            embedded: true,
+          ),
+        ),
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Productos',
+          subtitle: orderCardProductosSubtitle(
+            lines,
+            viewer: PedidoDesgloseViewer.importador,
+          ),
+          initiallyExpanded: true,
+          child: TransactionRequestProductosDesgloseSection(
+            lines: lines,
+            compact: true,
+            viewer: PedidoDesgloseViewer.importador,
+            hideSectionTitle: true,
+            showPrecioHelp: false,
+            showImporterGroupHeaders: isGroup,
+          ),
+        ),
+        if (orderCardCommissionSubtitle(lines) != null) ...[
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Comisión MotoLink',
+            subtitle: orderCardCommissionSubtitle(lines),
+            child: OrderCommissionSummary(
+              lines: orderLinesEligibleForCommission(lines),
+              suppressOuterTitle: true,
+            ),
+          ),
+        ],
+        if (expLine != null) ...[
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Valoración del aliado',
+            subtitle: expLine.aliadoExperienceStars != null
+                ? '${expLine.aliadoExperienceStars}/5 post-entrega'
+                : 'Comentario registrado',
+            child: TransactionRequestAliadoExperienceAdminSection(
+              request: expLine,
+              hideSectionTitle: true,
+            ),
+          ),
+        ],
+      ],
+      const SizedBox(height: kOrderCardSectionGap),
+      OrderCardCollapsibleSection(
+        title: 'Entrega',
+        subtitle: refLine.destinoEntregaLineaCompactaEs,
+        child: TransactionRequestDestinoEntregaSection(
+          request: refLine,
+          hideSectionTitle: true,
+        ),
+      ),
+      const SizedBox(height: kOrderCardSectionGap),
+      OrderCardCollapsibleSection(
+        title: 'Seguimiento',
+        subtitle: orderCardTimelineSubtitle(
+          refLine,
+          aliadoViewer: aliadoViewer,
+        ),
+        initiallyExpanded: orderCardTimelineInitiallyExpanded(refLine),
+        child: _detailTimelineBlock(lines, aliadoViewer: aliadoViewer),
+      ),
+      const SizedBox(height: kOrderCardSectionGap),
+      OrderCardCollapsibleSection(
+        title: 'Referencias',
+        subtitle: 'ID · ${r.id.substring(0, 8)}…',
+        child: _summaryReferenceBlock(r),
+      ),
+      if (hasNota) ...[
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Nota de MotoLink',
+          subtitle: 'Instrucción interna del pedido',
+          child: _noteCard(
+            r.notasAdmin!.trim(),
+            title: 'Nota de MotoLink',
+            tone: _NoteCardTone.info,
+          ),
+        ),
+      ],
+    ];
+    return out;
+  }
+
+  Widget _detailTimelineBlock(
+    List<TransactionRequestModel> lines, {
+    required bool aliadoViewer,
+  }) {
+    final isGroup = lines.length > 1;
+    final r = lines.first;
+    if (isGroup && checkoutGroupMismoEstadoEnvio(lines)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ..._detailEtaBanners(lines),
+          CourierTimelineWidget(
+            request: lines.first,
+            compact: true,
+            viewerRole: widget.homeRole,
+            showHeading: false,
+          ),
+          if (lines.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _flowItemsCaption(lines),
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    if (isGroup) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < lines.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            Text(
+              _timelineLineLabelForDetail(lines[i]),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            if (AliadoTransitEtaBanner.shouldShow(lines[i])) ...[
+              const SizedBox(height: 6),
+              AliadoTransitEtaBanner(
+                request: lines[i],
+                importerName: lines[i].ownerBusinessName,
+              ),
+            ],
+            const SizedBox(height: 6),
+            CourierTimelineWidget(
+              request: lines[i],
+              compact: true,
+              viewerRole: widget.homeRole,
+              showHeading: false,
+            ),
+          ],
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (AliadoTransitEtaBanner.shouldShow(r)) ...[
+          AliadoTransitEtaBanner(request: r),
+          const SizedBox(height: 8),
+        ],
+        CourierTimelineWidget(
+          request: r,
+          compact: true,
+          viewerRole: widget.homeRole,
+          showHeading: false,
+        ),
+      ],
     );
   }
 
@@ -641,7 +904,10 @@ class _TransactionRequestDetailScreenState
   Widget _contactByRole(TransactionRequestModel r) {
     switch (widget.homeRole) {
       case AppHomeRole.aliado:
-        return TransactionRequestImporterContactSection(request: r);
+        return TransactionRequestImporterContactSection(
+          request: r,
+          embedded: false,
+        );
       case AppHomeRole.importador:
         return TransactionRequestAliadoContactSection(request: r);
       case AppHomeRole.administrador:

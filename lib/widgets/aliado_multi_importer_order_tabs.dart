@@ -9,6 +9,7 @@ import 'aliado_transit_eta_banner.dart';
 import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
 import 'importer_aliado_solicitud_section.dart';
+import 'order_card_collapsible_layout.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Cabecera del pedido maestro (carrito multi-importador).
@@ -490,39 +491,60 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                AliadoTransitEtaBanner(
-                  request: ref,
-                  importerName: name,
+                OrderCardCollapsibleSection(
+                  title: 'Seguimiento',
+                  subtitle: orderCardTimelineSubtitle(
+                    ref,
+                    aliadoViewer: true,
+                  ),
+                  initiallyExpanded: orderCardTimelineInitiallyExpanded(ref),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AliadoTransitEtaBanner(
+                        request: ref,
+                        importerName: name,
+                      ),
+                      if (AliadoTransitEtaBanner.shouldShow(ref))
+                        const SizedBox(height: 8),
+                      CourierTimelineWidget(
+                        request: ref,
+                        compact: true,
+                        viewerRole: AppHomeRole.aliado,
+                        showHeading: false,
+                      ),
+                    ],
+                  ),
                 ),
-                if (AliadoTransitEtaBanner.shouldShow(ref))
-                  const SizedBox(height: 10),
-                CourierTimelineWidget(
-                  request: ref,
-                  compact: true,
-                  viewerRole: AppHomeRole.aliado,
-                  showHeading: true,
+                const SizedBox(height: kOrderCardSectionGap),
+                OrderCardCollapsibleSection(
+                  title: 'Importador',
+                  subtitle: orderCardPartySubtitle(
+                    businessName: ref.ownerBusinessName,
+                    ciudad: ref.ownerCiudad,
+                    estado: ref.ownerEstado,
+                  ),
+                  child: TransactionRequestImporterContactSection(
+                    request: ref,
+                    embedded: true,
+                  ),
                 ),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Divider(height: 20),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TransactionRequestImporterContactSection(request: ref),
-                const SizedBox(height: 12),
-                TransactionRequestProductosDesgloseSection(
-                  lines: chunk,
-                  compact: true,
-                  viewer: PedidoDesgloseViewer.aliado,
-                  showPrecioHelp: false,
-                  sectionTitle: 'Productos de este proveedor',
-                  showImporterGroupHeaders: false,
+                const SizedBox(height: kOrderCardSectionGap),
+                OrderCardCollapsibleSection(
+                  title: 'Productos',
+                  subtitle: orderCardProductosSubtitle(
+                    chunk,
+                    viewer: PedidoDesgloseViewer.aliado,
+                  ),
+                  initiallyExpanded: true,
+                  child: TransactionRequestProductosDesgloseSection(
+                    lines: chunk,
+                    compact: true,
+                    viewer: PedidoDesgloseViewer.aliado,
+                    showPrecioHelp: false,
+                    showImporterGroupHeaders: false,
+                    hideSectionTitle: true,
+                  ),
                 ),
               ],
             ),

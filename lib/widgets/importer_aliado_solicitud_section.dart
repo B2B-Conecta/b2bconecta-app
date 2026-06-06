@@ -87,6 +87,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
     this.showPrecioHelp = true,
     this.sectionTitle,
     this.showImporterGroupHeaders = true,
+    this.hideSectionTitle = false,
   });
 
   final List<TransactionRequestModel> lines;
@@ -99,6 +100,9 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
 
   /// En carritos multi-importador, agrupa por nombre de proveedor.
   final bool showImporterGroupHeaders;
+
+  /// Dentro de [OrderCardCollapsibleSection]: el título va en el encabezado colapsable.
+  final bool hideSectionTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -115,29 +119,31 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          sectionTitle ??
-              (viewer == PedidoDesgloseViewer.aliado
-                  ? 'Productos de tu pedido'
-                  : 'Productos del pedido'),
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: titleSize,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        if (showPrecioHelp && viewer == PedidoDesgloseViewer.importador) ...[
-          const SizedBox(height: 4),
+        if (!hideSectionTitle) ...[
           Text(
-            'Precios en REF = oferta MotoLink al aliado (alistamiento).',
+            sectionTitle ??
+                (viewer == PedidoDesgloseViewer.aliado
+                    ? 'Productos de tu pedido'
+                    : 'Productos del pedido'),
             style: TextStyle(
-              fontSize: helpSize,
-              color: Colors.grey.shade600,
-              height: 1.3,
+              fontWeight: FontWeight.w800,
+              fontSize: titleSize,
+              color: AppColors.textPrimary,
             ),
           ),
+          if (showPrecioHelp && viewer == PedidoDesgloseViewer.importador) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Precios en REF = oferta MotoLink al aliado (alistamiento).',
+              style: TextStyle(
+                fontSize: helpSize,
+                color: Colors.grey.shade600,
+                height: 1.3,
+              ),
+            ),
+          ],
+          SizedBox(height: compact ? 8 : 10),
         ],
-        SizedBox(height: compact ? 8 : 10),
         for (var ci = 0; ci < chunks.length; ci++) ...[
           if (ci > 0) SizedBox(height: compact ? 14 : 16),
           if (showImporterGroupHeaders && chunks.length > 1) ...[

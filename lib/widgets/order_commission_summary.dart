@@ -32,10 +32,13 @@ class OrderCommissionSummary extends StatelessWidget {
     required this.lines,
     /// Solo la comisión de un proveedor dentro de un carrito (panel admin por chip).
     this.importerChunk,
+    /// Dentro de [OrderCardCollapsibleSection]: sin título duplicado en la caja.
+    this.suppressOuterTitle = false,
   });
 
   final List<TransactionRequestModel> lines;
   final List<TransactionRequestModel>? importerChunk;
+  final bool suppressOuterTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +56,7 @@ class OrderCommissionSummary extends StatelessWidget {
         rateSnapshot: chunk.first.commissionRateSnapshot,
         breakdownMode:
             chunk.length > 1 ? _BreakdownMode.linesInChunk : _BreakdownMode.none,
+        suppressOuterTitle: suppressOuterTitle,
       );
     }
 
@@ -75,6 +79,7 @@ class OrderCommissionSummary extends StatelessWidget {
               ? _BreakdownMode.linesInChunk
               : _BreakdownMode.none),
       importerChunks: byImporter ? chunks : null,
+      suppressOuterTitle: suppressOuterTitle,
     );
   }
 }
@@ -93,6 +98,7 @@ class _CommissionBox extends StatelessWidget {
     required this.rateSnapshot,
     required this.breakdownMode,
     this.importerChunks,
+    this.suppressOuterTitle = false,
   });
 
   final String title;
@@ -102,6 +108,7 @@ class _CommissionBox extends StatelessWidget {
   final double rateSnapshot;
   final _BreakdownMode breakdownMode;
   final List<List<TransactionRequestModel>>? importerChunks;
+  final bool suppressOuterTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -126,23 +133,25 @@ class _CommissionBox extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.payments_outlined, size: 18, color: Colors.teal.shade800),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12.5,
-                    color: AppColors.textPrimary,
+          if (!suppressOuterTitle) ...[
+            Row(
+              children: [
+                Icon(Icons.payments_outlined, size: 18, color: Colors.teal.shade800),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           Text(
             'Tasa $pct % · '
             '${todasDevengadas ? 'Devengada' : 'Pendiente de recibir'}: '

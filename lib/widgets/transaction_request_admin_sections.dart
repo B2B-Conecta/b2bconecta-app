@@ -42,13 +42,67 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
   const TransactionRequestPartiesContactSection({
     super.key,
     required this.request,
+    this.embedded = false,
   });
 
   final TransactionRequestModel request;
+  final bool embedded;
+
+  static String partiesSubtitle(TransactionRequestModel r) {
+    final aliado = r.aliadoBusinessName?.trim();
+    final imp = r.ownerBusinessName?.trim();
+    if (aliado != null &&
+        aliado.isNotEmpty &&
+        imp != null &&
+        imp.isNotEmpty) {
+      return '$aliado · $imp';
+    }
+    return aliado ?? imp ?? 'Ver contacto B2B';
+  }
 
   @override
   Widget build(BuildContext context) {
     final r = request;
+    final aliadoProfile = TransactionRequestCounterpartyProfileSection(
+          profileId: r.aliadoId,
+          partyLabel: 'Aliado',
+          businessName: r.aliadoBusinessName,
+          rif: r.aliadoRif,
+          phone: r.aliadoPhone,
+          estado: r.aliadoEstado,
+          ciudad: r.aliadoCiudad,
+          direccion: r.aliadoDireccion,
+          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+          logoStoragePath: r.aliadoLogoStoragePath,
+          kycStatus: r.aliadoKycStatus,
+          loadApprovedDocuments: !embedded,
+        );
+    final importadorProfile = TransactionRequestCounterpartyProfileSection(
+      profileId: r.ownerId,
+      partyLabel: 'Importador',
+      businessName: r.ownerBusinessName,
+      rif: r.ownerRif,
+      phone: r.ownerPhone,
+      estado: r.ownerEstado,
+      ciudad: r.ownerCiudad,
+      direccion: r.ownerDireccion,
+      fiscalMapsUrl: r.ownerFiscalMapsUrl,
+      logoStoragePath: r.ownerLogoStoragePath,
+      kycStatus: r.ownerKycStatus,
+      loadApprovedDocuments: false,
+    );
+
+    if (embedded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          aliadoProfile,
+          const SizedBox(height: 10),
+          importadorProfile,
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -61,33 +115,9 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        TransactionRequestCounterpartyProfileSection(
-          profileId: r.aliadoId,
-          partyLabel: 'Aliado',
-          businessName: r.aliadoBusinessName,
-          rif: r.aliadoRif,
-          phone: r.aliadoPhone,
-          estado: r.aliadoEstado,
-          ciudad: r.aliadoCiudad,
-          direccion: r.aliadoDireccion,
-          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
-          logoStoragePath: r.aliadoLogoStoragePath,
-          kycStatus: r.aliadoKycStatus,
-        ),
+        aliadoProfile,
         const SizedBox(height: 10),
-        TransactionRequestCounterpartyProfileSection(
-          profileId: r.ownerId,
-          partyLabel: 'Importador',
-          businessName: r.ownerBusinessName,
-          rif: r.ownerRif,
-          phone: r.ownerPhone,
-          estado: r.ownerEstado,
-          ciudad: r.ownerCiudad,
-          direccion: r.ownerDireccion,
-          fiscalMapsUrl: r.ownerFiscalMapsUrl,
-          logoStoragePath: r.ownerLogoStoragePath,
-          kycStatus: r.ownerKycStatus,
-        ),
+        importadorProfile,
       ],
     );
   }
@@ -98,15 +128,50 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
   const TransactionRequestAliadoContactSection({
     super.key,
     required this.request,
+    this.embedded = false,
   });
 
   final TransactionRequestModel request;
+  final bool embedded;
+
+  static bool kycAprobadoPara(TransactionRequestModel r) =>
+      r.aliadoKycStatus?.trim() == KycStatus.aprobado;
+
+  static KycApprovedAliadoModel kycModelPara(TransactionRequestModel r) =>
+      KycApprovedAliadoModel(
+        id: r.aliadoId,
+        businessName: r.aliadoBusinessName,
+        rif: r.aliadoRif,
+        phone: r.aliadoPhone,
+        estado: r.aliadoEstado,
+        ciudad: r.aliadoCiudad,
+        direccion: r.aliadoDireccion,
+        fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+        logoStoragePath: r.aliadoLogoStoragePath,
+        kycStatus: r.aliadoKycStatus,
+      );
 
   @override
   Widget build(BuildContext context) {
     final r = request;
-    final kycAprobado =
-        r.aliadoKycStatus?.trim() == KycStatus.aprobado;
+    final profile = TransactionRequestCounterpartyProfileSection(
+      profileId: r.aliadoId,
+      partyLabel: 'Aliado',
+      businessName: r.aliadoBusinessName,
+      rif: r.aliadoRif,
+      phone: r.aliadoPhone,
+      estado: r.aliadoEstado,
+      ciudad: r.aliadoCiudad,
+      direccion: r.aliadoDireccion,
+      fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+      logoStoragePath: r.aliadoLogoStoragePath,
+      kycStatus: r.aliadoKycStatus,
+      loadApprovedDocuments: !embedded,
+    );
+
+    if (embedded) return profile;
+
+    final kycAprobado = kycAprobadoPara(r);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,18 +192,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
               TextButton.icon(
                 onPressed: () => showImporterAliadoKycDetailSheet(
                   context,
-                  aliado: KycApprovedAliadoModel(
-                    id: r.aliadoId,
-                    businessName: r.aliadoBusinessName,
-                    rif: r.aliadoRif,
-                    phone: r.aliadoPhone,
-                    estado: r.aliadoEstado,
-                    ciudad: r.aliadoCiudad,
-                    direccion: r.aliadoDireccion,
-                    fiscalMapsUrl: r.aliadoFiscalMapsUrl,
-                    logoStoragePath: r.aliadoLogoStoragePath,
-                    kycStatus: r.aliadoKycStatus,
-                  ),
+                  aliado: kycModelPara(r),
                 ),
                 icon: const Icon(Icons.verified_user_outlined, size: 18),
                 label: const Text('Expediente KYC'),
@@ -150,19 +204,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        TransactionRequestCounterpartyProfileSection(
-          profileId: r.aliadoId,
-          partyLabel: 'Aliado',
-          businessName: r.aliadoBusinessName,
-          rif: r.aliadoRif,
-          phone: r.aliadoPhone,
-          estado: r.aliadoEstado,
-          ciudad: r.aliadoCiudad,
-          direccion: r.aliadoDireccion,
-          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
-          logoStoragePath: r.aliadoLogoStoragePath,
-          kycStatus: r.aliadoKycStatus,
-        ),
+        profile,
       ],
     );
   }
@@ -173,13 +215,32 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
   const TransactionRequestImporterContactSection({
     super.key,
     required this.request,
+    this.embedded = false,
   });
 
   final TransactionRequestModel request;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final r = request;
+    final profile = TransactionRequestCounterpartyProfileSection(
+      profileId: r.ownerId,
+      partyLabel: 'Importador',
+      businessName: r.ownerBusinessName,
+      rif: r.ownerRif,
+      phone: r.ownerPhone,
+      estado: r.ownerEstado,
+      ciudad: r.ownerCiudad,
+      direccion: r.ownerDireccion,
+      fiscalMapsUrl: r.ownerFiscalMapsUrl,
+      logoStoragePath: r.ownerLogoStoragePath,
+      kycStatus: r.ownerKycStatus,
+      loadApprovedDocuments: false,
+    );
+
+    if (embedded) return profile;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -192,19 +253,7 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        TransactionRequestCounterpartyProfileSection(
-          profileId: r.ownerId,
-          partyLabel: 'Importador',
-          businessName: r.ownerBusinessName,
-          rif: r.ownerRif,
-          phone: r.ownerPhone,
-          estado: r.ownerEstado,
-          ciudad: r.ownerCiudad,
-          direccion: r.ownerDireccion,
-          fiscalMapsUrl: r.ownerFiscalMapsUrl,
-          logoStoragePath: r.ownerLogoStoragePath,
-          kycStatus: r.ownerKycStatus,
-        ),
+        profile,
       ],
     );
   }
@@ -215,9 +264,11 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
   const TransactionRequestAliadoExperienceAdminSection({
     super.key,
     required this.request,
+    this.hideSectionTitle = false,
   });
 
   final TransactionRequestModel request;
+  final bool hideSectionTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -229,15 +280,17 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Valoración del aliado (post-entrega)',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
+        if (!hideSectionTitle) ...[
+          const Text(
+            'Valoración del aliado (post-entrega)',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+          const SizedBox(height: 6),
+        ],
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
@@ -391,9 +444,11 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   const TransactionRequestDestinoEntregaSection({
     super.key,
     required this.request,
+    this.hideSectionTitle = false,
   });
 
   final TransactionRequestModel request;
+  final bool hideSectionTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -405,15 +460,17 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Destino de entrega',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
+        if (!hideSectionTitle) ...[
+          const Text(
+            'Destino de entrega',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+          const SizedBox(height: 6),
+        ],
         if (usa) ...[
           if (fiscalBloque != null && fiscalBloque.isNotEmpty)
             Text(

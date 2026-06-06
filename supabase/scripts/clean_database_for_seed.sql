@@ -17,7 +17,7 @@
 
 begin;
 
--- UUIDs fijos del seed (importadores c1000001…c100000c, aliado, admin)
+-- UUIDs fijos del seed (15 importadores, 3 aliados, 2 admins)
 create temporary table _seed_profile_ids (id uuid primary key) on commit drop;
 
 insert into _seed_profile_ids (id)
@@ -34,8 +34,14 @@ values
   ('c100000a-0000-4000-8000-000000000001'::uuid),
   ('c100000b-0000-4000-8000-000000000001'::uuid),
   ('c100000c-0000-4000-8000-000000000001'::uuid),
+  ('c100000d-0000-4000-8000-000000000001'::uuid),
+  ('c100000e-0000-4000-8000-000000000001'::uuid),
+  ('c100000f-0000-4000-8000-000000000001'::uuid),
   ('c2000001-0000-4000-8000-000000000001'::uuid),
-  ('c3000001-0000-4000-8000-000000000001'::uuid);
+  ('c2000002-0000-4000-8000-000000000001'::uuid),
+  ('c2000003-0000-4000-8000-000000000001'::uuid),
+  ('c3000001-0000-4000-8000-000000000001'::uuid),
+  ('c3000002-0000-4000-8000-000000000001'::uuid);
 
 -- ---------------------------------------------------------------------------
 -- 1) Devolver inventario descontado por pedidos seed (antes de borrar filas)
@@ -143,7 +149,28 @@ delete from public.notifications n
 where n.user_id in (select id from _seed_profile_ids);
 
 -- ---------------------------------------------------------------------------
--- 6) Catálogo y perfiles seed
+-- 6) Campañas promocionales y datos auxiliares demo
+-- ---------------------------------------------------------------------------
+do $t$
+begin
+  delete from public.promo_campaigns;
+exception
+  when undefined_table then null;
+end;
+$t$;
+
+do $t$
+begin
+  delete from public.aliado_pago_frecuente_importador
+  where aliado_id in (select id from _seed_profile_ids)
+     or importador_id in (select id from _seed_profile_ids);
+exception
+  when undefined_table then null;
+end;
+$t$;
+
+-- ---------------------------------------------------------------------------
+-- 7) Catálogo y perfiles seed
 -- ---------------------------------------------------------------------------
 delete from public.products p
 where p.owner_id in (
@@ -154,7 +181,7 @@ delete from public.profiles pr
 where pr.id in (select id from _seed_profile_ids);
 
 -- ---------------------------------------------------------------------------
--- 7) Auth (@motoconecta.seed)
+-- 8) Auth (@motoconecta.seed)
 -- ---------------------------------------------------------------------------
 delete from auth.identities i
 where i.user_id in (

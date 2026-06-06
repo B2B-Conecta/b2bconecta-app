@@ -9,7 +9,10 @@
 -- Solo datos de pago importadores (sin re-seed):
 --   supabase db query --linked -f supabase/scripts/patch_importer_pago_demo.sql
 --
--- Contraseña común (todos los seed): SeedPass123!
+-- Contraseñas seed (solo desarrollo):
+--   admin*@motoconecta.seed      → admin123
+--   importador*@motoconecta.seed → importador123
+--   aliado*@motoconecta.seed     → aliado123
 --
 -- Incluye: 15 importadores (2 × 15 SKU + 10 × 5 SKU; 13–15 catálogo vacío para carga masiva),
 -- datos de pago demo por método (Zelle, Pago Móvil, Binance, USDT, transferencia, efectivo),
@@ -31,6 +34,8 @@
 --   importador13–15: sin productos (plantilla carga masiva)
 --   aliado1@motoconecta.seed … aliado3@motoconecta.seed (solo aliado1 con pedidos)
 --   admin@motoconecta.seed, admin2@motoconecta.seed
+--
+-- Contraseñas: admin123 | importador123 | aliado123 (según prefijo del email)
 -- =============================================================================
 
 create extension if not exists pgcrypto;
@@ -185,7 +190,15 @@ select
   'authenticated',
   'authenticated',
   s.email,
-  crypt('SeedPass123!', gen_salt('bf')),
+  case
+    when s.email like 'admin%@motoconecta.seed'
+      then crypt('admin123', gen_salt('bf'))
+    when s.email like 'importador%@motoconecta.seed'
+      then crypt('importador123', gen_salt('bf'))
+    when s.email like 'aliado%@motoconecta.seed'
+      then crypt('aliado123', gen_salt('bf'))
+    else crypt('seed123', gen_salt('bf'))
+  end,
   now(),
   '{"provider":"email","providers":["email"]}'::jsonb,
   '{}'::jsonb,

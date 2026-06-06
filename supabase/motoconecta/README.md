@@ -25,7 +25,13 @@ Solo la baseline **`supabase/migrations/20260106000000_motoconecta_baseline.sql`
 4. Si el panel **Pedidos** del aliado muestra **PGRST202** / «`aliado_effective_open_exposure` not found»: ejecuta **`upgrade_aliado_effective_open_exposure.sql`** (RPC de suma de pedidos activos para el cupo en pantalla).
 5. Desde la raíz del repo, `supabase/seed.sql` — 12 importadores, un aliado, un admin; catálogo; **pedidos solo entregados y pagados** (sin abiertos), **valoraciones bucket_v2** y demo **E3 tramos** (`importador11` ≈ 5 %, `importador12` ≈ 3 %). Para vaciar operación: `supabase/scripts/reset_operational_data.sql` + `seed.sql`.
 
-Contraseña de todos los usuarios seed: **`SeedPass123!`**
+Contraseñas seed (solo desarrollo):
+
+| Prefijo del email | Contraseña |
+|-------------------|------------|
+| `admin*` | `admin123` |
+| `importador*` | `importador123` |
+| `aliado*` | `aliado123` |
 
 Si al ejecutar `seed.sql` aparece **`profiles_id_fkey`**: suele ser un email `@motoconecta.seed` que ya existía en `auth.users` con **otro** UUID (el seed inserta perfiles con IDs fijos). Vuelve a ejecutar el **mismo** `seed.sql` completo: el preámbulo borra esas filas por email antes de recrear. Si pegaste UUIDs a mano, revisa que importador2 sea **`c1000002-0000-4000-8000-000000000001`** (no `c1080802…`). **No hace falta** volver a ejecutar `schema.sql` salvo que hayas borrado tablas.
 

@@ -10,6 +10,9 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import 'order_commission_summary.dart';
+import '../models/kyc_approved_aliado_model.dart';
+import '../models/kyc_status.dart';
+import 'importer_kyc_approved_aliados_panel.dart';
 import 'transaction_request_counterparty_profile_section.dart';
 
 Future<void> _launchSignedOrderDoc(
@@ -101,30 +104,64 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = request;
+    final kycAprobado =
+        r.aliadoKycStatus?.trim() == KycStatus.aprobado;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Datos del aliado',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Datos del aliado',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (kycAprobado)
+              TextButton.icon(
+                onPressed: () => showImporterAliadoKycDetailSheet(
+                  context,
+                  aliado: KycApprovedAliadoModel(
+                    id: r.aliadoId,
+                    businessName: r.aliadoBusinessName,
+                    rif: r.aliadoRif,
+                    phone: r.aliadoPhone,
+                    estado: r.aliadoEstado,
+                    ciudad: r.aliadoCiudad,
+                    direccion: r.aliadoDireccion,
+                    fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+                    logoStoragePath: r.aliadoLogoStoragePath,
+                    kycStatus: r.aliadoKycStatus,
+                  ),
+                ),
+                icon: const Icon(Icons.verified_user_outlined, size: 18),
+                label: const Text('Expediente KYC'),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         TransactionRequestCounterpartyProfileSection(
-          profileId: request.aliadoId,
+          profileId: r.aliadoId,
           partyLabel: 'Aliado',
-          businessName: request.aliadoBusinessName,
-          rif: request.aliadoRif,
-          phone: request.aliadoPhone,
-          estado: request.aliadoEstado,
-          ciudad: request.aliadoCiudad,
-          direccion: request.aliadoDireccion,
-          fiscalMapsUrl: request.aliadoFiscalMapsUrl,
-          logoStoragePath: request.aliadoLogoStoragePath,
-          kycStatus: request.aliadoKycStatus,
+          businessName: r.aliadoBusinessName,
+          rif: r.aliadoRif,
+          phone: r.aliadoPhone,
+          estado: r.aliadoEstado,
+          ciudad: r.aliadoCiudad,
+          direccion: r.aliadoDireccion,
+          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+          logoStoragePath: r.aliadoLogoStoragePath,
+          kycStatus: r.aliadoKycStatus,
         ),
       ],
     );

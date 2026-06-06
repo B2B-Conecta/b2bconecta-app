@@ -8,6 +8,7 @@ import '../models/catalog_sort_mode.dart';
 import '../models/commission_settlement_model.dart';
 import '../models/document_review_status.dart';
 import '../models/in_app_notification_model.dart';
+import '../models/kyc_approved_aliado_model.dart';
 import '../models/kyc_status.dart';
 import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
@@ -2396,6 +2397,20 @@ class SupabaseService {
       );
     }
     return out;
+  }
+
+  /// Aliados con KYC aprobado (directorio importador para evaluar crédito B2B).
+  static Future<List<KycApprovedAliadoModel>>
+      listKycApprovedAliadosForImportador() async {
+    final res =
+        await _client.rpc('list_kyc_approved_aliados_for_importador');
+    final list = _decodeRpcJsonArray(res);
+    return list
+        .map((e) => KycApprovedAliadoModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .where((a) => a.id.isNotEmpty)
+        .toList();
   }
 
   /// Documentos KYC aprobados de una contraparte con la que el usuario comparte pedido.

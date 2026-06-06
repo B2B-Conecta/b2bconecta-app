@@ -1686,3 +1686,54 @@ select public.refresh_all_importer_catalog_boost ();
 --   'c100000c-0000-4000-8000-000000000001'::uuid
 -- );
 -- Esperado: importador11 ~4500 → 0.05; importador12 ~10500 → 0.03
+
+-- ---------------------------------------------------------------------------
+-- Aliado demo: KYC aprobado (directorio importadores / evaluación crédito B2B)
+-- ---------------------------------------------------------------------------
+update public.profiles
+set
+  kyc_status = 'aprobado',
+  rating_as_payer_avg_rolling100 = 4.20,
+  rating_as_payer_count_rolling100 = 5
+where id = 'c2000001-0000-4000-8000-000000000001'::uuid;
+
+delete from public.profile_documents
+where profile_id = 'c2000001-0000-4000-8000-000000000001'::uuid;
+
+insert into public.profile_documents (
+  profile_id,
+  doc_type,
+  storage_path,
+  file_name,
+  is_current,
+  review_status,
+  reviewed_at
+)
+values
+  (
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'foto_tienda',
+    'c2000001-0000-4000-8000-000000000001/seed-foto-tienda.jpg',
+    'foto-tienda-demo.jpg',
+    true,
+    'aprobado',
+    now()
+  ),
+  (
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'registro_mercantil',
+    'c2000001-0000-4000-8000-000000000001/seed-registro-mercantil.pdf',
+    'registro-mercantil-demo.pdf',
+    true,
+    'aprobado',
+    now()
+  ),
+  (
+    'c2000001-0000-4000-8000-000000000001'::uuid,
+    'cedula_propietario',
+    'c2000001-0000-4000-8000-000000000001/seed-cedula-propietario.jpg',
+    'cedula-propietario-demo.jpg',
+    true,
+    'aprobado',
+    now()
+  );

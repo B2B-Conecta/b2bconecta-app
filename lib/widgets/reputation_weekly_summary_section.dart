@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/reputation_weekly_snapshot_model.dart';
 import '../services/supabase_service.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/rating_scale_labels.dart';
+import 'profile_section_helpers.dart';
 
 /// Resumen de cierres semanales (E2.2 métrica global).
 class ReputationWeeklySummarySection extends StatefulWidget {
@@ -50,52 +50,40 @@ class _ReputationWeeklySummarySectionState
     }
   }
 
+  String _sectionSubtitle() {
+    if (_loading) return 'Cargando…';
+    if (_weeks.isEmpty) return 'Sin cierres todavía';
+    final latest = _weeks.first;
+    final avg = latest.avgOverall;
+    if (avg != null) {
+      return 'Última semana: ${avg.toStringAsFixed(1)} · ${latest.ratingCount} valoraciones';
+    }
+    return '${_weeks.length} semana(s) registrada(s)';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
+    return ProfileCollapsibleSection(
+      title: 'Resumen semanal',
+      subtitle: _sectionSubtitle(),
+      initiallyExpanded: _weeks.isNotEmpty,
+      infoMessage:
+          'Promedio y volumen de valoraciones por semana. Los cierres se registran los lunes.',
+      trailingActions: [
+        IconButton(
+          onPressed: _loading ? null : _load,
+          icon: const Icon(Icons.refresh, size: 18),
+          tooltip: 'Actualizar',
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Resumen semanal',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.refresh, size: 18),
-                tooltip: 'Actualizar',
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-          Text(
-            'Promedio y volumen de valoraciones por semana (cierre los lunes).',
-            style: TextStyle(
-              fontSize: 10.5,
-              height: 1.35,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 10),
           if (_loading)
             const Center(
               child: Padding(
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.symmetric(vertical: 8),
                 child: SizedBox(
                   width: 20,
                   height: 20,
@@ -104,7 +92,10 @@ class _ReputationWeeklySummarySectionState
               ),
             )
           else if (_error != null)
-            Text(_error!, style: TextStyle(fontSize: 11, color: Colors.red.shade800))
+            Text(
+              _error!,
+              style: TextStyle(fontSize: 11, color: Colors.red.shade800),
+            )
           else if (_weeks.isEmpty)
             Text(
               'Sin cierres semanales todavía.',

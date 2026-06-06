@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/aliado_received_rating_model.dart';
 import '../models/profile_model.dart';
+import '../models/rating_dimension_stat_model.dart';
 import '../models/rating_questionnaire_model.dart';
 import '../services/supabase_service.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/rating_dimension_summary.dart';
 import 'importer_dimension_reputation_rows.dart';
 import 'order_rating_form.dart';
+import 'profile_section_helpers.dart';
 import 'received_ratings_carousel.dart';
 
 /// Reputación del aliado (valorado por importadores) — pestaña dedicada E2.
@@ -64,6 +65,22 @@ class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
     }
   }
 
+  String _reputationSubtitle(int cnt, double? avg, bool hasDimensions) {
+    if (_loading) return 'Cargando…';
+    if (cnt == 0) return 'Sin valoraciones todavía';
+    if (avg != null) {
+      return 'Promedio ${avg.toStringAsFixed(1)} · $cnt valoraciones';
+    }
+    return hasDimensions ? '$cnt valoraciones' : '$cnt valoraciones';
+  }
+
+  String _commentsSubtitle() {
+    if (_loading) return 'Cargando…';
+    if (_ratings.isEmpty) return 'Sin comentarios';
+    if (_ratings.length == 1) return '1 comentario';
+    return '${_ratings.length} comentarios';
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
@@ -82,151 +99,126 @@ class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: Colors.teal.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.teal.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Reputación como aliado',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  color: Colors.teal.shade900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Valoraciones de importadores sobre su taller (Comunicación y Pagos).',
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.35,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-              if (cnt > 0) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '$cnt valoraciones · ventana últimas 100',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                if (avg != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Promedio global: ${avg.toStringAsFixed(1)} / 5',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.teal.shade900,
-                    ),
-                  ),
-                ],
-              ],
-              const SizedBox(height: 10),
-              if (_loading && !hasDimensions)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              else if (hasDimensions)
-                ImporterDimensionReputationRows(
-                  questionnaire: questionnaire,
-                  dimensionStats: dimensionStats,
-                )
-              else if (cnt > 0)
-                Text(
-                  'Aún no hay desglose por categoría en las valoraciones registradas.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 1.4,
-                    color: Colors.grey.shade800,
-                  ),
-                )
-              else
-                Text(
-                  'Cuando los importadores valoren pedidos entregados, verá aquí su reputación.',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.35,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-            ],
+        ProfileCollapsibleSection(
+          title: 'Reputación como aliado',
+          subtitle: _reputationSubtitle(cnt, avg, hasDimensions),
+          initiallyExpanded: hasDimensions,
+          infoMessage:
+              'Valoraciones de importadores sobre su taller (Comunicación y Pagos). '
+              'Ventana de las últimas 100 valoraciones.',
+          child: _reputationBody(
+            cnt: cnt,
+            hasDimensions: hasDimensions,
+            questionnaire: questionnaire,
+            dimensionStats: dimensionStats,
           ),
         ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Comentarios de importadores',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13.5,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
+        const SizedBox(height: 12),
+        ProfileCollapsibleSection(
+          title: 'Comentarios de importadores',
+          subtitle: _commentsSubtitle(),
+          initiallyExpanded: false,
+          infoMessage:
+              'Los importadores se muestran de forma anónima (solo ciudad).',
+          trailingActions: [
             IconButton(
               onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh, size: 20),
+              icon: const Icon(Icons.refresh, size: 18),
               tooltip: 'Actualizar',
+              visualDensity: VisualDensity.compact,
             ),
           ],
+          child: _commentsBody(),
         ),
-        Text(
-          'Los importadores se muestran de forma anónima (solo ciudad).',
-          style: TextStyle(fontSize: 11, height: 1.35, color: Colors.grey.shade700),
-        ),
-        const SizedBox(height: 10),
-        if (_loading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          )
-        else if (_error != null)
-          Text(_error!, style: TextStyle(color: Colors.red.shade800, fontSize: 12))
-        else if (_ratings.isEmpty)
-          Text(
-            'Sin comentarios todavía.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-          )
-        else
-          ReceivedRatingsCarousel(
-            itemCount: _ratings.length,
-            itemBuilder: (context, i) {
-              final r = _ratings[i];
-              final at = r.submittedAt;
-              final label = at != null ? formatEsShortDateTime(at) : '';
-              return OrderRatingReceivedCard(
-                overallStars: r.overallStars,
-                comment: r.comment,
-                authorLabel: r.importerLabel,
-                submittedAtLabel: label,
-                answers: r.answers,
-                questionnaire: _questionnaire,
-              );
-            },
-          ),
       ],
+    );
+  }
+
+  Widget _reputationBody({
+    required int cnt,
+    required bool hasDimensions,
+    required RatingQuestionnaireModel? questionnaire,
+    required Map<String, RatingDimensionStatModel> dimensionStats,
+  }) {
+    if (_loading && !hasDimensions) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (hasDimensions && questionnaire != null) {
+      return ImporterDimensionReputationRows(
+        questionnaire: questionnaire,
+        dimensionStats: dimensionStats,
+        compact: true,
+      );
+    }
+    if (cnt > 0) {
+      return Text(
+        'Aún no hay desglose por categoría en las valoraciones registradas.',
+        style: TextStyle(
+          fontSize: 11,
+          height: 1.4,
+          color: Colors.grey.shade800,
+        ),
+      );
+    }
+    return Text(
+      'Cuando los importadores valoren pedidos entregados, verá aquí su reputación.',
+      style: TextStyle(
+        fontSize: 11.5,
+        height: 1.35,
+        color: Colors.grey.shade800,
+      ),
+    );
+  }
+
+  Widget _commentsBody() {
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (_error != null) {
+      return Text(
+        _error!,
+        style: TextStyle(color: Colors.red.shade800, fontSize: 12),
+      );
+    }
+    if (_ratings.isEmpty) {
+      return Text(
+        'Sin comentarios todavía.',
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+      );
+    }
+    return ReceivedRatingsCarousel(
+      itemCount: _ratings.length,
+      itemBuilder: (context, i) {
+        final r = _ratings[i];
+        final at = r.submittedAt;
+        final label = at != null ? formatEsShortDateTime(at) : '';
+        return OrderRatingReceivedCard(
+          overallStars: r.overallStars,
+          comment: r.comment,
+          authorLabel: r.importerLabel,
+          submittedAtLabel: label,
+          answers: r.answers,
+          questionnaire: _questionnaire,
+        );
+      },
     );
   }
 }

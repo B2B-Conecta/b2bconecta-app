@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/aliado_reputation_panel.dart';
 import '../widgets/importer_reputation_panel.dart';
 import '../widgets/motolink_app_bar.dart';
+import '../widgets/profile_section_helpers.dart';
 import '../widgets/reputation_weekly_summary_section.dart';
 
 /// E2: pantalla dedicada de reputación (desacoplada de pedidos y perfil operativo).
@@ -47,28 +48,30 @@ class ReputationTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Reputación',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Reputación',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    ProfileInfoIcon(
+                      title: 'Reputación',
+                      message: isImportador
+                          ? 'Cierres semanales y valoraciones de aliados. '
+                              'Es independiente del detalle de cada pedido.'
+                          : 'Su reputación ante importadores: pagos, comunicación '
+                              'y resumen semanal.',
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  isImportador
-                      ? 'Métrica global, cierres semanales y valoraciones de aliados '
-                          '(independiente del detalle de cada pedido).'
-                      : 'Su reputación ante importadores: pagos, comunicación y '
-                          'resumen semanal.',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 const ReputationWeeklySummarySection(),
                 const SizedBox(height: 16),
                 if (isImportador)

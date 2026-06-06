@@ -127,7 +127,7 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
           ),
           if (!compact) ...[
             const SizedBox(height: 6),
-            Text(
+            const Text(
               'El total se actualiza al registrar el comprobante con este método.',
               style: TextStyle(
                 fontSize: 10,

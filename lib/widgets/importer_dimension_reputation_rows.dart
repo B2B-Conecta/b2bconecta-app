@@ -5,6 +5,7 @@ import '../models/rating_questionnaire_model.dart';
 import '../theme/app_theme.dart';
 import '../utils/rating_scale_labels.dart';
 import 'aliado_order_experience_display.dart';
+import 'profile_section_helpers.dart';
 
 /// Filas de reputación por categoría (Calidad, Despacho, …).
 class ImporterDimensionReputationRows extends StatelessWidget {
@@ -62,28 +63,24 @@ class _DimensionRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    question.displayTitle,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: compact ? 12 : 13,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
+                  Expanded(
+                    child: Text(
+                      question.displayTitle,
                       style: TextStyle(
-                        fontSize: compact ? 9.5 : 10,
-                        height: 1.3,
-                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w800,
+                        fontSize: compact ? 12 : 13,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  ],
+                  ),
+                  if (subtitle.isNotEmpty)
+                    ProfileInfoIcon(
+                      title: question.displayTitle,
+                      message: subtitle,
+                      iconSize: compact ? 16 : 17,
+                    ),
                 ],
               ),
             ),

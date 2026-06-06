@@ -13,6 +13,7 @@ import 'profile_kyc_documents_section.dart';
 import 'importer_accepted_pago_metodos_section.dart';
 import 'importer_commission_settlements_section.dart';
 import 'authorization_status_section.dart';
+import 'profile_section_helpers.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -220,46 +221,36 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     }
   }
 
-  String _fiscalMapsSectionDescription() {
+  String? _ubicacionFiscalHelp() {
     switch (_role.trim().toLowerCase()) {
-      case 'importador':
-        return 'Pegue el enlace «Compartir» de Google Maps apuntando a su almacén o domicilio fiscal. '
-            'MotoLink lo usa como origen al armar la ruta en vivo hacia el taller del aliado cuando el pedido '
-            'está en tránsito (junto con el enlace del aliado en su perfil).';
       case 'aliado':
-        return 'Enlace «Compartir» de Google Maps de su taller (requisito mínimo junto con RIF y dirección fiscal).';
+        return 'Estado, ciudad y domicilio fiscal son obligatorios para solicitar pedidos.';
+      case 'importador':
+        return 'Estado y ciudad aparecen en el catálogo. La dirección fiscal y el enlace Maps son obligatorios para operar.';
       default:
-        return 'Pegue un enlace público (compartir ubicación) para que MotoLink y los participantes '
-            'abran su domicilio fiscal en el mapa.';
+        return null;
     }
   }
 
-  String _ubicacionFiscalIntroText() {
+  String? _fiscalMapsHelp() {
     switch (_role.trim().toLowerCase()) {
-      case 'aliado':
-        return 'Estado, ciudad y domicilio fiscal son obligatorios para ingresar y solicitar pedidos.';
       case 'importador':
-        return 'Visible en el catálogo para ubicar proveedores y talleres. '
-            'Complete también la dirección fiscal más abajo: estado, ciudad y domicilio '
-            'son obligatorios para solicitar pedidos.';
+        return 'Enlace «Compartir» de Google Maps de su almacén o domicilio fiscal. '
+            'Ubica su negocio en el catálogo y permite abrir la dirección desde la app.';
+      case 'aliado':
+        return 'Enlace «Compartir» de Google Maps de su taller. '
+            'Es obligatorio junto con RIF y dirección fiscal.';
       default:
-        return '';
+        return 'Enlace público para abrir su domicilio fiscal en el mapa.';
     }
   }
 
-  Widget _sectionLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.6,
-          color: AppColors.textSecondary,
-        ),
-      ),
-    );
+  String _ubicacionSectionSubtitle() {
+    final es = _estadoController.text.trim();
+    final ci = _ciudadController.text.trim();
+    if (es.isEmpty && ci.isEmpty) return 'Toque para completar ubicación';
+    if (es.isNotEmpty && ci.isNotEmpty) return '$es · $ci';
+    return es.isNotEmpty ? es : ci;
   }
 
   Widget _reputationTabHint(BuildContext context) {
@@ -270,22 +261,26 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         onTap: () => MainShellTabController.navigateToReputationTab(),
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             children: [
-              Icon(Icons.star_outline, color: Colors.amber.shade800, size: 22),
-              const SizedBox(width: 10),
+              Icon(Icons.star_outline, color: Colors.amber.shade800, size: 20),
+              const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'Reputación, cierres semanales y comentarios en la pestaña Reputación.',
+                  'Ver reputación',
                   style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade600),
+              const ProfileInfoIcon(
+                message:
+                    'Valoraciones recibidas, cierres semanales y comentarios están en la pestaña Reputación.',
+                title: 'Reputación',
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade600, size: 20),
             ],
           ),
         ),
@@ -418,6 +413,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                             : 'Subir logo (opcional)',
                       ),
                     ),
+                    const ProfileInfoIcon(
+                      message:
+                          'Si no sube logo, se muestra el de MotoLink en la barra superior.',
+                      title: 'Logo del negocio',
+                    ),
                     if (widget.initial?.logoStoragePath != null &&
                         widget.initial!.logoStoragePath!.trim().isNotEmpty)
                       TextButton(
@@ -428,11 +428,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                         ),
                       ),
                   ],
-                ),
-                Text(
-                  'Si no sube imagen, se muestra el logo MotoLink en la barra superior.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -457,190 +452,215 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
           ),
           const SizedBox(height: 24),
-          _sectionLabel('TIPO DE CUENTA'),
-          Row(
-            children: [
-              Expanded(
-                child: _RoleChoiceTile(
-                  label: 'Importador',
-                  icon: Icons.local_shipping_outlined,
-                  selected: _role == 'importador',
-                  enabled: !_roleLocked,
-                  onTap: _saving || _roleLocked
-                      ? null
-                      : () => setState(() => _role = 'importador'),
+          ProfileCollapsibleSection(
+            title: 'Datos del negocio',
+            subtitle: _businessNameController.text.trim().isEmpty
+                ? 'Nombre, RIF y contacto'
+                : _businessNameController.text.trim(),
+            initiallyExpanded: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const ProfileSectionHeader(label: 'TIPO DE CUENTA'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _RoleChoiceTile(
+                        label: 'Importador',
+                        icon: Icons.local_shipping_outlined,
+                        selected: _role == 'importador',
+                        enabled: !_roleLocked,
+                        onTap: _saving || _roleLocked
+                            ? null
+                            : () => setState(() => _role = 'importador'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _RoleChoiceTile(
+                        label: 'Aliado',
+                        icon: Icons.person_outline,
+                        selected: _role == 'aliado',
+                        enabled: !_roleLocked,
+                        onTap: _saving || _roleLocked
+                            ? null
+                            : () => setState(() => _role = 'aliado'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _RoleChoiceTile(
-                  label: 'Aliado',
-                  icon: Icons.person_outline,
-                  selected: _role == 'aliado',
-                  enabled: !_roleLocked,
-                  onTap: _saving || _roleLocked
-                      ? null
-                      : () => setState(() => _role = 'aliado'),
+                if (_showAdministradorRoleOption) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _RoleChoiceTile(
+                      label: 'Administrador (broker)',
+                      icon: Icons.admin_panel_settings_outlined,
+                      selected: _role == 'administrador',
+                      enabled: !_roleLocked,
+                      onTap: _saving || _roleLocked
+                          ? null
+                          : () => setState(() => _role = 'administrador'),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                const ProfileSectionHeader(label: 'NOMBRE DEL NEGOCIO'),
+                TextFormField(
+                  controller: _businessNameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _fieldDecoration('Ej: Repuestos La Victoria C.A.'),
+                  onChanged: (_) => setState(() {}),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Campo obligatorio';
+                    return null;
+                  },
                 ),
-              ),
-            ],
-          ),
-          if (_showAdministradorRoleOption) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: _RoleChoiceTile(
-                label: 'Administrador (broker)',
-                icon: Icons.admin_panel_settings_outlined,
-                selected: _role == 'administrador',
-                enabled: !_roleLocked,
-                onTap: _saving || _roleLocked
-                    ? null
-                    : () => setState(() => _role = 'administrador'),
-              ),
+                const SizedBox(height: 12),
+                const ProfileSectionHeader(label: 'RIF'),
+                TextFormField(
+                  controller: _rifController,
+                  decoration: _fieldDecoration('J-12345678-9'),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Campo obligatorio';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                const ProfileSectionHeader(label: 'CORREO ELECTRÓNICO'),
+                TextFormField(
+                  controller: _emailDisplayController,
+                  readOnly: true,
+                  decoration: _fieldDecoration(''),
+                ),
+                const SizedBox(height: 12),
+                const ProfileSectionHeader(label: 'TELÉFONO'),
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: _fieldDecoration('+58 412 1234567'),
+                ),
+              ],
             ),
-          ],
-          const SizedBox(height: 20),
-          _sectionLabel('NOMBRE DEL NEGOCIO'),
-          TextFormField(
-            controller: _businessNameController,
-            textCapitalization: TextCapitalization.words,
-            decoration: _fieldDecoration('Ej: Repuestos La Victoria C.A.'),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Campo obligatorio';
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          _sectionLabel('RIF'),
-          TextFormField(
-            controller: _rifController,
-            decoration: _fieldDecoration('J-12345678-9'),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Campo obligatorio';
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          _sectionLabel('CORREO ELECTRÓNICO'),
-          TextFormField(
-            controller: _emailDisplayController,
-            readOnly: true,
-            decoration: _fieldDecoration(''),
-          ),
-          const SizedBox(height: 16),
-          _sectionLabel('TELÉFONO'),
-          TextFormField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration: _fieldDecoration('+58 412 1234567'),
           ),
           if (_requiereUbicacionFiscalCompleta) ...[
-            const SizedBox(height: 16),
-            _sectionLabel('UBICACIÓN (ESTADO / CIUDAD)'),
-            Text(
-              _ubicacionFiscalIntroText(),
-              style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 10),
-            TextFormField(
-              controller: _estadoController,
-              textCapitalization: TextCapitalization.words,
-              decoration: _fieldDecoration('Estado (ej: Miranda)'),
-              validator: (v) {
-                if (!_requiereUbicacionFiscalCompleta) return null;
-                if (v == null || v.trim().isEmpty) return 'Indique el estado';
-                return null;
-              },
-            ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _ciudadController,
-              textCapitalization: TextCapitalization.words,
-              decoration: _fieldDecoration('Ciudad (ej: Los Teques)'),
-              validator: (v) {
-                if (!_requiereUbicacionFiscalCompleta) return null;
-                if (v == null || v.trim().isEmpty) return 'Indique la ciudad';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _sectionLabel('DIRECCIÓN FISCAL'),
-            TextFormField(
-              controller: _fiscalAddressController,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: _fieldDecoration(
-                'Av. Principal, Local 12, Zona Industrial...',
+            ProfileCollapsibleSection(
+              title: 'Ubicación y domicilio fiscal',
+              subtitle: _ubicacionSectionSubtitle(),
+              initiallyExpanded: !(widget.initial?.isComplete ?? false),
+              infoMessage: _ubicacionFiscalHelp(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const ProfileSectionHeader(label: 'UBICACIÓN (ESTADO / CIUDAD)'),
+                  TextFormField(
+                    controller: _estadoController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _fieldDecoration('Estado (ej: Miranda)'),
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) {
+                      if (!_requiereUbicacionFiscalCompleta) return null;
+                      if (v == null || v.trim().isEmpty) return 'Indique el estado';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _ciudadController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _fieldDecoration('Ciudad (ej: Los Teques)'),
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) {
+                      if (!_requiereUbicacionFiscalCompleta) return null;
+                      if (v == null || v.trim().isEmpty) return 'Indique la ciudad';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const ProfileSectionHeader(label: 'DIRECCIÓN FISCAL'),
+                  TextFormField(
+                    controller: _fiscalAddressController,
+                    maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: _fieldDecoration(
+                      'Av. Principal, Local 12, Zona Industrial...',
+                    ),
+                    validator: (v) {
+                      if (!_requiereUbicacionFiscalCompleta) return null;
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Indique la dirección fiscal (domicilio de la empresa)';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ProfileSectionHeader(
+                    label: _fiscalMapsSectionTitle(),
+                    infoMessage: _fiscalMapsHelp(),
+                  ),
+                  TextFormField(
+                    controller: _fiscalMapsUrlController,
+                    keyboardType: TextInputType.url,
+                    decoration: _fieldDecoration(
+                      'https://maps.app.goo.gl/... o maps.google.com/...',
+                    ),
+                    validator: (v) {
+                      if (!_requiereUbicacionFiscalCompleta) return null;
+                      final t = v?.trim() ?? '';
+                      if (t.isEmpty) {
+                        return 'Indique el enlace «Compartir» de Google Maps de su domicilio fiscal';
+                      }
+                      final u = Uri.tryParse(t);
+                      if (u == null ||
+                          !u.hasScheme ||
+                          (u.scheme != 'http' && u.scheme != 'https')) {
+                        return 'Use una URL que empiece por http(s)://';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
               ),
-              validator: (v) {
-                if (!_requiereUbicacionFiscalCompleta) return null;
-                if (v == null || v.trim().isEmpty) {
-                  return 'Indique la dirección fiscal (domicilio de la empresa)';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-            _sectionLabel(_fiscalMapsSectionTitle()),
-            Text(
-              _fiscalMapsSectionDescription(),
-              style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _fiscalMapsUrlController,
-              keyboardType: TextInputType.url,
-              decoration: _fieldDecoration('https://maps.app.goo.gl/... o maps.google.com/...'),
-              validator: (v) {
-                if (!_requiereUbicacionFiscalCompleta) return null;
-                final t = v?.trim() ?? '';
-                if (t.isEmpty) {
-                  return 'Indique el enlace «Compartir» de Google Maps de su domicilio fiscal';
-                }
-                final u = Uri.tryParse(t);
-                if (u == null ||
-                    !u.hasScheme ||
-                    (u.scheme != 'http' && u.scheme != 'https')) {
-                  return 'Use una URL que empiece por http(s)://';
-                }
-                return null;
-              },
             ),
           ],
           if (!_requiereUbicacionFiscalCompleta) ...[
-            const SizedBox(height: 16),
-            _sectionLabel('DIRECCIÓN FISCAL'),
-            TextFormField(
-              controller: _fiscalAddressController,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: _fieldDecoration(
-                'Av. Principal, Local 12, Zona Industrial...',
+            const SizedBox(height: 12),
+            ProfileCollapsibleSection(
+              title: 'Dirección fiscal',
+              subtitle: 'Opcional',
+              initiallyExpanded: false,
+              child: TextFormField(
+                controller: _fiscalAddressController,
+                maxLines: 3,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: _fieldDecoration(
+                  'Av. Principal, Local 12, Zona Industrial...',
+                ),
               ),
             ),
           ],
           if (_roleLocked && _persistedAsImportador) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             AuthorizationStatusSection(
               key: ValueKey<int>(_authSectionTick),
               profile: widget.initial,
             ),
           ],
           if (_persistedAsImportador && widget.initial != null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             ImporterAcceptedPagoMetodosSection(
               profile: widget.initial!,
               onSaved: widget.onRelatedDataChanged,
             ),
-            const SizedBox(height: 20),
-            const ImporterCommissionSettlementsSection(),
             const SizedBox(height: 12),
+            const ImporterCommissionSettlementsSection(),
+            const SizedBox(height: 8),
             _reputationTabHint(context),
           ],
           if (_persistedAsAliado) ...[
             const SizedBox(height: 14),
-            _sectionLabel('VERIFICACIÓN'),
+            const ProfileSectionHeader(label: 'VERIFICACIÓN'),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
               child: ProfileKycDocumentsSection(

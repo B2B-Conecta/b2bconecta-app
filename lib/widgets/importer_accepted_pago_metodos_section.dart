@@ -4,6 +4,7 @@ import '../models/pago_metodo.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'profile_section_helpers.dart';
 
 /// Importador: métodos aceptados + datos de cuenta para que el aliado transfiera.
 class ImporterAcceptedPagoMetodosSection extends StatefulWidget {
@@ -236,178 +237,253 @@ class _ImporterAcceptedPagoMetodosSectionState
     if (!_dirty) setState(() => _dirty = true);
   }
 
+  String _pagoSectionSubtitle() {
+    final n = _selected.length;
+    if (n == 0) return 'Ningún método activo';
+    if (n == 1) return '1 método activo';
+    return '$n métodos activos';
+  }
+
   @override
   Widget build(BuildContext context) {
     final showSave = _dirty || _soloDivisasDirty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'MÉTODOS DE PAGO Y CUENTAS',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Active los métodos que acepta y registre los datos de cada cuenta. '
-          'El aliado los verá al elegir el método en el pedido.',
-          style: TextStyle(
-            fontSize: 11.5,
-            height: 1.35,
-            color: Colors.grey.shade700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Material(
-          color: Colors.white,
-          borderRadius: AppDecorations.radius12,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: AppDecorations.radius12,
-              border: Border.all(
-                color: _pagoSoloDivisas
-                    ? Colors.green.shade400
-                    : Colors.grey.shade300,
-              ),
-            ),
-            child: SwitchListTile(
-              value: _pagoSoloDivisas,
-              onChanged: _saving ? null : _onSoloDivisasChanged,
-              title: const Text(
-                'Solo pagos en divisas (USD)',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
+    return ProfileCollapsibleSection(
+      title: 'Métodos de pago y cuentas',
+      subtitle: _pagoSectionSubtitle(),
+      initiallyExpanded: false,
+      infoMessage:
+          'Active los métodos que acepta e indique los datos de cada cuenta. '
+          'El aliado los verá al pagar el pedido.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Colors.white,
+            borderRadius: AppDecorations.radius12,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: AppDecorations.radius12,
+                border: Border.all(
+                  color: _pagoSoloDivisas
+                      ? Colors.green.shade400
+                      : Colors.grey.shade300,
                 ),
               ),
-              subtitle: Text(
-                _pagoSoloDivisas
-                    ? 'Sin Pago Móvil ni transferencia en Bs. '
-                        'No puede ofrecer descuento línea USD en productos; '
-                        'sí descuentos por volumen.'
-                    : 'Si lo activa, los aliados solo podrán pagar en Zelle, Binance, USDT o efectivo.',
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.35,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        ..._visibleMetodos.map((code) {
-          final checked = _selected.contains(code);
-          final controller = _instruccionesControllers[code]!;
-          final showUsdDiscountHint =
-              !_pagoSoloDivisas && PagoMetodo.qualifiesForUsdDiscount(code);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Material(
-              color: Colors.white,
-              borderRadius: AppDecorations.radius12,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: AppDecorations.radius12,
-                  border: Border.all(
-                    color: checked
-                        ? AppColors.brandBlue.withOpacity(0.35)
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 2, 8, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      CheckboxListTile(
-                        value: checked,
-                        onChanged: _saving
-                            ? null
-                            : (v) {
-                                setState(() {
-                                  if (v == true) {
-                                    _selected.add(code);
-                                  } else {
-                                    _selected.remove(code);
-                                  }
-                                  _dirty = true;
-                                });
-                              },
-                        dense: true,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SwitchListTile(
+                        value: _pagoSoloDivisas,
+                        onChanged: _saving ? null : _onSoloDivisasChanged,
                         contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: Text(
-                          PagoMetodo.labelEs(code),
-                          style: const TextStyle(
+                        title: const Text(
+                          'Solo pagos en divisas (USD)',
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        subtitle: showUsdDiscountHint
-                            ? Text(
-                                'Elegible para descuento divisas/efectivo en catálogo',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: Colors.green.shade800,
-                                ),
-                              )
-                            : null,
                       ),
-                      if (checked) ...[
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 4, 4),
-                          child: TextFormField(
-                            controller: controller,
-                            enabled: !_saving,
-                            maxLines: 4,
-                            minLines: 3,
-                            maxLength: 2000,
-                            onChanged: (_) => _markDirty(),
-                            decoration: InputDecoration(
-                              labelText: 'Datos para transferencia',
-                              alignLabelWithHint: true,
-                              hintText: PagoMetodo.instructionHintEs(code),
-                              hintMaxLines: 6,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              counterText: '',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                    ),
+                    const ProfileInfoIcon(
+                      title: 'Solo pagos en divisas',
+                      message:
+                          'Si lo activa, los aliados solo podrán pagar en Zelle, Binance, USDT o efectivo. '
+                          'Se ocultan Pago Móvil y transferencia en Bs y no podrá ofrecer descuento línea USD; '
+                          'los descuentos por volumen se mantienen.',
+                    ),
+                  ],
                 ),
               ),
             ),
-          );
-        }),
-        if (showSave) ...[
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Guardar métodos y cuentas'),
+          ),
+          const SizedBox(height: 8),
+          ..._visibleMetodos.map(
+            (code) => _ImporterPagoMetodoTile(
+              code: code,
+              checked: _selected.contains(code),
+              saving: _saving,
+              controller: _instruccionesControllers[code]!,
+              showUsdDiscountInfo: !_pagoSoloDivisas &&
+                  PagoMetodo.qualifiesForUsdDiscount(code),
+              onCheckedChanged: (v) {
+                setState(() {
+                  if (v) {
+                    _selected.add(code);
+                  } else {
+                    _selected.remove(code);
+                  }
+                  _dirty = true;
+                });
+              },
+              onInstructionsChanged: _markDirty,
             ),
           ),
+          if (showSave) ...[
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Guardar métodos y cuentas'),
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _ImporterPagoMetodoTile extends StatefulWidget {
+  const _ImporterPagoMetodoTile({
+    required this.code,
+    required this.checked,
+    required this.saving,
+    required this.controller,
+    required this.showUsdDiscountInfo,
+    required this.onCheckedChanged,
+    required this.onInstructionsChanged,
+  });
+
+  final String code;
+  final bool checked;
+  final bool saving;
+  final TextEditingController controller;
+  final bool showUsdDiscountInfo;
+  final ValueChanged<bool> onCheckedChanged;
+  final VoidCallback onInstructionsChanged;
+
+  @override
+  State<_ImporterPagoMetodoTile> createState() => _ImporterPagoMetodoTileState();
+}
+
+class _ImporterPagoMetodoTileState extends State<_ImporterPagoMetodoTile> {
+  bool _detailsOpen = false;
+
+  @override
+  void didUpdateWidget(covariant _ImporterPagoMetodoTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.checked && widget.checked) {
+      _detailsOpen = true;
+    }
+    if (!widget.checked) {
+      _detailsOpen = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = widget.controller.text.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.white,
+        borderRadius: AppDecorations.radius12,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: AppDecorations.radius12,
+            border: Border.all(
+              color: widget.checked
+                  ? AppColors.brandBlue.withOpacity(0.35)
+                  : Colors.grey.shade300,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CheckboxListTile(
+                value: widget.checked,
+                onChanged: widget.saving
+                    ? null
+                    : (v) => widget.onCheckedChanged(v == true),
+                dense: true,
+                contentPadding: const EdgeInsets.fromLTRB(4, 0, 8, 0),
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        PagoMetodo.labelEs(widget.code),
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (widget.showUsdDiscountInfo)
+                      const ProfileInfoIcon(
+                        title: 'Descuento en catálogo',
+                        message:
+                            'Este método puede aplicar al descuento por pago en divisas o efectivo en su catálogo.',
+                        iconSize: 16,
+                      ),
+                  ],
+                ),
+                secondary: widget.checked
+                    ? IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: _detailsOpen
+                            ? 'Ocultar datos de cuenta'
+                            : 'Ver datos de cuenta',
+                        onPressed: widget.saving
+                            ? null
+                            : () => setState(() => _detailsOpen = !_detailsOpen),
+                        icon: Icon(
+                          _detailsOpen ? Icons.expand_less : Icons.expand_more,
+                          color: AppColors.textSecondary,
+                        ),
+                      )
+                    : null,
+              ),
+              if (widget.checked && !_detailsOpen && hasData)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(48, 0, 12, 8),
+                  child: Text(
+                    'Datos registrados · toque ⌄ para editar',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              if (widget.checked && _detailsOpen)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: TextFormField(
+                    controller: widget.controller,
+                    enabled: !widget.saving,
+                    maxLines: 4,
+                    minLines: 3,
+                    maxLength: 2000,
+                    onChanged: (_) => widget.onInstructionsChanged(),
+                    decoration: InputDecoration(
+                      labelText: 'Datos para transferencia',
+                      alignLabelWithHint: true,
+                      hintText: PagoMetodo.instructionHintEs(widget.code),
+                      hintMaxLines: 6,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      counterText: '',
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

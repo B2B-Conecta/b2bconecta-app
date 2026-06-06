@@ -14,6 +14,7 @@ import 'importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
 import 'moroso_order_visual.dart';
 import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
@@ -286,39 +287,38 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           if (onCancelarSolicitudPendiente != null &&
               lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-              child: OutlinedButton.icon(
-                onPressed: cancelarSolicitudPendienteBusy
-                    ? null
-                    : onCancelarSolicitudPendiente,
-                icon: cancelarSolicitudPendienteBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline, size: 20),
-                label: Text(
-                  cancelarSolicitudPendienteBusy
-                      ? 'Cancelando…'
-                      : isCheckoutGroup
-                          ? 'Cancelar carrito'
-                          : 'Cancelar pedido',
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade800,
-                ),
-              ),
-            ),
-            Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: Text(
-                'Hasta que el proveedor emita su factura. Motivo obligatorio.',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  height: 1.35,
-                  color: Colors.grey.shade700,
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: cancelarSolicitudPendienteBusy
+                          ? null
+                          : onCancelarSolicitudPendiente,
+                      icon: cancelarSolicitudPendienteBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_outline, size: 20),
+                      label: Text(
+                        cancelarSolicitudPendienteBusy
+                            ? 'Cancelando…'
+                            : isCheckoutGroup
+                                ? 'Cancelar carrito'
+                                : 'Cancelar pedido',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade800,
+                      ),
+                    ),
+                  ),
+                  ProfileInfoIcon(
+                    title: 'Cancelar pedido',
+                    message: OrderSectionHelp.aliadoCancelPending,
+                  ),
+                ],
               ),
             ),
           ],

@@ -45,7 +45,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

@@ -625,6 +625,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             subtitle: pagoSubtitle?.isNotEmpty == true
                 ? pagoSubtitle!
                 : 'Factura del importador y comprobante',
+            infoMessage: OrderSectionHelp.pagoAliadoMetodo,
             initiallyExpanded: !r.pedidoEntregadoYPagado,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -645,7 +646,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     onChanged: _load,
                     onPagoMetodoPreviewChanged: onMetodoPreview,
                     suppressPrimaryTitle: true,
-                    suppressNegotiationIntro: false,
+                    suppressNegotiationIntro: true,
                   ),
                 ),
               ],
@@ -655,6 +656,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           OrderCardCollapsibleSection(
             title: 'Mensajes',
             subtitle: 'Hilo con el importador y MotoLink',
+            infoMessage: OrderSectionHelp.chatPedido,
             child: OrderMotolinkThreadSection(
               key: ValueKey<String>('trm-aliado-${r.id}'),
               transactionRequestId: r.id,
@@ -662,6 +664,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               allowReplyAsAdmin: false,
               onThreadChanged: _load,
               suppressBuiltinTitle: true,
+              suppressInlineHelp: true,
             ),
           ),
         ],
@@ -721,6 +724,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         OrderCardCollapsibleSection(
           title: 'Pago e factura',
           subtitle: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),
+          infoMessage: OrderSectionHelp.pagoAliadoMetodo,
           initiallyExpanded: !chunk.every((l) => l.pedidoEntregadoYPagado),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -766,7 +770,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                         profile: _profile,
                         onChanged: _load,
                         suppressPrimaryTitle: true,
-                        suppressNegotiationIntro: i > 0,
+                        suppressNegotiationIntro: true,
                       ),
                     ],
                   ],
@@ -792,6 +796,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           subtitle: chunk.length > 1
               ? 'Hilo con este proveedor en el carrito'
               : 'Hilo con el importador y MotoLink',
+          infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>(
               chunk.length > 1
@@ -805,6 +810,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             allowReplyAsAdmin: false,
             onThreadChanged: _load,
             suppressBuiltinTitle: true,
+            suppressInlineHelp: true,
           ),
         ),
       ],

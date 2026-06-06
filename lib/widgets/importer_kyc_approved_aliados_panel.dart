@@ -4,6 +4,7 @@ import '../models/kyc_approved_aliado_model.dart';
 import '../models/kyc_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'order_card_collapsible_layout.dart';
 import 'profile_section_helpers.dart';
 import 'transaction_request_counterparty_profile_section.dart';
 
@@ -38,6 +39,10 @@ Future<void> showImporterAliadoKycDetailSheet(
                       ),
                     ),
                   ),
+                  ProfileInfoIcon(
+                    title: 'Expediente KYC',
+                    message: OrderSectionHelp.aliadoKycCredit,
+                  ),
                   IconButton(
                     onPressed: () => Navigator.pop(ctx),
                     icon: const Icon(Icons.close),
@@ -71,15 +76,6 @@ Future<void> showImporterAliadoKycDetailSheet(
                 logoStoragePath: aliado.logoStoragePath,
                 kycStatus: aliado.kycStatus ?? KycStatus.aprobado,
                 loadApprovedDocuments: true,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Use este expediente para evaluar solicitudes de crédito B2B con el aliado.',
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.35,
-                  color: Colors.grey.shade700,
-                ),
               ),
             ],
           ),

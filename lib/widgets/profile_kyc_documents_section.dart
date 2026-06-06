@@ -11,6 +11,26 @@ import '../theme/app_theme.dart';
 import 'aliado_profile_requirements_banner.dart';
 import 'kyc_status_highlight_widgets.dart';
 import 'profile_kyc_document_tile.dart';
+import 'profile_section_helpers.dart';
+
+/// Ayudas (icono ℹ️) en verificación KYC del aliado.
+abstract final class AliadoKycSectionHelp {
+  static const verificacion =
+      'MotoLink revisa su documentación para habilitar el uso completo de la '
+      'plataforma. Complete los requisitos del perfil y suba los archivos iniciales.';
+  static const requisitosPerfil =
+      'Datos fiscales del formulario y documentos mínimos. Deben estar listos '
+      'antes de enviar el registro inicial a revisión.';
+  static const registroInicial =
+      'Documentos obligatorios para el primer ingreso: foto del local, cédula '
+      'del propietario y registro mercantil o cámara de comercio.';
+  static const documentacionComplementaria =
+      'Opcional. Referencias bancarias y comerciales para fortalecer su perfil; '
+      'puede completarlas después de ingresar a la plataforma.';
+  static const morosidad =
+      'MotoLink suspendió nuevos pedidos por morosidad. Regularice pagos en '
+      'pedidos entregados.';
+}
 
 /// Subida de documentos KYC y envío a revisión MotoLink (solo aliados).
 class ProfileKycDocumentsSection extends StatefulWidget {
@@ -139,6 +159,14 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     }
   }
 
+  int _supplementaryUploaded(List<String> types) {
+    var n = 0;
+    for (final t in types) {
+      if (_docFor(t) != null) n++;
+    }
+    return n;
+  }
+
   Future<void> _submitReview() async {
     setState(() => _submittingReview = true);
     try {
@@ -188,7 +216,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     final note = doc?.reviewNote?.trim();
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: ProfileKycDocumentTile(
         title: AliadoDocType.labelEs(type),
         hasFile: has,
@@ -202,6 +230,18 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     );
   }
 
+  int _requiredDocsUploaded(List<String> types) {
+    var n = 0;
+    for (final t in types) {
+      if (t == AliadoDocType.cedulaPropietario && widget._isAliado) {
+        if (_cedulaAliadoDoc() != null) n++;
+      } else if (_docFor(t) != null) {
+        n++;
+      }
+    }
+    return n;
+  }
+
   @override
   Widget build(BuildContext context) {
     final st = widget.kycStatus?.trim();
@@ -212,6 +252,13 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     final supplementaryTypes = widget._isAliado
         ? AliadoDocType.supplementaryForRole(widget.role)
         : const <String>[];
+    final reqProgress = widget._isAliado && widget.profile != null
+        ? AliadoProfileRequirementsProgress.compute(
+            profile: widget.profile,
+            documents: _docs,
+          )
+        : null;
+    final requiredUploaded = _requiredDocsUploaded(requiredTypes);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -227,43 +274,34 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           ),
         if (widget._isAliado &&
             widget.profile?.pedidosSuspendidosMorosidad == true) ...[
-          Material(
-            color: Colors.red.shade50,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.block, color: Colors.red.shade800, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'MotoLink suspendió nuevos pedidos por morosidad. Regularice pagos en pedidos entregados.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red.shade900,
-                      ),
-                    ),
+          Row(
+            children: [
+              Chip(
+                avatar: Icon(Icons.block, size: 14, color: Colors.red.shade800),
+                label: Text(
+                  'Pedidos suspendidos (morosidad)',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.red.shade800,
                   ),
-                ],
+                ),
+                backgroundColor: Colors.red.shade50,
+                side: BorderSide(color: Colors.red.shade200),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-            ),
+              ProfileInfoIcon(
+                title: 'Morosidad',
+                message: AliadoKycSectionHelp.morosidad,
+              ),
+            ],
           ),
           const SizedBox(height: 8),
         ],
         if (!widget._isAliado) const SizedBox(height: 8),
         KycAliadoGlobalStatusHighlight(kycStatus: st),
-        if (widget._isAliado && widget.profile != null) ...[
-          const SizedBox(height: 8),
-          AliadoProfileRequirementsBanner(
-            profile: widget.profile,
-            documents: _docs,
-          ),
-        ],
-        const SizedBox(height: 10),
         if (_loading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -278,44 +316,52 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
               ),
             ),
           )
-        else ...[
-          if (widget._isAliado) ...[
-            const Text(
-              'Registro inicial',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
+        else if (widget._isAliado) ...[
+          if (reqProgress != null) ...[
+            const SizedBox(height: 8),
+            ProfileCollapsibleSection(
+              title: 'Requisitos del perfil',
+              subtitle: reqProgress.subtitle,
+              infoMessage: AliadoKycSectionHelp.requisitosPerfil,
+              initiallyExpanded: !reqProgress.allComplete,
+              child: AliadoProfileRequirementsBanner(
+                profile: widget.profile,
+                documents: _docs,
+                compact: true,
               ),
             ),
-            const SizedBox(height: 6),
           ],
-          ...requiredTypes.map(_buildDocTile),
+          const SizedBox(height: 8),
+          ProfileCollapsibleSection(
+            title: 'Registro inicial',
+            subtitle: requiredTypes.isEmpty
+                ? null
+                : '$requiredUploaded de ${requiredTypes.length} documentos',
+            infoMessage: AliadoKycSectionHelp.registroInicial,
+            initiallyExpanded:
+                requiredUploaded < requiredTypes.length || st == KycStatus.rechazado,
+            child: Column(
+              children: requiredTypes.map(_buildDocTile).toList(),
+            ),
+          ),
           if (supplementaryTypes.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Documentación complementaria',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade700,
+            const SizedBox(height: 8),
+            ProfileCollapsibleSection(
+              title: 'Documentación complementaria',
+              subtitle: 'Opcional · ${_supplementaryUploaded(supplementaryTypes)} de ${supplementaryTypes.length}',
+              infoMessage: AliadoKycSectionHelp.documentacionComplementaria,
+              initiallyExpanded: false,
+              child: Column(
+                children: supplementaryTypes.map(_buildDocTile).toList(),
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              'Opcional. Puede completarla después de ingresar a la plataforma.',
-              style: TextStyle(
-                fontSize: 10.5,
-                height: 1.3,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ...supplementaryTypes.map(_buildDocTile),
           ],
+        ] else ...[
+          const SizedBox(height: 10),
+          ...requiredTypes.map(_buildDocTile),
         ],
         if (canSendReview) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           FilledButton(
             onPressed: _submittingReview ? null : _submitReview,
             child: _submittingReview

@@ -13,6 +13,8 @@ import 'order_commission_summary.dart';
 import '../models/kyc_approved_aliado_model.dart';
 import '../models/kyc_status.dart';
 import 'importer_kyc_approved_aliados_panel.dart';
+import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 import 'transaction_request_counterparty_profile_section.dart';
 
 Future<void> _launchSignedOrderDoc(
@@ -586,21 +588,12 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Documentación y evidencia',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
-          ),
+        ProfileSectionHeader(
+          label: 'DOCUMENTACIÓN Y EVIDENCIA',
+          infoMessage: OrderSectionHelp.evidenciaPedido,
+          infoTitle: 'Documentación y evidencia',
+          padding: const EdgeInsets.only(bottom: 10, top: 0),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.',
-          style: TextStyle(
-              fontSize: 11, color: Colors.grey.shade700, height: 1.25),
-        ),
-        const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -626,25 +619,12 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ciclo del envío',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
-          ),
+        ProfileSectionHeader(
+          label: 'CICLO DEL ENVÍO',
+          infoMessage: OrderSectionHelp.cicloEnvioPago,
+          infoTitle: 'Ciclo del envío',
+          padding: const EdgeInsets.only(bottom: 8, top: 0),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'El comprobante de pago y su aprobación quedan en el expediente del pedido '
-          '(apartado de pago del aliado, activo tras la factura del importador); no forman parte de este cronograma.',
-          style: TextStyle(
-            fontSize: 10.5,
-            height: 1.35,
-            color: Colors.grey.shade700,
-          ),
-        ),
-        const SizedBox(height: 8),
         DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.surfaceTinted.withOpacity(0.4),

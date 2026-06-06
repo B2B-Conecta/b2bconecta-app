@@ -9,6 +9,8 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import 'main_shell_tab.dart';
+import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 
 /// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión MotoLink.
 class OrderMotolinkThreadSection extends StatefulWidget {
@@ -20,6 +22,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.allowReplyAsImportador = false,
     this.onThreadChanged,
     this.suppressBuiltinTitle = false,
+    this.suppressInlineHelp = false,
     /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
     this.mergedThreadRequestIds,
   });
@@ -37,6 +40,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 
   /// Cuando el padre ya mostró el título de sección (p. ej. carrito multi‑línea).
   final bool suppressBuiltinTitle;
+
+  /// La ayuda va en el icono ℹ️ del bloque colapsable padre.
+  final bool suppressInlineHelp;
 
   @override
   State<OrderMotolinkThreadSection> createState() =>
@@ -241,6 +247,11 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                   ),
                 ),
               ),
+            if (!widget.suppressInlineHelp)
+              ProfileInfoIcon(
+                title: 'Chat del pedido',
+                message: OrderSectionHelp.chatPedido,
+              ),
             IconButton(
               tooltip: 'Actualizar',
               onPressed: _loading ? null : _load,
@@ -248,12 +259,6 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
               visualDensity: VisualDensity.compact,
             ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Desde que el pedido está pendiente, aliado e importador pueden escribir aquí '
-          '(coordinación de cantidad, plazos y logística). MotoLink puede leer el hilo en tiempo real.',
-          style: TextStyle(fontSize: 11, height: 1.3, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 4),
         if (_loading)

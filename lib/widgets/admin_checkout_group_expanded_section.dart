@@ -309,6 +309,8 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
           OrderCardCollapsibleSection(
             title: 'Comisión MotoLink',
             subtitle: commissionSubtitle,
+            infoMessage:
+                'Comisión devengada o estimada según el estado del pedido.',
             child: AdminCheckoutGroupCommissionSummary(
               lines: allLines,
               importerChunk: chunk,
@@ -427,6 +429,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
         OrderCardCollapsibleSection(
           title: 'Mensajes',
           subtitle: 'Hilo con aliado, importador y MotoLink',
+          infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>(
               'trm-admin-grp-${anchor.ownerId}-${chunk.map((e) => e.id).join("-")}',
@@ -438,6 +441,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             allowReplyAsAdmin: true,
             onThreadChanged: onRefresh,
             suppressBuiltinTitle: true,
+            suppressInlineHelp: true,
           ),
         ),
       ],

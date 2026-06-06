@@ -660,7 +660,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ],
           if (_persistedAsAliado) ...[
             const SizedBox(height: 14),
-            const ProfileSectionHeader(label: 'VERIFICACIÓN'),
+            const ProfileSectionHeader(
+              label: 'VERIFICACIÓN',
+              infoTitle: 'Verificación',
+              infoMessage: AliadoKycSectionHelp.verificacion,
+            ),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
               child: ProfileKycDocumentsSection(

@@ -540,6 +540,8 @@ class _TransactionRequestDetailScreenState
           OrderCardCollapsibleSection(
             title: 'Comisión MotoLink',
             subtitle: orderCardCommissionSubtitle(lines),
+            infoMessage:
+                'Comisión devengada o estimada según el estado del pedido.',
             child: OrderCommissionSummary(
               lines: orderLinesEligibleForCommission(lines),
               suppressOuterTitle: true,

@@ -260,6 +260,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                       OrderCardCollapsibleSection(
                         title: 'Comisión MotoLink',
                         subtitle: orderCardCommissionSubtitle([r]),
+                        infoMessage:
+                            'Comisión devengada o estimada según el estado del pedido.',
                         child: OrderCommissionSummary(
                           lines: orderLinesEligibleForCommission([r]),
                           suppressOuterTitle: true,

@@ -7,6 +7,8 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
+import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 
 /// En preparación: factura del importador al aliado, pago y paso a tránsito.
 class AdminOrderPreTransitSection extends StatefulWidget {
@@ -79,25 +81,12 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Divider(height: 20),
-        const Text(
-          'Facturación y pago',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
-          ),
+        const ProfileSectionHeader(
+          label: 'FACTURACIÓN Y PAGO',
+          infoMessage: OrderSectionHelp.adminPreTransit,
+          infoTitle: 'Facturación y pago',
+          padding: EdgeInsets.only(bottom: 12, top: 0),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'La factura comercial la emite el importador. Tras registrarla, el aliado '
-          'puede declarar pago; en tránsito solo con factura cargada.',
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade700,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: 12),
         if (st == TransactionRequestStatus.enPreparacion) ...[
           Material(
             color: Colors.amber.shade50,

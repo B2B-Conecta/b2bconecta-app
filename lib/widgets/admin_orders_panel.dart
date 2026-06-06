@@ -22,6 +22,7 @@ import 'admin_pago_revision_section.dart';
 import 'efectivo_respaldo_registrar.dart';
 import 'main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 import 'order_list_filter_bar.dart';
 import 'order_motolink_thread_section.dart';
 
@@ -281,35 +282,36 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (r.motolinkPuedeAnularComoAdmin) ...[
-          OutlinedButton.icon(
-            onPressed: _anularMotolinkBusyId != null
-                ? null
-                : () => _anularPedidoPorMotolink(context, r),
-            icon: _anularMotolinkBusyId == r.id
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(Icons.gpp_bad_outlined,
-                    size: 20, color: Colors.red.shade800),
-            label: Text(
-              _anularMotolinkBusyId == r.id
-                  ? 'Anulando…'
-                  : 'Anular pedido (MotoLink) — requiere motivo',
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red.shade800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Cierra el pedido en curso; requiere motivo. Inventario puede revertirse.',
-            style: TextStyle(
-              fontSize: 10.5,
-              height: 1.35,
-              color: Colors.grey.shade800,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _anularMotolinkBusyId != null
+                      ? null
+                      : () => _anularPedidoPorMotolink(context, r),
+                  icon: _anularMotolinkBusyId == r.id
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.gpp_bad_outlined,
+                          size: 20, color: Colors.red.shade800),
+                  label: Text(
+                    _anularMotolinkBusyId == r.id
+                        ? 'Anulando…'
+                        : 'Anular pedido (MotoLink)',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade800,
+                  ),
+                ),
+              ),
+              ProfileInfoIcon(
+                title: 'Anular pedido',
+                message: OrderSectionHelp.adminAnularPedido,
+              ),
+            ],
           ),
           const SizedBox(height: 12),
         ],
@@ -346,6 +348,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         OrderCardCollapsibleSection(
           title: 'Mensajes',
           subtitle: 'Hilo con aliado, importador y supervisión MotoLink',
+          infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-admin-${r.id}'),
             transactionRequestId: r.id,
@@ -353,6 +356,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
             allowReplyAsAdmin: true,
             onThreadChanged: _load,
             suppressBuiltinTitle: true,
+            suppressInlineHelp: true,
           ),
         ),
       ],
@@ -394,6 +398,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         OrderCardCollapsibleSection(
           title: 'Mensajes',
           subtitle: 'Hilo con aliado, importador y supervisión MotoLink',
+          infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-admin-closed-${primary.id}'),
             transactionRequestId: primary.id,
@@ -401,6 +406,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
             allowReplyAsAdmin: true,
             onThreadChanged: _load,
             suppressBuiltinTitle: true,
+            suppressInlineHelp: true,
           ),
         ),
       ],

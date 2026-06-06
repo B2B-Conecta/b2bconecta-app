@@ -104,6 +104,7 @@ class ProfileCollapsibleSection extends StatefulWidget {
     required this.child,
     this.initiallyExpanded = false,
     this.infoMessage,
+    this.infoTitle,
     this.trailingActions = const [],
   });
 
@@ -112,6 +113,7 @@ class ProfileCollapsibleSection extends StatefulWidget {
   final Widget child;
   final bool initiallyExpanded;
   final String? infoMessage;
+  final String? infoTitle;
   final List<Widget> trailingActions;
 
   @override
@@ -182,7 +184,10 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
                       ),
                     ),
                     if (widget.infoMessage != null)
-                      ProfileInfoIcon(message: widget.infoMessage!),
+                      ProfileInfoIcon(
+                        message: widget.infoMessage!,
+                        title: widget.infoTitle ?? widget.title,
+                      ),
                     ...widget.trailingActions,
                     Icon(
                       _open ? Icons.expand_less : Icons.expand_more,

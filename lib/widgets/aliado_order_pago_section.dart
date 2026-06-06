@@ -10,6 +10,8 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 import '../utils/order_payment_pricing.dart';
 import 'aliado_usd_payment_discount_ficha.dart';
 import 'importer_pago_transfer_details_card.dart';
@@ -287,39 +289,34 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
           const SizedBox(height: 8),
         ],
         if (!widget.suppressPrimaryTitle) ...[
-          Text(
-            referenciaHistorica ? 'Pago (referencia)' : 'Pago al importador',
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: AppColors.textPrimary,
+          ProfileSectionHeader(
+            label: referenciaHistorica
+                ? 'PAGO (REFERENCIA)'
+                : 'PAGO AL IMPORTADOR',
+            infoMessage: referenciaHistorica
+                ? OrderSectionHelp.pagoAliadoArchivo
+                : OrderSectionHelp.pagoAliadoMetodo,
+            infoTitle:
+                referenciaHistorica ? 'Pago (referencia)' : 'Pago al importador',
+            padding: const EdgeInsets.only(bottom: 8, top: 0),
+          ),
+        ] else if (!widget.suppressNegotiationIntro && !referenciaHistorica) ...[
+          Align(
+            alignment: Alignment.centerRight,
+            child: ProfileInfoIcon(
+              title: 'Pago al importador',
+              message: OrderSectionHelp.pagoAliadoMetodo,
             ),
           ),
-          const SizedBox(height: 4),
+        ] else if (referenciaHistorica) ...[
+          Align(
+            alignment: Alignment.centerRight,
+            child: ProfileInfoIcon(
+              title: 'Pago (referencia)',
+              message: OrderSectionHelp.pagoAliadoArchivo,
+            ),
+          ),
         ],
-        if (!referenciaHistorica && !widget.suppressNegotiationIntro)
-          Text(
-            'Condiciones en el chat del pedido; aquí método y comprobante.',
-            style: TextStyle(
-              fontSize: 10.5,
-              height: 1.35,
-              color: Colors.grey.shade700,
-            ),
-          ),
-        if (!referenciaHistorica && !widget.suppressNegotiationIntro)
-          const SizedBox(height: 6),
-        if (referenciaHistorica)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              'Documentación archivada · solo consulta.',
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.35,
-                color: Colors.grey.shade700,
-              ),
-            ),
-          ),
         if (!referenciaHistorica && r.aliadoPagoEstadoResumenEs != null)
           Text(
             r.aliadoPagoEstadoResumenEs!,

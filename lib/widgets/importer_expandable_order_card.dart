@@ -489,6 +489,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         OrderCardCollapsibleSection(
                           title: 'Mensajes',
                           subtitle: 'Hilo con el aliado y supervisión MotoLink',
+                          infoMessage: OrderSectionHelp.chatPedido,
                           child: OrderMotolinkThreadSection(
                             key: ValueKey<String>(
                               isCheckoutGroup
@@ -510,6 +511,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             ),
                             onThreadChanged: onThreadChanged,
                             suppressBuiltinTitle: true,
+                            suppressInlineHelp: true,
                           ),
                         ),
                         if (expandedFooter != null) ...[

@@ -10,6 +10,7 @@ import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'order_card_collapsible_layout.dart';
+import 'profile_section_helpers.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Cabecera del pedido maestro (carrito multi-importador).
@@ -106,17 +107,11 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                   ),
                 ),
               ),
+              ProfileInfoIcon(
+                title: 'Pedido maestro',
+                message: OrderSectionHelp.carritoMaestroAliado,
+              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Un solo pedido en MotoLink: destino y productos compartidos. '
-            'Elija un proveedor abajo para ver su envío, factura y pago.',
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.35,
-              color: Colors.grey.shade700,
-            ),
           ),
           const SizedBox(height: 10),
           ClipRRect(

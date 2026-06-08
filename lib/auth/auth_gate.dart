@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/login_screen.dart';
 import '../screens/recover_password_screen.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'profile_gate.dart';
 
@@ -34,6 +35,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       }
       if (data.event == AuthChangeEvent.signedOut || data.session == null) {
         _awaitingPasswordRecovery = false;
+      }
+      if (data.session != null &&
+          (data.event == AuthChangeEvent.signedIn ||
+              data.event == AuthChangeEvent.initialSession)) {
+        final source = data.event == AuthChangeEvent.initialSession
+            ? 'session_restore'
+            : 'password';
+        unawaited(SupabaseService.logUserLoginEvent(source: source));
       }
       setState(() => _authState = data);
     });

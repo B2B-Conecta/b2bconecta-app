@@ -7,6 +7,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/product_catalog_pricing.dart';
 import '../widgets/catalog_product_price_display.dart';
+import '../widgets/product_warranty_seal.dart';
 import 'cart_screen.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
@@ -418,24 +419,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           fontStyle: FontStyle.italic,
                         ),
                       ),
-                      const SizedBox(height: 28),
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _ServicePill(
-                            icon: Icons.inventory_2_outlined,
-                            label: 'Envío B2B',
-                          ),
-                          _ServicePill(
-                            icon: Icons.local_shipping_outlined,
-                            label: 'Despacho 24h',
-                          ),
-                          _ServicePill(
-                            icon: Icons.verified_user_outlined,
-                            label: 'Garantía',
-                          ),
-                        ],
-                      ),
+                      if (part.hasWarranty) ...[
+                        const SizedBox(height: 28),
+                        const Center(child: ProductWarrantySeal()),
+                      ],
                       SizedBox(
                         height: MediaQuery.paddingOf(context).bottom + 100,
                       ),
@@ -565,29 +552,3 @@ class _SpecBlock extends StatelessWidget {
   }
 }
 
-class _ServicePill extends StatelessWidget {
-  const _ServicePill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 26, color: AppColors.textSecondary),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}

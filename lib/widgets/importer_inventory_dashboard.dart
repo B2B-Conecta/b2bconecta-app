@@ -229,7 +229,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               Text(
                 'Columnas obligatorias: sku, nombre, precio, stock. '
                 'Opcionales: descripcion, precio_oferta_usd, descuento_pago_usd_pct, '
-                'categoria y compatibilidad. '
+                'categoria, compatibilidad y garantia (si/no). '
                 'Los tramos por volumen y la foto se configuran en la app, no en Excel. '
                 'La plantilla trae una fila de ejemplo con SKU que empieza por '
                 '"EJEMPLO"; no se importa. Puedes borrarla.',
@@ -366,6 +366,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               pagoSoloDivisas: _pagoSoloDivisas,
               preserveVolumeTiersFrom: existingRules,
             ),
+            hasWarranty: row.hasWarranty,
           );
           ok++;
         } else {
@@ -384,6 +385,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               compatibility: row.compatibilidad,
               imageUrl: row.urlImagen,
               isActive: false,
+              hasWarranty: row.hasWarranty,
             );
             ok++;
           } catch (e) {

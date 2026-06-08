@@ -29,6 +29,7 @@ class PartModel {
     this.salePriceUsd,
     this.discountRules,
     this.ownerPagoSoloDivisas = false,
+    this.hasWarranty = false,
   });
 
   final String id;
@@ -83,6 +84,9 @@ class PartModel {
   /// Importador dueño: solo acepta pagos en divisas (sin descuento línea USD).
   final bool ownerPagoSoloDivisas;
 
+  /// Importador habilitó garantía en este producto (`products.has_warranty`).
+  final bool hasWarranty;
+
   bool get tieneOfertaDirecta => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: precio,
         salePriceUsd: salePriceUsd,
@@ -124,6 +128,11 @@ class PartModel {
         ? isActiveRaw
         : (isActiveRaw == null ? true : isActiveRaw.toString() == 'true');
 
+    final warrantyRaw = json['has_warranty'];
+    final hasWarranty = warrantyRaw is bool
+        ? warrantyRaw
+        : warrantyRaw?.toString().toLowerCase() == 'true';
+
     return PartModel(
       id: json['id']?.toString() ?? '',
       ownerId: _nullableUuid(json['owner_id']),
@@ -148,6 +157,7 @@ class PartModel {
       isActive: isActive,
       category: _nullableText(json['category']),
       distanceKmFromReference: null,
+      hasWarranty: hasWarranty,
     );
   }
 
@@ -175,6 +185,7 @@ class PartModel {
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     bool? ownerPagoSoloDivisas,
+    bool? hasWarranty,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -203,6 +214,7 @@ class PartModel {
       discountRules: discountRules ?? this.discountRules,
       ownerPagoSoloDivisas:
           ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
+      hasWarranty: hasWarranty ?? this.hasWarranty,
     );
   }
 

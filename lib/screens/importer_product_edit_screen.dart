@@ -39,6 +39,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
   late final TextEditingController _compatController;
   late final TextEditingController _imageController;
   bool _isActive = true;
+  bool _hasWarranty = false;
   bool _saving = false;
   bool _pagoSoloDivisas = false;
   Uint8List? _pickedImageBytes;
@@ -118,6 +119,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
     _compatController = TextEditingController(text: p?.compatibilidad ?? '');
     _imageController = TextEditingController(text: p?.imagenUrl ?? '');
     _isActive = p?.isActive ?? true;
+    _hasWarranty = p?.hasWarranty ?? false;
     _tabController = TabController(
       length: _isEdit ? 2 : 1,
       vsync: this,
@@ -244,6 +246,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           compatibility: _compatController.text.trim(),
           imageUrl: imageUrl,
           isActive: _isActive,
+          hasWarranty: _hasWarranty,
         );
       } else {
         await SupabaseService.insertProduct(
@@ -258,6 +261,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           compatibility: _compatController.text.trim(),
           imageUrl: imageUrl,
           isActive: _isActive,
+          hasWarranty: _hasWarranty,
         );
       }
       if (!mounted) return;
@@ -399,6 +403,21 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen>
           TextFormField(
             controller: _compatController,
             decoration: _dec('Compatibilidad'),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Producto con garantía',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: const Text(
+              'Si está activo, el aliado verá el sello de garantía en el catálogo.',
+              style: TextStyle(fontSize: 12),
+            ),
+            value: _hasWarranty,
+            onChanged:
+                _saving ? null : (v) => setState(() => _hasWarranty = v),
           ),
           const SizedBox(height: 12),
           const Text(

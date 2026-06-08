@@ -21,6 +21,7 @@ class ExcelInventoryRow {
     this.precioOfertaUsd,
     this.usdPaymentDiscountPct,
     this.tramosVolumenJson,
+    this.hasWarranty = false,
   });
 
   final int rowIndex;
@@ -35,6 +36,7 @@ class ExcelInventoryRow {
   final double? precioOfertaUsd;
   final double? usdPaymentDiscountPct;
   final String? tramosVolumenJson;
+  final bool hasWarranty;
 
   /// `discount_rules` listo para Supabase.
   /// Si no hay columna de tramos en el Excel, conserva volumen ya configurado en app.
@@ -73,6 +75,7 @@ class ExcelCatalogService {
     'stock',
     'categoria (opcional)',
     'compatibilidad (opcional)',
+    'garantia (opcional)',
   ];
 
   /// Bytes de un .xlsx con cabeceras (columnas alineadas al formulario y a BD).
@@ -94,6 +97,7 @@ class ExcelCatalogService {
         TextCellValue('10'),
         TextCellValue('Motor'),
         TextCellValue('CG150, CG125'),
+        TextCellValue('si'),
       ],
     );
     final bytes = excel.encode();
@@ -133,6 +137,7 @@ class ExcelCatalogService {
           TextCellValue('${p.stock}'),
           TextCellValue(p.category ?? ''),
           TextCellValue(p.compatibilidad ?? ''),
+          TextCellValue(p.hasWarranty ? 'si' : 'no'),
         ],
       );
     }
@@ -204,10 +209,14 @@ class ExcelCatalogService {
     needColumn('precio');
     needColumn('stock');
 
-    int? headerCol(String a, [String? b]) {
+    int? headerCol(String a, [String? b, String? c]) {
       final i = colIndex[a];
       if (i != null) return i;
-      if (b != null) return colIndex[b];
+      if (b != null) {
+        final j = colIndex[b];
+        if (j != null) return j;
+      }
+      if (c != null) return colIndex[c];
       return null;
     }
 
@@ -219,6 +228,7 @@ class ExcelCatalogService {
       'usd_payment_discount_pct',
     );
     final tiersCol = headerCol('tramos_volumen_json', 'tramos_volumen');
+    final warrantyCol = headerCol('garantia', 'tiene_garantia', 'has_warranty');
 
     final out = <ExcelInventoryRow>[];
     for (var r = 1; r < sheet.maxRows; r++) {
@@ -311,6 +321,14 @@ class ExcelCatalogService {
         usdPaymentDiscountPct = parseUsdPaymentDiscountPct(fromJson);
       }
 
+      bool hasWarranty = false;
+      if (warrantyCol != null) {
+        final warrantyStr = _cellText(_col(row, warrantyCol)).trim();
+        if (warrantyStr.isNotEmpty) {
+          hasWarranty = parseGarantiaExcelCell(warrantyStr, rowIndex: r + 1, sku: sku);
+        }
+      }
+
       out.add(
         ExcelInventoryRow(
           rowIndex: r + 1,
@@ -325,10 +343,36 @@ class ExcelCatalogService {
           precioOfertaUsd: precioOferta,
           usdPaymentDiscountPct: usdPaymentDiscountPct,
           tramosVolumenJson: tramosJson,
+          hasWarranty: hasWarranty,
         ),
       );
     }
     return out;
+  }
+
+  /// `si` / `no` (también `1`, `0`, `true`, `false`, `x`).
+  static bool parseGarantiaExcelCell(
+    String raw, {
+    required int rowIndex,
+    required String sku,
+  }) {
+    final t = raw.trim().toLowerCase();
+    if (t.isEmpty) return false;
+    if (t == 'si' ||
+        t == 'sí' ||
+        t == 'yes' ||
+        t == 'true' ||
+        t == '1' ||
+        t == 'x') {
+      return true;
+    }
+    if (t == 'no' || t == 'false' || t == '0') {
+      return false;
+    }
+    throw FormatException(
+      'Fila $rowIndex: garantia inválida para SKU $sku '
+      '(use si o no).',
+    );
   }
 
   static Data? _col(List<Data?> row, int? i) {

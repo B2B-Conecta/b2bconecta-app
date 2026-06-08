@@ -19,6 +19,7 @@ import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/admin_order_rating_row_model.dart';
+import '../models/admin_user_activity_row_model.dart';
 import '../models/aliado_received_rating_model.dart';
 import '../models/importador_received_rating_model.dart';
 import '../models/reputation_weekly_snapshot_model.dart';
@@ -796,6 +797,7 @@ class SupabaseService {
     String? compatibility,
     String? imageUrl,
     bool isActive = true,
+    bool hasWarranty = false,
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -807,6 +809,7 @@ class SupabaseService {
       'price_usd': priceUsd,
       'stock': stock,
       'is_active': isActive,
+      'has_warranty': hasWarranty,
     };
     final d = description?.trim();
     if (d != null && d.isNotEmpty) payload['description'] = d;
@@ -843,6 +846,7 @@ class SupabaseService {
     String? compatibility,
     String? imageUrl,
     required bool isActive,
+    bool hasWarranty = false,
   }) async {
     final upd = <String, dynamic>{
       'sku': sku.trim(),
@@ -850,6 +854,7 @@ class SupabaseService {
       'price_usd': priceUsd,
       'stock': stock,
       'is_active': isActive,
+      'has_warranty': hasWarranty,
     };
     final d = description?.trim();
     upd['description'] = d;
@@ -882,6 +887,7 @@ class SupabaseService {
     bool clearSalePrice = false,
     Map<String, dynamic>? discountRules,
     bool clearDiscountRules = false,
+    bool? hasWarranty,
   }) async {
     final upd = <String, dynamic>{
       'price_usd': priceUsd,
@@ -897,6 +903,9 @@ class SupabaseService {
     } else if (discountRules != null) {
       upd['discount_rules'] =
           discountRules.isEmpty ? null : discountRules;
+    }
+    if (hasWarranty != null) {
+      upd['has_warranty'] = hasWarranty;
     }
     await _client.from('products').update(upd).eq('id', productId);
   }
@@ -2871,6 +2880,40 @@ class SupabaseService {
     if (res is! List) return const [];
     return res
         .map((e) => ImportadorReceivedRatingModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  /// Registra ingreso del usuario actual (RPC `log_user_login_event`).
+  static Future<void> logUserLoginEvent({String source = 'app'}) async {
+    if (_client.auth.currentSession == null) return;
+    try {
+      await _client.rpc(
+        'log_user_login_event',
+        params: <String, dynamic>{'p_source': source},
+      );
+    } catch (_) {
+      // No bloquear la app si falla el tracking.
+    }
+  }
+
+  /// Admin: monitoreo de ingresos y pedidos B2B (RPC `list_admin_user_activity_monitoring`).
+  static Future<List<AdminUserActivityRowModel>>
+      listAdminUserActivityMonitoring({
+    String? role,
+    String period = 'week',
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_user_activity_monitoring',
+      params: <String, dynamic>{
+        'p_role': role?.trim().isEmpty == true ? null : role?.trim(),
+        'p_period': period,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AdminUserActivityRowModel.fromJson(
               Map<String, dynamic>.from(e as Map),
             ))
         .toList();

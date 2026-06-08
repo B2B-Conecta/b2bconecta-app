@@ -51,5 +51,11 @@
 	<string>Permite elegir una imagen desde tu galería para el producto.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MotoLink usa tu ubicación para ordenar el catálogo de importadores por cercanía y estimar distancias de envío.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Permite que las herramientas de desarrollo se conecten a la app para depuración.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartVmService._tcp</string>
+	</array>
 </dict>
 </plist>

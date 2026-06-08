@@ -16,6 +16,7 @@ import '../utils/promo_popup_frequency.dart';
 import '../widgets/aliado_catalog_filters_sheet.dart';
 import '../widgets/aliado_promo_campaign_widgets.dart';
 import '../widgets/catalog_product_price_display.dart';
+import '../widgets/product_warranty_seal.dart';
 import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
@@ -1004,18 +1005,29 @@ class _ProductGridCard extends StatelessWidget {
                   aspectRatio: 1.0,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Hero(
-                      tag: ProductDetailScreen.heroImageTag(part),
-                      child: part.imagenUrl != null &&
-                              part.imagenUrl!.isNotEmpty
-                          ? Image.network(
-                              part.imagenUrl!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              errorBuilder: (_, __, ___) => _placeholder(),
-                            )
-                          : _placeholder(),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Hero(
+                          tag: ProductDetailScreen.heroImageTag(part),
+                          child: part.imagenUrl != null &&
+                                  part.imagenUrl!.isNotEmpty
+                              ? Image.network(
+                                  part.imagenUrl!,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  errorBuilder: (_, __, ___) => _placeholder(),
+                                )
+                              : _placeholder(),
+                        ),
+                        if (part.hasWarranty)
+                          const Positioned(
+                            top: 6,
+                            right: 6,
+                            child: ProductWarrantySeal(compact: true),
+                          ),
+                      ],
                     ),
                   ),
                 ),

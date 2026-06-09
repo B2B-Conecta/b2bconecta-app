@@ -28,6 +28,17 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // No depender solo del stream: en iOS Release el primer evento puede tardar
+    // y la UI queda en blanco/spinner indefinidamente.
+    final bootSession = Supabase.instance.client.auth.currentSession;
+    _authState = AuthState(
+      bootSession != null
+          ? AuthChangeEvent.initialSession
+          : AuthChangeEvent.signedOut,
+      bootSession,
+    );
+
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.passwordRecovery &&
           data.session != null) {

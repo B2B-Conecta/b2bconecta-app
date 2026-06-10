@@ -12,7 +12,10 @@ import '../theme/app_theme.dart';
 import '../utils/admin_order_panel_utils.dart';
 import '../utils/aliado_order_grouping.dart';
 import '../utils/notification_related_order_match.dart';
+import '../models/importer_pedidos_filters_draft.dart';
+import '../utils/importer_order_date.dart';
 import '../utils/transaction_request_filter_utils.dart';
+import 'importer_pedidos_filters_sheet.dart';
 import 'admin_checkout_group_expanded_section.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_motolink_anula_pedido_dialog.dart';
@@ -51,6 +54,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   bool _morosoOnly = false;
   Map<String, AdminAliadoMorosidadFlag> _morosidadFlags = {};
   _AdminOrdersScope _scope = _AdminOrdersScope.enCurso;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
 
   List<OrderStatusFilterOption> get _statusChipOptions {
     final statuses = switch (_scope) {
@@ -170,8 +175,27 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     setState(() {
       _statusFilter = null;
       _morosoOnly = false;
+      _dateFrom = null;
+      _dateTo = null;
     });
   }
+
+  Future<void> _openDateFilters() async {
+    final draft = await ImporterPedidosFiltersSheet.show(
+      context,
+      initial: ImporterPedidosFiltersDraft(
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
+    );
+    if (draft == null || !mounted) return;
+    setState(() {
+      _dateFrom = draft.dateFrom;
+      _dateTo = draft.dateTo;
+    });
+  }
+
+  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   void _onScopeChanged(_AdminOrdersScope next) {
     if (next == _scope) return;
@@ -179,16 +203,23 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       _scope = next;
       _statusFilter = null;
       _morosoOnly = false;
+      _dateFrom = null;
+      _dateTo = null;
     });
     _load();
   }
 
   List<TransactionRequestModel> get _filteredFlat {
-    return TransactionRequestFilterUtils.apply(
+    final list = TransactionRequestFilterUtils.apply(
       _rows,
       searchQuery: _searchCtrl.text,
       statusFilter: _statusFilter,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      useOrderPanelDate: true,
     );
+    list.sort(ImporterOrderDate.compareByFechaReciente);
+    return list;
   }
 
   List<List<TransactionRequestModel>> get _displayGroups {
@@ -510,6 +541,26 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                 onMorosoOnlyChanged: _showMorosoChip
                     ? (v) => setState(() => _morosoOnly = v)
                     : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilterChip(
+                    label: Text(_hasDateFilter ? 'Fecha ✓' : 'Filtrar por fecha'),
+                    selected: _hasDateFilter,
+                    onSelected: (_) => _openDateFilters(),
+                    selectedColor: AppColors.brandBlue.withOpacity(0.18),
+                    checkmarkColor: AppColors.brandBlue,
+                    avatar: Icon(
+                      Icons.calendar_month_outlined,
+                      size: 16,
+                      color: _hasDateFilter
+                          ? AppColors.brandBlue
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
               ),
               Expanded(
                 child: groups.isEmpty

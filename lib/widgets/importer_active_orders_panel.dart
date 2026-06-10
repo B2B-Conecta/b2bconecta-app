@@ -17,6 +17,9 @@ import 'importer_order_pago_verification_section.dart';
 import 'order_rating_sheet.dart';
 import 'importer_notificar_ajuste_cantidad_dialog.dart';
 import 'main_shell_tab.dart';
+import '../models/importer_pedidos_filters_draft.dart';
+import '../utils/importer_order_date.dart';
+import 'importer_pedidos_filters_sheet.dart';
 import 'order_list_filter_bar.dart';
 
 enum _ImporterQuickFilter {
@@ -43,6 +46,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   late final TextEditingController _searchCtrl;
   _ImporterQuickFilter _quickFilter = _ImporterQuickFilter.nuevos;
   bool _morosoOnly = false;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
 
   @override
   void initState() {
@@ -132,8 +137,27 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     setState(() {
       _quickFilter = _ImporterQuickFilter.nuevos;
       _morosoOnly = false;
+      _dateFrom = null;
+      _dateTo = null;
     });
   }
+
+  Future<void> _openDateFilters() async {
+    final draft = await ImporterPedidosFiltersSheet.show(
+      context,
+      initial: ImporterPedidosFiltersDraft(
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
+    );
+    if (draft == null || !mounted) return;
+    setState(() {
+      _dateFrom = draft.dateFrom;
+      _dateTo = draft.dateTo;
+    });
+  }
+
+  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   bool _matchesQuickFilter(TransactionRequestModel r) {
     final s = r.status;
@@ -157,8 +181,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       searchQuery: _searchCtrl.text,
       statusFilter: null,
       morosoOnly: _morosoOnly,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      useOrderPanelDate: true,
     );
-    return searched.where(_matchesQuickFilter).toList();
+    final list = searched.where(_matchesQuickFilter).toList()
+      ..sort(ImporterOrderDate.compareByFechaReciente);
+    return list;
   }
 
   String _rowKey(TransactionRequestModel r) => r.id;
@@ -185,6 +214,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       child: Wrap(
         spacing: 8,
         runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           chip(
             'Pendientes · nuevos',
@@ -192,6 +222,23 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           ),
           chip('En proceso', _ImporterQuickFilter.enProceso),
           chip('Despachados · cerrados', _ImporterQuickFilter.cerrados),
+          FilterChip(
+            label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
+            selected: _hasDateFilter,
+            onSelected: (_) => _openDateFilters(),
+            selectedColor: AppColors.brandBlue.withOpacity(0.18),
+            checkmarkColor: AppColors.brandBlue,
+            avatar: Icon(
+              Icons.calendar_month_outlined,
+              size: 16,
+              color: _hasDateFilter ? AppColors.brandBlue : Colors.grey.shade600,
+            ),
+            labelStyle: TextStyle(
+              fontWeight: _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 12.5,
+              color: _hasDateFilter ? AppColors.brandBlue : AppColors.textPrimary,
+            ),
+          ),
           if (_quickFilter == _ImporterQuickFilter.cerrados)
             FilterChip(
               label: const Text('Morosos'),

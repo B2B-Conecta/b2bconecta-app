@@ -1,4 +1,5 @@
 import '../models/transaction_request_model.dart';
+import 'importer_order_date.dart';
 
 /// Filtrado local de solicitudes (búsqueda + estado opcional).
 abstract final class TransactionRequestFilterUtils {
@@ -41,6 +42,7 @@ abstract final class TransactionRequestFilterUtils {
     bool morosoOnly = false,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool useOrderPanelDate = false,
   }) {
     var list = rows.where((r) => matchesSearch(r, searchQuery)).toList();
     if (statusFilter != null && statusFilter.isNotEmpty) {
@@ -52,11 +54,17 @@ abstract final class TransactionRequestFilterUtils {
     if (dateFrom != null || dateTo != null) {
       list = list
           .where(
-            (r) => matchesDateRange(
-              r,
-              dateFrom: dateFrom,
-              dateTo: dateTo,
-            ),
+            (r) => useOrderPanelDate
+                ? ImporterOrderDate.matchesDateRange(
+                    r,
+                    dateFrom: dateFrom,
+                    dateTo: dateTo,
+                  )
+                : matchesDateRange(
+                    r,
+                    dateFrom: dateFrom,
+                    dateTo: dateTo,
+                  ),
           )
           .toList();
     }

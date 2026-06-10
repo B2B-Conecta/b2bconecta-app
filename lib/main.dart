@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_scaffold_messenger.dart';
 import 'auth/auth_gate.dart';
 import 'theme/app_theme.dart';
 
@@ -42,6 +43,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MotoLink',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       theme: buildAppTheme(),
       home: const AuthGate(),
     );

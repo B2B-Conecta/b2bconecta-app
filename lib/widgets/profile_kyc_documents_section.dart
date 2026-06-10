@@ -381,7 +381,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
                 padding: EdgeInsets.zero,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              ProfileInfoIcon(
+              const ProfileInfoIcon(
                 title: 'Morosidad',
                 message: AliadoKycSectionHelp.morosidad,
               ),

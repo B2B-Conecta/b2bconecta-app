@@ -26,7 +26,7 @@ class _TermsAcceptanceSectionState extends State<TermsAcceptanceSection> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(TermsConfig.title),
+        title: const Text(TermsConfig.title),
         content: SingleChildScrollView(
           child: Text(
             TermsConfig.body,
@@ -100,7 +100,7 @@ class _TermsAcceptanceSectionState extends State<TermsAcceptanceSection> {
                     const Text('Acepto los '),
                     InkWell(
                       onTap: _showTermsDialog,
-                      child: Text(
+                      child: const Text(
                         'términos y condiciones',
                         style: TextStyle(
                           color: AppColors.brand,

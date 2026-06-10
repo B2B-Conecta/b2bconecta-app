@@ -107,7 +107,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              ProfileInfoIcon(
+              const ProfileInfoIcon(
                 title: 'Pedido maestro',
                 message: OrderSectionHelp.carritoMaestroAliado,
               ),

@@ -338,7 +338,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                   ),
                 ),
               ),
-              ProfileInfoIcon(
+              const ProfileInfoIcon(
                 title: 'Anular pedido',
                 message: OrderSectionHelp.adminAnularPedido,
               ),

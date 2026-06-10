@@ -39,7 +39,7 @@ Future<void> showImporterAliadoKycDetailSheet(
                       ),
                     ),
                   ),
-                  ProfileInfoIcon(
+                  const ProfileInfoIcon(
                     title: 'Expediente KYC',
                     message: OrderSectionHelp.aliadoKycCredit,
                   ),

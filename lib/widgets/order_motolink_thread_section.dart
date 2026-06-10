@@ -248,7 +248,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                 ),
               ),
             if (!widget.suppressInlineHelp)
-              ProfileInfoIcon(
+              const ProfileInfoIcon(
                 title: 'Chat del pedido',
                 message: OrderSectionHelp.chatPedido,
               ),

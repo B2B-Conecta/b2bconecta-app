@@ -31,7 +31,7 @@ class AliadoPendingReviewScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(child: MotoLinkProLogo(height: 56)),
+              const Center(child: MotoLinkProLogo(height: 56)),
               const SizedBox(height: 24),
               Icon(
                 _isRejected ? Icons.cancel_outlined : Icons.hourglass_top,

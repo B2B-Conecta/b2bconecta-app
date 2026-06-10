@@ -51,7 +51,7 @@ class ProductWarrantySeal extends StatelessWidget {
       );
     }
 
-    return Column(
+    return const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
@@ -59,7 +59,7 @@ class ProductWarrantySeal extends StatelessWidget {
           size: 26,
           color: AppColors.brandBlue,
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(
           'Garantía',
           textAlign: TextAlign.center,

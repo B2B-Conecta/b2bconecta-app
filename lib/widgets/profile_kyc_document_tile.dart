@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/document_review_status.dart';
 import '../theme/app_theme.dart';
 import 'kyc_status_highlight_widgets.dart';
+import 'media_pick_action_chips.dart';
 
-/// Fila compacta: documento KYC + estado + acción subir/cambiar.
+/// Fila compacta: documento KYC + estado + acciones cámara / galería / archivo.
 class ProfileKycDocumentTile extends StatelessWidget {
   const ProfileKycDocumentTile({
     super.key,
@@ -12,8 +13,11 @@ class ProfileKycDocumentTile extends StatelessWidget {
     required this.hasFile,
     required this.statusLabel,
     required this.effectiveStatus,
-    required this.onUpload,
+    required this.onPickCamera,
+    required this.onPickGallery,
+    required this.onPickFile,
     this.busy = false,
+    this.actionsEnabled = true,
     this.reviewedHint,
     this.reviewNote,
   });
@@ -22,15 +26,16 @@ class ProfileKycDocumentTile extends StatelessWidget {
   final bool hasFile;
   final String statusLabel;
   final String? effectiveStatus;
-  final VoidCallback onUpload;
+  final VoidCallback onPickCamera;
+  final VoidCallback onPickGallery;
+  final VoidCallback onPickFile;
   final bool busy;
+  final bool actionsEnabled;
   final String? reviewedHint;
   final String? reviewNote;
 
   @override
   Widget build(BuildContext context) {
-    final esAprobado = effectiveStatus == DocumentReviewStatus.aprobado;
-
     return Material(
       color: Colors.white,
       clipBehavior: Clip.antiAlias,
@@ -45,49 +50,33 @@ class ProfileKycDocumentTile extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
+        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                if (busy)
-                  const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    onPressed: onUpload,
-                    child: Text(
-                      !hasFile ? 'Subir' : esAprobado ? 'Actualizar' : 'Cambiar',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-              ],
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
             ),
+            const SizedBox(height: 6),
             _CompactDocStatusLine(
               statusLabel: statusLabel,
               hasFile: hasFile,
               effectiveStatus: effectiveStatus,
             ),
+            const SizedBox(height: 8),
+            MediaPickActionChips(
+              busy: busy,
+              enabled: actionsEnabled,
+              onCamera: onPickCamera,
+              onGallery: onPickGallery,
+              onFile: onPickFile,
+            ),
             if (reviewedHint != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 reviewedHint!,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
@@ -140,25 +129,22 @@ class _CompactDocStatusLine extends StatelessWidget {
       _ when !hasFile => (Icons.upload_file_outlined, Colors.grey.shade600),
       _ => (Icons.description_outlined, AppColors.brandBlue),
     };
-    return Padding(
-      padding: const EdgeInsets.only(left: 2, top: 2),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              statusLabel,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.25,
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            statusLabel,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.25,
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

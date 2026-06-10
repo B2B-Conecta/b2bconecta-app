@@ -7,11 +7,13 @@ import '../models/profile_model.dart';
 import '../services/notification_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/admin_orders_panel.dart';
+import '../utils/app_breakpoints.dart';
 import '../widgets/admin_commission_settlements_panel.dart';
+import '../widgets/admin_desktop_shell.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
-import '../widgets/admin_order_ratings_panel.dart';
 import '../widgets/admin_kyc_review_panel.dart';
+import '../widgets/admin_order_ratings_panel.dart';
+import '../widgets/admin_orders_panel.dart';
 import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
@@ -99,6 +101,93 @@ class _MainShellState extends State<MainShell> {
     setState(() => _profile = p);
   }
 
+  void _openAccountSettings() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const AccountSettingsScreen(),
+      ),
+    );
+  }
+
+  static const _adminDestinations = <AdminShellDestination>[
+    AdminShellDestination(
+      icon: Icons.local_shipping_outlined,
+      selectedIcon: Icons.local_shipping,
+      label: 'Pedidos',
+      title: 'Pedidos',
+      subtitle:
+          'Use «En curso», «Cerrados» o «Todos» y filtre por estado o búsqueda.',
+    ),
+    AdminShellDestination(
+      icon: Icons.analytics_outlined,
+      selectedIcon: Icons.analytics,
+      label: 'Reportes',
+      title: 'Reportes de encomiendas',
+    ),
+    AdminShellDestination(
+      icon: Icons.star_rate_outlined,
+      selectedIcon: Icons.star_rate,
+      label: 'Valoraciones',
+      title: 'Valoraciones',
+      subtitle:
+          'Expediente aliado ↔ importador tras la entrega. Filtre por dirección y despliegue el detalle.',
+    ),
+    AdminShellDestination(
+      icon: Icons.payments_outlined,
+      selectedIcon: Icons.payments,
+      label: 'Comisiones',
+      title: 'Comisiones MotoLink',
+      subtitle:
+          'Devengo al marcar Recibido · corte semanal y facturación por importador.',
+    ),
+    AdminShellDestination(
+      icon: Icons.verified_user_outlined,
+      selectedIcon: Icons.verified_user,
+      label: 'KYC',
+      title: 'Verificación KYC',
+      subtitle:
+          'Revise documentación de aliados e importadores; apruebe por archivo o el estado global.',
+    ),
+    AdminShellDestination(
+      icon: Icons.person_outline,
+      selectedIcon: Icons.person,
+      label: 'Perfil',
+      title: 'Mi perfil',
+      subtitle: 'Datos de la cuenta broker MotoLink.',
+    ),
+  ];
+
+  List<Widget> _adminPanelWidgets() {
+    return const [
+      AdminOrdersPanel(),
+      AdminEncomiendasReportPanel(),
+      AdminOrderRatingsPanel(),
+      AdminCommissionSettlementsPanel(),
+      AdminKycReviewPanel(),
+    ];
+  }
+
+  Widget _adminProfileBody() {
+    return SingleChildScrollView(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: AppBreakpoints.formMaxWidth,
+          ),
+          child: ProfileB2BForm(
+            key: ValueKey<Object>(
+              '${_profile.id}_${_profile.businessName}_${_profile.rif}_${_profile.role}_${_profile.kycStatus}_${_profile.primerosPedidosContadoEntregados}_${_profile.creditLimit}_${_profile.creditoPreactivadoPorAdmin}_${_profile.logoStoragePath}_${_profile.fiscalMapsUrl}',
+            ),
+            initial: _profile,
+            onRelatedDataChanged: _refreshProfile,
+            onSaved: _refreshProfile,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Pestañas admin: Pedidos, Reportes, Valoraciones, Comisiones, KYC, Perfil (sin catálogo).
   Widget _adminOrdersScaffold({
     required String title,
@@ -150,38 +239,45 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildAdminShell() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= AppBreakpoints.adminDesktop) {
+          return _buildAdminDesktopShell();
+        }
+        return _buildAdminMobileShell();
+      },
+    );
+  }
+
+  Widget _buildAdminDesktopShell() {
+    final panels = _adminPanelWidgets();
+    return AdminDesktopShell(
+      selectedIndex: _tabIndex,
+      onDestinationSelected: (i) => setState(() => _tabIndex = i),
+      destinations: _adminDestinations,
+      profile: _profile,
+      unreadNotifications: _notifications.unreadCount,
+      onNotificationTap: _openNotificationCenter,
+      onOpenSettings: _openAccountSettings,
+      pages: [
+        ...panels,
+        _adminProfileBody(),
+      ],
+    );
+  }
+
+  Widget _buildAdminMobileShell() {
+    final panels = _adminPanelWidgets();
     return Scaffold(
       body: IndexedStack(
         index: _tabIndex,
         children: [
-          _adminOrdersScaffold(
-            title: 'Pedidos',
-            subtitle:
-                'Use «En curso», «Cerrados» o «Todos» y filtre por estado o búsqueda.',
-            child: const AdminOrdersPanel(),
-          ),
-          _adminOrdersScaffold(
-            title: 'Reportes de encomiendas',
-            child: const AdminEncomiendasReportPanel(),
-          ),
-          _adminOrdersScaffold(
-            title: 'Valoraciones',
-            subtitle:
-                'Expediente aliado ↔ importador tras la entrega. Filtre por dirección y despliegue el detalle.',
-            child: const AdminOrderRatingsPanel(),
-          ),
-          _adminOrdersScaffold(
-            title: 'Comisiones MotoLink',
-            subtitle:
-                'Devengo al marcar Recibido · corte semanal y facturación por importador.',
-            child: const AdminCommissionSettlementsPanel(),
-          ),
-          _adminOrdersScaffold(
-            title: 'Verificación KYC',
-            subtitle:
-                'Revise documentación de aliados e importadores; apruebe por archivo o el estado global.',
-            child: const AdminKycReviewPanel(),
-          ),
+          for (var i = 0; i < panels.length; i++)
+            _adminOrdersScaffold(
+              title: _adminDestinations[i].title,
+              subtitle: _adminDestinations[i].subtitle,
+              child: panels[i],
+            ),
           _ProfileTab(
             profile: _profile,
             homeRole: AppHomeRole.administrador,
@@ -206,37 +302,13 @@ class _MainShellState extends State<MainShell> {
           currentIndex: _tabIndex,
           type: BottomNavigationBarType.fixed,
           onTap: (i) => setState(() => _tabIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping_outlined),
-              activeIcon: Icon(Icons.local_shipping),
-              label: 'Pedidos',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.analytics_outlined),
-              activeIcon: Icon(Icons.analytics),
-              label: 'Reportes',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.star_rate_outlined),
-              activeIcon: Icon(Icons.star_rate),
-              label: 'Valoraciones',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.payments_outlined),
-              activeIcon: Icon(Icons.payments),
-              label: 'Comisiones',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.verified_user_outlined),
-              activeIcon: Icon(Icons.verified_user),
-              label: 'KYC',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
-            ),
+          items: [
+            for (final d in _adminDestinations)
+              BottomNavigationBarItem(
+                icon: Icon(d.icon),
+                activeIcon: Icon(d.selectedIcon),
+                label: d.label,
+              ),
           ],
         ),
       ),

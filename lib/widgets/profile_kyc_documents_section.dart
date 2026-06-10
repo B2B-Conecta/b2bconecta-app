@@ -1,17 +1,20 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../config/email_config.dart';
+import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/profile_model.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_document_model.dart';
 import '../services/supabase_service.dart';
+import '../utils/document_pick_utils.dart';
 import '../theme/app_theme.dart';
 import 'aliado_profile_requirements_banner.dart';
 import 'kyc_status_highlight_widgets.dart';
 import 'profile_kyc_document_tile.dart';
 import 'profile_section_helpers.dart';
+import 'terms_acceptance_section.dart';
 
 /// Ayudas (icono ℹ️) en verificación KYC del aliado.
 abstract final class AliadoKycSectionHelp {
@@ -23,7 +26,8 @@ abstract final class AliadoKycSectionHelp {
       'antes de enviar el registro inicial a revisión.';
   static const registroInicial =
       'Documentos obligatorios para el primer ingreso: foto del local, cédula '
-      'del propietario y registro mercantil o cámara de comercio.';
+      'del propietario y registro mercantil o cámara de comercio. Puede tomar '
+      'una foto con la cámara o subir un archivo (PDF o imagen).';
   static const documentacionComplementaria =
       'Opcional. Referencias bancarias y comerciales para fortalecer su perfil; '
       'puede completarlas después de ingresar a la plataforma.';
@@ -40,12 +44,24 @@ class ProfileKycDocumentsSection extends StatefulWidget {
     required this.role,
     this.profile,
     this.onChanged,
+    this.beforeUpload,
+    this.beforeSubmitReview,
+    this.registrationLocked = false,
   });
 
   final String? kycStatus;
   final String role;
   final ProfileModel? profile;
   final VoidCallback? onChanged;
+
+  /// Guarda borrador del perfil si hace falta antes de subir (onboarding aliado).
+  final Future<bool> Function()? beforeUpload;
+
+  /// Persiste datos del formulario antes de enviar registro inicial.
+  final Future<bool> Function()? beforeSubmitReview;
+
+  /// Tras enviar a revisión: ocultar envío y mostrar solo estado.
+  final bool registrationLocked;
 
   bool get _isAliado => role.trim().toLowerCase() == 'aliado';
 
@@ -59,22 +75,28 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   bool _loading = true;
   String? _busyDocType;
   bool _submittingReview = false;
+  bool _termsAccepted = false;
 
   @override
   void initState() {
     super.initState();
+    _termsAccepted = widget.profile?.hasAcceptedCurrentTerms ?? false;
     _load();
   }
 
   @override
   void didUpdateWidget(covariant ProfileKycDocumentsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.kycStatus != widget.kycStatus) {
+    if (oldWidget.kycStatus != widget.kycStatus ||
+        oldWidget.profile?.id != widget.profile?.id ||
+        oldWidget.profile?.termsAcceptedAt != widget.profile?.termsAcceptedAt) {
+      _termsAccepted = widget.profile?.hasAcceptedCurrentTerms ?? false;
       _load();
     }
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final list = await SupabaseService.fetchMyProfileDocuments();
@@ -116,29 +138,40 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     return '$dd/$mm/${l.year} $hh:$min';
   }
 
-  Future<void> _pickAndUpload(String docType) async {
-    final res = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
-      withData: true,
-    );
-    if (res == null || res.files.isEmpty) return;
-    final f = res.files.first;
-    final bytes = f.bytes;
-    final name = f.name;
-    if (bytes == null || bytes.isEmpty) {
+  bool get _hasPersistedProfile => widget.profile?.id.isNotEmpty == true;
+
+  Future<void> _guardUpload(Future<void> Function() action) async {
+    if (widget.beforeUpload != null) {
+      final ok = await widget.beforeUpload!();
+      if (!ok) return;
+    } else if (!_hasPersistedProfile) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo leer el archivo.')),
+        const SnackBar(
+          content: Text(
+            'Guarde el perfil antes de subir documentos.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
+    await action();
+  }
+
+  Future<void> _pickAndUpload(
+    String docType, {
+    DocumentPickChannel channel = DocumentPickChannel.file,
+  }) async {
+    final picked = await pickKycDocument(channel: channel);
+    if (picked == null || !mounted) return;
+
     setState(() => _busyDocType = docType);
     try {
       await SupabaseService.uploadMyProfileDocument(
         docType: docType,
-        bytes: bytes,
-        fileName: name,
+        bytes: picked.bytes,
+        fileName: picked.fileName,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -168,13 +201,17 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   }
 
   Future<void> _submitReview() async {
+    if (widget.beforeSubmitReview != null) {
+      final saved = await widget.beforeSubmitReview!();
+      if (!saved || !mounted) return;
+    }
     setState(() => _submittingReview = true);
     try {
-      await SupabaseService.profileSubmitKycForReview();
+      final emailOutcome = await SupabaseService.profileSubmitKycForReview();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solicitud enviada. MotoLink revisará su documentación.'),
+        SnackBar(
+          content: Text(emailOutcome.registrationSubmittedSnackBar()),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -225,7 +262,16 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
         busy: busy,
         reviewedHint: reviewedHint,
         reviewNote: note,
-        onUpload: () => _pickAndUpload(type),
+        onPickCamera: () => _guardUpload(
+          () => _pickAndUpload(type, channel: DocumentPickChannel.camera),
+        ),
+        onPickGallery: () => _guardUpload(
+          () => _pickAndUpload(type, channel: DocumentPickChannel.gallery),
+        ),
+        onPickFile: () => _guardUpload(
+          () => _pickAndUpload(type, channel: DocumentPickChannel.file),
+        ),
+        actionsEnabled: widget.beforeUpload != null || _hasPersistedProfile,
       ),
     );
   }
@@ -245,9 +291,20 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   @override
   Widget build(BuildContext context) {
     final st = widget.kycStatus?.trim();
-    final canSendReview = st == KycStatus.pendiente ||
-        st == KycStatus.rechazado ||
-        st == KycStatus.enRevision;
+    final access = widget.profile?.accountAccessStatus?.trim();
+    final accountAllowsSubmit = access == null ||
+        access.isEmpty ||
+        access == AccountAccessStatus.draft ||
+        access == AccountAccessStatus.rejected;
+    final canSendReview = widget._isAliado &&
+        !widget.registrationLocked &&
+        accountAllowsSubmit &&
+        (st == null ||
+            st.isEmpty ||
+            st == KycStatus.pendiente ||
+            st == KycStatus.rechazado);
+    final termsPending = widget.profile?.hasAcceptedCurrentTerms != true;
+    final termsOk = !termsPending || _termsAccepted;
     final requiredTypes = AliadoDocType.forRole(widget.role);
     final supplementaryTypes = widget._isAliado
         ? AliadoDocType.supplementaryForRole(widget.role)
@@ -272,6 +329,38 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
               color: AppColors.textPrimary,
             ),
           ),
+        if (widget._isAliado &&
+            !_hasPersistedProfile &&
+            widget.beforeUpload != null) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 18, color: Colors.amber.shade900),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Indique nombre del negocio y RIF. Al adjuntar un documento '
+                    'guardamos esos datos automáticamente si aún no pulsó '
+                    '«Guardar Perfil».',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (widget._isAliado &&
             widget.profile?.pedidosSuspendidosMorosidad == true) ...[
           Row(
@@ -360,10 +449,26 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           const SizedBox(height: 10),
           ...requiredTypes.map(_buildDocTile),
         ],
+        if (widget._isAliado && accountAllowsSubmit && termsPending) ...[
+          const SizedBox(height: 12),
+          const ProfileSectionHeader(
+            label: 'TÉRMINOS LEGALES',
+            infoTitle: 'Términos y condiciones',
+            infoMessage:
+                'Debe aceptar los términos vigentes antes de enviar el registro '
+                'inicial a revisión.',
+          ),
+          TermsAcceptanceSection(
+            accepted: _termsAccepted,
+            onAcceptedChanged: (v) => setState(() => _termsAccepted = v),
+          ),
+        ],
         if (canSendReview) ...[
           const SizedBox(height: 10),
           FilledButton(
-            onPressed: _submittingReview ? null : _submitReview,
+            onPressed: _submittingReview || (widget._isAliado && !termsOk)
+                ? null
+                : _submitReview,
             child: _submittingReview
                 ? const SizedBox(
                     height: 20,

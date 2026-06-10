@@ -1,11 +1,13 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/account_access_status.dart';
+import '../models/kyc_status.dart';
 import '../models/profile_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
+import '../utils/document_pick_utils.dart';
 import '../theme/app_theme.dart';
 import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
@@ -13,7 +15,9 @@ import 'profile_kyc_documents_section.dart';
 import 'importer_accepted_pago_metodos_section.dart';
 import 'importer_commission_settlements_section.dart';
 import 'authorization_status_section.dart';
+import 'media_pick_action_chips.dart';
 import 'profile_section_helpers.dart';
+import 'terms_acceptance_section.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -57,6 +61,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   /// Recrea [AuthorizationStatusSection] al actualizar documentos KYC.
   int _authSectionTick = 0;
 
+  bool _termsAccepted = false;
+
   /// Ancla scroll desde notificaciones KYC → sección documentación aliado.
   final GlobalKey _kycDocumentationSectionKey = GlobalKey();
 
@@ -75,9 +81,39 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'aliado';
   }
 
+  bool get _showAliadoKycSection =>
+      _role.trim().toLowerCase() == 'aliado' || _persistedAsAliado;
+
+  /// Aliados usan «Enviar registro inicial»; no muestran «Guardar Perfil».
+  bool get _showGuardarPerfilButton => !_showAliadoKycSection;
+
+  bool get _aliadoRegistrationLocked {
+    if (!_showAliadoKycSection) return false;
+    final kyc = widget.initial?.kycStatus?.trim().toLowerCase();
+    final access = widget.initial?.accountAccessStatus?.trim().toLowerCase();
+    return kyc == KycStatus.enRevision ||
+        kyc == KycStatus.aprobado ||
+        access == AccountAccessStatus.pendingReview ||
+        access == AccountAccessStatus.active;
+  }
+
   bool get _persistedAsImportador {
     return widget.initial?.role?.trim().toLowerCase() == 'importador';
   }
+
+  bool get _requiresTerms {
+    final r = _role.trim().toLowerCase();
+    return r == 'importador' || r == 'aliado';
+  }
+
+  bool get _hasAcceptedTerms =>
+      widget.initial?.hasAcceptedCurrentTerms == true || _termsAccepted;
+
+  /// Solo registro inicial: ocultar tras aceptar en BD (no se puede desmarcar).
+  bool get _showTermsSection =>
+      _requiresTerms &&
+      !_showAliadoKycSection &&
+      widget.initial?.hasAcceptedCurrentTerms != true;
 
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
@@ -109,10 +145,25 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
     }
+    _termsAccepted = widget.initial?.hasAcceptedCurrentTerms ?? false;
     if (_persistedAsAliado) {
       MainShellTabController.registerKycDocumentationSectionKey(
         _kycDocumentationSectionKey,
       );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileB2BForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initial?.termsAcceptedAt != widget.initial?.termsAcceptedAt) {
+      _termsAccepted = widget.initial?.hasAcceptedCurrentTerms ?? false;
+    }
+    if (oldWidget.initial?.id != widget.initial?.id ||
+        oldWidget.initial?.kycStatus != widget.initial?.kycStatus ||
+        oldWidget.initial?.accountAccessStatus !=
+            widget.initial?.accountAccessStatus) {
+      _bumpAuthorizationSection();
     }
   }
 
@@ -132,24 +183,28 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     super.dispose();
   }
 
-  Future<void> _pickProfileLogo() async {
+  Future<void> _pickProfileLogo({
+    DocumentPickChannel? channel,
+  }) async {
     setState(() => _logoBusy = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) return;
-      final f = result.files.single;
-      final bytes = f.bytes;
-      if (bytes == null || bytes.isEmpty) return;
-      final name = f.name.toLowerCase();
+      final picked = channel == null
+          ? await pickProfileImageBytes(context)
+          : await pickKycDocument(channel: channel).then((doc) {
+              if (doc == null) return null;
+              final n = doc.fileName.toLowerCase();
+              if (n.endsWith('.pdf')) {
+                throw ArgumentError('El logo debe ser una imagen (JPG, PNG, WEBP).');
+              }
+              return doc;
+            });
+      if (picked == null) return;
+      final name = picked.fileName.toLowerCase();
       String ext = 'png';
       if (name.endsWith('.jpg') || name.endsWith('.jpeg')) ext = 'jpg';
       if (name.endsWith('.webp')) ext = 'webp';
       await SupabaseService.uploadMyProfileLogo(
-        bytes: bytes,
+        bytes: picked.bytes,
         fileExtension: ext,
       );
       if (!mounted) return;
@@ -290,9 +345,26 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_requiresTerms &&
+        !_hasAcceptedTerms &&
+        _role.trim().toLowerCase() != 'aliado') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debe aceptar los términos y condiciones para continuar.'),
+        ),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {
+      final mapsUrl = SupabaseService.normalizeHttpUrl(
+        _fiscalMapsUrlController.text,
+      );
+      if (mapsUrl != null &&
+          mapsUrl != _fiscalMapsUrlController.text.trim()) {
+        _fiscalMapsUrlController.text = mapsUrl;
+      }
       await SupabaseService.upsertMyProfile(
         businessName: _businessNameController.text,
         rif: _rifController.text,
@@ -301,7 +373,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         estado: _estadoController.text,
         ciudad: _ciudadController.text,
         direccion: _fiscalAddressController.text,
-        fiscalMapsUrl: _fiscalMapsUrlController.text,
+        fiscalMapsUrl: mapsUrl ?? _fiscalMapsUrlController.text,
       );
       await _tryGeocodeAndSaveCoordinates();
       if (!mounted) return;
@@ -311,7 +383,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo guardar el perfil: $e'),
+          content: Text(SupabaseService.profileSaveErrorMessage(e)),
           backgroundColor: Colors.red.shade800,
         ),
       );
@@ -322,6 +394,76 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   Future<void> _signOut() async {
     await AuthService.signOut();
+  }
+
+  Future<bool> _persistProfileFromForm({bool validate = true}) async {
+    if (validate && !_formKey.currentState!.validate()) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Revise los campos del perfil antes de continuar.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return false;
+    }
+    try {
+      final mapsUrl = SupabaseService.normalizeHttpUrl(
+        _fiscalMapsUrlController.text,
+      );
+      if (mapsUrl != null &&
+          mapsUrl != _fiscalMapsUrlController.text.trim()) {
+        _fiscalMapsUrlController.text = mapsUrl;
+      }
+      await SupabaseService.upsertMyProfile(
+        businessName: _businessNameController.text,
+        rif: _rifController.text,
+        role: _role,
+        phone: _phoneController.text,
+        estado: _estadoController.text,
+        ciudad: _ciudadController.text,
+        direccion: _fiscalAddressController.text,
+        fiscalMapsUrl: mapsUrl ?? _fiscalMapsUrlController.text,
+      );
+      await _tryGeocodeAndSaveCoordinates();
+      if (!mounted) return false;
+      widget.onRelatedDataChanged?.call();
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(SupabaseService.profileSaveErrorMessage(e))),
+      );
+      return false;
+    }
+  }
+
+  /// Crea/actualiza borrador mínimo para poder subir documentos KYC en onboarding.
+  Future<bool> _ensureProfileForDocumentUpload() async {
+    final persisted = await SupabaseService.fetchMyProfile();
+    final persistedRole = persisted?.role?.trim().toLowerCase();
+    final hasPersistedRole = persistedRole == 'importador' ||
+        persistedRole == 'aliado' ||
+        persistedRole == 'administrador';
+    if (persisted != null && hasPersistedRole) {
+      return true;
+    }
+    final businessName = _businessNameController.text.trim();
+    final rif = _rifController.text.trim();
+    if (businessName.isEmpty || rif.isEmpty) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Indique nombre del negocio y RIF antes de adjuntar documentos.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return false;
+    }
+    if (_role.trim().toLowerCase() != 'aliado') return false;
+    return _persistProfileFromForm(validate: false);
   }
 
   /// Geocodifica el domicilio fiscal del importador o aliado (catálogo / proximidad).
@@ -394,39 +536,50 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                MediaPickActionChips(
+                  busy: _logoBusy,
+                  enabled: !_saving,
+                  fileLabel: 'Archivo',
+                  onCamera: () => _pickProfileLogo(
+                    channel: DocumentPickChannel.camera,
+                  ),
+                  onGallery: () => _pickProfileLogo(
+                    channel: DocumentPickChannel.gallery,
+                  ),
+                  onFile: () => _pickProfileLogo(
+                    channel: DocumentPickChannel.file,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    TextButton.icon(
-                      onPressed: (_saving || _logoBusy) ? null : _pickProfileLogo,
-                      icon: _logoBusy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.upload_outlined, size: 18),
-                      label: Text(
-                        widget.initial?.logoStoragePath != null &&
-                                widget.initial!.logoStoragePath!.trim().isNotEmpty
-                            ? 'Cambiar logo'
-                            : 'Subir logo (opcional)',
-                      ),
-                    ),
                     const ProfileInfoIcon(
                       message:
                           'Si no sube logo, se muestra el de MotoLink en la barra superior.',
                       title: 'Logo del negocio',
                     ),
                     if (widget.initial?.logoStoragePath != null &&
-                        widget.initial!.logoStoragePath!.trim().isNotEmpty)
+                        widget.initial!.logoStoragePath!.trim().isNotEmpty) ...[
+                      const SizedBox(width: 4),
                       TextButton(
-                        onPressed: (_saving || _logoBusy) ? null : _clearProfileLogo,
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed:
+                            (_saving || _logoBusy) ? null : _clearProfileLogo,
                         child: Text(
                           'Quitar',
-                          style: TextStyle(color: Colors.grey.shade700),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
                         ),
                       ),
+                    ],
                   ],
                 ),
               ],
@@ -611,11 +764,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                       if (t.isEmpty) {
                         return 'Indique el enlace «Compartir» de Google Maps de su domicilio fiscal';
                       }
-                      final u = Uri.tryParse(t);
-                      if (u == null ||
-                          !u.hasScheme ||
-                          (u.scheme != 'http' && u.scheme != 'https')) {
-                        return 'Use una URL que empiece por http(s)://';
+                      if (SupabaseService.normalizeHttpUrl(t) == null) {
+                        return 'Use una URL válida (p. ej. https://maps.app.goo.gl/...)';
                       }
                       return null;
                     },
@@ -658,7 +808,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 8),
             _reputationTabHint(context),
           ],
-          if (_persistedAsAliado) ...[
+          if (_showAliadoKycSection) ...[
             const SizedBox(height: 14),
             const ProfileSectionHeader(
               label: 'VERIFICACIÓN',
@@ -671,6 +821,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 role: 'aliado',
                 profile: widget.initial,
                 kycStatus: widget.initial?.kycStatus,
+                beforeUpload: _ensureProfileForDocumentUpload,
+                beforeSubmitReview: _persistProfileFromForm,
+                registrationLocked: _aliadoRegistrationLocked,
                 onChanged: () {
                   _bumpAuthorizationSection();
                   widget.onRelatedDataChanged?.call();
@@ -678,20 +831,37 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ),
             ),
           ],
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _saving ? null : _submit,
-            child: _saving
-                ? const SizedBox(
-                    height: 22,
-                    width: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Guardar Perfil'),
-          ),
+          if (_showTermsSection) ...[
+            const SizedBox(height: 14),
+            const ProfileSectionHeader(
+              label: 'TÉRMINOS LEGALES',
+              infoTitle: 'Términos y condiciones',
+              infoMessage:
+                  'Aliados e importadores deben aceptar los términos vigentes '
+                  'antes de usar MotoLink.',
+            ),
+            TermsAcceptanceSection(
+              accepted: _termsAccepted,
+              onAcceptedChanged: (v) => setState(() => _termsAccepted = v),
+            ),
+          ],
+          if (_showGuardarPerfilButton) ...[
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _saving ? null : _submit,
+              child: _saving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Guardar Perfil'),
+            ),
+          ] else
+            const SizedBox(height: 16),
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: _saving ? null : _signOut,

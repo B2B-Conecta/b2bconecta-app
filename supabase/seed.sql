@@ -640,6 +640,15 @@ on conflict (id) do update set
   rating_avg_received = excluded.rating_avg_received,
   rating_count_received = excluded.rating_count_received;
 
+-- Seed: cuentas demo con acceso activo (gate aliado Fase 1).
+update public.profiles
+set
+  account_access_status = 'active',
+  kyc_status = coalesce(kyc_status, 'aprobado'),
+  terms_accepted_at = coalesce(terms_accepted_at, now()),
+  terms_version = coalesce(terms_version, '2026-06-01-pilot')
+where role in ('importador', 'administrador', 'aliado');
+
 -- Demo E2.1: ventana rolling = histórico mientras no hay order_ratings en seed.
 update public.profiles
 set

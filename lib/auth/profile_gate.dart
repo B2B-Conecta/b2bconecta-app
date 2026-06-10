@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../models/account_access_status.dart';
 import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
+import '../screens/aliado_pending_review_screen.dart';
 import '../screens/main_shell.dart';
 import '../screens/profile_setup_screen.dart';
 import '../services/supabase_service.dart';
@@ -107,6 +109,29 @@ class _ProfileGateState extends State<ProfileGate> {
           return ProfileSetupScreen(
             initial: profile,
             onProfileComplete: _reloadProfile,
+          );
+        }
+
+        if (profile.requiresTermsAcceptance && !profile.hasAcceptedCurrentTerms) {
+          return ProfileSetupScreen(
+            initial: profile,
+            onProfileComplete: _reloadProfile,
+          );
+        }
+
+        if (profile.isAliado && !profile.hasActiveAccountAccess) {
+          final access = profile.accountAccessStatus?.trim();
+          if (access == AccountAccessStatus.draft ||
+              access == null ||
+              access.isEmpty) {
+            return ProfileSetupScreen(
+              initial: profile,
+              onProfileComplete: _reloadProfile,
+            );
+          }
+          return AliadoPendingReviewScreen(
+            profile: profile,
+            onRefresh: _reloadProfile,
           );
         }
 

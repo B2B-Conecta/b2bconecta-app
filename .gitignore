@@ -1,5 +1,7 @@
 # Environment (secrets)
 .env
+config/email.env
+config/email.env.local
 
 # Miscellaneous
 *.class

@@ -301,7 +301,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             padding: const EdgeInsets.only(bottom: 8, top: 0),
           ),
         ] else if (!widget.suppressNegotiationIntro && !referenciaHistorica) ...[
-          Align(
+          const Align(
             alignment: Alignment.centerRight,
             child: ProfileInfoIcon(
               title: 'Pago al importador',
@@ -309,7 +309,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             ),
           ),
         ] else if (referenciaHistorica) ...[
-          Align(
+          const Align(
             alignment: Alignment.centerRight,
             child: ProfileInfoIcon(
               title: 'Pago (referencia)',

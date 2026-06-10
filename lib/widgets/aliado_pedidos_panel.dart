@@ -1078,7 +1078,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                ),
+              ),
               Expanded(
                 child: filtered.isEmpty
                     ? ListView(

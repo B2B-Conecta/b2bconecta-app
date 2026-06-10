@@ -326,7 +326,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  ProfileInfoIcon(
+                  const ProfileInfoIcon(
                     title: 'Cancelar pedido',
                     message: OrderSectionHelp.aliadoCancelPending,
                   ),

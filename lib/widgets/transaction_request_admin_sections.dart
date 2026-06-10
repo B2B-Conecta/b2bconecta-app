@@ -588,11 +588,11 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ProfileSectionHeader(
+        const ProfileSectionHeader(
           label: 'DOCUMENTACIÓN Y EVIDENCIA',
           infoMessage: OrderSectionHelp.evidenciaPedido,
           infoTitle: 'Documentación y evidencia',
-          padding: const EdgeInsets.only(bottom: 10, top: 0),
+          padding: EdgeInsets.only(bottom: 10, top: 0),
         ),
         Wrap(
           spacing: 8,
@@ -619,11 +619,11 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ProfileSectionHeader(
+        const ProfileSectionHeader(
           label: 'CICLO DEL ENVÍO',
           infoMessage: OrderSectionHelp.cicloEnvioPago,
           infoTitle: 'Ciclo del envío',
-          padding: const EdgeInsets.only(bottom: 8, top: 0),
+          padding: EdgeInsets.only(bottom: 8, top: 0),
         ),
         DecoratedBox(
           decoration: BoxDecoration(

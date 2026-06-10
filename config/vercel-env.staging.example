@@ -8,5 +8,4 @@
 NEXT_PUBLIC_SUPABASE_URL=https://lwrqjpqyitnveizshawc.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_K80Bh8S-cNwvU2ykSWzaRg__cT1TTFS
 
-# Optional (recommended after you know the Vercel URL):
-# SUPABASE_AUTH_REDIRECT_URL=https://motolink-pro-app.vercel.app
+SUPABASE_AUTH_REDIRECT_URL=https://motolink-pro-app.vercel.app

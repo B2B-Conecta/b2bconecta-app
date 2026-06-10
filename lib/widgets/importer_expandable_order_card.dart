@@ -355,7 +355,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 : r,
                             expanded: true,
                             riskWarningChild: anyPagoRiesgo
-                                ? _InfoBanner(
+                                ? const _InfoBanner(
                                     color: Colors.red,
                                     text:
                                         '>3 días hábiles sin pago aprobado: posible restricción de nuevos pedidos.',
@@ -532,7 +532,7 @@ class _DetailSummaryStrip extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${formatRefAmount(totalRef)} REF',
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 14,
               color: AppColors.brandBlue,

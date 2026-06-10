@@ -38,7 +38,7 @@
 -- Contraseñas: admin123 | importador123 | aliado123 (según prefijo del email)
 -- =============================================================================
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Limpieza re-seed (usuarios @motoconecta.seed + catálogo + pedidos demo)
@@ -192,12 +192,12 @@ select
   s.email,
   case
     when s.email like 'admin%@motoconecta.seed'
-      then crypt('admin123', gen_salt('bf'))
+      then extensions.crypt('admin123', extensions.gen_salt('bf'))
     when s.email like 'importador%@motoconecta.seed'
-      then crypt('importador123', gen_salt('bf'))
+      then extensions.crypt('importador123', extensions.gen_salt('bf'))
     when s.email like 'aliado%@motoconecta.seed'
-      then crypt('aliado123', gen_salt('bf'))
-    else crypt('seed123', gen_salt('bf'))
+      then extensions.crypt('aliado123', extensions.gen_salt('bf'))
+    else extensions.crypt('seed123', extensions.gen_salt('bf'))
   end,
   now(),
   '{"provider":"email","providers":["email"]}'::jsonb,

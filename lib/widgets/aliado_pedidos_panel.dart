@@ -10,6 +10,7 @@ import '../utils/aliado_order_grouping.dart';
 import '../utils/notification_related_order_match.dart';
 import '../utils/motolink_volume_discount.dart';
 import 'aliado_importador_factura_section.dart';
+import '../utils/importer_order_date.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import '../utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
@@ -324,14 +325,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   }
 
   List<TransactionRequestModel> get _filtered {
-    return TransactionRequestFilterUtils.apply(
+    final list = TransactionRequestFilterUtils.apply(
       _rows,
       searchQuery: _searchCtrl.text,
       statusFilter: _statusFilter,
       morosoOnly: _morosoOnly,
       dateFrom: _dateFrom,
       dateTo: _dateTo,
+      useOrderPanelDate: true,
     );
+    list.sort(ImporterOrderDate.compareByFechaReciente);
+    return list;
   }
 
   void _toggleExpand(String id) {

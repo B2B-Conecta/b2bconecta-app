@@ -5,8 +5,11 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../utils/importer_order_advance.dart';
 import '../theme/app_theme.dart';
+import '../models/importer_pedidos_filters_draft.dart';
+import '../utils/importer_order_date.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
+import 'importer_pedidos_filters_sheet.dart';
 import 'main_shell_tab.dart';
 import 'order_list_filter_bar.dart';
 
@@ -27,6 +30,8 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
   String? _error;
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
 
   @override
   void initState() {
@@ -75,14 +80,39 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
 
   void _clearFilters() {
     _searchCtrl.clear();
-    setState(() {});
+    setState(() {
+      _dateFrom = null;
+      _dateTo = null;
+    });
   }
 
+  Future<void> _openDateFilters() async {
+    final draft = await ImporterPedidosFiltersSheet.show(
+      context,
+      initial: ImporterPedidosFiltersDraft(
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
+    );
+    if (draft == null || !mounted) return;
+    setState(() {
+      _dateFrom = draft.dateFrom;
+      _dateTo = draft.dateTo;
+    });
+  }
+
+  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
+
   List<TransactionRequestModel> get _filtered {
-    return TransactionRequestFilterUtils.apply(
+    final list = TransactionRequestFilterUtils.apply(
       _rows,
       searchQuery: _searchCtrl.text,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      useOrderPanelDate: true,
     );
+    list.sort(ImporterOrderDate.compareByFechaReciente);
+    return list;
   }
 
   void _toggleExpand(String id) {
@@ -188,6 +218,26 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),
                 hintText: 'Buscar por aliado',
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilterChip(
+                    label: Text(_hasDateFilter ? 'Fecha ✓' : 'Filtrar por fecha'),
+                    selected: _hasDateFilter,
+                    onSelected: (_) => _openDateFilters(),
+                    selectedColor: AppColors.brandBlue.withOpacity(0.18),
+                    checkmarkColor: AppColors.brandBlue,
+                    avatar: Icon(
+                      Icons.calendar_month_outlined,
+                      size: 16,
+                      color: _hasDateFilter
+                          ? AppColors.brandBlue
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
               ),
               Expanded(
                 child: filtered.isEmpty

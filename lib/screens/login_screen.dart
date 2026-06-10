@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../app_scaffold_messenger.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/login_forgot_password_dialog.dart';
 import '../widgets/motolink_pro_logo.dart';
-import '../widgets/profile_kyc_documents_info.dart';
 
 enum _AuthMode { login, register }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.initialErrorMessage});
+
+  /// Mensaje de error tras abrir un enlace Auth inválido o expirado.
+  final String? initialErrorMessage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -25,6 +29,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscureConfirm = true;
 
   @override
+  void initState() {
+    super.initState();
+    final msg = widget.initialErrorMessage?.trim();
+    if (msg != null && msg.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showSnackBar(msg, isError: true);
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -33,7 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger =
+        scaffoldMessengerKey.currentState ?? ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: isError ? Colors.red.shade800 : Colors.green.shade800,
@@ -132,59 +149,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final ctrl = TextEditingController(text: _emailController.text.trim());
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Recuperar contraseña'),
-          content: TextField(
-            controller: ctrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Correo',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.brandOrange),
-              onPressed: () async {
-                final e = ctrl.text.trim();
-                if (e.isEmpty || !_validateEmail(e)) {
-                  Navigator.of(ctx).pop();
-                  _showSnackBar('Introduce un correo válido.', isError: true);
-                  return;
-                }
-                try {
-                  await AuthService.resetPasswordForEmail(e);
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                  if (mounted) {
-                    _showSnackBar(
-                      'Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña.',
-                      isError: false,
-                    );
-                  }
-                } on AuthException catch (ex) {
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                  _showSnackBar(
-                    AuthService.mapAuthErrorMessage(ex.message),
-                    isError: true,
-                  );
-                }
-              },
-              child: const Text('Enviar'),
-            ),
-          ],
-        );
-      },
+    final result = await showLoginForgotPasswordDialog(
+      context,
+      initialEmail: _emailController.text.trim(),
     );
-    ctrl.dispose();
+    if (!mounted || result == null) return;
+    _showSnackBar(result.message, isError: result.isError);
   }
 
   InputDecoration _inputDecoration({
@@ -249,21 +219,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppColors.textSecondary,
                 ),
               ),
-              if (_mode == _AuthMode.register) ...[
-                const SizedBox(height: 20),
-                const ProfileKycDocumentsInfo(),
-                const SizedBox(height: 8),
-                const Text(
-                  'Tenga a mano esta documentación para completar su perfil tras registrarse.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
               const SizedBox(height: 28),
               TextField(
                 controller: _emailController,

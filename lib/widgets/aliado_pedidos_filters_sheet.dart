@@ -185,7 +185,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Estado, morosidad y rango de fechas del pedido.',
+                  'Estado, morosidad y rango de fechas. Cerrados: fecha de cierre; '
+                  'activos: fecha de alta.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,

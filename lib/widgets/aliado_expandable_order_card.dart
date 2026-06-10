@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import '../utils/ves_amount_format.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../utils/importer_order_date.dart';
+import 'importer_order_date_badge.dart';
 import 'aliado_multi_importer_order_tabs.dart';
 import 'courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
@@ -102,6 +104,13 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       showHeadline = tracking.isNotEmpty && tracking != '—';
     }
 
+    final fechaLabel = isCheckoutGroup
+        ? ImporterOrderDate.etiquetaGrupo(lines)
+        : ImporterOrderDate.etiquetaFecha(r);
+    final fechaActiva = isCheckoutGroup
+        ? lines.any(ImporterOrderDate.isAbierto)
+        : ImporterOrderDate.isAbierto(r);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
@@ -121,6 +130,22 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              ImporterOrderDateBadge(
+                                label: fechaLabel,
+                                isActive: fechaActiva,
+                              ),
+                              const Spacer(),
+                              OrderStatusHeaderChips(
+                                statusLabel: statusLabel,
+                                showMoroso: isCheckoutGroup
+                                    ? lines.any((x) => x.esPedidoMoroso)
+                                    : r.esPedidoMoroso,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           if (showHeadline) ...[
                             Text(
                               tracking,
@@ -143,29 +168,16 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                           ],
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  isCheckoutGroup
-                                      ? tituloCheckoutGrupoAliado(lines)
-                                      : r.etiquetaProductoAliado,
-                                  maxLines: expanded ? 3 : 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              OrderStatusHeaderChips(
-                                statusLabel: statusLabel,
-                                showMoroso: isCheckoutGroup
-                                    ? lines.any((x) => x.esPedidoMoroso)
-                                    : r.esPedidoMoroso,
-                              ),
-                            ],
+                          Text(
+                            isCheckoutGroup
+                                ? tituloCheckoutGrupoAliado(lines)
+                                : r.etiquetaProductoAliado,
+                            maxLines: expanded ? 3 : 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
                           ),
                           if (isCheckoutGroup &&
                               distinctImporterIds.length > 1) ...[

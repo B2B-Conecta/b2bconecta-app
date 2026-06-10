@@ -7,6 +7,12 @@ class AuthService {
 
   static GoTrueClient get _auth => Supabase.instance.client.auth;
 
+  /// URL post-auth (recovery, confirmación de registro). Ver `.env` → `SUPABASE_AUTH_REDIRECT_URL`.
+  static String? get authRedirectUrl {
+    final redirect = dotenv.env['SUPABASE_AUTH_REDIRECT_URL']?.trim();
+    return redirect != null && redirect.isNotEmpty ? redirect : null;
+  }
+
   static Future<AuthResponse> signInWithPassword({
     required String email,
     required String password,
@@ -24,16 +30,15 @@ class AuthService {
     return _auth.signUp(
       email: email.trim(),
       password: password,
+      emailRedirectTo: authRedirectUrl,
     );
   }
 
   /// [redirectTo] opcional vía `.env` → `SUPABASE_AUTH_REDIRECT_URL` (URL de tu app web o deep link).
   static Future<void> resetPasswordForEmail(String email) {
-    final redirect = dotenv.env['SUPABASE_AUTH_REDIRECT_URL']?.trim();
     return _auth.resetPasswordForEmail(
       email.trim(),
-      redirectTo:
-          redirect != null && redirect.isNotEmpty ? redirect : null,
+      redirectTo: authRedirectUrl,
     );
   }
 

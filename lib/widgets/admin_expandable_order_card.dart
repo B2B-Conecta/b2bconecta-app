@@ -5,6 +5,8 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/admin_order_panel_utils.dart';
+import '../utils/importer_order_date.dart';
+import 'importer_order_date_badge.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
@@ -56,6 +58,12 @@ class AdminExpandableOrderCard extends StatelessWidget {
         ? adminCheckoutGroupResumenLinea(lines)
         : '${r.totalUnidadesAliado} uds · Total (aliado) '
             '${r.precioTotal.toStringAsFixed(2)} REF';
+    final fechaLabel = isCheckoutGroup
+        ? ImporterOrderDate.etiquetaGrupo(lines)
+        : ImporterOrderDate.etiquetaFecha(r);
+    final fechaActiva = isCheckoutGroup
+        ? lines.any(ImporterOrderDate.isAbierto)
+        : ImporterOrderDate.isAbierto(r);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -79,25 +87,27 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  titulo,
-                                  maxLines: expanded ? 2 : 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                  ),
-                                ),
+                              ImporterOrderDateBadge(
+                                label: fechaLabel,
+                                isActive: fechaActiva,
                               ),
-                              const SizedBox(width: 6),
+                              const Spacer(),
                               OrderStatusHeaderChips(
                                 statusLabel: statusLabel,
                                 showMoroso: groupMoroso,
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            titulo,
+                            maxLines: expanded ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
                           ),
                           if (!expanded) ...[
                             if (isCheckoutGroup) ...[

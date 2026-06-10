@@ -44,10 +44,8 @@ class _TermsAcceptanceSectionState extends State<TermsAcceptanceSection> {
   }
 
   Future<void> _onChanged(bool? value) async {
-    if (value != true) {
-      widget.onAcceptedChanged(false);
-      return;
-    }
+    if (widget.accepted) return;
+    if (value != true) return;
     setState(() => _busy = true);
     try {
       await SupabaseService.acceptTerms(version: TermsConfig.currentVersion);

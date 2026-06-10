@@ -109,6 +109,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   bool get _hasAcceptedTerms =>
       widget.initial?.hasAcceptedCurrentTerms == true || _termsAccepted;
 
+  /// Solo registro inicial: ocultar tras aceptar en BD (no se puede desmarcar).
+  bool get _showTermsSection =>
+      _requiresTerms &&
+      !_showAliadoKycSection &&
+      widget.initial?.hasAcceptedCurrentTerms != true;
+
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
     final r = _role.trim().toLowerCase();
@@ -825,7 +831,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ),
             ),
           ],
-          if (_requiresTerms && !_showAliadoKycSection) ...[
+          if (_showTermsSection) ...[
             const SizedBox(height: 14),
             const ProfileSectionHeader(
               label: 'TÉRMINOS LEGALES',

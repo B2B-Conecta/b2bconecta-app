@@ -303,6 +303,8 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
             st.isEmpty ||
             st == KycStatus.pendiente ||
             st == KycStatus.rechazado);
+    final termsPending = widget.profile?.hasAcceptedCurrentTerms != true;
+    final termsOk = !termsPending || _termsAccepted;
     final requiredTypes = AliadoDocType.forRole(widget.role);
     final supplementaryTypes = widget._isAliado
         ? AliadoDocType.supplementaryForRole(widget.role)
@@ -447,7 +449,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           const SizedBox(height: 10),
           ...requiredTypes.map(_buildDocTile),
         ],
-        if (widget._isAliado && accountAllowsSubmit) ...[
+        if (widget._isAliado && accountAllowsSubmit && termsPending) ...[
           const SizedBox(height: 12),
           const ProfileSectionHeader(
             label: 'TÉRMINOS LEGALES',
@@ -464,7 +466,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
         if (canSendReview) ...[
           const SizedBox(height: 10),
           FilledButton(
-            onPressed: _submittingReview || (widget._isAliado && !_termsAccepted)
+            onPressed: _submittingReview || (widget._isAliado && !termsOk)
                 ? null
                 : _submitReview,
             child: _submittingReview

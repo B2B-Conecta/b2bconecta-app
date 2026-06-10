@@ -1,0 +1,12 @@
+# Paste these in Vercel → Project → Settings → Environment Variables
+# Scope: Production (and Preview if you want branch previews on staging API)
+#
+# After first deploy, set SUPABASE_AUTH_REDIRECT_URL to your stable URL, e.g.:
+#   https://motolink-pro-app.vercel.app
+# Or leave unset: build uses https://$VERCEL_URL automatically per deployment.
+
+NEXT_PUBLIC_SUPABASE_URL=https://lwrqjpqyitnveizshawc.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_K80Bh8S-cNwvU2ykSWzaRg__cT1TTFS
+
+# Optional (recommended after you know the Vercel URL):
+# SUPABASE_AUTH_REDIRECT_URL=https://motolink-pro-app.vercel.app

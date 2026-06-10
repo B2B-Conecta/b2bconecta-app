@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "framework": null,
+  "installCommand": "echo \"Flutter web: deps installed in buildCommand\"",
+  "buildCommand": "bash scripts/build_web_vercel.sh",
+  "outputDirectory": "build/web"
+}

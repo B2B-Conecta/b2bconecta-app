@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/profile_model.dart';
 import '../models/document_review_status.dart';
@@ -12,6 +13,7 @@ import 'aliado_profile_requirements_banner.dart';
 import 'kyc_status_highlight_widgets.dart';
 import 'profile_kyc_document_tile.dart';
 import 'profile_section_helpers.dart';
+import 'terms_acceptance_section.dart';
 
 /// Ayudas (icono ℹ️) en verificación KYC del aliado.
 abstract final class AliadoKycSectionHelp {
@@ -59,17 +61,21 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   bool _loading = true;
   String? _busyDocType;
   bool _submittingReview = false;
+  bool _termsAccepted = false;
 
   @override
   void initState() {
     super.initState();
+    _termsAccepted = widget.profile?.hasAcceptedCurrentTerms ?? false;
     _load();
   }
 
   @override
   void didUpdateWidget(covariant ProfileKycDocumentsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.kycStatus != widget.kycStatus) {
+    if (oldWidget.kycStatus != widget.kycStatus ||
+        oldWidget.profile?.termsAcceptedAt != widget.profile?.termsAcceptedAt) {
+      _termsAccepted = widget.profile?.hasAcceptedCurrentTerms ?? false;
       _load();
     }
   }
@@ -174,7 +180,9 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Solicitud enviada. MotoLink revisará su documentación.'),
+          content: Text(
+            'Solicitud enviada. MotoLink revisará su registro y habilitará el acceso.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -245,9 +253,17 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   @override
   Widget build(BuildContext context) {
     final st = widget.kycStatus?.trim();
-    final canSendReview = st == KycStatus.pendiente ||
-        st == KycStatus.rechazado ||
-        st == KycStatus.enRevision;
+    final access = widget.profile?.accountAccessStatus?.trim();
+    final accountAllowsSubmit = access == null ||
+        access.isEmpty ||
+        access == AccountAccessStatus.draft ||
+        access == AccountAccessStatus.rejected;
+    final canSendReview = widget._isAliado &&
+        accountAllowsSubmit &&
+        (st == null ||
+            st.isEmpty ||
+            st == KycStatus.pendiente ||
+            st == KycStatus.rechazado);
     final requiredTypes = AliadoDocType.forRole(widget.role);
     final supplementaryTypes = widget._isAliado
         ? AliadoDocType.supplementaryForRole(widget.role)
@@ -360,10 +376,19 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           const SizedBox(height: 10),
           ...requiredTypes.map(_buildDocTile),
         ],
+        if (canSendReview && widget._isAliado) ...[
+          const SizedBox(height: 12),
+          TermsAcceptanceSection(
+            accepted: _termsAccepted,
+            onAcceptedChanged: (v) => setState(() => _termsAccepted = v),
+          ),
+        ],
         if (canSendReview) ...[
           const SizedBox(height: 10),
           FilledButton(
-            onPressed: _submittingReview ? null : _submitReview,
+            onPressed: _submittingReview || (widget._isAliado && !_termsAccepted)
+                ? null
+                : _submitReview,
             child: _submittingReview
                 ? const SizedBox(
                     height: 20,

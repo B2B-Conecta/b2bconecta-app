@@ -14,6 +14,7 @@ import 'importer_accepted_pago_metodos_section.dart';
 import 'importer_commission_settlements_section.dart';
 import 'authorization_status_section.dart';
 import 'profile_section_helpers.dart';
+import 'terms_acceptance_section.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -57,6 +58,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   /// Recrea [AuthorizationStatusSection] al actualizar documentos KYC.
   int _authSectionTick = 0;
 
+  bool _termsAccepted = false;
+
   /// Ancla scroll desde notificaciones KYC → sección documentación aliado.
   final GlobalKey _kycDocumentationSectionKey = GlobalKey();
 
@@ -78,6 +81,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   bool get _persistedAsImportador {
     return widget.initial?.role?.trim().toLowerCase() == 'importador';
   }
+
+  bool get _requiresTerms {
+    final r = _role.trim().toLowerCase();
+    return r == 'importador' || r == 'aliado';
+  }
+
+  bool get _hasAcceptedTerms =>
+      widget.initial?.hasAcceptedCurrentTerms == true || _termsAccepted;
 
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
@@ -109,6 +120,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
     }
+    _termsAccepted = widget.initial?.hasAcceptedCurrentTerms ?? false;
     if (_persistedAsAliado) {
       MainShellTabController.registerKycDocumentationSectionKey(
         _kycDocumentationSectionKey,
@@ -290,6 +302,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_requiresTerms && !_hasAcceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debe aceptar los términos y condiciones para continuar.'),
+        ),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {
@@ -657,6 +677,23 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const ImporterCommissionSettlementsSection(),
             const SizedBox(height: 8),
             _reputationTabHint(context),
+          ],
+          if (_requiresTerms && !_hasAcceptedTerms) ...[
+            const SizedBox(height: 14),
+            const ProfileSectionHeader(
+              label: 'TÉRMINOS LEGALES',
+              infoTitle: 'Términos y condiciones',
+              infoMessage:
+                  'Aliados e importadores deben aceptar los términos vigentes '
+                  'antes de usar MotoLink.',
+            ),
+            TermsAcceptanceSection(
+              accepted: _termsAccepted,
+              onAcceptedChanged: (v) {
+                setState(() => _termsAccepted = v);
+                widget.onRelatedDataChanged?.call();
+              },
+            ),
           ],
           if (_persistedAsAliado) ...[
             const SizedBox(height: 14),

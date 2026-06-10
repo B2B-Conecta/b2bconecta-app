@@ -1,3 +1,5 @@
+import 'account_access_status.dart';
+import '../config/terms_config.dart';
 import 'pago_metodo.dart';
 import 'pago_metodo_instrucciones.dart';
 import 'rating_dimension_stat_model.dart';
@@ -14,6 +16,10 @@ class ProfileModel {
     this.creditScore,
     this.creditLimit,
     this.kycStatus,
+    this.accountAccessStatus,
+    this.termsAcceptedAt,
+    this.termsVersion,
+    this.accountReviewNote,
     this.primerosPedidosContadoEntregados,
     this.creditoConsumidoAcumulado,
     this.creditoPreactivadoPorAdmin = false,
@@ -56,6 +62,15 @@ class ProfileModel {
 
   /// Verificación documental MotoLink (`pendiente` … `aprobado`); solo aliados.
   final String? kycStatus;
+
+  /// Acceso a la app (solo aliados): `draft` … `active` | `rejected`.
+  final String? accountAccessStatus;
+
+  final DateTime? termsAcceptedAt;
+  final String? termsVersion;
+
+  /// Motivo de rechazo admin al solicitar ingreso (aliado).
+  final String? accountReviewNote;
 
   /// Legado en base de datos (`primeros_pedidos_contado_entregados`); ya no usado en reglas de negocio.
   final int? primerosPedidosContadoEntregados;
@@ -151,6 +166,26 @@ class ProfileModel {
         (uri.scheme == 'http' || uri.scheme == 'https');
   }
 
+  bool get isAliado => role?.trim().toLowerCase() == 'aliado';
+
+  bool get isImportador => role?.trim().toLowerCase() == 'importador';
+
+  /// Aliados e importadores deben aceptar términos vigentes.
+  bool get requiresTermsAcceptance => isAliado || isImportador;
+
+  bool get hasActiveAccountAccess => AccountAccessStatus.allowsAppAccess(
+        role: role,
+        accountAccessStatus: accountAccessStatus,
+      );
+
+  bool get hasAcceptedCurrentTerms {
+    final v = termsVersion?.trim();
+    return termsAcceptedAt != null &&
+        v != null &&
+        v.isNotEmpty &&
+        v == TermsConfig.currentVersion;
+  }
+
   /// Datos mínimos para considerar el perfil listo (catálogo / RLS).
   bool get isComplete {
     final r = role?.trim().toLowerCase();
@@ -223,6 +258,12 @@ class ProfileModel {
       creditScore: cs,
       creditLimit: cl,
       kycStatus: _text(json['kyc_status']),
+      accountAccessStatus: _text(json['account_access_status']),
+      termsAcceptedAt: json['terms_accepted_at'] != null
+          ? DateTime.tryParse(json['terms_accepted_at'].toString())
+          : null,
+      termsVersion: _text(json['terms_version']),
+      accountReviewNote: _text(json['account_review_note']),
       primerosPedidosContadoEntregados: pce,
       creditoConsumidoAcumulado: cca,
       creditoPreactivadoPorAdmin: cpa,

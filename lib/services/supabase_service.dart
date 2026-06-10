@@ -1214,12 +1214,14 @@ class SupabaseService {
   static Future<void> adminSetProfileKycStatus({
     required String profileId,
     required String status,
+    String? note,
   }) async {
     await _client.rpc(
       'admin_set_profile_kyc_status',
       params: <String, dynamic>{
         'p_profile_id': profileId,
         'p_status': status,
+        if (note != null && note.trim().isNotEmpty) 'p_note': note.trim(),
       },
     );
   }
@@ -1281,6 +1283,14 @@ class SupabaseService {
   /// Aliado o importador: envía expediente a revisión MotoLink.
   static Future<void> profileSubmitKycForReview() async {
     await _client.rpc('profile_submit_kyc_for_review');
+  }
+
+  /// Registra aceptación de términos y condiciones (versión vigente).
+  static Future<void> acceptTerms({required String version}) async {
+    await _client.rpc(
+      'profile_accept_terms',
+      params: <String, dynamic>{'p_version': version.trim()},
+    );
   }
 
   static const _profileDocumentsSelect = 'id, profile_id, doc_type, '

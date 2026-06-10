@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
@@ -11,7 +12,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'main_shell_tab.dart';
 
-enum _KycQueueFilter { todos, enRevision, conPendientes }
+enum _KycQueueFilter { solicitudesIngreso, enRevision, conPendientes, todos }
 
 /// Admin: cola de verificación KYC (solo aliados).
 class AdminKycReviewPanel extends StatefulWidget {
@@ -29,7 +30,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   String? _expandedProfileId;
   String? _busyProfileId;
   String? _busyDocKey;
-  _KycQueueFilter _filter = _KycQueueFilter.enRevision;
+  _KycQueueFilter _filter = _KycQueueFilter.solicitudesIngreso;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -121,6 +122,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       switch (_filter) {
         case _KycQueueFilter.todos:
           return true;
+        case _KycQueueFilter.solicitudesIngreso:
+          return p.accountAccessStatus?.trim() ==
+              AccountAccessStatus.pendingReview;
         case _KycQueueFilter.enRevision:
           return p.kycStatus?.trim() == KycStatus.enRevision;
         case _KycQueueFilter.conPendientes:
@@ -218,18 +222,25 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   }
 
   Future<void> _setGlobalKyc(ProfileModel profile, String status) async {
+    String? note;
+    if (status == KycStatus.rechazado) {
+      note = await _promptRejectionNote();
+      if (note == null) return;
+    }
     setState(() => _busyProfileId = profile.id);
     try {
       await SupabaseService.adminSetProfileKycStatus(
         profileId: profile.id,
         status: status,
+        note: note,
       );
       if (!mounted) return;
+      final accessLabel = status == KycStatus.aprobado
+          ? 'Acceso habilitado para el aliado.'
+          : 'KYC global: ${KycStatus.labelEs(status)}.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'KYC global: ${KycStatus.labelEs(status)}.',
-          ),
+          content: Text(accessLabel),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -325,6 +336,14 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
           child: Row(
             children: [
               ChoiceChip(
+                label: const Text('Solicitudes ingreso'),
+                selected: _filter == _KycQueueFilter.solicitudesIngreso,
+                onSelected: (_) => setState(
+                  () => _filter = _KycQueueFilter.solicitudesIngreso,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
                 label: const Text('En revisión'),
                 selected: _filter == _KycQueueFilter.enRevision,
                 onSelected: (_) =>
@@ -413,7 +432,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                             right: 4,
                                           ),
                                           child: Text(
-                                            KycStatus.labelEs(p.kycStatus),
+                                            AccountAccessStatus.labelEs(
+                                              p.accountAccessStatus,
+                                            ),
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
@@ -469,7 +490,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                                   Icons.check_circle_outline,
                                                   size: 18,
                                                 ),
-                                                label: const Text('Aprobar todo'),
+                                                label: const Text(
+                                                  'Habilitar acceso',
+                                                ),
                                               ),
                                             ],
                                           ),

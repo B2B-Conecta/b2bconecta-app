@@ -357,6 +357,9 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+[functions.send-account-email]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
@@ -368,8 +371,12 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+SMTP_USER = "env(MOTOLINK_SMTP_USER)"
+SMTP_PASS = "env(MOTOLINK_SMTP_PASS)"
+SMTP_FROM = "env(MOTOLINK_SMTP_FROM)"
+SMTP_HOST = "env(MOTOLINK_SMTP_HOST)"
+SMTP_PORT = "env(MOTOLINK_SMTP_PORT)"
 
 [analytics]
 enabled = true

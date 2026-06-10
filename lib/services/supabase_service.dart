@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../config/account_email_events.dart';
+import '../config/email_config.dart';
 
 import '../models/catalog_filters.dart';
 import '../models/catalog_sort_mode.dart';
@@ -53,6 +57,14 @@ class SupabaseService {
   static const _promoCampaignsBucket = 'promo-campaigns';
 
   static String? get currentUserId => _currentUserId;
+
+  /// Supabase Docker / CLI local (sin Edge Functions desplegadas por defecto).
+  static bool get isLocalSupabase {
+    final url = _client.rest.url;
+    return url.contains('127.0.0.1') ||
+        url.contains('localhost:54321') ||
+        url.contains('localhost:54321/');
+  }
 
   /// Comisión MotoLink sobre precio mayorista (misma base que [BrokerPricing.feeRate]).
   static double get logisticFeeRate => BrokerPricing.feeRate;
@@ -370,11 +382,37 @@ class SupabaseService {
     );
   }
 
-  /// Crea o actualiza el perfil B2B (upsert por `id`).
+  static String? _normalizeB2bRole(String? role) {
+    final r = role?.trim().toLowerCase();
+    if (r == 'importador' || r == 'aliado' || r == 'administrador') {
+      return r;
+    }
+    return null;
+  }
+
+  /// Corrige enlaces pegados sin esquema (`://maps...` o `maps.app.goo.gl/...`).
+  static String? normalizeHttpUrl(String? raw) {
+    var t = raw?.trim() ?? '';
+    if (t.isEmpty) return null;
+    if (t.startsWith('://')) {
+      t = 'https$t';
+    } else if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:').hasMatch(t)) {
+      t = 'https://$t';
+    }
+    final u = Uri.tryParse(t);
+    if (u == null ||
+        !u.hasScheme ||
+        (u.scheme != 'http' && u.scheme != 'https')) {
+      return null;
+    }
+    return t;
+  }
+
+  /// Crea o actualiza el perfil B2B.
   ///
-  /// El campo [role] solo se persiste si el perfil aún no tiene rol definido
-  /// (`importador` / `aliado` / `administrador`). Tras la primera asignación,
-  /// los updates omiten `role` para que no pueda cambiarse desde el cliente.
+  /// El campo [role] solo se persiste en el primer alta o si el perfil aún no
+  /// tiene rol válido en BD. Tras la primera asignación, los updates omiten
+  /// `role` para que no pueda cambiarse desde el cliente.
   static Future<void> upsertMyProfile({
     required String businessName,
     required String rif,
@@ -390,20 +428,19 @@ class SupabaseService {
       throw StateError('No hay sesión activa.');
     }
 
+    final requestedRole = _normalizeB2bRole(role);
+    if (requestedRole == null) {
+      throw ArgumentError(
+        'Seleccione un rol válido (importador o aliado) antes de guardar.',
+      );
+    }
+
     final existing = await fetchMyProfile();
-    final existingRole = existing?.role?.trim().toLowerCase();
-    final roleAlreadySet = existingRole == 'importador' ||
-        existingRole == 'aliado' ||
-        existingRole == 'administrador';
 
     final payload = <String, dynamic>{
-      'id': uid,
       'business_name': businessName.trim(),
       'rif': rif.trim(),
     };
-    if (!roleAlreadySet) {
-      payload['role'] = role.trim();
-    }
 
     final p = phone?.trim();
     if (p != null && p.isNotEmpty) {
@@ -417,20 +454,52 @@ class SupabaseService {
     final dir = direccion?.trim();
     payload['direccion'] = (dir == null || dir.isEmpty) ? null : dir;
 
-    final fmu = fiscalMapsUrl?.trim();
-    if (fmu != null && fmu.isNotEmpty) {
-      final u = Uri.tryParse(fmu);
-      if (u == null ||
-          !u.hasScheme ||
-          (u.scheme != 'http' && u.scheme != 'https')) {
-        throw ArgumentError('El enlace de mapa debe ser una URL http o https.');
-      }
+    final fmu = normalizeHttpUrl(fiscalMapsUrl);
+    if (fmu != null) {
       payload['fiscal_maps_url'] = fmu;
+    } else if (fiscalMapsUrl?.trim().isNotEmpty == true) {
+      throw ArgumentError(
+        'El enlace de Google Maps debe ser una URL http o https.',
+      );
     } else {
       payload['fiscal_maps_url'] = null;
     }
 
-    await _client.from('profiles').upsert(payload);
+    // PostgREST upsert sin `role` en el cuerpo puede dejar `role` en null (23502).
+    // Insert incluye rol; update omite rol para no permitir cambiarlo desde el cliente.
+    if (existing == null) {
+      await _client.from('profiles').insert({
+        'id': uid,
+        ...payload,
+        'role': requestedRole,
+      });
+    } else {
+      await _client.from('profiles').update(payload).eq('id', uid);
+    }
+  }
+
+  /// Mensaje legible para errores al guardar `profiles` (sin detalles Postgres).
+  static String profileSaveErrorMessage(Object error) {
+    if (error is ArgumentError) {
+      final m = error.message?.toString().trim();
+      if (m != null && m.isNotEmpty) return m;
+      return 'Revise los datos del perfil e intente de nuevo.';
+    }
+    if (error is StateError) {
+      final m = error.message.trim();
+      if (m.isNotEmpty) return m;
+    }
+    if (error is PostgrestException) {
+      final code = error.code?.trim();
+      final msg = error.message.toLowerCase();
+      if (code == '23505' && msg.contains('rif')) {
+        return 'Ese RIF ya está registrado en MotoLink. Use el RIF fiscal real de su negocio.';
+      }
+      if (code == '23502' && msg.contains('role')) {
+        return 'No se pudo guardar el perfil. Vuelva a seleccionar Importador o Aliado e intente de nuevo.';
+      }
+    }
+    return 'No se pudo guardar el perfil. Revise los datos e intente de nuevo.';
   }
 
   /// Importador: métodos de pago que el aliado puede elegir al registrar comprobante.
@@ -1211,7 +1280,8 @@ class SupabaseService {
   }
 
   /// Broker: actualiza estado KYC global del perfil aliado.
-  static Future<void> adminSetProfileKycStatus({
+  /// Si aprueba, devuelve resultado del correo de bienvenida.
+  static Future<EmailDispatchOutcome?> adminSetProfileKycStatus({
     required String profileId,
     required String status,
     String? note,
@@ -1221,9 +1291,16 @@ class SupabaseService {
       params: <String, dynamic>{
         'p_profile_id': profileId,
         'p_status': status,
-        if (note != null && note.trim().isNotEmpty) 'p_note': note.trim(),
+        'p_note': note?.trim().isNotEmpty == true ? note!.trim() : null,
       },
     );
+    if (status.trim().toLowerCase() == KycStatus.aprobado) {
+      return dispatchAccountEmail(
+        event: AccountEmailEvent.profileApproved,
+        profileId: profileId,
+      );
+    }
+    return null;
   }
 
   /// Admin: aliados con pedido moroso y estado de suspensión por morosidad.
@@ -1281,8 +1358,68 @@ class SupabaseService {
   }
 
   /// Aliado o importador: envía expediente a revisión MotoLink.
-  static Future<void> profileSubmitKycForReview() async {
+  static Future<EmailDispatchOutcome> profileSubmitKycForReview() async {
     await _client.rpc('profile_submit_kyc_for_review');
+    return dispatchAccountEmail(
+      event: AccountEmailEvent.registrationSubmitted,
+      profileId: _currentUserId,
+    );
+  }
+
+  /// Correo transaccional (Gmail SMTP vía Edge Function).
+  static Future<EmailDispatchOutcome> dispatchAccountEmail({
+    required String event,
+    String? profileId,
+  }) async {
+    try {
+      final sessionEmail = _client.auth.currentUser?.email?.trim();
+      final resolvedProfileId = profileId?.trim().isNotEmpty == true
+          ? profileId!.trim()
+          : _currentUserId;
+      final res = await _client.functions.invoke(
+        'send-account-email',
+        body: <String, dynamic>{
+          'event': event,
+          if (resolvedProfileId != null && resolvedProfileId.isNotEmpty)
+            'profile_id': resolvedProfileId,
+          if (sessionEmail != null && sessionEmail.isNotEmpty)
+            'recipient_email': sessionEmail,
+        },
+      );
+      final data = res.data;
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        if (map['skipped'] == true) {
+          debugPrint(
+            'dispatchAccountEmail($event) skipped: ${map['reason'] ?? map['error']}',
+          );
+          return EmailDispatchOutcome.skipped;
+        }
+        if (map['ok'] == true) {
+          return EmailDispatchOutcome.sent;
+        }
+        debugPrint(
+          'dispatchAccountEmail($event) error: ${map['error'] ?? map['reason']}',
+        );
+        return EmailDispatchOutcome.failed;
+      }
+      if (res.status >= 400) {
+        debugPrint('dispatchAccountEmail($event) HTTP ${res.status}');
+        return EmailDispatchOutcome.failed;
+      }
+      return EmailDispatchOutcome.sent;
+    } on FunctionException catch (e) {
+      debugPrint(
+        'dispatchAccountEmail($event): ${e.status} ${e.details ?? e.reasonPhrase}',
+      );
+      if (e.status == 404 && isLocalSupabase) {
+        return EmailDispatchOutcome.skipped;
+      }
+      return EmailDispatchOutcome.failed;
+    } catch (e, st) {
+      debugPrint('dispatchAccountEmail($event): $e\n$st');
+      return EmailDispatchOutcome.failed;
+    }
   }
 
   /// Registra aceptación de términos y condiciones (versión vigente).

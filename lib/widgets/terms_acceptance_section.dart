@@ -88,7 +88,9 @@ class _TermsAcceptanceSectionState extends State<TermsAcceptanceSection> {
                   )
                 : Checkbox(
                     value: widget.accepted,
-                    onChanged: _busy ? null : _onChanged,
+                    onChanged: _busy || widget.accepted
+                        ? null
+                        : _onChanged,
                     activeColor: AppColors.brand,
                   ),
             Expanded(

@@ -14,4 +14,9 @@ if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 echo "Starting Flutter web on http://localhost:$PORT (ensure .env is local)..."
+echo ""
+echo "Correos transaccionales (local): en otra terminal ejecute"
+echo "  bash scripts/serve_functions_local.sh"
+echo "y configure config/email.env (MOTOLINK_SMTP_PASS de motolink.admin@gmail.com)."
+echo ""
 flutter run -d chrome --web-port="$PORT" "$@"

@@ -116,7 +116,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Precio MotoLink',
+          'Precio',
           style: TextStyle(
             fontSize: compact ? 11 : 12,
             fontWeight: FontWeight.w700,

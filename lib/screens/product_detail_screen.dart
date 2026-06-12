@@ -8,8 +8,6 @@ import '../theme/app_theme.dart';
 import '../utils/product_catalog_pricing.dart';
 import '../widgets/catalog_product_price_display.dart';
 import '../widgets/product_warranty_seal.dart';
-import 'cart_screen.dart';
-
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.part});
@@ -52,55 +50,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return id.substring(0, 12);
   }
 
-  Future<void> _openCartScreen() async {
-    var profile = _profile;
-    if (profile == null) {
-      profile = await SupabaseService.fetchMyProfile();
-      if (mounted) setState(() => _profile = profile);
+  String? _cartBlockReason() {
+    final ownerId = part.ownerId?.trim();
+    if (ownerId == null || ownerId.isEmpty) {
+      return 'No se pudo identificar al importador.';
     }
-    if (!mounted) return;
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Complete su perfil para confirmar el pedido.'),
-        ),
-      );
-      return;
+    if (_pedidosSuspendidosMorosidad) {
+      return 'MotoLink suspendió nuevos pedidos en su cuenta por morosidad.';
     }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => CartScreen(profile: profile!, liveTasaBcv: null),
+    if (part.stock < 1) return 'Sin stock disponible.';
+    return null;
+  }
+
+  void _showCartBlock(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  Future<void> _addToCart({bool navigateToCartAfter = false}) async {
-    final ownerId = part.ownerId?.trim();
-    if (ownerId == null || ownerId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo identificar al importador.')),
-      );
-      return;
-    }
-    if (_pedidosSuspendidosMorosidad) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'MotoLink suspendió nuevos pedidos en su cuenta por morosidad.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    if (part.stock < 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sin stock disponible.')),
-      );
+  Future<void> _addToCart() async {
+    final block = _cartBlockReason();
+    if (block != null) {
+      _showCartBlock(block);
       return;
     }
 
     final maxQty = part.stock;
+    var q = 1;
+
     final qtyCtrl = TextEditingController(text: '1');
     bool? ok;
     var qtyRaw = '1';
@@ -109,20 +89,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         context: context,
         builder: (ctx) {
           return AlertDialog(
-            title: Text(
-              navigateToCartAfter
-                  ? 'Solicitar este ítem'
-                  : 'Agregar al carrito',
-            ),
+            title: const Text('Agregar al carrito'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    navigateToCartAfter
-                        ? 'Indique la cantidad; luego revisará el carrito antes de confirmar el pedido (disponibles: $maxQty).'
-                        : 'Indique cuántas unidades desea añadir (disponibles: $maxQty).',
+                    'Indique cuántas unidades desea añadir (disponibles: $maxQty).',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.35,
@@ -155,7 +129,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: Text(navigateToCartAfter ? 'Ir al carrito' : 'Agregar'),
+                child: const Text('Agregar'),
               ),
             ],
           );
@@ -171,7 +145,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     var requested = int.tryParse(qtyRaw) ?? 1;
     if (requested < 1) requested = 1;
 
-    var q = requested;
+    q = requested;
     if (requested > maxQty) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -198,17 +172,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       q = maxQty;
     }
 
-    CartService.instance.addOrIncrement(
-      part,
-      precioUnitarioAliadoRef: _precioVentaUnit(quantity: q),
-      delta: q,
-    );
+    _putInCart(quantity: q);
     if (!mounted) return;
-
-    if (navigateToCartAfter) {
-      await _openCartScreen();
-      return;
-    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -222,7 +187,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Future<void> _solicitarItemViaCarrito() => _addToCart(navigateToCartAfter: true);
+  void _putInCart({required int quantity}) {
+    CartService.instance.addOrIncrement(
+      part,
+      precioUnitarioAliadoRef: _precioVentaUnit(quantity: quantity),
+      delta: quantity,
+    );
+    CartService.instance.setQuantity(part.id, quantity);
+  }
+
+  /// Una unidad al carrito y vuelta al catálogo (sin pedir cantidad ni abrir carrito).
+  Future<void> _solicitarItemViaCarrito() async {
+    final block = _cartBlockReason();
+    if (block != null) {
+      _showCartBlock(block);
+      return;
+    }
+
+    _putInCart(quantity: 1);
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('1 unidad añadida al carrito.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

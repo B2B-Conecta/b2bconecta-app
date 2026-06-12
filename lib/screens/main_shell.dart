@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
 import '../services/notification_provider.dart';
+import '../services/push_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
@@ -51,6 +52,8 @@ class _MainShellState extends State<MainShell> {
     _notifications = NotificationProvider(homeRole: widget.homeRole)
       ..addListener(_onNotificationsChanged)
       ..start();
+    PushNotificationService.instance.registerTapHandler(_onPushNotificationTap);
+    unawaited(PushNotificationService.instance.registerForCurrentUser());
     MainShellTabController.register((index) {
       if (mounted) setState(() => _tabIndex = index);
     });
@@ -73,10 +76,28 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    PushNotificationService.instance.unregisterTapHandler();
     _notifications.removeListener(_onNotificationsChanged);
     _notifications.dispose();
     MainShellTabController.unregister();
     super.dispose();
+  }
+
+  void _onPushNotificationTap({
+    required String type,
+    String? relatedId,
+    String? notificationId,
+    String? title,
+  }) {
+    if (notificationId != null && notificationId.trim().isNotEmpty) {
+      unawaited(_notifications.markAsRead(notificationId.trim()));
+    }
+    PushNotificationService.navigateTap(
+      homeRole: widget.homeRole,
+      type: type,
+      relatedId: relatedId,
+      title: title,
+    );
   }
 
   void _onNotificationsChanged() {

@@ -357,8 +357,8 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
-[functions.send-account-email]
-verify_jwt = true
+[functions.send-push-notification]
+verify_jwt = false
 
 [edge_runtime]
 enabled = true
@@ -372,11 +372,8 @@ inspector_port = 8083
 deno_version = 2
 
 [edge_runtime.secrets]
-SMTP_USER = "env(MOTOLINK_SMTP_USER)"
-SMTP_PASS = "env(MOTOLINK_SMTP_PASS)"
-SMTP_FROM = "env(MOTOLINK_SMTP_FROM)"
-SMTP_HOST = "env(MOTOLINK_SMTP_HOST)"
-SMTP_PORT = "env(MOTOLINK_SMTP_PORT)"
+FCM_SERVER_KEY = "env(MOTOLINK_FCM_SERVER_KEY)"
+PUSH_WEBHOOK_SECRET = "env(MOTOLINK_PUSH_WEBHOOK_SECRET)"
 
 [analytics]
 enabled = true

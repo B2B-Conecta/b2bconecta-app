@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../config/email_config.dart';
 import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/profile_model.dart';
@@ -207,11 +206,13 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     }
     setState(() => _submittingReview = true);
     try {
-      final emailOutcome = await SupabaseService.profileSubmitKycForReview();
+      await SupabaseService.profileSubmitKycForReview();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(emailOutcome.registrationSubmittedSnackBar()),
+        const SnackBar(
+          content: Text(
+            'Solicitud enviada. MotoLink revisará su registro y le avisará en la app.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

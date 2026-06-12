@@ -1,7 +1,6 @@
 # Environment (secrets)
 .env
-config/email.env
-config/email.env.local
+config/push.env
 
 # Miscellaneous
 *.class

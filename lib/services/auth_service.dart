@@ -1,6 +1,8 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'push_notification_service.dart';
+
 /// Operaciones de Supabase Auth (login, registro, recuperación, actualización).
 class AuthService {
   AuthService._();
@@ -47,7 +49,10 @@ class AuthService {
     return _auth.updateUser(UserAttributes(password: newPassword));
   }
 
-  static Future<void> signOut() => _auth.signOut();
+  static Future<void> signOut() async {
+    await PushNotificationService.instance.unregisterCurrentDevice();
+    await _auth.signOut();
+  }
 
   /// Mensajes legibles para [AuthException.message] y respuestas genéricas.
   static String mapAuthErrorMessage(String? raw) {

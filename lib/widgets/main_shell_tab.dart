@@ -16,7 +16,9 @@ class MainShellTabController {
   static AdminPedidosNotificationScope? _pendingAdminPedidosScope;
   static int? _b2bProfileTabIndex;
   static bool _importerPedidosPreferNuevosFilter = false;
+  static bool _importerPedidosPreferEnProcesoFilter = false;
   static bool _importerPedidosPreferCerradosFilter = false;
+  static String? _pendingNotificationType;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
   static String? _pendingCommissionSettlementId;
@@ -38,7 +40,9 @@ class MainShellTabController {
     _pendingAdminPedidosScope = null;
     _b2bProfileTabIndex = null;
     _importerPedidosPreferNuevosFilter = false;
+    _importerPedidosPreferEnProcesoFilter = false;
     _importerPedidosPreferCerradosFilter = false;
+    _pendingNotificationType = null;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
     _pendingCommissionSettlementId = null;
@@ -78,8 +82,13 @@ class MainShellTabController {
   }
 
   /// Abrir listado importador en filtro «Nuevos» (p. ej. tras tocar notificación).
-  static void setImporterPedidosPreferNuevosFilter(bool value) =>
-      _importerPedidosPreferNuevosFilter = value;
+  static void setImporterPedidosPreferNuevosFilter(bool value) {
+    _importerPedidosPreferNuevosFilter = value;
+    if (value) {
+      _importerPedidosPreferEnProcesoFilter = false;
+      _importerPedidosPreferCerradosFilter = false;
+    }
+  }
 
   static bool consumeImporterPedidosPreferNuevosFilter() {
     final v = _importerPedidosPreferNuevosFilter;
@@ -87,15 +96,46 @@ class MainShellTabController {
     return v;
   }
 
+  static void setImporterPedidosPreferEnProcesoFilter() {
+    _importerPedidosPreferEnProcesoFilter = true;
+    _importerPedidosPreferNuevosFilter = false;
+    _importerPedidosPreferCerradosFilter = false;
+  }
+
+  static bool consumeImporterPedidosPreferEnProcesoFilter() {
+    final v = _importerPedidosPreferEnProcesoFilter;
+    _importerPedidosPreferEnProcesoFilter = false;
+    return v;
+  }
+
   static void setPendingImporterPedidosPreferCerradosFilter() {
     _importerPedidosPreferCerradosFilter = true;
     _importerPedidosPreferNuevosFilter = false;
+    _importerPedidosPreferEnProcesoFilter = false;
   }
 
   static bool consumeImporterPedidosPreferCerradosFilter() {
     final v = _importerPedidosPreferCerradosFilter;
     _importerPedidosPreferCerradosFilter = false;
     return v;
+  }
+
+  static void setPendingNotificationType(String? type) {
+    final s = type?.trim();
+    _pendingNotificationType = (s == null || s.isEmpty) ? null : s;
+  }
+
+  static String? peekPendingNotificationType() {
+    final s = _pendingNotificationType?.trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
+  }
+
+  static String? consumePendingNotificationType() {
+    final v = _pendingNotificationType;
+    _pendingNotificationType = null;
+    final s = v?.trim();
+    return (s == null || s.isEmpty) ? null : s;
   }
 
   /// Índices: 0 Inventario/Catálogo, 1 Pedidos, 2 Reputación, 3 Perfil.

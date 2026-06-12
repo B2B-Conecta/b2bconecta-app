@@ -1,0 +1,9 @@
+# Supabase Dashboard → Authentication → URL Configuration → Redirect URLs
+# Añadir todas las que uses (staging + producción cuando aplique).
+#
+# Web (Vercel / local):
+#   https://motolink-pro-app.vercel.app/**
+#   http://localhost:3000/**
+#
+# Móvil (APK / iOS — deep link empaquetado en mobile-staging.env):
+#   com.carlosf12.motolinkProApp://auth-callback

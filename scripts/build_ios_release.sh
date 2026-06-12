@@ -7,6 +7,9 @@ cd "$ROOT_DIR"
 
 unset ALL_PROXY HTTP_PROXY HTTPS_PROXY http_proxy https_proxy 2>/dev/null || true
 
+echo "Activando .env mobile-staging (deep link auth)..."
+bash "$ROOT_DIR/scripts/use_env.sh" mobile-staging
+
 if [[ "${CLEAN:-0}" == "1" ]]; then
   echo "Limpiando artefactos previos (CLEAN=1)..."
   flutter clean

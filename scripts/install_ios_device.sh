@@ -19,6 +19,9 @@ if [[ -z "$DEVICE_ID" ]]; then
 fi
 
 echo "Dispositivo: $DEVICE_ID"
+echo "Activando .env mobile-staging (deep link auth)..."
+bash "$ROOT_DIR/scripts/use_env.sh" mobile-staging
+
 echo "Dependencias..."
 flutter pub get
 

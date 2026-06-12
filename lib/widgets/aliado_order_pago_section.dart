@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -578,18 +577,14 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               MediaPickActionChips(
                 busy: _busy,
                 maxWidth: double.infinity,
-                onCamera: kIsWeb
-                    ? null
-                    : () => _pickAndSubmitComprobante(
-                          context,
-                          DocumentPickChannel.camera,
-                        ),
-                onGallery: kIsWeb
-                    ? null
-                    : () => _pickAndSubmitComprobante(
-                          context,
-                          DocumentPickChannel.gallery,
-                        ),
+                onCamera: () => _pickAndSubmitComprobante(
+                  context,
+                  DocumentPickChannel.camera,
+                ),
+                onGallery: () => _pickAndSubmitComprobante(
+                  context,
+                  DocumentPickChannel.gallery,
+                ),
                 onFile: () => _pickAndSubmitComprobante(
                   context,
                   DocumentPickChannel.file,
@@ -610,18 +605,14 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               MediaPickActionChips(
                 busy: _busy,
                 maxWidth: double.infinity,
-                onCamera: kIsWeb
-                    ? null
-                    : () => _pickAndSubmitComprobante(
-                          context,
-                          DocumentPickChannel.camera,
-                        ),
-                onGallery: kIsWeb
-                    ? null
-                    : () => _pickAndSubmitComprobante(
-                          context,
-                          DocumentPickChannel.gallery,
-                        ),
+                onCamera: () => _pickAndSubmitComprobante(
+                  context,
+                  DocumentPickChannel.camera,
+                ),
+                onGallery: () => _pickAndSubmitComprobante(
+                  context,
+                  DocumentPickChannel.gallery,
+                ),
                 onFile: () => _pickAndSubmitComprobante(
                   context,
                   DocumentPickChannel.file,

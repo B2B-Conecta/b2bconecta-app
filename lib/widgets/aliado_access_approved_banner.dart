@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 
@@ -17,11 +18,21 @@ class AliadoAccessApprovedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.green.shade50,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(14, compact ? 10 : 14, 14, compact ? 10 : 14),
-        child: Row(
+    final topInset = MediaQuery.paddingOf(context).top;
+    final vertical = compact ? 10.0 : 14.0;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Material(
+        color: Colors.green.shade50,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            14,
+            vertical + topInset,
+            14,
+            vertical,
+          ),
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
@@ -69,6 +80,7 @@ class AliadoAccessApprovedBanner extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

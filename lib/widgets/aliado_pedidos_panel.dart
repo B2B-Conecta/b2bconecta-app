@@ -85,32 +85,55 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       orderExpandKeyForNotification(_rows, id);
 
   void _onNotificationPedidosDeepLink() {
-    final pending = MainShellTabController.peekPendingNotificationRelatedId();
-    if (pending == null) return;
-    final key = _expandKeyForTransactionId(pending);
-    if (key != null) {
-      MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = key);
+    _prepareAliadoFiltersForNotificationDeepLink();
+    final expanded = _tryApplyExpandFromPendingNotification();
+    if (!expanded && !_loading) {
+      _load(silent: true);
     } else if (!_loading) {
-      _load();
+      _load(silent: true);
     }
+    MainShellTabController.consumePendingNotificationType();
+  }
+
+  void _prepareAliadoFiltersForNotificationDeepLink() {
+    final notifType = MainShellTabController.peekPendingNotificationType();
+    if (notifType == null) return;
+    setState(() {
+      if (notifType == 'morosidad') {
+        _morosoOnly = true;
+      } else {
+        _statusFilter = null;
+        _morosoOnly = false;
+      }
+    });
+  }
+
+  bool _tryApplyExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return false;
+    final key = _expandKeyForTransactionId(pending);
+    if (key == null) return false;
+    MainShellTabController.consumePendingNotificationRelatedId();
+    setState(() => _expandedRequestId = key);
+    return true;
   }
 
   void _tryExpandFromPendingNotification() {
-    final pending = MainShellTabController.peekPendingNotificationRelatedId();
-    if (pending == null) return;
-    final key = _expandKeyForTransactionId(pending);
-    if (key != null) {
-      MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = key);
+    if (MainShellTabController.peekPendingNotificationRelatedId() == null) {
+      return;
     }
+    _prepareAliadoFiltersForNotificationDeepLink();
+    _tryApplyExpandFromPendingNotification();
+    MainShellTabController.consumePendingNotificationType();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final rows =
           await SupabaseService.fetchMyPedidosActivosYCerradosForAliado();
@@ -120,7 +143,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         _rows = rows;
         _profile = profile;
         _loading = false;
-        _expandedRequestId = null;
       });
       _tryExpandFromPendingNotification();
     } catch (e) {
@@ -131,6 +153,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       });
     }
   }
+
+  /// Refresca datos sin colapsar la ficha ni mostrar overlay de carga.
+  Future<void> _refreshExpandedCard() => _load(silent: true);
 
   void _onSearchTextChanged() {
     if (mounted) setState(() {});
@@ -371,7 +396,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       showAliadoOrderRatingSheet(
         context,
         request: ref,
-        onSubmitted: _load,
+        onSubmitted: _refreshExpandedCard,
         bundleCheckoutGroupId:
             (cg != null && cg.isNotEmpty) ? cg : null,
         bundleImportadorId: imp.isNotEmpty ? imp : null,
@@ -401,7 +426,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         );
       }
       if (!context.mounted) return;
-      await _load();
+      await _refreshExpandedCard();
       if (!context.mounted) return;
       final refreshed = _grupoPorExpandKey(expandKey) ?? rows;
       await _abrirValoracionTrasCancelacionAliado(
@@ -518,7 +543,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ),
         );
       }
-      await _load();
+      await _refreshExpandedCard();
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -560,7 +585,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ),
         );
       }
-      await _load();
+      await _refreshExpandedCard();
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -621,7 +646,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (r.qtyAdjustmentPendienteAliado) ...[
-            AliadoQtyAdjustmentActions(request: r, onChanged: _load),
+            AliadoQtyAdjustmentActions(
+              request: r,
+              onChanged: _refreshExpandedCard,
+            ),
             const SizedBox(height: kOrderCardSectionGap),
           ],
           OrderCardCollapsibleSection(
@@ -647,7 +675,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     key: ValueKey<String>('pago-${r.id}'),
                     request: r,
                     profile: _profile,
-                    onChanged: _load,
+                    onChanged: _refreshExpandedCard,
                     onPagoMetodoPreviewChanged: onMetodoPreview,
                     suppressPrimaryTitle: true,
                     suppressNegotiationIntro: true,
@@ -666,7 +694,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               transactionRequestId: r.id,
               allowReplyAsAliado: _esEnCurso(r.status),
               allowReplyAsAdmin: false,
-              onThreadChanged: _load,
+              onThreadChanged: _refreshExpandedCard,
               suppressBuiltinTitle: true,
               suppressInlineHelp: true,
             ),
@@ -772,7 +800,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                       AliadoOrderPagoSection(
                         request: chunk[i],
                         profile: _profile,
-                        onChanged: _load,
+                        onChanged: _refreshExpandedCard,
                         suppressPrimaryTitle: true,
                         suppressNegotiationIntro: true,
                       ),
@@ -791,7 +819,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               child: AliadoQtyAdjustmentActions(
                 key: ValueKey<String>('qty-adj-${line.id}'),
                 request: line,
-                onChanged: _load,
+                onChanged: _refreshExpandedCard,
               ),
             ),
         ],
@@ -812,7 +840,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
             allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
             allowReplyAsAdmin: false,
-            onThreadChanged: _load,
+            onThreadChanged: _refreshExpandedCard,
             suppressBuiltinTitle: true,
             suppressInlineHelp: true,
           ),
@@ -889,7 +917,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         showAliadoOrderRatingSheet(
           context,
           request: ref,
-          onSubmitted: _load,
+          onSubmitted: _refreshExpandedCard,
           bundleCheckoutGroupId: bundleCheckoutGroupId,
           bundleImportadorId: importadorId,
           importadorLabel: importadorLabel,
@@ -899,7 +927,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ? () => showAliadoOrderRatingSheet(
                 context,
                 request: ref,
-                onSubmitted: _load,
+                onSubmitted: _refreshExpandedCard,
                 bundleCheckoutGroupId: bundleCheckoutGroupId,
                 bundleImportadorId: importadorId,
                 importadorLabel: importadorLabel,
@@ -920,7 +948,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         AliadoOrderPagoSection(
           request: chunk.first,
           profile: _profile,
-          onChanged: _load,
+          onChanged: _refreshExpandedCard,
           onPagoMetodoPreviewChanged: onMetodoPreview,
           pagoBundleLines: chunk,
           suppressPrimaryTitle: true,

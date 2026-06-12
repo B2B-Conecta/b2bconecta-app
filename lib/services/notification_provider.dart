@@ -125,6 +125,7 @@ class NotificationProvider extends ChangeNotifier {
 
   void _deepLinkToInteractiveOrders(InAppNotificationModel n) {
     MainShellTabController.setPendingNotificationRelatedId(n.relatedId);
+    MainShellTabController.setPendingNotificationType(n.type);
     final t0 = n.type.trim();
     if (t0 == 'kyc') {
       switch (homeRole) {
@@ -194,14 +195,43 @@ class NotificationProvider extends ChangeNotifier {
           return;
       }
     }
-    if (t0 == 'pago') {
+    if (t0 == 'envio') {
+      switch (homeRole) {
+        case AppHomeRole.aliado:
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.importador:
+          MainShellTabController.setImporterPedidosPreferNuevosFilter(true);
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.administrador:
+          MainShellTabController.navigateToAdminActivosForNotification();
+          return;
+      }
+    }
+    if (t0 == 'pedido') {
       switch (homeRole) {
         case AppHomeRole.aliado:
         case AppHomeRole.importador:
           MainShellTabController.navigateToPedidosForNotification();
           return;
         case AppHomeRole.administrador:
-          break;
+          MainShellTabController.navigateToAdminActivosForNotification();
+          return;
+      }
+    }
+    if (t0 == 'pago') {
+      switch (homeRole) {
+        case AppHomeRole.aliado:
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.importador:
+          MainShellTabController.setImporterPedidosPreferEnProcesoFilter();
+          MainShellTabController.navigateToPedidosForNotification();
+          return;
+        case AppHomeRole.administrador:
+          MainShellTabController.navigateToAdminActivosForNotification();
+          return;
       }
     }
     final type = n.type.trim();
@@ -221,7 +251,6 @@ class NotificationProvider extends ChangeNotifier {
         MainShellTabController.navigateToPedidosForNotification();
         return;
       case AppHomeRole.importador:
-        MainShellTabController.setImporterPedidosPreferNuevosFilter(true);
         MainShellTabController.navigateToPedidosForNotification();
         return;
     }

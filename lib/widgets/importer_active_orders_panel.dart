@@ -74,34 +74,103 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   }
 
   void _onNotificationPedidosDeepLink() {
+    _prepareImporterFilterForNotificationDeepLink();
+    final expanded = _tryApplyExpandFromPendingNotification();
+    if (!expanded && !_loading) {
+      _load(silent: true);
+    } else if (!_loading) {
+      _load(silent: true);
+    }
+    MainShellTabController.consumePendingNotificationType();
+  }
+
+  void _prepareImporterFilterForNotificationDeepLink() {
     if (MainShellTabController.consumeImporterPedidosPreferCerradosFilter()) {
       setState(() {
         _quickFilter = _ImporterQuickFilter.cerrados;
         _morosoOnly = true;
       });
-    } else if (MainShellTabController
-        .consumeImporterPedidosPreferNuevosFilter()) {
-      setState(() => _quickFilter = _ImporterQuickFilter.nuevos);
+      return;
     }
+
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
-    if (pending == null) return;
-    final key = _expandKeyForPendingId(pending);
-    if (key != null) {
-      MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = key);
-    } else if (!_loading) {
-      _load();
+    if (pending != null) {
+      final match = findTransactionForNotificationRelatedId(_rows, pending);
+      if (match != null) {
+        setState(() {
+          _quickFilter = _quickFilterForOrderStatus(match.status);
+          if (_quickFilter != _ImporterQuickFilter.cerrados) {
+            _morosoOnly = false;
+          }
+        });
+        return;
+      }
+    }
+
+    final notifType = MainShellTabController.peekPendingNotificationType();
+    if (notifType != null) {
+      final hint = importerPedidosQuickFilterForNotificationType(notifType);
+      if (hint != null) {
+        setState(() {
+          _quickFilter = _quickFilterFromHint(hint);
+          _morosoOnly = hint == ImporterPedidosQuickFilterHint.cerrados &&
+              notifType == 'morosidad';
+        });
+        return;
+      }
+    }
+
+    if (MainShellTabController.consumeImporterPedidosPreferEnProcesoFilter()) {
+      setState(() {
+        _quickFilter = _ImporterQuickFilter.enProceso;
+        _morosoOnly = false;
+      });
+      return;
+    }
+
+    if (MainShellTabController.consumeImporterPedidosPreferNuevosFilter()) {
+      setState(() {
+        _quickFilter = _ImporterQuickFilter.nuevos;
+        _morosoOnly = false;
+      });
     }
   }
 
-  void _tryExpandFromPendingNotification() {
-    final pending = MainShellTabController.peekPendingNotificationRelatedId();
-    if (pending == null) return;
-    final key = _expandKeyForPendingId(pending);
-    if (key != null) {
-      MainShellTabController.consumePendingNotificationRelatedId();
-      setState(() => _expandedRequestId = key);
+  _ImporterQuickFilter _quickFilterForOrderStatus(String status) {
+    final hint = importerPedidosQuickFilterForOrderStatus(status);
+    return _quickFilterFromHint(
+      hint ?? ImporterPedidosQuickFilterHint.enProceso,
+    );
+  }
+
+  _ImporterQuickFilter _quickFilterFromHint(ImporterPedidosQuickFilterHint hint) {
+    switch (hint) {
+      case ImporterPedidosQuickFilterHint.nuevos:
+        return _ImporterQuickFilter.nuevos;
+      case ImporterPedidosQuickFilterHint.enProceso:
+        return _ImporterQuickFilter.enProceso;
+      case ImporterPedidosQuickFilterHint.cerrados:
+        return _ImporterQuickFilter.cerrados;
     }
+  }
+
+  bool _tryApplyExpandFromPendingNotification() {
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    if (pending == null) return false;
+    final key = _expandKeyForPendingId(pending);
+    if (key == null) return false;
+    MainShellTabController.consumePendingNotificationRelatedId();
+    setState(() => _expandedRequestId = key);
+    return true;
+  }
+
+  void _tryExpandFromPendingNotification() {
+    if (MainShellTabController.peekPendingNotificationRelatedId() == null) {
+      return;
+    }
+    _prepareImporterFilterForNotificationDeepLink();
+    _tryApplyExpandFromPendingNotification();
+    MainShellTabController.consumePendingNotificationType();
   }
 
   String? _expandKeyForPendingId(String id) =>

@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -12,9 +12,11 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'order_card_collapsible_layout.dart';
 import 'profile_section_helpers.dart';
+import '../utils/document_pick_utils.dart';
 import '../utils/order_payment_pricing.dart';
 import 'aliado_usd_payment_discount_ficha.dart';
 import 'importer_pago_transfer_details_card.dart';
+import 'media_pick_action_chips.dart';
 import 'moroso_order_visual.dart';
 
 /// Método de pago y comprobante. El importador verifica la acreditación (negociación por chat).
@@ -163,7 +165,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
-  Future<void> _subirComprobante(BuildContext context) async {
+  Future<void> _subirComprobante(
+    BuildContext context, {
+    required PickedDocumentBytes picked,
+  }) async {
     final r = widget.request;
     final metodo = _metodoSeleccionado;
     if (metodo == null || !_metodosPermitidos.contains(metodo)) {
@@ -172,16 +177,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
       );
       return;
     }
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final f = result.files.single;
-    final bytes = f.bytes;
-    final name = f.name.trim();
-    if (bytes == null || bytes.isEmpty || name.isEmpty) return;
 
     setState(() => _busy = true);
     try {
@@ -190,24 +185,72 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         await SupabaseService.aliadoSubmitComprobantePagoBundle(
           lines: bundle,
           metodo: metodo,
-          bytes: bytes,
-          fileName: name,
+          bytes: picked.bytes,
+          fileName: picked.fileName,
         );
       } else {
         await SupabaseService.aliadoSubmitComprobantePago(
           transactionRequestId: r.id,
           metodo: metodo,
-          bytes: bytes,
-          fileName: name,
+          bytes: picked.bytes,
+          fileName: picked.fileName,
         );
       }
       if (!context.mounted) return;
+      final esEfectivo = metodo == PagoMetodo.efectivo;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             bundle != null && bundle.length > 1
-                ? 'Comprobante enviado. El importador lo revisará.'
-                : 'Comprobante enviado. El importador verificará la acreditación.',
+                ? esEfectivo
+                    ? 'Foto enviada. El importador confirmará la recepción del efectivo.'
+                    : 'Comprobante enviado. El importador lo revisará.'
+                : esEfectivo
+                    ? 'Foto enviada. El importador confirmará la recepción del efectivo.'
+                    : 'Comprobante enviado. El importador verificará la acreditación.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      widget.onChanged();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pickAndSubmitComprobante(
+    BuildContext context,
+    DocumentPickChannel channel,
+  ) async {
+    final picked = await pickKycDocument(channel: channel);
+    if (picked == null) return;
+    if (!context.mounted) return;
+    await _subirComprobante(context, picked: picked);
+  }
+
+  Future<void> _declararPagoEfectivo(BuildContext context) async {
+    if (_metodoSeleccionado != PagoMetodo.efectivo) return;
+
+    setState(() => _busy = true);
+    try {
+      final bundle = widget.pagoBundleLines;
+      if (bundle != null && bundle.length > 1) {
+        await SupabaseService.aliadoDeclaraPagoEfectivoBundle(lines: bundle);
+      } else {
+        await SupabaseService.aliadoDeclaraPagoEfectivo(
+          transactionRequestId: widget.request.id,
+        );
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pago en efectivo declarado. El importador confirmará cuando reciba el dinero.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -483,41 +526,116 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               _metodoSeleccionado != null &&
               metodosPermitidos.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(
-              pe == PagoRevisionEstado.enRevision
-                  ? 'Puede reemplazar el archivo si hubo error.'
-                  : 'Imagen o PDF legible según el método.',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey.shade700,
-                height: 1.25,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _busy ? null : () => _subirComprobante(context),
-                child: _busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+            if (_metodoSeleccionado == PagoMetodo.efectivo) ...[
+              if (pe == PagoRevisionEstado.pendiente ||
+                  pe == PagoRevisionEstado.rechazado) ...[
+                Text(
+                  pe == PagoRevisionEstado.rechazado
+                      ? 'Declare de nuevo el pago en efectivo. Puede adjuntar una foto opcional.'
+                      : 'Declare el pago en efectivo. Una foto con la cámara es opcional.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : () => _declararPagoEfectivo(context),
+                    icon: const Icon(Icons.payments_outlined, size: 18),
+                    label: Text(
+                      pe == PagoRevisionEstado.rechazado
+                          ? 'Declarar pago en efectivo de nuevo'
+                          : 'Declarar pago en efectivo',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Foto opcional',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ] else ...[
+                Text(
+                  r.hasComprobantePago
+                      ? 'Puede reemplazar la foto si hubo error.'
+                      : 'Esperando confirmación del importador. Puede adjuntar una foto opcional.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              MediaPickActionChips(
+                busy: _busy,
+                maxWidth: double.infinity,
+                onCamera: kIsWeb
+                    ? null
+                    : () => _pickAndSubmitComprobante(
+                          context,
+                          DocumentPickChannel.camera,
                         ),
-                      )
-                    : Text(
-                        _labelBotonComprobante(r, pe),
-                      ),
+                onGallery: kIsWeb
+                    ? null
+                    : () => _pickAndSubmitComprobante(
+                          context,
+                          DocumentPickChannel.gallery,
+                        ),
+                onFile: () => _pickAndSubmitComprobante(
+                  context,
+                  DocumentPickChannel.file,
+                ),
               ),
-            ),
+            ] else ...[
+              Text(
+                pe == PagoRevisionEstado.enRevision
+                    ? 'Puede reemplazar el archivo si hubo error.'
+                    : 'Use cámara, galería o suba imagen/PDF legible.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade700,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 8),
+              MediaPickActionChips(
+                busy: _busy,
+                maxWidth: double.infinity,
+                onCamera: kIsWeb
+                    ? null
+                    : () => _pickAndSubmitComprobante(
+                          context,
+                          DocumentPickChannel.camera,
+                        ),
+                onGallery: kIsWeb
+                    ? null
+                    : () => _pickAndSubmitComprobante(
+                          context,
+                          DocumentPickChannel.gallery,
+                        ),
+                onFile: () => _pickAndSubmitComprobante(
+                  context,
+                  DocumentPickChannel.file,
+                ),
+              ),
+            ],
           ],
         if (!referenciaHistorica && pe == PagoRevisionEstado.enRevision)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'En revisión; puede reemplazar el archivo con el botón de arriba.',
+                _metodoSeleccionado == PagoMetodo.efectivo
+                    ? 'En revisión; el importador confirmará la recepción del efectivo.'
+                    : 'En revisión; puede reemplazar el archivo con las opciones de arriba.',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ),
@@ -549,19 +667,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         const SizedBox(height: 8),
       ],
     );
-  }
-
-  static String _labelBotonComprobante(
-    TransactionRequestModel r,
-    String pe,
-  ) {
-    if (pe == PagoRevisionEstado.enRevision && r.hasComprobantePago) {
-      return 'Reemplazar comprobante';
-    }
-    if (pe == PagoRevisionEstado.rechazado) {
-      return 'Enviar nuevo comprobante';
-    }
-    return 'Adjuntar comprobante de pago';
   }
 
   static String _etiquetaEstadoPago(String pe) {

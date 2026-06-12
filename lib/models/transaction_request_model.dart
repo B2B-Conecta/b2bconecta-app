@@ -681,11 +681,13 @@ class TransactionRequestModel {
     if (metodo == PagoMetodo.efectivo) {
       switch (pagoEstadoRevisionEfectivo) {
         case PagoRevisionEstado.pendiente:
-          return 'Factura del importador lista · declare pago en efectivo y adjunte comprobante.';
+          return 'Factura del importador lista · declare pago en efectivo; puede adjuntar una foto opcional.';
         case PagoRevisionEstado.enRevision:
-          return 'Pago en efectivo en revisión por el importador.';
+          return hasComprobantePago
+              ? 'Pago en efectivo en revisión por el importador.'
+              : 'Pago en efectivo declarado · el importador confirmará la recepción.';
         case PagoRevisionEstado.rechazado:
-          return 'Comprobante no aceptado · puede enviar otro.';
+          return 'Pago no confirmado · puede declarar de nuevo o adjuntar una foto.';
         case PagoRevisionEstado.aprobado:
           return 'Pago en efectivo confirmado por el importador.';
         default:

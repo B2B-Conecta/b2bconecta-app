@@ -138,6 +138,22 @@ class _ImporterOrderPagoVerificationSectionState
     }
   }
 
+  static bool _puedeConfirmarPago(TransactionRequestModel r) {
+    if (r.status == TransactionRequestStatus.rechazado) return false;
+    if (r.pagoEstadoRevisionEfectivo != PagoRevisionEstado.enRevision) {
+      return false;
+    }
+    if (r.hasComprobantePago) return true;
+    return r.pagoMetodo?.trim() == PagoMetodo.efectivo;
+  }
+
+  static String _labelConfirmarPago(TransactionRequestModel r) {
+    if (r.pagoMetodo?.trim() == PagoMetodo.efectivo && !r.hasComprobantePago) {
+      return 'Confirmar efectivo recibido';
+    }
+    return 'Confirmar pago recibido';
+  }
+
   static String _etiquetaEstado(String pe) {
     switch (pe) {
       case PagoRevisionEstado.pendiente:
@@ -178,13 +194,13 @@ class _ImporterOrderPagoVerificationSectionState
 
     final algunoRechazado =
         _lines.any((r) => r.status == TransactionRequestStatus.rechazado);
-    final todosComprobante = _lines.every((r) => r.hasComprobantePago);
     final todosEnRevision = _lines.every(
       (r) => r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.enRevision,
     );
+    final todosConfirmables = _lines.every(_puedeConfirmarPago);
     final mostrarAcciones = !algunoRechazado &&
-        todosComprobante &&
         todosEnRevision &&
+        todosConfirmables &&
         pathsDistintos <= 1;
 
     return Padding(
@@ -283,7 +299,7 @@ class _ImporterOrderPagoVerificationSectionState
                     onPressed: _busy
                         ? null
                         : () => _setEstado(context, PagoRevisionEstado.aprobado),
-                    child: const Text('Confirmar pago recibido'),
+                    child: Text(_labelConfirmarPago(ref)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -298,11 +314,13 @@ class _ImporterOrderPagoVerificationSectionState
               ],
             ),
           ],
-          if (!_lines.any((r) => r.hasComprobantePago))
+          if (!_lines.any(_puedeConfirmarPago))
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'El aliado declara método y comprobante en su ficha del pedido.',
+                ref.pagoMetodo?.trim() == PagoMetodo.efectivo
+                    ? 'El aliado puede declarar pago en efectivo desde su ficha del pedido.'
+                    : 'El aliado declara método y comprobante en su ficha del pedido.',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
             ),
@@ -314,9 +332,7 @@ class _ImporterOrderPagoVerificationSectionState
   Widget _buildSingle(BuildContext context) {
     final r = widget.request;
     final pe = r.pagoEstadoRevisionEfectivo;
-    final mostrarAcciones = r.status != TransactionRequestStatus.rechazado &&
-        r.hasComprobantePago &&
-        pe == PagoRevisionEstado.enRevision;
+    final mostrarAcciones = _puedeConfirmarPago(r);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -386,7 +402,7 @@ class _ImporterOrderPagoVerificationSectionState
                     onPressed: _busy
                         ? null
                         : () => _setEstado(context, PagoRevisionEstado.aprobado),
-                    child: const Text('Confirmar pago recibido'),
+                    child: Text(_labelConfirmarPago(r)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -401,11 +417,15 @@ class _ImporterOrderPagoVerificationSectionState
               ],
             ),
           ],
-          if (!r.hasComprobantePago)
+          if (!_puedeConfirmarPago(r) &&
+              pe != PagoRevisionEstado.aprobado &&
+              pe != PagoRevisionEstado.rechazado)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'El aliado puede declarar método y adjuntar comprobante desde su ficha del pedido.',
+                r.pagoMetodo?.trim() == PagoMetodo.efectivo
+                    ? 'El aliado puede declarar pago en efectivo desde su ficha del pedido.'
+                    : 'El aliado puede declarar método y adjuntar comprobante desde su ficha del pedido.',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
             ),

@@ -2023,6 +2023,31 @@ class SupabaseService {
     }
   }
 
+  /// Aliado: declara pago en efectivo sin adjunto obligatorio (importador confirma recepción).
+  static Future<void> aliadoDeclaraPagoEfectivo({
+    required String transactionRequestId,
+  }) async {
+    if (_currentUserId == null) throw StateError('No hay sesión activa.');
+    await _client.rpc(
+      'aliado_declara_pago_efectivo',
+      params: <String, dynamic>{'p_request_id': transactionRequestId},
+    );
+  }
+
+  /// Varias líneas del mismo carrito e importador: declara efectivo en todas.
+  static Future<void> aliadoDeclaraPagoEfectivoBundle({
+    required List<TransactionRequestModel> lines,
+  }) async {
+    if (lines.isEmpty) return;
+    if (lines.length == 1) {
+      await aliadoDeclaraPagoEfectivo(transactionRequestId: lines.first.id);
+      return;
+    }
+    for (final r in lines) {
+      await aliadoDeclaraPagoEfectivo(transactionRequestId: r.id);
+    }
+  }
+
   /// Importador: mismo estado de revisión del comprobante en todas las líneas del carrito (mismo comprobante).
   static Future<void> importadorSetPagoRevisionEstadoBundle({
     required List<String> transactionRequestIds,

@@ -303,6 +303,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     String next,
   ) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final groupKey = _displayGroupKey(g);
+    final switchToEnProceso =
+        _quickFilter == _ImporterQuickFilter.nuevos &&
+        next == TransactionRequestStatus.enPreparacion;
     final ok = await advanceImporterOrderGroup(
       context,
       lines: g,
@@ -321,6 +325,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       ),
     );
     await _load(silent: true);
+    if (!mounted) return;
+    if (switchToEnProceso) {
+      setState(() {
+        _quickFilter = _ImporterQuickFilter.enProceso;
+        _expandedRequestId = groupKey;
+      });
+    }
   }
 
   bool _canCancelGroup(List<TransactionRequestModel> g) {

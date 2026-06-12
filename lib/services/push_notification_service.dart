@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../firebase_options.dart';
 import '../models/app_home_role.dart';
+import '../utils/kyc_notification_match.dart';
 import 'notification_deep_link.dart';
 import 'supabase_service.dart';
 
@@ -156,10 +157,17 @@ class PushNotificationService {
   void _onForegroundMessage(RemoteMessage message) {
     final n = message.notification;
     final data = message.data;
+    final rawTitle =
+        n?.title ?? data['title']?.toString() ?? 'MotoLink';
+    final type = data['type']?.toString() ?? 'mensaje';
+    final accessApproved = isAliadoAccessApprovedNotification(
+      type: type,
+      title: rawTitle,
+    );
     showLocalBanner(
-      title: n?.title ?? data['title']?.toString() ?? 'MotoLink',
+      title: accessApproved ? 'Acceso validado' : rawTitle,
       body: n?.body ?? data['body']?.toString() ?? '',
-      type: data['type']?.toString(),
+      type: type,
       relatedId: data['related_id']?.toString(),
       notificationId: data['notification_id']?.toString(),
     );

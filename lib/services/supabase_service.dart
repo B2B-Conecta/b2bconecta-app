@@ -328,6 +328,34 @@ class SupabaseService {
     await _client.removeChannel(channel);
   }
 
+  /// Realtime: cambio de acceso del aliado (`account_access_status` → active).
+  static RealtimeChannel subscribeToMyProfileAccess({
+    required void Function() onAccessActive,
+  }) {
+    final uid = _currentUserId;
+    if (uid == null) {
+      throw StateError('No hay sesión activa para escuchar el perfil.');
+    }
+    final channel = _client.channel('profiles:access:$uid');
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'profiles',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: uid,
+      ),
+      callback: (payload) {
+        final status =
+            payload.newRecord['account_access_status']?.toString().trim();
+        if (status == 'active') onAccessActive();
+      },
+    );
+    channel.subscribe();
+    return channel;
+  }
+
   /// Perfil del usuario autenticado (`id` = `auth.uid()`). `null` si no hay fila.
   static Future<ProfileModel?> fetchMyProfile() async {
     final uid = _currentUserId;

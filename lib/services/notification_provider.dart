@@ -6,6 +6,7 @@ import '../models/in_app_notification_model.dart';
 import '../services/notification_deep_link.dart';
 import '../services/push_notification_service.dart';
 import '../services/supabase_service.dart';
+import '../utils/kyc_notification_match.dart';
 
 class NotificationProvider extends ChangeNotifier {
   NotificationProvider({
@@ -133,9 +134,15 @@ class NotificationProvider extends ChangeNotifier {
     _items.insert(0, n);
     _enrichOrderContext();
     notifyListeners();
-    PushNotificationService.instance.showLocalBanner(
+    final title = n.title.trim().isNotEmpty ? n.title : 'MotoLink';
+    final body = n.body.trim().isNotEmpty ? n.body : title;
+    final accessApproved = isAliadoAccessApprovedNotification(
+      type: n.type,
       title: n.title,
-      body: n.body,
+    );
+    PushNotificationService.instance.showLocalBanner(
+      title: accessApproved ? 'Acceso validado' : title,
+      body: body,
       type: n.type,
       relatedId: n.relatedId,
       notificationId: n.id,

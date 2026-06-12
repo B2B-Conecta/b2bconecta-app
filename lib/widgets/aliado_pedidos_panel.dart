@@ -958,6 +958,25 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     );
   }
 
+  Widget? _qtyAdjustmentCollapsedAccessory(List<TransactionRequestModel> g) {
+    final pending =
+        g.where((r) => r.qtyAdjustmentPendienteAliado).toList(growable: false);
+    if (pending.isEmpty) return null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < pending.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          AliadoQtyAdjustmentActions(
+            key: ValueKey<String>('qty-adj-collapsed-${pending[i].id}'),
+            request: pending[i],
+            onChanged: _refreshExpandedCard,
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildOrderCard(
     BuildContext context,
     List<TransactionRequestModel> g,
@@ -995,6 +1014,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ? () => _cancelarGrupoPendiente(context, g)
           : null,
       cancelarSolicitudPendienteBusy: _cancelarBusyId == expandKey,
+      collapsedAccessory: _expandedRequestId == expandKey
+          ? null
+          : _qtyAdjustmentCollapsedAccessory(g),
       expandedFooter: isMulti ? null : _orderCardFooter(context, g),
       multiImporterPanelBuilder: isMulti
           ? (ctx, chunk, idx, total) => _multiImporterPanelContent(

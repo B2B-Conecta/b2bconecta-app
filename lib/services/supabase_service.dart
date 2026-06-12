@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/account_email_events.dart';
-import '../config/email_config.dart';
 
 import '../models/catalog_filters.dart';
 import '../models/catalog_sort_mode.dart';
@@ -1279,8 +1277,7 @@ class SupabaseService {
   }
 
   /// Broker: actualiza estado KYC global del perfil aliado.
-  /// Si aprueba, devuelve resultado del correo de bienvenida.
-  static Future<EmailDispatchOutcome?> adminSetProfileKycStatus({
+  static Future<void> adminSetProfileKycStatus({
     required String profileId,
     required String status,
     String? note,
@@ -1293,13 +1290,6 @@ class SupabaseService {
         'p_note': note?.trim().isNotEmpty == true ? note!.trim() : null,
       },
     );
-    if (status.trim().toLowerCase() == KycStatus.aprobado) {
-      return dispatchAccountEmail(
-        event: AccountEmailEvent.profileApproved,
-        profileId: profileId,
-      );
-    }
-    return null;
   }
 
   /// Admin: aliados con pedido moroso y estado de suspensión por morosidad.
@@ -1357,68 +1347,38 @@ class SupabaseService {
   }
 
   /// Aliado o importador: envía expediente a revisión MotoLink.
-  static Future<EmailDispatchOutcome> profileSubmitKycForReview() async {
+  static Future<void> profileSubmitKycForReview() async {
     await _client.rpc('profile_submit_kyc_for_review');
-    return dispatchAccountEmail(
-      event: AccountEmailEvent.registrationSubmitted,
-      profileId: _currentUserId,
+  }
+
+  static String get _pushPlatform {
+    if (kIsWeb) return 'web';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      default:
+        return 'unknown';
+    }
+  }
+
+  /// Registra token FCM del dispositivo actual.
+  static Future<void> upsertDevicePushToken({required String token}) async {
+    await _client.rpc(
+      'upsert_device_push_token',
+      params: <String, dynamic>{
+        'p_token': token.trim(),
+        'p_platform': _pushPlatform,
+      },
     );
   }
 
-  /// Correo transaccional (Gmail SMTP vía Edge Function).
-  static Future<EmailDispatchOutcome> dispatchAccountEmail({
-    required String event,
-    String? profileId,
-  }) async {
-    try {
-      final sessionEmail = _client.auth.currentUser?.email?.trim();
-      final resolvedProfileId = profileId?.trim().isNotEmpty == true
-          ? profileId!.trim()
-          : _currentUserId;
-      final res = await _client.functions.invoke(
-        'send-account-email',
-        body: <String, dynamic>{
-          'event': event,
-          if (resolvedProfileId != null && resolvedProfileId.isNotEmpty)
-            'profile_id': resolvedProfileId,
-          if (sessionEmail != null && sessionEmail.isNotEmpty)
-            'recipient_email': sessionEmail,
-        },
-      );
-      final data = res.data;
-      if (data is Map) {
-        final map = Map<String, dynamic>.from(data);
-        if (map['skipped'] == true) {
-          debugPrint(
-            'dispatchAccountEmail($event) skipped: ${map['reason'] ?? map['error']}',
-          );
-          return EmailDispatchOutcome.skipped;
-        }
-        if (map['ok'] == true) {
-          return EmailDispatchOutcome.sent;
-        }
-        debugPrint(
-          'dispatchAccountEmail($event) error: ${map['error'] ?? map['reason']}',
-        );
-        return EmailDispatchOutcome.failed;
-      }
-      if (res.status >= 400) {
-        debugPrint('dispatchAccountEmail($event) HTTP ${res.status}');
-        return EmailDispatchOutcome.failed;
-      }
-      return EmailDispatchOutcome.sent;
-    } on FunctionException catch (e) {
-      debugPrint(
-        'dispatchAccountEmail($event): ${e.status} ${e.details ?? e.reasonPhrase}',
-      );
-      if (e.status == 404 && isLocalSupabase) {
-        return EmailDispatchOutcome.skipped;
-      }
-      return EmailDispatchOutcome.failed;
-    } catch (e, st) {
-      debugPrint('dispatchAccountEmail($event): $e\n$st');
-      return EmailDispatchOutcome.failed;
-    }
+  static Future<void> removeDevicePushToken({required String token}) async {
+    await _client.rpc(
+      'remove_device_push_token',
+      params: <String, dynamic>{'p_token': token.trim()},
+    );
   }
 
   /// Registra aceptación de términos y condiciones (versión vigente).

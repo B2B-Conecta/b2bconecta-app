@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../config/email_config.dart';
 import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/document_review_status.dart';
@@ -230,15 +229,14 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     }
     setState(() => _busyProfileId = profile.id);
     try {
-      final emailOutcome = await SupabaseService.adminSetProfileKycStatus(
+      await SupabaseService.adminSetProfileKycStatus(
         profileId: profile.id,
         status: status,
         note: note,
       );
       if (!mounted) return;
       final accessLabel = status == KycStatus.aprobado
-          ? (emailOutcome ?? EmailDispatchOutcome.skipped)
-              .profileApprovedSnackBar()
+          ? 'Acceso habilitado. El aliado recibirá una notificación en la app.'
           : 'KYC global: ${KycStatus.labelEs(status)}.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

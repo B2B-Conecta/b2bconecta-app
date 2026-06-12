@@ -3,8 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_home_role.dart';
 import '../models/in_app_notification_model.dart';
+import '../services/notification_deep_link.dart';
+import '../services/push_notification_service.dart';
 import '../services/supabase_service.dart';
-import '../widgets/main_shell_tab.dart';
 
 class NotificationProvider extends ChangeNotifier {
   NotificationProvider({
@@ -120,146 +121,25 @@ class NotificationProvider extends ChangeNotifier {
 
   Future<void> handleTap(InAppNotificationModel n) async {
     await markAsRead(n.id);
-    _deepLinkToInteractiveOrders(n);
-  }
-
-  void _deepLinkToInteractiveOrders(InAppNotificationModel n) {
-    MainShellTabController.setPendingNotificationRelatedId(n.relatedId);
-    MainShellTabController.setPendingNotificationType(n.type);
-    final t0 = n.type.trim();
-    if (t0 == 'kyc') {
-      switch (homeRole) {
-        case AppHomeRole.administrador:
-          MainShellTabController.setPendingKycProfileId(n.relatedId);
-          MainShellTabController.navigateToAdminKycForNotification();
-          return;
-        case AppHomeRole.aliado:
-        case AppHomeRole.importador:
-          MainShellTabController.navigateToProfileKycDocumentation();
-          return;
-      }
-    }
-    if (t0 == 'credito' && homeRole == AppHomeRole.administrador) {
-      MainShellTabController.navigateToAdminActivosForNotification();
-      return;
-    }
-    if (t0 == 'supervision' && homeRole == AppHomeRole.administrador) {
-      MainShellTabController.navigateToAdminActivosForNotification();
-      return;
-    }
-    if (t0 == 'mensaje') {
-      switch (homeRole) {
-        case AppHomeRole.aliado:
-        case AppHomeRole.importador:
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminActivosForNotification();
-          return;
-      }
-    }
-    if (t0 == 'comision') {
-      MainShellTabController.setPendingCommissionSettlementId(n.relatedId);
-      switch (homeRole) {
-        case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminComisionesForNotification();
-          return;
-        case AppHomeRole.importador:
-          MainShellTabController.navigateToImporterCommissionSettlementsForNotification();
-          return;
-        case AppHomeRole.aliado:
-          return;
-      }
-    }
-    if (t0 == 'promocion') {
-      switch (homeRole) {
-        case AppHomeRole.importador:
-          MainShellTabController.navigateToImporterInventoryForNotification();
-          return;
-        case AppHomeRole.administrador:
-        case AppHomeRole.aliado:
-          return;
-      }
-    }
-    if (t0 == 'morosidad') {
-      switch (homeRole) {
-        case AppHomeRole.aliado:
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.importador:
-          MainShellTabController.setPendingImporterPedidosPreferCerradosFilter();
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminCerradosForNotification();
-          return;
-      }
-    }
-    if (t0 == 'envio') {
-      switch (homeRole) {
-        case AppHomeRole.aliado:
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.importador:
-          MainShellTabController.setImporterPedidosPreferNuevosFilter(true);
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminActivosForNotification();
-          return;
-      }
-    }
-    if (t0 == 'pedido') {
-      switch (homeRole) {
-        case AppHomeRole.aliado:
-        case AppHomeRole.importador:
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminActivosForNotification();
-          return;
-      }
-    }
-    if (t0 == 'pago') {
-      switch (homeRole) {
-        case AppHomeRole.aliado:
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.importador:
-          MainShellTabController.setImporterPedidosPreferEnProcesoFilter();
-          MainShellTabController.navigateToPedidosForNotification();
-          return;
-        case AppHomeRole.administrador:
-          MainShellTabController.navigateToAdminActivosForNotification();
-          return;
-      }
-    }
-    final type = n.type.trim();
-    final legacyOrderAsActive = homeRole == AppHomeRole.administrador &&
-        type == 'envio' &&
-        n.title.trim() == 'Nueva solicitud por validar';
-    if (homeRole == AppHomeRole.administrador &&
-        (type == 'validacion' || legacyOrderAsActive)) {
-      MainShellTabController.navigateToAdminActivosForNotification();
-      return;
-    }
-    switch (homeRole) {
-      case AppHomeRole.administrador:
-        MainShellTabController.navigateToAdminActivosForNotification();
-        return;
-      case AppHomeRole.aliado:
-        MainShellTabController.navigateToPedidosForNotification();
-        return;
-      case AppHomeRole.importador:
-        MainShellTabController.navigateToPedidosForNotification();
-        return;
-    }
+    navigateFromNotificationPayload(
+      homeRole: homeRole,
+      type: n.type,
+      relatedId: n.relatedId,
+      title: n.title,
+    );
   }
 
   void _onRealtimeInsert(InAppNotificationModel n) {
     _items.insert(0, n);
     _enrichOrderContext();
     notifyListeners();
+    PushNotificationService.instance.showLocalBanner(
+      title: n.title,
+      body: n.body,
+      type: n.type,
+      relatedId: n.relatedId,
+      notificationId: n.id,
+    );
   }
 
   Future<void> _enrichOrderContext() async {

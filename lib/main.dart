@@ -4,11 +4,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_scaffold_messenger.dart';
 import 'auth/auth_gate.dart';
+import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
+  await PushNotificationService.instance.initialize();
 
   final url = dotenv.env['NEXT_PUBLIC_SUPABASE_URL']?.trim();
   final anonKey = (dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY'] ??

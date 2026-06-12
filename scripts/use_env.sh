@@ -6,16 +6,21 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 usage() {
-  echo "Usage: bash scripts/use_env.sh <local|staging|production>"
+  echo "Usage: bash scripts/use_env.sh <local|staging|mobile-staging|production>"
   echo ""
-  echo "  local       → Supabase Docker (supabase start; keys en supabase status)"
-  echo "  staging     → lwrqjpqyitnveizshawc"
-  echo "  production  → ufrphhiynowsychgxvkn"
+  echo "  local           → Supabase Docker (supabase start; keys en supabase status)"
+  echo "  staging         → lwrqjpqyitnveizshawc (web / Vercel redirect)"
+  echo "  mobile-staging  → mismo API staging + deep link auth para APK/iOS"
+  echo "  production      → ufrphhiynowsychgxvkn"
   exit 1
 }
 
 ENV_NAME="${1:-}"
 [[ -n "$ENV_NAME" ]] || usage
+
+if [[ "$ENV_NAME" == "mobile" ]]; then
+  ENV_NAME="mobile-staging"
+fi
 
 TEMPLATE="$ROOT_DIR/config/env/$ENV_NAME.env"
 TARGET="$ROOT_DIR/.env"

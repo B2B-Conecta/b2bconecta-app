@@ -15,6 +15,8 @@ import '../widgets/admin_encomiendas_report_panel.dart';
 import '../widgets/admin_kyc_review_panel.dart';
 import '../widgets/admin_order_ratings_panel.dart';
 import '../widgets/admin_orders_panel.dart';
+import '../utils/kyc_notification_match.dart';
+import '../widgets/aliado_access_approved_banner.dart';
 import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
@@ -44,14 +46,21 @@ class _MainShellState extends State<MainShell> {
   int _tabIndex = 0;
   late ProfileModel _profile;
   late final NotificationProvider _notifications;
+  bool _showAliadoAccessApprovedBanner = false;
+  String _aliadoAccessApprovedMessage =
+      'Su acceso a MotoLink está habilitado. Ya puede operar en la plataforma.';
 
   @override
   void initState() {
     super.initState();
     _profile = widget.profile;
     _notifications = NotificationProvider(homeRole: widget.homeRole)
-      ..addListener(_onNotificationsChanged)
-      ..start();
+      ..addListener(_onNotificationsChanged);
+    unawaited(
+      _notifications.start().then((_) {
+        if (mounted) _syncAliadoAccessApprovedBanner();
+      }),
+    );
     PushNotificationService.instance.registerTapHandler(_onPushNotificationTap);
     unawaited(PushNotificationService.instance.registerForCurrentUser());
     MainShellTabController.register((index) {
@@ -101,7 +110,45 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onNotificationsChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    _syncAliadoAccessApprovedBanner();
+    setState(() {});
+  }
+
+  void _syncAliadoAccessApprovedBanner() {
+    if (widget.homeRole != AppHomeRole.aliado) return;
+    final pending = _notifications.items.where(
+      (n) =>
+          !n.isRead &&
+          isAliadoAccessApprovedNotification(type: n.type, title: n.title),
+    );
+    final n = pending.isEmpty ? null : pending.first;
+    final show = n != null;
+    final message = n != null && n.body.trim().isNotEmpty
+        ? n.body.trim()
+        : _aliadoAccessApprovedMessage;
+    if (show == _showAliadoAccessApprovedBanner &&
+        message == _aliadoAccessApprovedMessage) {
+      return;
+    }
+    setState(() {
+      _showAliadoAccessApprovedBanner = show;
+      _aliadoAccessApprovedMessage = message;
+    });
+  }
+
+  Future<void> _dismissAliadoAccessApprovedBanner() async {
+    final pending = _notifications.items.where(
+      (n) =>
+          !n.isRead &&
+          isAliadoAccessApprovedNotification(type: n.type, title: n.title),
+    );
+    if (pending.isNotEmpty) {
+      try {
+        await _notifications.markAsRead(pending.first.id);
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _showAliadoAccessApprovedBanner = false);
   }
 
   Future<void> _openNotificationCenter() async {
@@ -338,34 +385,47 @@ class _MainShellState extends State<MainShell> {
 
   Widget _buildDefaultShell() {
     return Scaffold(
-      body: IndexedStack(
-        index: _tabIndex,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HomeScreen(
-            profile: _profile,
-            homeRole: widget.homeRole,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
-          _OrdersTab(
-            profile: _profile,
-            homeRole: widget.homeRole,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
-          ReputationTab(
-            profile: _profile,
-            homeRole: widget.homeRole,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-            onProfileRefresh: _refreshProfile,
-          ),
-          _ProfileTab(
-            profile: _profile,
-            homeRole: widget.homeRole,
-            onProfileSaved: _refreshProfile,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
+          if (_showAliadoAccessApprovedBanner)
+            AliadoAccessApprovedBanner(
+              message: _aliadoAccessApprovedMessage,
+              onDismiss: _dismissAliadoAccessApprovedBanner,
+              compact: true,
+            ),
+          Expanded(
+            child: IndexedStack(
+              index: _tabIndex,
+              children: [
+                HomeScreen(
+                  profile: _profile,
+                  homeRole: widget.homeRole,
+                  onNotificationTap: _openNotificationCenter,
+                  unreadNotifications: _notifications.unreadCount,
+                ),
+                _OrdersTab(
+                  profile: _profile,
+                  homeRole: widget.homeRole,
+                  onNotificationTap: _openNotificationCenter,
+                  unreadNotifications: _notifications.unreadCount,
+                ),
+                ReputationTab(
+                  profile: _profile,
+                  homeRole: widget.homeRole,
+                  onNotificationTap: _openNotificationCenter,
+                  unreadNotifications: _notifications.unreadCount,
+                  onProfileRefresh: _refreshProfile,
+                ),
+                _ProfileTab(
+                  profile: _profile,
+                  homeRole: widget.homeRole,
+                  onProfileSaved: _refreshProfile,
+                  onNotificationTap: _openNotificationCenter,
+                  unreadNotifications: _notifications.unreadCount,
+                ),
+              ],
+            ),
           ),
         ],
       ),

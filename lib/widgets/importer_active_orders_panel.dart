@@ -412,12 +412,27 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     );
   }
 
-  bool _canNotifyQtyAdjustment(List<TransactionRequestModel> g) {
+  bool _showQtyAdjustmentSection(List<TransactionRequestModel> g) {
     if (!g.every((r) => r.status == TransactionRequestStatus.pendiente)) {
       return false;
     }
-    if (g.any((r) => r.qtyAdjustmentPendienteAliado)) return false;
+    return !g.any((r) => r.qtyAdjustmentPendienteAliado);
+  }
+
+  bool _canNotifyQtyAdjustment(List<TransactionRequestModel> g) {
+    if (!_showQtyAdjustmentSection(g)) return false;
     return g.any((r) => r.cantidad > 1);
+  }
+
+  String? _qtyAdjustmentDisabledHint(List<TransactionRequestModel> g) {
+    if (!_showQtyAdjustmentSection(g) || _canNotifyQtyAdjustment(g)) {
+      return null;
+    }
+    if (g.length > 1) {
+      return 'En carritos multi-partida use el chat para acordar unidades; '
+          'la propuesta formal aplica cuando alguna partida tiene más de 1 unidad.';
+    }
+    return 'Solo aplica si el aliado pidió más de 1 unidad.';
   }
 
   int _requestedQtyForGroup(List<TransactionRequestModel> g) =>
@@ -674,7 +689,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                 .importerOperationalHeadline(primary.status);
                             final rk = _displayGroupKey(g);
                             final canCancel = _canCancelGroup(g);
+                            final showQtyAdj = _showQtyAdjustmentSection(g);
                             final canNotifyQty = _canNotifyQtyAdjustment(g);
+                            final qtyAdjHint = _qtyAdjustmentDisabledHint(g);
                             return ImporterExpandableOrderCard(
                               request: primary,
                               checkoutGroupLines: isBundle ? g : null,
@@ -725,10 +742,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                         rk,
                                       )
                                   : null,
-                              canNotifyQtyAdjustment: canNotifyQty,
+                              canNotifyQtyAdjustment: showQtyAdj,
                               onNotifyQtyAdjustment: canNotifyQty
                                   ? () => _notificarAjusteCantidad(context, g)
                                   : null,
+                              qtyAdjustmentDisabledHint: qtyAdjHint,
                               onThreadChanged: _load,
                               expandedFooter: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,

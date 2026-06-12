@@ -36,6 +36,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.onCancelByImporter,
     this.canNotifyQtyAdjustment = false,
     this.onNotifyQtyAdjustment,
+    this.qtyAdjustmentDisabledHint,
     this.expandedFooter,
     this.onThreadChanged,
     this.ratingBar,
@@ -55,6 +56,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final VoidCallback? onCancelByImporter;
   final bool canNotifyQtyAdjustment;
   final VoidCallback? onNotifyQtyAdjustment;
+  final String? qtyAdjustmentDisabledHint;
   final Widget? expandedFooter;
   final VoidCallback? onThreadChanged;
   final Widget? ratingBar;
@@ -299,13 +301,30 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-          if (canNotifyQtyAdjustment && onNotifyQtyAdjustment != null)
+          if (canNotifyQtyAdjustment || qtyAdjustmentDisabledHint != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-              child: OutlinedButton.icon(
-                onPressed: onNotifyQtyAdjustment,
-                icon: const Icon(Icons.inventory_2_outlined, size: 19),
-                label: const Text('Proponer ajuste de cantidad'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: onNotifyQtyAdjustment,
+                    icon: const Icon(Icons.inventory_2_outlined, size: 19),
+                    label: const Text('Proponer ajuste de cantidad'),
+                  ),
+                  if (qtyAdjustmentDisabledHint != null &&
+                      onNotifyQtyAdjustment == null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      qtyAdjustmentDisabledHint!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.3,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           AnimatedSize(

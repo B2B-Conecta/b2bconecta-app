@@ -34,6 +34,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     this.expandedFooter,
     this.multiImporterPanelBuilder,
     this.ratingBar,
+    this.collapsedAccessory,
   });
 
   final TransactionRequestModel request;
@@ -54,6 +55,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
 
   /// CTA de valoración (modal), visible sin expandir la ficha.
   final Widget? ratingBar;
+
+  /// Acciones visibles sin expandir (p. ej. aceptar/rechazar ajuste de cantidad).
+  final Widget? collapsedAccessory;
 
   /// Carrito multi-importador: factura, pago y mensajes por proveedor (pestañas).
   final Widget Function(
@@ -296,6 +300,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
             ),
           ),
           if (ratingBar != null) ratingBar!,
+          if (collapsedAccessory != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: collapsedAccessory!,
+            ),
+          ],
           if (onCancelarSolicitudPendiente != null &&
               lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)) ...[
             Padding(

@@ -14,6 +14,9 @@ export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djava.net.useSystemProxies=fal
 JAVA_TOOL_OPTIONS="$(echo "$JAVA_TOOL_OPTIONS" | xargs)"
 export JAVA_TOOL_OPTIONS
 
+echo "Activando .env mobile-staging (deep link auth)..."
+bash "$ROOT_DIR/scripts/use_env.sh" mobile-staging
+
 echo "Building release APK (proxy disabled for Java/Gradle)..."
 flutter build apk --release "$@"
 

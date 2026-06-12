@@ -95,7 +95,7 @@ class PartModel {
   List<ProductVolumeTier> get volumeTiers =>
       parseProductVolumeTiers(discountRules);
 
-  /// Precio unitario final MotoLink (mayorista + comisión broker).
+  /// Precio unitario para aliado sin markup broker (legacy; preferir [precioUnitarioParaAliado]).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
   /// Precio de venta al aliado (cascada E4; sin tramo volumen si [quantity] = 1 en grid).

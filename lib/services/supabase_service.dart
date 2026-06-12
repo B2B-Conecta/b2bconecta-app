@@ -65,7 +65,7 @@ class SupabaseService {
         url.contains('localhost:54321/');
   }
 
-  /// Comisión MotoLink sobre precio mayorista (misma base que [BrokerPricing.feeRate]).
+  /// Sin markup en catálogo; comisión de liquidación usa tasas E3 en servidor.
   static double get logisticFeeRate => BrokerPricing.feeRate;
 
   static double calculateAliadoUnitPrice(double precioUnitarioProveedor) {

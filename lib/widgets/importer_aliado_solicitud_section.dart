@@ -134,7 +134,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
           if (showPrecioHelp && viewer == PedidoDesgloseViewer.importador) ...[
             const SizedBox(height: 4),
             Text(
-              'Precios en REF = oferta MotoLink al aliado (alistamiento).',
+              'Precios en REF = precio lista del importador (con oferta o volumen si aplican).',
               style: TextStyle(
                 fontSize: helpSize,
                 color: Colors.grey.shade600,
@@ -288,7 +288,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           if (!embedInOrderCard) ...[
             const SizedBox(height: 2),
             Text(
-              'REF = precio oferta MotoLink al aliado (alistamiento).',
+              'REF = precio lista del importador (con oferta o volumen si aplican).',
               style: TextStyle(
                 fontSize: compact ? 9.5 : 10.5,
                 color: Colors.grey.shade600,
@@ -373,7 +373,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
           if (!embedInOrderCard) ...[
             const SizedBox(height: 2),
             Text(
-              'REF = precio oferta MotoLink al aliado (alistamiento).',
+              'REF = precio lista del importador (con oferta o volumen si aplican).',
               style: TextStyle(
                 fontSize: compact ? 9.5 : 10.5,
                 color: Colors.grey.shade600,

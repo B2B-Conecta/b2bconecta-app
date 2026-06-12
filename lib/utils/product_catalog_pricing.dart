@@ -1,9 +1,8 @@
-import 'broker_pricing.dart';
 import 'product_volume_tiers.dart';
 
 /// Cascada E4 para precios aliado (catálogo y preview; checkout en servidor).
+/// Sin markup MotoLink: lista/oferta del importador → % volumen → línea USD opcional.
 abstract final class ProductCatalogPricing {
-  static const double motolinkFeeRate = BrokerPricing.feeRate;
 
   /// Descuento en la línea USD del catálogo (pago en divisas / Zelle), % sobre precio REF.
   static double? usdPaymentDiscountPct(Map<String, dynamic>? discountRules) =>
@@ -94,8 +93,7 @@ abstract final class ProductCatalogPricing {
       salePriceUsd: salePriceUsd,
     );
     final pct = volumeDiscountPercent(discountRules, quantity);
-    final afterVolume = wholesale * (1 - pct / 100.0);
-    return afterVolume * (1 + motolinkFeeRate);
+    return wholesale * (1 - pct / 100.0);
   }
 
   /// Precio tachado: lista regular sin oferta directa (sin tramo volumen en grid).

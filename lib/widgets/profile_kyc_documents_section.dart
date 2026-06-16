@@ -46,6 +46,7 @@ class ProfileKycDocumentsSection extends StatefulWidget {
     this.beforeUpload,
     this.beforeSubmitReview,
     this.registrationLocked = false,
+    this.onTermsAccepted,
   });
 
   final String? kycStatus;
@@ -61,6 +62,9 @@ class ProfileKycDocumentsSection extends StatefulWidget {
 
   /// Tras enviar a revisión: ocultar envío y mostrar solo estado.
   final bool registrationLocked;
+
+  /// Tras registrar aceptación legal en BD (p. ej. reevaluar gate de onboarding).
+  final VoidCallback? onTermsAccepted;
 
   bool get _isAliado => role.trim().toLowerCase() == 'aliado';
 
@@ -88,9 +92,15 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.kycStatus != widget.kycStatus ||
         oldWidget.profile?.id != widget.profile?.id ||
-        oldWidget.profile?.termsAcceptedAt != widget.profile?.termsAcceptedAt) {
-      _termsAccepted = widget.profile?.hasAcceptedCurrentTerms ?? false;
-      _load();
+        oldWidget.profile?.termsAcceptedAt != widget.profile?.termsAcceptedAt ||
+        oldWidget.profile?.termsVersion != widget.profile?.termsVersion) {
+      if (widget.profile?.hasAcceptedCurrentTerms == true) {
+        _termsAccepted = true;
+      }
+      if (oldWidget.kycStatus != widget.kycStatus ||
+          oldWidget.profile?.id != widget.profile?.id) {
+        _load();
+      }
     }
   }
 
@@ -304,8 +314,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
             st.isEmpty ||
             st == KycStatus.pendiente ||
             st == KycStatus.rechazado);
-    final termsPending = widget.profile?.hasAcceptedCurrentTerms != true;
-    final termsOk = !termsPending || _termsAccepted;
+    final termsOk = _termsAccepted;
     final requiredTypes = AliadoDocType.forRole(widget.role);
     final supplementaryTypes = widget._isAliado
         ? AliadoDocType.supplementaryForRole(widget.role)
@@ -450,18 +459,21 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           const SizedBox(height: 10),
           ...requiredTypes.map(_buildDocTile),
         ],
-        if (widget._isAliado && accountAllowsSubmit && termsPending) ...[
+        if (widget._isAliado && accountAllowsSubmit) ...[
           const SizedBox(height: 12),
           const ProfileSectionHeader(
             label: 'TÉRMINOS LEGALES',
-            infoTitle: 'Términos y condiciones',
+            infoTitle: 'Términos y privacidad',
             infoMessage:
-                'Debe aceptar los términos vigentes antes de enviar el registro '
-                'inicial a revisión.',
+                'Debe aceptar los términos y la política de privacidad vigentes '
+                'antes de enviar el registro inicial a revisión.',
           ),
           TermsAcceptanceSection(
             accepted: _termsAccepted,
-            onAcceptedChanged: (v) => setState(() => _termsAccepted = v),
+            onAcceptedChanged: (v) {
+              setState(() => _termsAccepted = v);
+              if (v) widget.onTermsAccepted?.call();
+            },
           ),
         ],
         if (canSendReview) ...[

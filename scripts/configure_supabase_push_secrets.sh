@@ -18,12 +18,18 @@ set -a && source "$PUSH_ENV" && set +a
 
 PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
 if [[ -z "$PROJECT_REF" ]]; then
-  if [[ "$TARGET" == "staging" ]]; then
-    PROJECT_REF="${STAGING_PROJECT_REF:-lwrqjpqyitnveizshawc}"
-  else
-    echo "Defina SUPABASE_PROJECT_REF o use target staging."
-    exit 1
-  fi
+  case "$TARGET" in
+    staging)
+      PROJECT_REF="${STAGING_PROJECT_REF:-lwrqjpqyitnveizshawc}"
+      ;;
+    production)
+      PROJECT_REF="${PRODUCTION_PROJECT_REF:-ufrphhiynowsychgxvkn}"
+      ;;
+    *)
+      echo "Target desconocido: $TARGET (use staging o production)"
+      exit 1
+      ;;
+  esac
 fi
 
 SUPABASE_URL="${SUPABASE_URL:-https://${PROJECT_REF}.supabase.co}"

@@ -24,7 +24,7 @@ class ProfileB2BForm extends StatefulWidget {
   const ProfileB2BForm({
     super.key,
     required this.initial,
-    required     this.onSaved,
+    required this.onSaved,
     this.showCloseBar = false,
     this.onClose,
     this.onRelatedDataChanged,

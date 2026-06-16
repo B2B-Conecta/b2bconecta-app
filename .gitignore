@@ -1,6 +1,13 @@
 # Environment (secrets)
 .env
 config/push.env
+config/env/*.env.local
+
+# Signing & service accounts (never commit)
+**/*.jks
+**/*.keystore
+**/*-credentials.json
+**/service-account*.json
 
 # Miscellaneous
 *.class

@@ -1,0 +1,10 @@
+# Paste these in Vercel → Project (production) → Settings → Environment Variables
+# Scope: Production only (use vercel-env.staging.example for staging/preview)
+#
+# Replace placeholders with values from Supabase Dashboard (ufrphhiynowsychgxvkn).
+
+NEXT_PUBLIC_SUPABASE_URL=https://ufrphhiynowsychgxvkn.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PRODUCTION_PUBLISHABLE_KEY
+
+# Stable production web URL (must match Supabase Auth → Redirect URLs)
+SUPABASE_AUTH_REDIRECT_URL=https://YOUR_PRODUCTION_DOMAIN

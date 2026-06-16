@@ -28,6 +28,7 @@ class ProfileB2BForm extends StatefulWidget {
     this.showCloseBar = false,
     this.onClose,
     this.onRelatedDataChanged,
+    this.onTermsAccepted,
   });
 
   final ProfileModel? initial;
@@ -39,6 +40,9 @@ class ProfileB2BForm extends StatefulWidget {
 
   /// Tras subir documentos KYC u otra acción que requiera refrescar el perfil.
   final VoidCallback? onRelatedDataChanged;
+
+  /// Tras registrar aceptación legal en BD (sin refrescar todo el formulario).
+  final VoidCallback? onTermsAccepted;
 
   @override
   State<ProfileB2BForm> createState() => _ProfileB2BFormState();
@@ -106,14 +110,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return r == 'importador' || r == 'aliado';
   }
 
-  bool get _hasAcceptedTerms =>
-      widget.initial?.hasAcceptedCurrentTerms == true || _termsAccepted;
+  bool get _hasAcceptedTerms => _termsAccepted;
 
-  /// Solo registro inicial: ocultar tras aceptar en BD (no se puede desmarcar).
-  bool get _showTermsSection =>
-      _requiresTerms &&
-      !_showAliadoKycSection &&
-      widget.initial?.hasAcceptedCurrentTerms != true;
+  /// Visible siempre para importadores (marcar / desmarcar sin ocultar la sección).
+  bool get _showTermsSection => _requiresTerms && !_showAliadoKycSection;
 
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
@@ -156,8 +156,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   @override
   void didUpdateWidget(covariant ProfileB2BForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initial?.termsAcceptedAt != widget.initial?.termsAcceptedAt) {
-      _termsAccepted = widget.initial?.hasAcceptedCurrentTerms ?? false;
+    if (oldWidget.initial?.termsAcceptedAt !=
+            widget.initial?.termsAcceptedAt ||
+        oldWidget.initial?.termsVersion != widget.initial?.termsVersion) {
+      if (widget.initial?.hasAcceptedCurrentTerms == true) {
+        _termsAccepted = true;
+      }
     }
     if (oldWidget.initial?.id != widget.initial?.id ||
         oldWidget.initial?.kycStatus != widget.initial?.kycStatus ||
@@ -350,7 +354,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         _role.trim().toLowerCase() != 'aliado') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debe aceptar los términos y condiciones para continuar.'),
+          content: Text(
+            'Debe aceptar los términos y la política de privacidad para continuar.',
+          ),
         ),
       );
       return;
@@ -824,6 +830,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 beforeUpload: _ensureProfileForDocumentUpload,
                 beforeSubmitReview: _persistProfileFromForm,
                 registrationLocked: _aliadoRegistrationLocked,
+                onTermsAccepted: widget.onTermsAccepted,
                 onChanged: () {
                   _bumpAuthorizationSection();
                   widget.onRelatedDataChanged?.call();
@@ -835,14 +842,17 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 14),
             const ProfileSectionHeader(
               label: 'TÉRMINOS LEGALES',
-              infoTitle: 'Términos y condiciones',
+              infoTitle: 'Términos y privacidad',
               infoMessage:
-                  'Aliados e importadores deben aceptar los términos vigentes '
-                  'antes de usar MotoLink.',
+                  'Aliados e importadores deben aceptar los términos y la '
+                  'política de privacidad vigentes antes de usar MotoLink.',
             ),
             TermsAcceptanceSection(
               accepted: _termsAccepted,
-              onAcceptedChanged: (v) => setState(() => _termsAccepted = v),
+              onAcceptedChanged: (v) {
+                setState(() => _termsAccepted = v);
+                if (v) widget.onTermsAccepted?.call();
+              },
             ),
           ],
           if (_showGuardarPerfilButton) ...[

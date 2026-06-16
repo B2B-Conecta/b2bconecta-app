@@ -53,6 +53,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     setState(() => _profile = fetched);
   }
 
+  Future<void> _onTermsAccepted() async {
+    await _softRefreshProfile();
+    if (!mounted) return;
+    final p = _profile;
+    if (p != null &&
+        p.isComplete &&
+        (!p.requiresTermsAcceptance || p.hasAcceptedCurrentTerms)) {
+      widget.onProfileComplete();
+    }
+  }
+
   Future<void> _onProfileSaved() async {
     await _softRefreshProfile();
     if (!mounted) return;
@@ -93,6 +104,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             initial: _profile,
             showCloseBar: false,
             onRelatedDataChanged: _softRefreshProfile,
+            onTermsAccepted: _onTermsAccepted,
             onSaved: _onProfileSaved,
           ),
         ),

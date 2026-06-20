@@ -1,6 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/auth_recovery_storage.dart';
 import 'push_notification_service.dart';
 
 /// Operaciones de Supabase Auth (login, registro, recuperación, actualización).
@@ -37,8 +38,9 @@ class AuthService {
   }
 
   /// [redirectTo] opcional vía `.env` → `SUPABASE_AUTH_REDIRECT_URL` (URL de tu app web o deep link).
-  static Future<void> resetPasswordForEmail(String email) {
-    return _auth.resetPasswordForEmail(
+  static Future<void> resetPasswordForEmail(String email) async {
+    await AuthRecoveryStorage.markPendingPasswordRecovery();
+    await _auth.resetPasswordForEmail(
       email.trim(),
       redirectTo: authRedirectUrl,
     );
@@ -50,6 +52,7 @@ class AuthService {
   }
 
   static Future<void> signOut() async {
+    await AuthRecoveryStorage.clearPendingPasswordRecovery();
     await PushNotificationService.instance.unregisterCurrentDevice();
     await _auth.signOut();
   }
@@ -77,6 +80,10 @@ class AuthService {
     }
     if (m.contains('signup') && m.contains('disabled')) {
       return 'El registro está deshabilitado en este momento.';
+    }
+    if (m.contains('code verifier')) {
+      return 'Abre el enlace en el mismo navegador donde solicitaste '
+          'la recuperación de contraseña.';
     }
     return raw?.isNotEmpty == true
         ? raw!

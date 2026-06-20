@@ -76,7 +76,9 @@ class _LoginForgotPasswordDialogState extends State<_LoginForgotPasswordDialog> 
       Navigator.of(context).pop(
         const ForgotPasswordDialogResult(
           message:
-              'Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña.',
+              'Si existe una cuenta con ese correo, recibirás un enlace para '
+              'restablecer la contraseña. Ábrelo en el mismo navegador donde '
+              'lo solicitaste.',
           isError: false,
         ),
       );

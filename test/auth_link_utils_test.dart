@@ -11,6 +11,14 @@ void main() {
     expect(result.errorMessage, isNull);
   });
 
+  test('detects PKCE auth callback with code query param', () {
+    final uri = Uri.parse(
+      'https://motolink-app.vercel.app/?code=abc-123',
+    );
+    expect(hasAuthCallbackInUri(uri), isTrue);
+    expect(parseAuthUriFragment(uri).isPasswordRecovery, isFalse);
+  });
+
   test('maps expired otp error from fragment', () {
     final uri = Uri.parse(
       'http://localhost:3000/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired',

@@ -170,6 +170,28 @@ class ProfileModel {
 
   bool get isImportador => role?.trim().toLowerCase() == 'importador';
 
+  bool get hasValidAppRole {
+    final r = role?.trim().toLowerCase();
+    return r == 'importador' || r == 'aliado' || r == 'administrador';
+  }
+
+  /// Perfil listo para entrar al panel principal (post login).
+  bool get isReadyForMainApp {
+    if (!hasValidAppRole || !isComplete) return false;
+    if (requiresTermsAcceptance && !hasAcceptedCurrentTerms) return false;
+    if (isAliado && !hasActiveAccountAccess) return false;
+    return true;
+  }
+
+  /// Aliado en revisión MotoLink (no borrador ni activo).
+  bool get needsAliadoPendingReviewScreen {
+    if (!isAliado || hasActiveAccountAccess) return false;
+    final access = accountAccessStatus?.trim();
+    return access != null &&
+        access.isNotEmpty &&
+        access != AccountAccessStatus.draft;
+  }
+
   /// Aliados e importadores deben aceptar términos vigentes.
   bool get requiresTermsAcceptance => isAliado || isImportador;
 

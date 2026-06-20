@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/profile_model.dart';
+import '../../models/profile_role_labels.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_breakpoints.dart';
 import '../admin_content_frame.dart';
@@ -21,7 +22,6 @@ class DesktopNavigationShell extends StatelessWidget {
     required this.onNotificationTap,
     required this.onOpenSettings,
     required this.railBadgeLabel,
-    required this.contextLabel,
     this.trailingActions = const [],
   });
 
@@ -34,7 +34,6 @@ class DesktopNavigationShell extends StatelessWidget {
   final VoidCallback onNotificationTap;
   final VoidCallback onOpenSettings;
   final String railBadgeLabel;
-  final String contextLabel;
   final List<Widget> trailingActions;
 
   @override
@@ -54,6 +53,7 @@ class DesktopNavigationShell extends StatelessWidget {
             selectedIndex: safeIndex,
             destinations: destinations,
             badgeLabel: railBadgeLabel,
+            profile: profile,
             onDestinationSelected: onDestinationSelected,
             onOpenSettings: onOpenSettings,
           ),
@@ -62,11 +62,8 @@ class DesktopNavigationShell extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DesktopShellTopBar(
-                  profile: profile,
                   unreadNotifications: unreadNotifications,
                   onNotificationTap: onNotificationTap,
-                  onOpenSettings: onOpenSettings,
-                  contextLabel: contextLabel,
                   trailingActions: trailingActions,
                 ),
                 Padding(
@@ -125,6 +122,7 @@ class _DesktopSideRail extends StatelessWidget {
     required this.selectedIndex,
     required this.destinations,
     required this.badgeLabel,
+    required this.profile,
     required this.onDestinationSelected,
     required this.onOpenSettings,
   });
@@ -133,6 +131,7 @@ class _DesktopSideRail extends StatelessWidget {
   final int selectedIndex;
   final List<ShellDestination> destinations;
   final String badgeLabel;
+  final ProfileModel profile;
   final ValueChanged<int> onDestinationSelected;
   final VoidCallback onOpenSettings;
 
@@ -190,21 +189,113 @@ class _DesktopSideRail extends StatelessWidget {
                 },
               ),
             ),
-            if (extended)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                child: OutlinedButton.icon(
-                  onPressed: onOpenSettings,
-                  icon: const Icon(Icons.settings_outlined, size: 18),
-                  label: const Text('Ajustes'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.brandBlue,
-                    side: BorderSide(color: Colors.grey.shade300),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
+            _DesktopSideRailAccountFooter(
+              extended: extended,
+              profile: profile,
+              onOpenSettings: onOpenSettings,
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopSideRailAccountFooter extends StatelessWidget {
+  const _DesktopSideRailAccountFooter({
+    required this.extended,
+    required this.profile,
+    required this.onOpenSettings,
+  });
+
+  final bool extended;
+  final ProfileModel profile;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final business = profile.businessName?.trim();
+    final role = ProfileRoleLabels.labelEs(profile.role);
+    final displayName =
+        business != null && business.isNotEmpty ? business : 'Mi cuenta';
+
+    if (extended) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: onOpenSettings,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    displayName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    role,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.settings_outlined,
+                        size: 16,
+                        color: AppColors.brandBlue,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Ajustes de cuenta',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.brandBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+      child: Tooltip(
+        message: '$displayName · $role · Ajustes',
+        child: IconButton(
+          onPressed: onOpenSettings,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white,
+            side: BorderSide(color: Colors.grey.shade200),
+            minimumSize: const Size(48, 48),
+          ),
+          icon: Icon(Icons.settings_outlined, color: Colors.grey.shade700),
         ),
       ),
     );

@@ -9,6 +9,24 @@ class AuthLinkParseResult {
   final String? errorMessage;
 }
 
+/// Indica si la URL actual trae un callback de Supabase Auth (PKCE, implicit o error).
+bool hasAuthCallbackInUri(Uri uri) {
+  if (uri.fragment.isNotEmpty) {
+    final fragment = Uri.splitQueryString(uri.fragment);
+    if (fragment.containsKey('access_token') ||
+        fragment.containsKey('error') ||
+        fragment.containsKey('error_description')) {
+      return true;
+    }
+  }
+  if (uri.queryParameters.containsKey('code')) return true;
+  if (uri.queryParameters.containsKey('error') ||
+      uri.queryParameters.containsKey('error_description')) {
+    return true;
+  }
+  return false;
+}
+
 AuthLinkParseResult parseAuthUriFragment(Uri uri) {
   final params = _authParamsFromUri(uri);
   if (params.isEmpty) {

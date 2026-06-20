@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/auth_recovery_storage.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_breakpoints.dart';
+import '../widgets/motolink_pro_logo.dart';
 
 /// Tras abrir el enlace del correo de recuperación: obliga a definir nueva contraseña y cerrar sesión.
 class RecoverPasswordScreen extends StatefulWidget {
@@ -17,12 +20,49 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _busy = false;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
 
   @override
   void dispose() {
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(prefixIcon, color: AppColors.textSecondary),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: AppColors.fieldFill,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.red.shade400),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.red.shade600, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+    );
   }
 
   Future<void> _submit() async {
@@ -32,10 +72,15 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
     try {
       await AuthService.updatePassword(_newPasswordController.text);
       if (!mounted) return;
+      await AuthRecoveryStorage.clearPendingPasswordRecovery();
+      if (!mounted) return;
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text('Contraseña actualizada'),
           content: const Text(
             'Tu contraseña se ha guardado. Inicia sesión de nuevo con el correo '
@@ -58,6 +103,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
         SnackBar(
           content: Text(AuthService.mapAuthErrorMessage(e.message)),
           backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
@@ -66,6 +112,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
         SnackBar(
           content: Text('No se pudo guardar la contraseña: $e'),
           backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -77,120 +124,355 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
     await AuthService.signOut();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'Nueva contraseña',
-          style: TextStyle(fontWeight: FontWeight.bold),
+  Widget _buildRecoveryIcon() {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Icon(
+        Icons.lock_reset_rounded,
+        size: 32,
+        color: AppColors.brandBlue,
+      ),
+    );
+  }
+
+  Widget _buildRecoveryHeader({required bool compact}) {
+    return Column(
+      children: [
+        if (!compact) ...[
+          const MotoLinkProLogo(height: MotoLinkProLogoHeights.login),
+          const SizedBox(height: 20),
+        ],
+        _buildRecoveryIcon(),
+        SizedBox(height: compact ? 18 : 20),
+        const Text(
+          'Recuperación de cuenta',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Define una contraseña nueva. Luego deberás iniciar sesión otra vez.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.45,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormFields() {
+    return AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _newPasswordController,
+            obscureText: _obscureNew,
+            autofillHints: const [AutofillHints.newPassword],
+            textInputAction: TextInputAction.next,
+            enabled: !_busy,
+            decoration: _inputDecoration(
+              hint: 'Nueva contraseña',
+              prefixIcon: Icons.lock_outlined,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureNew
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: AppColors.textSecondary,
+                ),
+                onPressed: () => setState(() => _obscureNew = !_obscureNew),
+              ),
+            ),
+            validator: (v) {
+              if (v == null || v.length < 6) {
+                return 'Mínimo 6 caracteres';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _confirmPasswordController,
+            obscureText: _obscureConfirm,
+            autofillHints: const [AutofillHints.newPassword],
+            textInputAction: TextInputAction.done,
+            enabled: !_busy,
+            onFieldSubmitted: _busy ? null : (_) => _submit(),
+            decoration: _inputDecoration(
+              hint: 'Confirmar contraseña',
+              prefixIcon: Icons.lock_outlined,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: AppColors.textSecondary,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+            ),
+            validator: (v) {
+              if (v != _newPasswordController.text) {
+                return 'Las contraseñas no coinciden';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrimaryButton() {
+    return SizedBox(
+      height: 52,
+      child: FilledButton(
+        onPressed: _busy ? null : _submit,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.brand,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: _busy
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : const Text(
+                'Guardar y cerrar sesión',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildCancelLink() {
+    return TextButton(
+      onPressed: _busy ? null : _cancelRecovery,
+      child: const Text(
+        'Cancelar y volver al inicio de sesión',
+        style: TextStyle(
+          color: AppColors.brand,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+    );
+  }
+
+  Widget _buildRecoveryCard({required bool showHeader}) {
+    return Material(
+      color: Colors.white,
+      elevation: 0,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: AppDecorations.cardShadow,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
           child: Form(
             key: _formKey,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.lock_reset, size: 56, color: Colors.grey.shade700),
-                const SizedBox(height: 16),
-                Text(
-                  'Recuperación de cuenta',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.grey.shade900,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Define una contraseña nueva. Luego deberás iniciar sesión otra vez.',
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 28),
-                TextFormField(
-                  controller: _newPasswordController,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: InputDecoration(
-                    labelText: 'Nueva contraseña',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.length < 6) {
-                      return 'Mínimo 6 caracteres';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: InputDecoration(
-                    labelText: 'Confirmar contraseña',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v != _newPasswordController.text) {
-                      return 'Las contraseñas no coinciden';
-                    }
-                    return null;
-                  },
-                ),
+                if (showHeader) ...[
+                  _buildRecoveryHeader(compact: true),
+                  const SizedBox(height: 28),
+                ],
+                _buildFormFields(),
                 const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _busy ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.brand,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _busy
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Guardar y cerrar sesión',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _busy ? null : _cancelRecovery,
-                  child: const Text('Cancelar y volver al inicio de sesión'),
-                ),
+                _buildPrimaryButton(),
+                const SizedBox(height: 4),
+                _buildCancelLink(),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBrandingPanel() {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0D47A1),
+            AppColors.brandBlue,
+            Color(0xFF1976D2),
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Restablece\n tu acceso',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  height: 1.15,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Por seguridad, define una contraseña nueva y vuelve a '
+                'iniciar sesión para continuar en MotoLink.',
+                style: TextStyle(
+                  fontSize: 15.5,
+                  height: 1.5,
+                  color: Colors.white.withOpacity(0.88),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const _RecoveryBrandingBullet(
+                icon: Icons.mark_email_read_outlined,
+                label: 'Enlace verificado desde tu correo',
+              ),
+              const SizedBox(height: 12),
+              const _RecoveryBrandingBullet(
+                icon: Icons.security_outlined,
+                label: 'Sesión temporal hasta guardar la contraseña',
+              ),
+              const SizedBox(height: 12),
+              const _RecoveryBrandingBullet(
+                icon: Icons.login_outlined,
+                label: 'Inicio de sesión con la nueva clave',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= AppBreakpoints.authDesktop;
+
+          if (isDesktop) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: 5, child: _buildBrandingPanel()),
+                Expanded(
+                  flex: 4,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 32,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: AppBreakpoints.authFormMaxWidth,
+                        ),
+                        child: _buildRecoveryCard(showHeader: true),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AppBreakpoints.authFormMaxWidth,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildRecoveryHeader(compact: false),
+                    const SizedBox(height: 28),
+                    _buildRecoveryCard(showHeader: false),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RecoveryBrandingBullet extends StatelessWidget {
+  const _RecoveryBrandingBullet({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.14),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withOpacity(0.95),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

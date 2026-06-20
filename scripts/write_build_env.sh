@@ -23,6 +23,11 @@ if [[ -z "$redirect" ]]; then
   redirect="http://localhost:3000"
 fi
 
+if [[ "$redirect" == *"motolink-pro-app.vercel.app"* ]]; then
+  echo "WARN: SUPABASE_AUTH_REDIRECT_URL uses motolink-pro-app.vercel.app (404)."
+  echo "      Use https://motolink-app.vercel.app — see config/vercel-env.staging.example"
+fi
+
 cat >"$TARGET" <<EOF
 # Generated at build time ($(date -u +%Y-%m-%dT%H:%MZ))
 NEXT_PUBLIC_SUPABASE_URL=$url

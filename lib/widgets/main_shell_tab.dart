@@ -26,6 +26,9 @@ class MainShellTabController {
   static VoidCallback? _importerCommissionSettlementDeepLink;
   static String? _pendingKycProfileId;
   static VoidCallback? _adminKycNotificationDeepLink;
+  static String? _pendingSupportTicketId;
+  static VoidCallback? _adminSupportNotificationDeepLink;
+  static VoidCallback? _b2bSupportNotificationDeepLink;
 
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
@@ -50,6 +53,9 @@ class MainShellTabController {
     _importerCommissionSettlementDeepLink = null;
     _pendingKycProfileId = null;
     _adminKycNotificationDeepLink = null;
+    _pendingSupportTicketId = null;
+    _adminSupportNotificationDeepLink = null;
+    _b2bSupportNotificationDeepLink = null;
   }
 
   /// [ImporterInventoryDashboard] registra [reload] para refrescar stock tras entrega.
@@ -239,9 +245,9 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Perfil (índice 5).
+  /// Admin: pestaña Perfil (índice 6).
   static void navigateToAdminProfileTab() {
-    _goTo?.call(5);
+    _goTo?.call(6);
   }
 
   /// Admin: pestaña Comisiones (índice 3).
@@ -334,6 +340,50 @@ class MainShellTabController {
     _pendingKycProfileId = null;
     return v;
   }
+
+  /// Admin: pestaña Soporte (índice 5).
+  static void navigateToAdminSupportForNotification() {
+    _goTo?.call(5);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminSupportNotificationDeepLink?.call();
+    });
+  }
+
+  /// Aliado/importador: pantalla de soporte desde notificación (Perfil → soporte).
+  static void navigateToSupportForNotification() {
+    _goTo?.call(_resolvedB2BProfileTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _b2bSupportNotificationDeepLink?.call();
+    });
+  }
+
+  static void registerAdminSupportNotificationDeepLink(VoidCallback? onNavigate) {
+    _adminSupportNotificationDeepLink = onNavigate;
+  }
+
+  static void registerB2BSupportNotificationDeepLink(VoidCallback? onNavigate) {
+    _b2bSupportNotificationDeepLink = onNavigate;
+  }
+
+  static void setPendingSupportTicketId(String? ticketId) {
+    final s = ticketId?.trim();
+    _pendingSupportTicketId = (s == null || s.isEmpty) ? null : s;
+  }
+
+  static String? peekPendingSupportTicketId() {
+    final s = _pendingSupportTicketId?.trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
+  }
+
+  static String? consumePendingSupportTicketId() {
+    final v = _pendingSupportTicketId;
+    _pendingSupportTicketId = null;
+    return v;
+  }
+
+  static VoidCallback? peekB2BSupportNotificationHandler() =>
+      _b2bSupportNotificationDeepLink;
 }
 
 /// Alcance de la bandeja admin al abrir desde una notificación in-app.

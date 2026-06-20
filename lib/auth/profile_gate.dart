@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/account_access_status.dart';
 import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
 import '../screens/aliado_pending_review_screen.dart';
@@ -30,6 +29,17 @@ class _ProfileGateState extends State<ProfileGate> {
     setState(() {
       _profileFuture = SupabaseService.fetchMyProfile();
     });
+  }
+
+  AppHomeRole _homeRoleFor(ProfileModel profile) {
+    switch (profile.role?.trim().toLowerCase()) {
+      case 'aliado':
+        return AppHomeRole.aliado;
+      case 'administrador':
+        return AppHomeRole.administrador;
+      default:
+        return AppHomeRole.importador;
+    }
   }
 
   @override
@@ -98,14 +108,8 @@ class _ProfileGateState extends State<ProfileGate> {
         }
 
         final profile = snapshot.data;
-        final roleNorm = profile?.role?.trim().toLowerCase();
-        final hasValidRole = roleNorm == 'importador' ||
-            roleNorm == 'aliado' ||
-            roleNorm == 'administrador';
-        final needsOnboarding =
-            profile == null || !hasValidRole || !profile.isComplete;
 
-        if (needsOnboarding) {
+        if (profile == null || !profile.hasValidAppRole || !profile.isComplete) {
           return ProfileSetupScreen(
             initial: profile,
             onProfileComplete: _reloadProfile,
@@ -120,33 +124,26 @@ class _ProfileGateState extends State<ProfileGate> {
         }
 
         if (profile.isAliado && !profile.hasActiveAccountAccess) {
-          final access = profile.accountAccessStatus?.trim();
-          if (access == AccountAccessStatus.draft ||
-              access == null ||
-              access.isEmpty) {
-            return ProfileSetupScreen(
-              initial: profile,
-              onProfileComplete: _reloadProfile,
+          if (profile.needsAliadoPendingReviewScreen) {
+            return AliadoPendingReviewScreen(
+              profile: profile,
+              onRefresh: _reloadProfile,
             );
           }
-          return AliadoPendingReviewScreen(
-            profile: profile,
-            onRefresh: _reloadProfile,
+          return ProfileSetupScreen(
+            initial: profile,
+            onProfileComplete: _reloadProfile,
           );
         }
 
-        final AppHomeRole homeRole;
-        switch (roleNorm) {
-          case 'aliado':
-            homeRole = AppHomeRole.aliado;
-            break;
-          case 'administrador':
-            homeRole = AppHomeRole.administrador;
-            break;
-          default:
-            homeRole = AppHomeRole.importador;
+        if (profile.isReadyForMainApp) {
+          return MainShell(homeRole: _homeRoleFor(profile), profile: profile);
         }
-        return MainShell(homeRole: homeRole, profile: profile);
+
+        return ProfileSetupScreen(
+          initial: profile,
+          onProfileComplete: _reloadProfile,
+        );
       },
     );
   }

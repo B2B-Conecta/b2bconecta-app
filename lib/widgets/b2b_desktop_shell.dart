@@ -17,7 +17,6 @@ class B2bDesktopShell extends StatelessWidget {
     required this.onNotificationTap,
     required this.onOpenSettings,
     required this.railBadgeLabel,
-    required this.contextLabel,
     this.trailingActions = const [],
   });
 
@@ -30,7 +29,6 @@ class B2bDesktopShell extends StatelessWidget {
   final VoidCallback onNotificationTap;
   final VoidCallback onOpenSettings;
   final String railBadgeLabel;
-  final String contextLabel;
   final List<Widget> trailingActions;
 
   @override
@@ -45,7 +43,6 @@ class B2bDesktopShell extends StatelessWidget {
       onNotificationTap: onNotificationTap,
       onOpenSettings: onOpenSettings,
       railBadgeLabel: railBadgeLabel,
-      contextLabel: contextLabel,
       trailingActions: trailingActions,
     );
   }

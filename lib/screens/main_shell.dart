@@ -567,7 +567,6 @@ class _MainShellState extends State<MainShell> {
     required AppHomeRole role,
     required List<ShellDestination> destinations,
     required String railBadgeLabel,
-    required String contextLabel,
     List<Widget> trailingActions = const [],
   }) {
     return Column(
@@ -590,7 +589,6 @@ class _MainShellState extends State<MainShell> {
             onNotificationTap: _openNotificationCenter,
             onOpenSettings: _openAccountSettings,
             railBadgeLabel: railBadgeLabel,
-            contextLabel: contextLabel,
             trailingActions: trailingActions,
           ),
         ),
@@ -649,7 +647,6 @@ class _MainShellState extends State<MainShell> {
             role: AppHomeRole.aliado,
             destinations: _aliadoDestinations,
             railBadgeLabel: 'Panel aliado',
-            contextLabel: 'MotoLink · Aliado',
             trailingActions: [_aliadoCartTopBarAction()],
           );
         }
@@ -691,7 +688,6 @@ class _MainShellState extends State<MainShell> {
             role: AppHomeRole.importador,
             destinations: _importadorDestinations,
             railBadgeLabel: 'Panel importador',
-            contextLabel: 'MotoLink · Importador',
           );
         }
         return _buildB2bMobileShell(

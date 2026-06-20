@@ -460,7 +460,6 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           ...requiredTypes.map(_buildDocTile),
         ],
         if (widget._isAliado &&
-            accountAllowsSubmit &&
             !(widget.profile?.hasAcceptedCurrentTerms ?? false)) ...[
           const SizedBox(height: 12),
           const ProfileSectionHeader(

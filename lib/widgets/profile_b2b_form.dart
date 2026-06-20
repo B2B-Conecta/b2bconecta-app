@@ -31,6 +31,7 @@ class ProfileB2BForm extends StatefulWidget {
     this.onTermsAccepted,
     this.afterReputation,
     this.beforeSignOut,
+    this.onEnterApp,
   });
 
   final ProfileModel? initial;
@@ -51,6 +52,9 @@ class ProfileB2BForm extends StatefulWidget {
 
   /// Contenido opcional justo encima del botón «Cerrar sesión» (aliado).
   final Widget? beforeSignOut;
+
+  /// Cuando el perfil ya puede entrar al panel (cuenta aprobada / activa).
+  final VoidCallback? onEnterApp;
 
   @override
   State<ProfileB2BForm> createState() => _ProfileB2BFormState();
@@ -621,6 +625,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               color: AppColors.textSecondary,
             ),
           ),
+          if (widget.onEnterApp != null &&
+              (widget.initial?.isReadyForMainApp ?? false)) ...[
+            const SizedBox(height: 20),
+            _EnterAppBanner(onPressed: widget.onEnterApp!),
+          ],
           const SizedBox(height: 24),
           ProfileCollapsibleSection(
             title: 'Datos del negocio',
@@ -1012,6 +1021,66 @@ class _RoleChoiceTile extends StatelessWidget {
           borderRadius: AppDecorations.radius12,
           child: content,
         ),
+      ),
+    );
+  }
+}
+
+class _EnterAppBanner extends StatelessWidget {
+  const _EnterAppBanner({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.successGreen.withOpacity(0.12),
+        borderRadius: AppDecorations.radius12,
+        border: Border.all(color: AppColors.successGreen.withOpacity(0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle, color: AppColors.successGreen, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Su cuenta está habilitada',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.green.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ya puede acceder al panel de MotoLink con su catálogo, pedidos y operaciones.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              color: Colors.green.shade900.withOpacity(0.85),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.successGreen,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            icon: const Icon(Icons.dashboard_outlined, size: 20),
+            label: const Text(
+              'Entrar a MotoLink',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

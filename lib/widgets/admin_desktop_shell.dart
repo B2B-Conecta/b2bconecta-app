@@ -42,7 +42,6 @@ class AdminDesktopShell extends StatelessWidget {
       onNotificationTap: onNotificationTap,
       onOpenSettings: onOpenSettings,
       railBadgeLabel: 'Panel administrador',
-      contextLabel: 'MotoLink · Operaciones',
     );
   }
 }

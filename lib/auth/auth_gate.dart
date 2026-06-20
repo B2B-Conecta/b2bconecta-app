@@ -5,11 +5,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/login_screen.dart';
 import '../screens/recover_password_screen.dart';
+import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
-import 'auth_link_fragment_clear_stub.dart'
-    if (dart.library.html) 'auth_link_fragment_clear_web.dart';
 import 'auth_link_utils.dart';
+import 'auth_recovery_storage.dart';
+import 'auth_uri_callback_clear_stub.dart'
+    if (dart.library.html) 'auth_uri_callback_clear_web.dart';
 import 'profile_gate.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
@@ -24,16 +26,18 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   late final StreamSubscription<AuthState> _authSub;
   AuthState? _authState;
 
-  /// Tras [AuthChangeEvent.passwordRecovery] sigue activo hasta [signedOut].
+  /// Tras recovery sigue activo hasta [signedOut] o cambio de contraseña.
   bool _awaitingPasswordRecovery = false;
 
-  /// Evita montar [ProfileGate] antes de resolver recovery vs login normal (web/PKCE).
+  /// Resolviendo `?code=` / fragmento Auth al abrir la app (web PKCE).
+  bool _resolvingAuthCallback = false;
+
+  /// Evita montar [ProfileGate] antes de resolver recovery vs login normal.
   bool _awaitingInitialAuthEvent = false;
 
   /// Mensaje de enlace inválido; no se limpia con setState para no recrear [LoginScreen].
   String? _initialLinkError;
 
-  /// Evita aplicar un [signedIn] diferido si ya llegó [passwordRecovery].
   bool _bootstrapResolved = false;
 
   @override
@@ -41,15 +45,28 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    final link = parseAuthUriFragment(Uri.base);
-    _awaitingPasswordRecovery = link.isPasswordRecovery;
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
+      _onAuthStateChange,
+    );
+
+    final uri = Uri.base;
+    final link = parseAuthUriFragment(uri);
     _initialLinkError = link.errorMessage;
+    _awaitingPasswordRecovery = link.isPasswordRecovery;
 
     if (_initialLinkError != null) {
-      clearAuthUriFragment();
+      clearAuthUriCallback();
       unawaited(_signOutAfterLinkError());
+      _bootstrapWithoutCallback();
+    } else if (hasAuthCallbackInUri(uri)) {
+      _resolvingAuthCallback = true;
+      unawaited(_resolveAuthCallback(uri, link));
+    } else {
+      _bootstrapWithoutCallback();
     }
+  }
 
+  void _bootstrapWithoutCallback() {
     final bootSession = Supabase.instance.client.auth.currentSession;
     final hasLinkError = _initialLinkError != null;
 
@@ -63,17 +80,72 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           : AuthChangeEvent.signedOut,
       hasLinkError ? null : bootSession,
     );
+    _bootstrapResolved = ! _awaitingInitialAuthEvent;
+  }
 
-    if (!hasLinkError && (link.isPasswordRecovery || bootSession != null)) {
-      clearAuthUriFragment();
+  Future<void> _resolveAuthCallback(Uri uri, AuthLinkParseResult link) async {
+    try {
+      // Deja que Supabase.initialize termine detectSessionInUri si aplica.
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      var session = Supabase.instance.client.auth.currentSession;
+      var redirectType = link.isPasswordRecovery ? 'recovery' : null;
+
+      if (uri.queryParameters.containsKey('code')) {
+        if (session == null) {
+          try {
+            final response =
+                await Supabase.instance.client.auth.getSessionFromUrl(uri);
+            session = response.session;
+            redirectType = response.redirectType ?? redirectType;
+          } on AuthException catch (e) {
+            _initialLinkError = AuthService.mapAuthErrorMessage(e.message);
+            await _signOutAfterLinkError();
+            return;
+          }
+        }
+      }
+
+      clearAuthUriCallback();
+
+      final pendingRecovery = redirectType == 'recovery' ||
+          _awaitingPasswordRecovery ||
+          await AuthRecoveryStorage.consumePendingPasswordRecovery();
+
+      if (pendingRecovery && session != null) {
+        _awaitingPasswordRecovery = true;
+      } else if (session != null) {
+        await AuthRecoveryStorage.clearPendingPasswordRecovery();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _authState = AuthState(
+          session != null
+              ? (pendingRecovery
+                  ? AuthChangeEvent.passwordRecovery
+                  : AuthChangeEvent.signedIn)
+              : AuthChangeEvent.signedOut,
+          session,
+        );
+      });
+    } catch (e) {
+      _initialLinkError ??=
+          'No se pudo completar la autenticación desde el enlace.';
+      await _signOutAfterLinkError();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _resolvingAuthCallback = false;
+          _awaitingInitialAuthEvent = false;
+          _bootstrapResolved = true;
+        });
+      }
     }
-
-    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
-      _onAuthStateChange,
-    );
   }
 
   Future<void> _signOutAfterLinkError() async {
+    await AuthRecoveryStorage.clearPendingPasswordRecovery();
     try {
       await Supabase.instance.client.auth.signOut();
     } catch (_) {
@@ -86,7 +158,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         data.session != null) {
       _awaitingPasswordRecovery = true;
       _bootstrapResolved = true;
-      _applyAuthState(data);
+      unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
+      if (!_resolvingAuthCallback) {
+        _applyAuthState(data);
+      }
+      return;
+    }
+
+    if (_resolvingAuthCallback && !_bootstrapResolved) {
       return;
     }
 
@@ -100,9 +179,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (_awaitingInitialAuthEvent &&
         data.session != null &&
         !_bootstrapResolved) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _bootstrapResolved) return;
-        if (parseAuthUriFragment(Uri.base).isPasswordRecovery) {
+        final pending = await AuthRecoveryStorage.consumePendingPasswordRecovery();
+        if (pending || parseAuthUriFragment(Uri.base).isPasswordRecovery) {
           _awaitingPasswordRecovery = true;
         }
         _bootstrapResolved = true;
@@ -149,25 +229,20 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
   }
 
-  /// Solo refresca si ya hay sesión con refresh token (evita [AuthSessionMissingException] en login/registro).
   Future<void> _refreshSessionIfLoggedIn() async {
     final token =
         Supabase.instance.client.auth.currentSession?.refreshToken;
     if (token == null || token.isEmpty) return;
     try {
       await Supabase.instance.client.auth.refreshSession();
-    } catch (_) {
-      // Token inválido o revocado; el siguiente evento de auth actualizará la UI.
-    }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_authState == null) {
-      return const _AuthLoadingScaffold();
-    }
-
-    if (_awaitingInitialAuthEvent) {
+    if (_authState == null ||
+        _resolvingAuthCallback ||
+        _awaitingInitialAuthEvent) {
       return const _AuthLoadingScaffold();
     }
 

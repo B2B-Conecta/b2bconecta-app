@@ -12,6 +12,18 @@ void navigateFromNotificationPayload({
   MainShellTabController.setPendingNotificationType(type);
   final t0 = type.trim();
 
+  if (t0 == 'soporte') {
+    MainShellTabController.setPendingSupportTicketId(relatedId);
+    switch (homeRole) {
+      case AppHomeRole.administrador:
+        MainShellTabController.navigateToAdminSupportForNotification();
+        return;
+      case AppHomeRole.aliado:
+      case AppHomeRole.importador:
+        MainShellTabController.navigateToSupportForNotification();
+        return;
+    }
+  }
   if (t0 == 'kyc') {
     switch (homeRole) {
       case AppHomeRole.administrador:

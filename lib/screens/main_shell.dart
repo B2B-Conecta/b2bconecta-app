@@ -15,6 +15,7 @@ import '../widgets/admin_encomiendas_report_panel.dart';
 import '../widgets/admin_kyc_review_panel.dart';
 import '../widgets/admin_order_ratings_panel.dart';
 import '../widgets/admin_orders_panel.dart';
+import '../widgets/admin_support_tickets_panel.dart';
 import '../utils/kyc_notification_match.dart';
 import '../widgets/aliado_access_approved_banner.dart';
 import '../widgets/aliado_pedidos_panel.dart';
@@ -26,6 +27,8 @@ import '../widgets/profile_b2b_form.dart';
 import 'account_settings_screen.dart';
 import 'home_screen.dart';
 import 'reputation_tab.dart';
+import 'support_tickets_screen.dart';
+import 'support_ticket_detail_screen.dart';
 
 /// Shell principal: navegación por rol (admin: pedidos; aliado: catálogo / pedidos / perfil).
 class MainShell extends StatefulWidget {
@@ -217,6 +220,14 @@ class _MainShellState extends State<MainShell> {
           'Revise documentación de aliados e importadores; apruebe por archivo o el estado global.',
     ),
     AdminShellDestination(
+      icon: Icons.support_agent_outlined,
+      selectedIcon: Icons.support_agent,
+      label: 'Soporte',
+      title: 'Atención al cliente',
+      subtitle:
+          'Reclamos de aliados e importadores. Responda y cierre cuando quede resuelto.',
+    ),
+    AdminShellDestination(
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
       label: 'Perfil',
@@ -232,6 +243,7 @@ class _MainShellState extends State<MainShell> {
       AdminOrderRatingsPanel(),
       AdminCommissionSettlementsPanel(),
       AdminKycReviewPanel(),
+      AdminSupportTicketsPanel(),
     ];
   }
 
@@ -606,7 +618,7 @@ class _OrdersTab extends StatelessWidget {
   }
 }
 
-class _ProfileTab extends StatelessWidget {
+class _ProfileTab extends StatefulWidget {
   const _ProfileTab({
     required this.profile,
     required this.homeRole,
@@ -622,16 +634,79 @@ class _ProfileTab extends StatelessWidget {
   final int unreadNotifications;
 
   @override
+  State<_ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<_ProfileTab> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.homeRole == AppHomeRole.aliado ||
+        widget.homeRole == AppHomeRole.importador) {
+      MainShellTabController.registerB2BSupportNotificationDeepLink(
+        _onSupportNotificationDeepLink,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.homeRole == AppHomeRole.aliado ||
+        widget.homeRole == AppHomeRole.importador) {
+      MainShellTabController.registerB2BSupportNotificationDeepLink(null);
+    }
+    super.dispose();
+  }
+
+  Future<void> _onSupportNotificationDeepLink() async {
+    if (!mounted) return;
+    await _openSupportTickets(openPendingTicket: true);
+  }
+
+  Future<void> _openSupportTickets({bool openPendingTicket = false}) async {
+    if (openPendingTicket) {
+      final ticketId = MainShellTabController.peekPendingSupportTicketId() ??
+          MainShellTabController.peekPendingNotificationRelatedId();
+      if (ticketId != null && ticketId.isNotEmpty) {
+        MainShellTabController.consumePendingSupportTicketId();
+        MainShellTabController.consumePendingNotificationRelatedId();
+        final ticket = await SupabaseService.fetchSupportTicketById(ticketId);
+        if (!mounted) return;
+        if (ticket != null) {
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => SupportTicketDetailScreen(
+                ticket: ticket,
+                isAdminView: false,
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const SupportTicketsScreen(),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showSupportEntry = widget.homeRole == AppHomeRole.aliado ||
+        widget.homeRole == AppHomeRole.importador;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: MotolinkAppBar(
-        currentUserProfile: profile,
-        logoHeight: homeRole == AppHomeRole.aliado
+        currentUserProfile: widget.profile,
+        logoHeight: widget.homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
             : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: onNotificationTap,
-        unreadNotifications: unreadNotifications,
+        onNotificationTap: widget.onNotificationTap,
+        unreadNotifications: widget.unreadNotifications,
         extraActions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -649,15 +724,73 @@ class _ProfileTab extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: ProfileB2BForm(
-            key: ValueKey<Object>(
-              '${profile.id}_${profile.businessName}_${profile.rif}_${profile.role}_${profile.kycStatus}_${profile.primerosPedidosContadoEntregados}_${profile.creditLimit}_${profile.creditoPreactivadoPorAdmin}_${profile.logoStoragePath}_${profile.fiscalMapsUrl}',
-            ),
-            initial: profile,
-            onRelatedDataChanged: onProfileSaved,
-            onSaved: () {
-              onProfileSaved();
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showSupportEntry) ...[
+                Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _openSupportTickets(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.support_agent_outlined,
+                            color: AppColors.brandBlue,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Atención al cliente',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Abra un reclamo con el equipo MotoLink '
+                                  '(máx. 3 abiertos).',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    height: 1.35,
+                                    color: Colors.grey.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: AppColors.brandOrange,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              ProfileB2BForm(
+                key: ValueKey<Object>(
+                  '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
+                ),
+                initial: widget.profile,
+                onRelatedDataChanged: widget.onProfileSaved,
+                onSaved: () {
+                  widget.onProfileSaved();
+                },
+              ),
+            ],
           ),
         ),
       ),

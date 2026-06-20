@@ -12,6 +12,7 @@ import '../services/geolocator_service.dart';
 import '../services/supabase_service.dart';
 import 'cart_screen.dart';
 import '../theme/app_theme.dart';
+import '../utils/aliado_catalog_layout.dart';
 import '../utils/promo_popup_frequency.dart';
 import '../widgets/aliado_catalog_filters_sheet.dart';
 import '../widgets/aliado_promo_campaign_widgets.dart';
@@ -56,6 +57,7 @@ class HomeScreen extends StatefulWidget {
     this.homeRole = AppHomeRole.importador,
     this.onNotificationTap,
     this.unreadNotifications = 0,
+    this.embedInDesktopShell = false,
   });
 
   final ProfileModel profile;
@@ -63,13 +65,17 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onNotificationTap;
   final int unreadNotifications;
 
+  /// Sin AppBar propio cuando el shell de escritorio provee chrome.
+  final bool embedInDesktopShell;
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const int _kCrossAxisCount = 2;
-  static const int _kPageSize = _kCrossAxisCount * 3;
+  int _catalogCrossAxisCount = 2;
+
+  int get _catalogPageSize => _catalogCrossAxisCount * 4;
 
   late Future<List<PartModel>> _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
@@ -369,12 +375,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_hasMoreProducts) return List<PartModel>.unmodifiable(_loadedParts);
 
     final nextBatch = await SupabaseService.fetchParts(
-      limit: _kPageSize,
+      limit: _catalogPageSize,
       offset: _loadedParts.length,
       filters: _activeFilters,
     );
 
-    if (nextBatch.length < _kPageSize) {
+    if (nextBatch.length < _catalogPageSize) {
       _hasMoreProducts = false;
     }
     _loadedParts.addAll(nextBatch);
@@ -407,7 +413,51 @@ class _HomeScreenState extends State<HomeScreen> {
   InputDecoration _searchDecoration({
     VoidCallback? onOpenFilters,
     int filterBadge = 0,
+    bool showFilterButton = true,
   }) {
+    Widget? suffix;
+    if (onOpenFilters == null) {
+      suffix = _searchController.text.trim().isEmpty
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.clear, size: 20),
+              onPressed: () {
+                _searchController.clear();
+                _applyFiltersFromUi();
+              },
+            );
+    } else {
+      final suffixChildren = <Widget>[
+        if (_searchController.text.trim().isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.clear, size: 20),
+            onPressed: () {
+              _searchController.clear();
+              _applyFiltersFromUi();
+            },
+          ),
+        if (showFilterButton)
+          IconButton(
+            tooltip: 'Filtros',
+            onPressed: onOpenFilters,
+            icon: Badge(
+              isLabelVisible: filterBadge > 0,
+              label: Text('$filterBadge'),
+              backgroundColor: AppColors.brandOrange,
+              child: Icon(
+                Icons.tune,
+                color: filterBadge > 0
+                    ? AppColors.brandOrange
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
+      ];
+      if (suffixChildren.isNotEmpty) {
+        suffix = Row(mainAxisSize: MainAxisSize.min, children: suffixChildren);
+      }
+    }
+
     return InputDecoration(
       hintText: 'Buscar repuesto…',
       hintStyle: const TextStyle(color: AppColors.textSecondary),
@@ -427,44 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
-      suffixIcon: onOpenFilters == null
-          ? (_searchController.text.trim().isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.clear, size: 20),
-                  onPressed: () {
-                    _searchController.clear();
-                    _applyFiltersFromUi();
-                  },
-                ))
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_searchController.text.trim().isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
-                    onPressed: () {
-                      _searchController.clear();
-                      _applyFiltersFromUi();
-                    },
-                  ),
-                IconButton(
-                  tooltip: 'Filtros',
-                  onPressed: onOpenFilters,
-                  icon: Badge(
-                    isLabelVisible: filterBadge > 0,
-                    label: Text('$filterBadge'),
-                    backgroundColor: AppColors.brandOrange,
-                    child: Icon(
-                      Icons.tune,
-                      color: filterBadge > 0
-                          ? AppColors.brandOrange
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      suffixIcon: suffix,
     );
   }
 
@@ -617,7 +630,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final appBar = MotolinkAppBar(
+    final appBar = widget.embedInDesktopShell
+        ? null
+        : MotolinkAppBar(
       currentUserProfile: widget.profile,
       logoHeight: widget.homeRole == AppHomeRole.aliado
           ? MotolinkAppBarLogoSizes.aliado
@@ -756,209 +771,288 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           }
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: TextField(
-                  controller: _searchController,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => _applyFiltersFromUi(),
-                  decoration: _searchDecoration(
-                    onOpenFilters: bootstrapSnapshot.hasError
-                        ? null
-                        : () => _openCatalogFiltersSheet(importers),
-                    filterBadge: filterBadge,
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final catalogWidth = constraints.maxWidth;
+              final isDesktopCatalog =
+                  AliadoCatalogLayout.isDesktop(catalogWidth);
+              final crossAxisCount =
+                  AliadoCatalogLayout.crossAxisCount(catalogWidth);
+              final hPad =
+                  AliadoCatalogLayout.horizontalPadding(catalogWidth);
+              final gridSpacing =
+                  AliadoCatalogLayout.gridSpacing(catalogWidth);
+              _catalogCrossAxisCount = crossAxisCount;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
+                    child: isDesktopCatalog
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  textInputAction: TextInputAction.search,
+                                  onSubmitted: (_) => _applyFiltersFromUi(),
+                                  decoration: _searchDecoration(
+                                    onOpenFilters: bootstrapSnapshot.hasError
+                                        ? null
+                                        : () => _openCatalogFiltersSheet(importers),
+                                    filterBadge: filterBadge,
+                                    showFilterButton: false,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              OutlinedButton.icon(
+                                onPressed: bootstrapSnapshot.hasError
+                                    ? null
+                                    : () => _openCatalogFiltersSheet(importers),
+                                icon: Badge(
+                                  isLabelVisible: filterBadge > 0,
+                                  label: Text('$filterBadge'),
+                                  child: const Icon(Icons.tune, size: 20),
+                                ),
+                                label: const Text('Filtros'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.brandBlue,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                ),
+                              ),
+                            ],
+                          )
+                        : TextField(
+                            controller: _searchController,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => _applyFiltersFromUi(),
+                            decoration: _searchDecoration(
+                              onOpenFilters: bootstrapSnapshot.hasError
+                                  ? null
+                                  : () => _openCatalogFiltersSheet(importers),
+                              filterBadge: filterBadge,
+                            ),
+                          ),
                   ),
-                ),
-              ),
-              if (activeFilterChips != null) activeFilterChips,
-              if (_catalogSortMode == CatalogSortMode.reputation &&
-                  widget.homeRole == AppHomeRole.aliado)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.leaderboard_outlined,
-                          size: 18,
-                          color: Colors.amber.shade900,
+                  if (activeFilterChips != null) activeFilterChips,
+                  if (_catalogSortMode == CatalogSortMode.reputation &&
+                      widget.homeRole == AppHomeRole.aliado)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Ranking por reputación (últ. 100 valoraciones). '
-                            'Los proveedores mejor calificados aparecen primero.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.35,
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.leaderboard_outlined,
+                              size: 18,
                               color: Colors.amber.shade900,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Ranking por reputación (últ. 100 valoraciones). '
+                                'Los proveedores mejor calificados aparecen primero.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.35,
+                                  color: Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (promos.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 4),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => _openActivePromotionsSheet(promos),
+                          icon: const Icon(Icons.campaign_outlined, size: 18),
+                          label: Text('Promociones (${promos.length})'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.brandOrange,
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
+                  AliadoPromoBannerCarousel(
+                    campaigns: bannerPromos,
+                    onPromoCampaignSelected: _onPromoCampaignSelected,
+                    compact: isDesktopCatalog,
                   ),
-                ),
-              if (promos.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => _openActivePromotionsSheet(promos),
-                      icon: const Icon(Icons.campaign_outlined, size: 18),
-                      label: Text('Promociones (${promos.length})'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.brandOrange,
-                        textStyle: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
+                    child: Text(
+                      '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
+                      style: TextStyle(
+                        fontSize: isDesktopCatalog ? 14 : 13,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ),
-              AliadoPromoBannerCarousel(
-                campaigns: bannerPromos,
-                onPromoCampaignSelected: _onPromoCampaignSelected,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: Text(
-                  '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              Expanded(
-            child: FutureBuilder<List<PartModel>>(
-              future: _partsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    _loadedParts.isEmpty) {
-                  return const _LoadingState();
-                }
-                if (snapshot.hasError) {
-                  return ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      const SizedBox(height: 120),
-                      Icon(Icons.error_outline,
-                          size: 48, color: Colors.red.shade700),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No se pudieron cargar los repuestos.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey.shade800,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${snapshot.error}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  );
-                }
-                final parts = snapshot.data ?? [];
-                if (parts.isEmpty) {
-                  return ListView(
-                    children: [
-                      const SizedBox(height: 160),
-                      Center(
-                        child: Text(
-                          _activeFilters.hasAnyFilter
-                              ? 'No hay resultados con esos filtros.'
-                              : 'No hay repuestos disponibles.',
-                          style: const TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  );
-                }
-                return Column(
-                  children: [
-                    Expanded(
-                      child: GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: _kCrossAxisCount,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio:
-                              _activeFilters.sortByDistanceFromReference
-                                  ? 0.42
-                                  : 0.44,
-                        ),
-                        itemCount: parts.length,
-                        itemBuilder: (context, index) {
-                          final p = parts[index];
-                          return _ProductGridCard(
-                            part: p,
-                            profile: widget.profile,
-                            showDistanceChips:
-                                _activeFilters.sortByDistanceFromReference,
-                            onTap: () {
-                              Navigator.of(context).push<void>(
-                                MaterialPageRoute<void>(
-                                  builder: (ctx) =>
-                                      ProductDetailScreen(part: p),
+                  Expanded(
+                    child: FutureBuilder<List<PartModel>>(
+                      future: _partsFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting &&
+                            _loadedParts.isEmpty) {
+                          return const _LoadingState();
+                        }
+                        if (snapshot.hasError) {
+                          return ListView(
+                            padding: const EdgeInsets.all(24),
+                            children: [
+                              const SizedBox(height: 120),
+                              Icon(Icons.error_outline,
+                                  size: 48, color: Colors.red.shade700),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No se pudieron cargar los repuestos.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey.shade800,
+                                  fontSize: 16,
                                 ),
-                              );
-                            },
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           );
-                        },
-                      ),
-                    ),
-                    if (_hasMoreProducts)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed:
-                                _isLoadingMore ? null : _loadMoreProducts,
-                            child: _isLoadingMore
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
+                        }
+                        final parts = snapshot.data ?? [];
+                        if (parts.isEmpty) {
+                          return ListView(
+                            children: [
+                              const SizedBox(height: 160),
+                              Center(
+                                child: Text(
+                                  _activeFilters.hasAnyFilter
+                                      ? 'No hay resultados con esos filtros.'
+                                      : 'No hay repuestos disponibles.',
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: GridView.builder(
+                                padding: EdgeInsets.fromLTRB(
+                                  hPad,
+                                  0,
+                                  hPad,
+                                  8,
+                                ),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  mainAxisSpacing: gridSpacing,
+                                  crossAxisSpacing: gridSpacing,
+                                  childAspectRatio:
+                                      AliadoCatalogLayout.childAspectRatio(
+                                    catalogWidth,
+                                    showDistance: _activeFilters
+                                        .sortByDistanceFromReference,
+                                  ),
+                                ),
+                                itemCount: parts.length,
+                                itemBuilder: (context, index) {
+                                  final p = parts[index];
+                                  return _ProductGridCard(
+                                    part: p,
+                                    profile: widget.profile,
+                                    compact: true,
+                                    showDistanceChips: _activeFilters
+                                        .sortByDistanceFromReference,
+                                    onTap: () {
+                                      Navigator.of(context).push<void>(
+                                        MaterialPageRoute<void>(
+                                          builder: (ctx) =>
+                                              ProductDetailScreen(part: p),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            if (_hasMoreProducts)
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
+                                child: Align(
+                                  alignment: Alignment.center,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: isDesktopCatalog
+                                          ? 360
+                                          : double.infinity,
                                     ),
-                                  )
-                                : const Text('Ver mas productos'),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-            ],
+                                    child: SizedBox(
+                                      width: isDesktopCatalog
+                                          ? null
+                                          : double.infinity,
+                                      child: ElevatedButton(
+                                      onPressed: _isLoadingMore
+                                          ? null
+                                          : _loadMoreProducts,
+                                      child: _isLoadingMore
+                                          ? const SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Text('Ver más productos'),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -970,12 +1064,14 @@ class _ProductGridCard extends StatelessWidget {
   const _ProductGridCard({
     required this.part,
     required this.profile,
+    this.compact = false,
     this.showDistanceChips = false,
     this.onTap,
   });
 
   final PartModel part;
   final ProfileModel profile;
+  final bool compact;
   final bool showDistanceChips;
   final VoidCallback? onTap;
 
@@ -985,6 +1081,9 @@ class _ProductGridCard extends StatelessWidget {
     final importerLine =
         importer.isNotEmpty ? importer.toUpperCase() : 'SIN IMPORTADOR';
     final locLine = _ownerLocationLine(part);
+    final cardPadding = compact
+        ? const EdgeInsets.fromLTRB(8, 8, 8, 6)
+        : const EdgeInsets.fromLTRB(10, 10, 10, 8);
 
     return InkWell(
       onTap: onTap,
@@ -992,187 +1091,189 @@ class _ProductGridCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(compact ? 12 : 14),
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: AppDecorations.cardShadow,
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+          padding: cardPadding,
           child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AspectRatio(
-                  aspectRatio: 1.0,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Hero(
-                          tag: ProductDetailScreen.heroImageTag(part),
-                          child: part.imagenUrl != null &&
-                                  part.imagenUrl!.isNotEmpty
-                              ? Image.network(
-                                  part.imagenUrl!,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  errorBuilder: (_, __, ___) => _placeholder(),
-                                )
-                              : _placeholder(),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 11,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Hero(
+                        tag: ProductDetailScreen.heroImageTag(part),
+                        child: part.imagenUrl != null &&
+                                part.imagenUrl!.isNotEmpty
+                            ? Image.network(
+                                part.imagenUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _placeholder(compact),
+                              )
+                            : _placeholder(compact),
+                      ),
+                      if (part.hasWarranty)
+                        Positioned(
+                          top: compact ? 4 : 6,
+                          right: compact ? 4 : 6,
+                          child: const ProductWarrantySeal(compact: true),
                         ),
-                        if (part.hasWarranty)
-                          const Positioned(
-                            top: 6,
-                            right: 6,
-                            child: ProductWarrantySeal(compact: true),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        part.nombre,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          height: 1.2,
-                        ),
+              ),
+              SizedBox(height: compact ? 4 : 6),
+              Expanded(
+                flex: 13,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      part.nombre,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact ? 12 : 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        height: 1.15,
                       ),
-                      const SizedBox(height: 4),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      importerLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact ? 9 : 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        height: 1.1,
+                      ),
+                    ),
+                    if (!compact && locLine.isNotEmpty)
                       Text(
-                        importerLine,
+                        locLine,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
                           height: 1.1,
                         ),
                       ),
-                      if (locLine.isNotEmpty)
-                        Text(
-                          locLine,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade600,
-                            height: 1.1,
-                          ),
-                        ),
-                      if (part.ownerRatingAvg != null &&
-                          (part.ownerRatingCount ?? 0) > 0) ...[
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.star,
-                              size: 12,
-                              color: Colors.amber.shade800,
-                            ),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.grey.shade800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (showDistanceChips) ...[
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Chip(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            label: Text(
-                              _distanceChipLabel(part),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            backgroundColor:
-                                AppColors.brandBlue.withOpacity(0.1),
-                            side: BorderSide(
-                              color: AppColors.brandBlue.withOpacity(0.35),
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      CatalogProductPriceDisplay(
-                        listPriceUsd: part.precio,
-                        salePriceUsd: part.salePriceUsd,
-                        discountRules: part.discountRules,
-                        catalogGrid: true,
-                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
-                      ),
-                      const Spacer(),
-                      Divider(height: 1, color: Colors.grey.shade200),
-                      const SizedBox(height: 6),
+                    if (part.ownerRatingAvg != null &&
+                        (part.ownerRatingCount ?? 0) > 0) ...[
+                      const SizedBox(height: 2),
                       Row(
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.successGreen,
-                              shape: BoxShape.circle,
-                            ),
+                          Icon(
+                            Icons.star,
+                            size: compact ? 10 : 11,
+                            color: Colors.amber.shade800,
                           ),
-                          const SizedBox(width: 6),
-                          Expanded(
+                          const SizedBox(width: 2),
+                          Flexible(
                             child: Text(
-                              '${part.stock} en stock',
+                              '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: compact ? 9 : 9.5,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.green.shade700,
+                                color: Colors.grey.shade800,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ],
-                  ),
+                    if (showDistanceChips) ...[
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Chip(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          label: Text(
+                            _distanceChipLabel(part),
+                            style: TextStyle(
+                              fontSize: compact ? 9 : 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          backgroundColor:
+                              AppColors.brandBlue.withOpacity(0.1),
+                          side: BorderSide(
+                            color: AppColors.brandBlue.withOpacity(0.35),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    Expanded(
+                      child: CatalogProductPriceDisplay(
+                        listPriceUsd: part.precio,
+                        salePriceUsd: part.salePriceUsd,
+                        discountRules: part.discountRules,
+                        catalogGrid: true,
+                        compact: compact,
+                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                      ),
+                    ),
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: AppColors.successGreen,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${part.stock} en stock',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: compact ? 10 : 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
     );
   }
 
-  Widget _placeholder() {
+  Widget _placeholder(bool compact) {
     return ColoredBox(
       color: Colors.grey.shade200,
       child: Icon(
         Icons.precision_manufacturing_outlined,
-        size: 40,
+        size: compact ? 32 : 40,
         color: Colors.grey.shade500,
       ),
     );

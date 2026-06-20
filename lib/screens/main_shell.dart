@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
 import '../models/profile_model.dart';
+import '../services/cart_service.dart';
 import '../services/notification_provider.dart';
 import '../services/push_notification_service.dart';
 import '../services/supabase_service.dart';
@@ -11,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
 import '../widgets/admin_commission_settlements_panel.dart';
 import '../widgets/admin_desktop_shell.dart';
+import '../widgets/b2b_desktop_shell.dart';
 import '../widgets/admin_encomiendas_report_panel.dart';
 import '../widgets/admin_kyc_review_panel.dart';
 import '../widgets/admin_order_ratings_panel.dart';
@@ -22,9 +24,11 @@ import '../widgets/aliado_pedidos_panel.dart';
 import '../widgets/importer_active_orders_panel.dart';
 import '../widgets/main_shell_tab.dart';
 import '../widgets/motolink_app_bar.dart';
+import '../widgets/shell/shell_destination.dart';
 import '../widgets/notification_center_sheet.dart';
 import '../widgets/profile_b2b_form.dart';
 import 'account_settings_screen.dart';
+import 'cart_screen.dart';
 import 'home_screen.dart';
 import 'reputation_tab.dart';
 import 'support_tickets_screen.dart';
@@ -236,6 +240,69 @@ class _MainShellState extends State<MainShell> {
     ),
   ];
 
+  static const _aliadoDestinations = <ShellDestination>[
+    ShellDestination(
+      icon: Icons.grid_view_outlined,
+      selectedIcon: Icons.grid_view,
+      label: 'Catálogo',
+      title: 'Catálogo',
+      subtitle:
+          'Explore repuestos de importadores, filtre por categoría y agregue al carrito.',
+    ),
+    ShellDestination(
+      icon: Icons.shopping_cart_outlined,
+      selectedIcon: Icons.shopping_cart,
+      label: 'Pedidos',
+      title: 'Mis pedidos',
+      subtitle: 'Siga el estado de sus encomiendas y gestione entregas.',
+    ),
+    ShellDestination(
+      icon: Icons.star_outline,
+      selectedIcon: Icons.star,
+      label: 'Reputación',
+      title: 'Reputación',
+      subtitle: 'Valoraciones recibidas y resumen semanal de su desempeño.',
+    ),
+    ShellDestination(
+      icon: Icons.person_outline,
+      selectedIcon: Icons.person,
+      label: 'Perfil',
+      title: 'Mi perfil',
+      subtitle: 'Datos comerciales, KYC, soporte y configuración de cuenta.',
+    ),
+  ];
+
+  static const _importadorDestinations = <ShellDestination>[
+    ShellDestination(
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2,
+      label: 'Inventario',
+      title: 'Inventario',
+      subtitle: 'Publique repuestos, precios y stock para la red de aliados.',
+    ),
+    ShellDestination(
+      icon: Icons.shopping_cart_outlined,
+      selectedIcon: Icons.shopping_cart,
+      label: 'Pedidos',
+      title: 'Pedidos activos',
+      subtitle: 'Encomiendas en curso y historial de ventas a aliados.',
+    ),
+    ShellDestination(
+      icon: Icons.star_outline,
+      selectedIcon: Icons.star,
+      label: 'Reputación',
+      title: 'Reputación',
+      subtitle: 'Valoraciones de aliados y métricas de servicio.',
+    ),
+    ShellDestination(
+      icon: Icons.person_outline,
+      selectedIcon: Icons.person,
+      label: 'Perfil',
+      title: 'Mi perfil',
+      subtitle: 'Datos comerciales, KYC, soporte y configuración de cuenta.',
+    ),
+  ];
+
   List<Widget> _adminPanelWidgets() {
     return const [
       AdminOrdersPanel(),
@@ -395,12 +462,151 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildDefaultShell() {
+  void _openAliadoCart() {
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CartScreen(
+          profile: _profile,
+          liveTasaBcv: null,
+        ),
+      ),
+    );
+  }
+
+  Widget _aliadoCartTopBarAction() {
+    return ListenableBuilder(
+      listenable: CartService.instance,
+      builder: (context, _) {
+        final n = CartService.instance.itemCount;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              tooltip: 'Carrito',
+              onPressed: _openAliadoCart,
+              icon: Icon(Icons.shopping_cart_outlined, color: Colors.grey.shade700),
+            ),
+            if (n > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.brandOrange,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                  child: Text(
+                    n > 99 ? '99+' : '$n',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _onB2bTabSelected(int i, AppHomeRole role) {
+    setState(() => _tabIndex = i);
+    if (role == AppHomeRole.importador && i == 1) {
+      MainShellTabController.notifyImporterPedidosReload();
+    }
+    if (i == 2 || (role == AppHomeRole.aliado && i == 3)) {
+      unawaited(_refreshProfile());
+    }
+  }
+
+  List<Widget> _b2bPages({
+    required AppHomeRole role,
+    required bool desktop,
+  }) {
+    final embedded = desktop;
+    return [
+      HomeScreen(
+        profile: _profile,
+        homeRole: role,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        embedInDesktopShell: embedded,
+      ),
+      _OrdersTab(
+        profile: _profile,
+        homeRole: role,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        embedInDesktopShell: embedded,
+      ),
+      ReputationTab(
+        profile: _profile,
+        homeRole: role,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onProfileRefresh: _refreshProfile,
+        embedInDesktopShell: embedded,
+      ),
+      _ProfileTab(
+        profile: _profile,
+        homeRole: role,
+        onProfileSaved: _refreshProfile,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        embedInDesktopShell: embedded,
+      ),
+    ];
+  }
+
+  Widget _buildB2bDesktopShell({
+    required AppHomeRole role,
+    required List<ShellDestination> destinations,
+    required String railBadgeLabel,
+    required String contextLabel,
+    List<Widget> trailingActions = const [],
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_showAliadoAccessApprovedBanner && role == AppHomeRole.aliado)
+          AliadoAccessApprovedBanner(
+            message: _aliadoAccessApprovedMessage,
+            onDismiss: _dismissAliadoAccessApprovedBanner,
+            compact: true,
+          ),
+        Expanded(
+          child: B2bDesktopShell(
+            selectedIndex: _tabIndex,
+            onDestinationSelected: (i) => _onB2bTabSelected(i, role),
+            destinations: destinations,
+            pages: _b2bPages(role: role, desktop: true),
+            profile: _profile,
+            unreadNotifications: _notifications.unreadCount,
+            onNotificationTap: _openNotificationCenter,
+            onOpenSettings: _openAccountSettings,
+            railBadgeLabel: railBadgeLabel,
+            contextLabel: contextLabel,
+            trailingActions: trailingActions,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildB2bMobileShell({
+    required AppHomeRole role,
+    required List<BottomNavigationBarItem> navItems,
+  }) {
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_showAliadoAccessApprovedBanner)
+          if (_showAliadoAccessApprovedBanner && role == AppHomeRole.aliado)
             AliadoAccessApprovedBanner(
               message: _aliadoAccessApprovedMessage,
               onDismiss: _dismissAliadoAccessApprovedBanner,
@@ -409,34 +615,7 @@ class _MainShellState extends State<MainShell> {
           Expanded(
             child: IndexedStack(
               index: _tabIndex,
-              children: [
-                HomeScreen(
-                  profile: _profile,
-                  homeRole: widget.homeRole,
-                  onNotificationTap: _openNotificationCenter,
-                  unreadNotifications: _notifications.unreadCount,
-                ),
-                _OrdersTab(
-                  profile: _profile,
-                  homeRole: widget.homeRole,
-                  onNotificationTap: _openNotificationCenter,
-                  unreadNotifications: _notifications.unreadCount,
-                ),
-                ReputationTab(
-                  profile: _profile,
-                  homeRole: widget.homeRole,
-                  onNotificationTap: _openNotificationCenter,
-                  unreadNotifications: _notifications.unreadCount,
-                  onProfileRefresh: _refreshProfile,
-                ),
-                _ProfileTab(
-                  profile: _profile,
-                  homeRole: widget.homeRole,
-                  onProfileSaved: _refreshProfile,
-                  onNotificationTap: _openNotificationCenter,
-                  unreadNotifications: _notifications.unreadCount,
-                ),
-              ],
+              children: _b2bPages(role: role, desktop: false),
             ),
           ),
         ],
@@ -455,13 +634,28 @@ class _MainShellState extends State<MainShell> {
         child: BottomNavigationBar(
           currentIndex: _tabIndex,
           type: BottomNavigationBarType.fixed,
-          onTap: (i) {
-            setState(() => _tabIndex = i);
-            if (widget.homeRole == AppHomeRole.aliado && i == 3) {
-              unawaited(_refreshProfile());
-            }
-          },
-          items: const [
+          onTap: (i) => _onB2bTabSelected(i, role),
+          items: navItems,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultShell() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= AppBreakpoints.b2bDesktop) {
+          return _buildB2bDesktopShell(
+            role: AppHomeRole.aliado,
+            destinations: _aliadoDestinations,
+            railBadgeLabel: 'Panel aliado',
+            contextLabel: 'MotoLink · Aliado',
+            trailingActions: [_aliadoCartTopBarAction()],
+          );
+        }
+        return _buildB2bMobileShell(
+          role: AppHomeRole.aliado,
+          navItems: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.grid_view_outlined),
               activeIcon: Icon(Icons.grid_view),
@@ -483,80 +677,26 @@ class _MainShellState extends State<MainShell> {
               label: 'Perfil',
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.homeRole == AppHomeRole.administrador) {
-      return _buildAdminShell();
-    }
-    if (widget.homeRole == AppHomeRole.importador) {
-      return _buildImportadorShell();
-    }
-    return _buildDefaultShell();
   }
 
   /// Importador: Inventario, Pedidos (unificado), Perfil.
   Widget _buildImportadorShell() {
-    return Scaffold(
-      body: IndexedStack(
-        index: _tabIndex,
-        children: [
-          HomeScreen(
-            profile: _profile,
-            homeRole: AppHomeRole.importador,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
-          _OrdersTab(
-            profile: _profile,
-            homeRole: AppHomeRole.importador,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
-          ReputationTab(
-            profile: _profile,
-            homeRole: AppHomeRole.importador,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-            onProfileRefresh: _refreshProfile,
-          ),
-          _ProfileTab(
-            profile: _profile,
-            homeRole: AppHomeRole.importador,
-            onProfileSaved: _refreshProfile,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-          ),
-        ],
-      ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceTinted,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _tabIndex,
-          type: BottomNavigationBarType.fixed,
-          onTap: (i) {
-            setState(() => _tabIndex = i);
-            if (i == 1) {
-              MainShellTabController.notifyImporterPedidosReload();
-            }
-            if (i == 2) {
-              unawaited(_refreshProfile());
-            }
-          },
-          items: const [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= AppBreakpoints.b2bDesktop) {
+          return _buildB2bDesktopShell(
+            role: AppHomeRole.importador,
+            destinations: _importadorDestinations,
+            railBadgeLabel: 'Panel importador',
+            contextLabel: 'MotoLink · Importador',
+          );
+        }
+        return _buildB2bMobileShell(
+          role: AppHomeRole.importador,
+          navItems: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.inventory_2_outlined),
               activeIcon: Icon(Icons.inventory_2),
@@ -578,9 +718,20 @@ class _MainShellState extends State<MainShell> {
               label: 'Perfil',
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.homeRole == AppHomeRole.administrador) {
+      return _buildAdminShell();
+    }
+    if (widget.homeRole == AppHomeRole.importador) {
+      return _buildImportadorShell();
+    }
+    return _buildDefaultShell();
   }
 }
 
@@ -590,18 +741,22 @@ class _OrdersTab extends StatelessWidget {
     required this.homeRole,
     required this.onNotificationTap,
     required this.unreadNotifications,
+    this.embedInDesktopShell = false,
   });
 
   final ProfileModel profile;
   final AppHomeRole homeRole;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
+  final bool embedInDesktopShell;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(
+      appBar: embedInDesktopShell
+          ? null
+          : MotolinkAppBar(
         currentUserProfile: profile,
         logoHeight: homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
@@ -625,6 +780,7 @@ class _ProfileTab extends StatefulWidget {
     required this.onProfileSaved,
     required this.onNotificationTap,
     required this.unreadNotifications,
+    this.embedInDesktopShell = false,
   });
 
   final ProfileModel profile;
@@ -632,6 +788,7 @@ class _ProfileTab extends StatefulWidget {
   final Future<void> Function() onProfileSaved;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
+  final bool embedInDesktopShell;
 
   @override
   State<_ProfileTab> createState() => _ProfileTabState();
@@ -693,6 +850,59 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
+  Widget _buildSupportEntryCard() {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openSupportTickets(),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.support_agent_outlined,
+                color: AppColors.brandBlue,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Atención al cliente',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Abra un reclamo con el equipo MotoLink '
+                      '(máx. 3 abiertos).',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.brandOrange,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final showSupportEntry = widget.homeRole == AppHomeRole.aliado ||
@@ -700,7 +910,9 @@ class _ProfileTabState extends State<_ProfileTab> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(
+      appBar: widget.embedInDesktopShell
+          ? null
+          : MotolinkAppBar(
         currentUserProfile: widget.profile,
         logoHeight: widget.homeRole == AppHomeRole.aliado
             ? MotolinkAppBarLogoSizes.aliado
@@ -722,64 +934,25 @@ class _ProfileTabState extends State<_ProfileTab> {
         ],
       ),
       body: SafeArea(
+        top: !widget.embedInDesktopShell,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showSupportEntry) ...[
-                Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _openSupportTickets(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.support_agent_outlined,
-                            color: AppColors.brandBlue,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Atención al cliente',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Abra un reclamo con el equipo MotoLink '
-                                  '(máx. 3 abiertos).',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    height: 1.35,
-                                    color: Colors.grey.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: AppColors.brandOrange,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
+          padding: EdgeInsets.fromLTRB(
+            widget.embedInDesktopShell ? 0 : 20,
+            widget.embedInDesktopShell ? 0 : 8,
+            widget.embedInDesktopShell ? 0 : 20,
+            24,
+          ),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: widget.embedInDesktopShell
+                    ? AppBreakpoints.formMaxWidth
+                    : double.infinity,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               ProfileB2BForm(
                 key: ValueKey<Object>(
                   '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
@@ -789,8 +962,18 @@ class _ProfileTabState extends State<_ProfileTab> {
                 onSaved: () {
                   widget.onProfileSaved();
                 },
+                beforeSignOut: showSupportEntry &&
+                        widget.homeRole == AppHomeRole.aliado
+                    ? _buildSupportEntryCard()
+                    : null,
+                afterReputation: showSupportEntry &&
+                        widget.homeRole == AppHomeRole.importador
+                    ? _buildSupportEntryCard()
+                    : null,
               ),
             ],
+              ),
+            ),
           ),
         ),
       ),

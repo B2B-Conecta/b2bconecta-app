@@ -32,10 +32,12 @@ class AliadoPromoBannerCarousel extends StatefulWidget {
     super.key,
     required this.campaigns,
     this.onPromoCampaignSelected,
+    this.compact = false,
   });
 
   final List<PromoCampaignModel> campaigns;
   final ValueChanged<PromoCampaignModel>? onPromoCampaignSelected;
+  final bool compact;
 
   @override
   State<AliadoPromoBannerCarousel> createState() =>
@@ -73,13 +75,16 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
+    final bannerHeight = widget.compact ? 96.0 : 132.0;
+    final horizontalPadding = widget.compact ? 0.0 : 16.0;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 132,
+            height: bannerHeight,
             child: PageView.builder(
               controller: _pageController,
               itemCount: items.length,

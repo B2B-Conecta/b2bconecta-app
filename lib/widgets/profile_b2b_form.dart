@@ -29,6 +29,8 @@ class ProfileB2BForm extends StatefulWidget {
     this.onClose,
     this.onRelatedDataChanged,
     this.onTermsAccepted,
+    this.afterReputation,
+    this.beforeSignOut,
   });
 
   final ProfileModel? initial;
@@ -43,6 +45,12 @@ class ProfileB2BForm extends StatefulWidget {
 
   /// Tras registrar aceptación legal en BD (sin refrescar todo el formulario).
   final VoidCallback? onTermsAccepted;
+
+  /// Contenido opcional justo después de «Ver reputación» (importador).
+  final Widget? afterReputation;
+
+  /// Contenido opcional justo encima del botón «Cerrar sesión» (aliado).
+  final Widget? beforeSignOut;
 
   @override
   State<ProfileB2BForm> createState() => _ProfileB2BFormState();
@@ -112,8 +120,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   bool get _hasAcceptedTerms => _termsAccepted;
 
-  /// Visible siempre para importadores (marcar / desmarcar sin ocultar la sección).
-  bool get _showTermsSection => _requiresTerms && !_showAliadoKycSection;
+  /// Solo durante el primer registro; oculto si ya aceptó términos vigentes.
+  bool get _showTermsSection =>
+      _requiresTerms &&
+      !_showAliadoKycSection &&
+      !(widget.initial?.hasAcceptedCurrentTerms ?? false);
 
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
@@ -813,6 +824,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const ImporterCommissionSettlementsSection(),
             const SizedBox(height: 8),
             _reputationTabHint(context),
+            if (widget.afterReputation != null) ...[
+              const SizedBox(height: 12),
+              widget.afterReputation!,
+            ],
           ],
           if (_showAliadoKycSection) ...[
             const SizedBox(height: 14),
@@ -872,6 +887,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
           ] else
             const SizedBox(height: 16),
+          if (widget.beforeSignOut != null) ...[
+            const SizedBox(height: 12),
+            widget.beforeSignOut!,
+          ],
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: _saving ? null : _signOut,

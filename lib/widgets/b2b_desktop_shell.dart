@@ -4,12 +4,9 @@ import '../models/profile_model.dart';
 import 'shell/desktop_navigation_shell.dart';
 import 'shell/shell_destination.dart';
 
-/// Alias histórico — mismos campos que [ShellDestination].
-typedef AdminShellDestination = ShellDestination;
-
-/// Shell web/escritorio para administradores.
-class AdminDesktopShell extends StatelessWidget {
-  const AdminDesktopShell({
+/// Shell web/escritorio para aliados e importadores.
+class B2bDesktopShell extends StatelessWidget {
+  const B2bDesktopShell({
     super.key,
     required this.selectedIndex,
     required this.onDestinationSelected,
@@ -19,6 +16,9 @@ class AdminDesktopShell extends StatelessWidget {
     required this.unreadNotifications,
     required this.onNotificationTap,
     required this.onOpenSettings,
+    required this.railBadgeLabel,
+    required this.contextLabel,
+    this.trailingActions = const [],
   });
 
   final int selectedIndex;
@@ -29,6 +29,9 @@ class AdminDesktopShell extends StatelessWidget {
   final int unreadNotifications;
   final VoidCallback onNotificationTap;
   final VoidCallback onOpenSettings;
+  final String railBadgeLabel;
+  final String contextLabel;
+  final List<Widget> trailingActions;
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +44,9 @@ class AdminDesktopShell extends StatelessWidget {
       unreadNotifications: unreadNotifications,
       onNotificationTap: onNotificationTap,
       onOpenSettings: onOpenSettings,
-      railBadgeLabel: 'Panel administrador',
-      contextLabel: 'MotoLink · Operaciones',
+      railBadgeLabel: railBadgeLabel,
+      contextLabel: contextLabel,
+      trailingActions: trailingActions,
     );
   }
 }

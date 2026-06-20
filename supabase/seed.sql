@@ -646,7 +646,8 @@ set
   account_access_status = 'active',
   kyc_status = coalesce(kyc_status, 'aprobado'),
   terms_accepted_at = coalesce(terms_accepted_at, now()),
-  terms_version = coalesce(terms_version, '2026-06-01-pilot')
+  -- Debe coincidir con TermsConfig.currentVersion para evitar re-onboarding en demos.
+  terms_version = '2026-06-13'
 where role in ('importador', 'administrador', 'aliado');
 
 -- Demo E2.1: ventana rolling = histórico mientras no hay order_ratings en seed.

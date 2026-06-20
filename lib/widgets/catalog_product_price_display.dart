@@ -60,10 +60,12 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             salePriceUsd: salePriceUsd,
             discountRules: discountRules,
             refUnitUsd: refUnit,
-            compact: false,
+            compact: compact,
             ownerPagoSoloDivisas: ownerPagoSoloDivisas,
           )
         : const SizedBox.shrink();
+
+    final promoHeight = compact ? 32.0 : 44.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,17 +74,19 @@ class CatalogProductPriceDisplay extends StatelessWidget {
         _refPriceRow(
           refUnit: refUnit,
           strikeRef: strikeRef,
-          refSize: 17,
-          strikeSize: 11,
+          refSize: compact ? 14 : 16,
+          strikeSize: compact ? 9 : 10,
         ),
-        // Reserva espacio fijo para promociones y evita tarjetas desproporcionadas.
-        SizedBox(
-          height: 72,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: promoChips,
+        if (showPromotionChips)
+          SizedBox(
+            height: promoHeight,
+            child: ClipRect(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: promoChips,
+              ),
+            ),
           ),
-        ),
       ],
     );
   }

@@ -18,6 +18,7 @@ class ReputationTab extends StatelessWidget {
     required this.onNotificationTap,
     required this.unreadNotifications,
     required this.onProfileRefresh,
+    this.embedInDesktopShell = false,
   });
 
   final ProfileModel profile;
@@ -25,13 +26,16 @@ class ReputationTab extends StatelessWidget {
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
   final Future<void> Function() onProfileRefresh;
+  final bool embedInDesktopShell;
 
   @override
   Widget build(BuildContext context) {
     final isImportador = homeRole == AppHomeRole.importador;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(
+      appBar: embedInDesktopShell
+          ? null
+          : MotolinkAppBar(
         currentUserProfile: profile,
         logoHeight: isImportador
             ? MotolinkAppBarLogoSizes.importador

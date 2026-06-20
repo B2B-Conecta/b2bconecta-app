@@ -846,6 +846,22 @@ class SupabaseService {
     }).inFilter('id', ids);
   }
 
+  /// Elimina un producto del inventario del importador (RLS: owner).
+  static Future<void> deleteProduct({required String productId}) async {
+    if (productId.trim().isEmpty) return;
+    await _client.from('products').delete().eq('id', productId.trim());
+  }
+
+  /// Elimina varios productos del inventario actual (RLS).
+  static Future<int> deleteProductsBulk({
+    required List<String> productIds,
+  }) async {
+    final ids = productIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
+    if (ids.isEmpty) return 0;
+    await _client.from('products').delete().inFilter('id', ids);
+    return ids.length;
+  }
+
   /// Sube una imagen al bucket [product-images] y devuelve la URL pública.
   /// El primer segmento del path debe ser [auth.uid()] (políticas RLS).
   static Future<String> uploadProductImage({

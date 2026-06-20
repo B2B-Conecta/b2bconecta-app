@@ -459,7 +459,9 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           const SizedBox(height: 10),
           ...requiredTypes.map(_buildDocTile),
         ],
-        if (widget._isAliado && accountAllowsSubmit) ...[
+        if (widget._isAliado &&
+            accountAllowsSubmit &&
+            !(widget.profile?.hasAcceptedCurrentTerms ?? false)) ...[
           const SizedBox(height: 12),
           const ProfileSectionHeader(
             label: 'TÉRMINOS LEGALES',

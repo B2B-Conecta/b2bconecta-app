@@ -11,11 +11,13 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
     required this.metodo,
     required this.instrucciones,
     this.importadorNombre,
+    this.sinDatosMensaje,
   });
 
   final String metodo;
   final String? instrucciones;
   final String? importadorNombre;
+  final String? sinDatosMensaje;
 
   @override
   Widget build(BuildContext context) {
@@ -99,8 +101,10 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
               )
             else
               Text(
-                'El importador aún no registró los datos de esta cuenta. '
-                'Confirme por chat antes de transferir.',
+                sinDatosMensaje?.trim().isNotEmpty == true
+                    ? sinDatosMensaje!.trim()
+                    : 'El importador aún no registró los datos de esta cuenta. '
+                        'Confirme por chat antes de transferir.',
                 style: TextStyle(
                   fontSize: 11.5,
                   height: 1.35,

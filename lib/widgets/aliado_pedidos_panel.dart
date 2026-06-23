@@ -21,6 +21,8 @@ import 'aliado_order_pago_section.dart';
 import '../utils/order_payment_pricing.dart';
 import 'order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
+import 'aliado_pedido_carrier_selection_section.dart';
+import 'aliado_flete_separado_section.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
@@ -652,6 +654,19 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             ),
             const SizedBox(height: kOrderCardSectionGap),
           ],
+          AliadoPedidoCarrierSelectionSection(
+            request: r,
+            onChanged: _refreshExpandedCard,
+          ),
+          if (r.aliadoMuestraSeccionFleteSeparado) ...[
+            const SizedBox(height: kOrderCardSectionGap),
+            AliadoFleteSeparadoSection(
+              request: r,
+              onChanged: _refreshExpandedCard,
+              compact: true,
+            ),
+          ],
+          const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
             title: 'Pago e factura',
             subtitle: pagoSubtitle?.isNotEmpty == true
@@ -753,6 +768,19 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ),
           const SizedBox(height: 10),
         ],
+        AliadoPedidoCarrierSelectionSection(
+          request: chunk.first,
+          onChanged: _refreshExpandedCard,
+        ),
+        if (chunk.first.aliadoMuestraSeccionFleteSeparado) ...[
+          const SizedBox(height: 10),
+          AliadoFleteSeparadoSection(
+            request: chunk.first,
+            onChanged: _refreshExpandedCard,
+            compact: true,
+          ),
+        ],
+        const SizedBox(height: 10),
         OrderCardCollapsibleSection(
           title: 'Pago e factura',
           subtitle: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),

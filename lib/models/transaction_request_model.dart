@@ -3,6 +3,7 @@ import 'profile_model.dart';
 import 'qty_adjustment_status.dart';
 import 'pago_metodo.dart';
 import 'pago_metodo_instrucciones.dart';
+import 'carrier_flete_pago_modo.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
 import '../utils/business_calendar.dart';
@@ -107,6 +108,29 @@ class TransactionRequestModel {
     this.ownerAcceptedPagoMetodos,
     this.ownerPagoMetodoInstrucciones = const {},
     this.ownerPagoSoloDivisas = false,
+    this.importerCarrierId,
+    this.importerCarrierDriverId,
+    this.carrierCompanyName,
+    this.carrierEtaHoursSnapshot,
+    this.carrierDistanceKmSnapshot,
+    this.carrierFeeUsdSnapshot,
+    this.carrierFletePagoModoSnapshot,
+    this.carrierSelectedAt,
+    this.fleteFacturaStoragePath,
+    this.fleteFacturaFileName,
+    this.fleteFacturaSubmittedAt,
+    this.carrierAcceptedPagoMetodos,
+    this.carrierPagoMetodoInstrucciones = const {},
+    this.carrierCompanyNameSnapshot,
+    this.carrierAcceptedPagoMetodosSnapshot,
+    this.carrierPagoInstruccionesSnapshot = const {},
+    this.fletePagoMetodo,
+    this.fleteComprobantePagoStoragePath,
+    this.fleteComprobantePagoFileName,
+    this.fleteComprobanteSubmittedAt,
+    this.fletePagoEstadoRevision,
+    this.fleteComprobanteRechazoNota,
+    this.fletePagoAprobadoAt,
   });
 
   final String id;
@@ -176,6 +200,30 @@ class TransactionRequestModel {
 
   /// Importador: solo pagos en divisas/USD.
   final bool ownerPagoSoloDivisas;
+
+  final String? importerCarrierId;
+  final String? importerCarrierDriverId;
+  final String? carrierCompanyName;
+  final double? carrierEtaHoursSnapshot;
+  final double? carrierDistanceKmSnapshot;
+  final double? carrierFeeUsdSnapshot;
+  final String? carrierFletePagoModoSnapshot;
+  final DateTime? carrierSelectedAt;
+  final String? fleteFacturaStoragePath;
+  final String? fleteFacturaFileName;
+  final DateTime? fleteFacturaSubmittedAt;
+  final List<String>? carrierAcceptedPagoMetodos;
+  final Map<String, String> carrierPagoMetodoInstrucciones;
+  final String? carrierCompanyNameSnapshot;
+  final List<String>? carrierAcceptedPagoMetodosSnapshot;
+  final Map<String, String> carrierPagoInstruccionesSnapshot;
+  final String? fletePagoMetodo;
+  final String? fleteComprobantePagoStoragePath;
+  final String? fleteComprobantePagoFileName;
+  final DateTime? fleteComprobanteSubmittedAt;
+  final String? fletePagoEstadoRevision;
+  final String? fleteComprobanteRechazoNota;
+  final DateTime? fletePagoAprobadoAt;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -350,6 +398,62 @@ class TransactionRequestModel {
       proveedorFacturaStoragePath != null &&
       proveedorFacturaStoragePath!.trim().isNotEmpty;
 
+  bool get hasFleteFactura =>
+      fleteFacturaStoragePath != null &&
+      fleteFacturaStoragePath!.trim().isNotEmpty;
+
+  bool get hasImporterCarrierSelected =>
+      importerCarrierId != null && importerCarrierId!.trim().isNotEmpty;
+
+  bool get carrierFletePagoSeparado =>
+      carrierFletePagoModoSnapshot == CarrierFletePagoModo.pagoSeparado;
+
+  bool get aliadoMuestraSeccionFleteSeparado =>
+      hasImporterCarrierSelected &&
+      carrierFletePagoSeparado &&
+      status != TransactionRequestStatus.rechazado;
+
+  bool get hasFleteComprobantePago =>
+      fleteComprobantePagoStoragePath != null &&
+      fleteComprobantePagoStoragePath!.trim().isNotEmpty;
+
+  String get fletePagoEstadoRevisionEfectivo {
+    final r = fletePagoEstadoRevision?.trim();
+    if (r == null || r.isEmpty) return PagoRevisionEstado.pendiente;
+    return r;
+  }
+
+  bool get fletePagoAprobadoPorImportador =>
+      fletePagoEstadoRevisionEfectivo == PagoRevisionEstado.aprobado;
+
+  List<String> get metodosFletePagoPermitidos =>
+      PagoMetodo.filterByImporterAccepted(carrierAcceptedPagoMetodosEffective);
+
+  List<String>? get carrierAcceptedPagoMetodosEffective {
+    final snap = carrierAcceptedPagoMetodosSnapshot;
+    if (snap != null && snap.isNotEmpty) return snap;
+    return carrierAcceptedPagoMetodos;
+  }
+
+  Map<String, String> get carrierPagoInstruccionesEffective {
+    if (carrierPagoInstruccionesSnapshot.isNotEmpty) {
+      return carrierPagoInstruccionesSnapshot;
+    }
+    return carrierPagoMetodoInstrucciones;
+  }
+
+  String? get carrierDisplayCompanyName {
+    final snap = carrierCompanyNameSnapshot?.trim();
+    if (snap != null && snap.isNotEmpty) return snap;
+    return carrierCompanyName?.trim();
+  }
+
+  String? pagoInstruccionesCarrierFor(String? metodo) =>
+      PagoMetodoInstrucciones.forMetodo(carrierPagoInstruccionesEffective, metodo);
+
+  bool get aliadoPuedeElegirTransportista =>
+      status == TransactionRequestStatus.pedidoListo;
+
   /// Negocio nota vs factura fiscal: solo en el chat con el importador (sin selector en app).
   bool get aliadoDebeElegirDocumentTypeAntesDePago => false;
 
@@ -365,31 +469,56 @@ class TransactionRequestModel {
   bool get tieneDocumentacionFacturaPago =>
       hasProveedorFactura || hasComprobantePago;
 
-  /// Pedido entregado y pago sin aprobar por el importador.
-  bool get pagoMotolinkPendienteTrasEntrega {
+  /// Pedido entregado con factura del importador sin pago aprobado.
+  bool get pagoImportadorPendienteTrasEntrega {
     if (status != TransactionRequestStatus.entregado) return false;
+    if (!hasProveedorFactura) return false;
     final pe = pagoEstadoRevision?.trim();
     if (pe == PagoRevisionEstado.aprobado) return false;
     return true;
   }
 
-  /// En tránsito (o legado enviado) con factura pero pago sin aprobar (aviso antes de confirmar recepción).
+  /// Pedido entregado con factura de flete (pago separado) sin aprobación del importador.
+  bool get pagoFletePendienteTrasEntrega {
+    if (status != TransactionRequestStatus.entregado) return false;
+    if (!carrierFletePagoSeparado) return false;
+    if (!hasFleteFactura) return false;
+    return !fletePagoAprobadoPorImportador;
+  }
+
+  /// Pedido entregado con alguna factura asociada sin pagar por completo.
+  bool get pagoMotolinkPendienteTrasEntrega =>
+      pagoImportadorPendienteTrasEntrega || pagoFletePendienteTrasEntrega;
+
+  /// En tránsito (o legado enviado) con factura(s) sin pago completo.
   bool get pagoMotolinkPendienteEnTransito {
     if (status != TransactionRequestStatus.enTransito &&
         status != TransactionRequestStatus.enviado) {
       return false;
     }
-    if (!hasProveedorFactura) return false;
-    final pe = pagoEstadoRevision?.trim();
-    if (pe == PagoRevisionEstado.aprobado) return false;
-    return true;
+    if (hasProveedorFactura) {
+      final pe = pagoEstadoRevision?.trim();
+      if (pe != PagoRevisionEstado.aprobado) return true;
+    }
+    if (carrierFletePagoSeparado &&
+        hasFleteFactura &&
+        !fletePagoAprobadoPorImportador) {
+      return true;
+    }
+    return false;
   }
 
-  /// Entregado, con factura del importador y pago aprobado.
+  /// Entregado, con todas las facturas asociadas pagadas y aprobadas.
   bool get pedidoEntregadoYPagado {
     if (status != TransactionRequestStatus.entregado) return false;
     if (!hasProveedorFactura) return false;
-    return pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
+    if (pagoEstadoRevision?.trim() != PagoRevisionEstado.aprobado) return false;
+    if (carrierFletePagoSeparado &&
+        hasFleteFactura &&
+        !fletePagoAprobadoPorImportador) {
+      return false;
+    }
+    return true;
   }
 
   /// Tras entrega, pago aún no aprobado y ya transcurrieron 3+ días hábiles (excl. sáb/dom) desde el día de entrega.
@@ -750,6 +879,12 @@ class TransactionRequestModel {
       ownerMap = Map<String, dynamic>.from(importadorRaw);
     }
 
+    Map<String, dynamic>? carrierMap;
+    final carrierRaw = json['importer_carrier'];
+    if (carrierRaw is Map) {
+      carrierMap = Map<String, dynamic>.from(carrierRaw);
+    }
+
     final cant = _asInt(json['cantidad']);
     final precioTotalVal =
         _asDouble(json['precio_total'] ?? json['precio_total_usd']);
@@ -844,6 +979,43 @@ class TransactionRequestModel {
       ownerPagoSoloDivisas: ownerMap?['pago_solo_divisas'] is bool
           ? ownerMap!['pago_solo_divisas'] as bool
           : ownerMap?['pago_solo_divisas']?.toString().toLowerCase() == 'true',
+      importerCarrierId: _nullableText(json['importer_carrier_id']),
+      importerCarrierDriverId: _nullableText(json['importer_carrier_driver_id']),
+      carrierCompanyName: _nullableText(carrierMap?['company_name']),
+      carrierEtaHoursSnapshot: _asNullableDouble(json['carrier_eta_hours_snapshot']),
+      carrierDistanceKmSnapshot:
+          _asNullableDouble(json['carrier_distance_km_snapshot']),
+      carrierFeeUsdSnapshot: _asNullableDouble(json['carrier_fee_usd_snapshot']),
+      carrierFletePagoModoSnapshot:
+          _nullableText(json['carrier_flete_pago_modo_snapshot']),
+      carrierSelectedAt: _parseDate(json['carrier_selected_at']),
+      fleteFacturaStoragePath: _nullableText(json['flete_factura_storage_path']),
+      fleteFacturaFileName: _nullableText(json['flete_factura_file_name']),
+      fleteFacturaSubmittedAt: _parseDate(json['flete_factura_submitted_at']),
+      carrierAcceptedPagoMetodos:
+          ProfileModel.parseStringList(carrierMap?['accepted_pago_metodos']),
+      carrierPagoMetodoInstrucciones: PagoMetodoInstrucciones.parseMap(
+        carrierMap?['pago_metodo_instrucciones'],
+      ),
+      carrierCompanyNameSnapshot:
+          _nullableText(json['carrier_company_name_snapshot']),
+      carrierAcceptedPagoMetodosSnapshot: ProfileModel.parseStringList(
+        json['carrier_accepted_pago_metodos_snapshot'],
+      ),
+      carrierPagoInstruccionesSnapshot: PagoMetodoInstrucciones.parseMap(
+        json['carrier_pago_instrucciones_snapshot'],
+      ),
+      fletePagoMetodo: _nullableText(json['flete_pago_metodo']),
+      fleteComprobantePagoStoragePath:
+          _nullableText(json['flete_comprobante_pago_storage_path']),
+      fleteComprobantePagoFileName:
+          _nullableText(json['flete_comprobante_pago_file_name']),
+      fleteComprobanteSubmittedAt:
+          _parseDate(json['flete_comprobante_submitted_at']),
+      fletePagoEstadoRevision: _nullableText(json['flete_pago_estado_revision']),
+      fleteComprobanteRechazoNota:
+          _nullableText(json['flete_comprobante_rechazo_nota']),
+      fletePagoAprobadoAt: _parseDate(json['flete_pago_aprobado_at']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:

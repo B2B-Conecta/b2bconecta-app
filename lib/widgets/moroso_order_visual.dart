@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/transaction_request_model.dart';
+import '../models/pago_revision_estado.dart';
 
 /// Etiqueta de estado en listas (sin «Moroso»; usar [MorosoOrderStatusChip] aparte).
 String orderListStatusLabel(
@@ -122,16 +123,45 @@ String _detailMessage(
   TransactionRequestModel request, {
   required bool aliadoViewer,
 }) {
-  final faltaFactura = !request.hasProveedorFactura;
+  final impPend = request.pagoImportadorPendienteTrasEntrega;
+  final fletePend = request.pagoFletePendienteTrasEntrega;
+
   if (aliadoViewer) {
-    if (faltaFactura) {
+    if (impPend && fletePend) {
+      return 'Pagos pendientes: comprobante al importador (factura del proveedor) y '
+          'pago del flete al transportista. Regístrelos en las secciones correspondientes.';
+    }
+    if (fletePend) {
+      if (!request.hasFleteComprobantePago) {
+        return 'Pago del flete pendiente. Registre el comprobante en la sección '
+            '«Flete (pago separado)».';
+      }
+      if (request.fletePagoEstadoRevisionEfectivo ==
+          PagoRevisionEstado.enRevision) {
+        return 'Comprobante del flete en revisión por el importador.';
+      }
+      if (request.fletePagoEstadoRevisionEfectivo ==
+          PagoRevisionEstado.rechazado) {
+        return 'Comprobante del flete no aceptado. Adjunte uno nuevo en la sección '
+            '«Flete (pago separado)».';
+      }
+      return 'Pago del flete pendiente de confirmación por el importador.';
+    }
+    if (!request.hasProveedorFactura) {
       return 'Pago pendiente tras la recepción. Cuando el importador adjunte su factura, '
           'registre su comprobante en la sección de pago.';
     }
     return 'Pago pendiente de aprobación por el importador. Registre o actualice su comprobante '
         'en la sección de pago.';
   }
-  if (faltaFactura) {
+
+  if (impPend && fletePend) {
+    return 'Entregado con pagos pendientes: comprobante al importador y pago del flete.';
+  }
+  if (fletePend) {
+    return 'Entregado con pago del flete pendiente de confirmación por el importador.';
+  }
+  if (!request.hasProveedorFactura) {
     return 'Entregado sin pago aprobado. Factura del importador pendiente; '
         'el aliado debe registrar comprobante cuando corresponda.';
   }

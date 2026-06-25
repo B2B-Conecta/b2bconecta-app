@@ -19,6 +19,8 @@ import '../models/kyc_verification_exception.dart';
 import '../models/profile_location_exception.dart';
 import '../models/stock_insufficient_exception.dart';
 import '../models/part_model.dart';
+import '../models/product_image_bulk_result.dart';
+import '../utils/product_images.dart';
 import '../models/admin_aliado_morosidad_flag.dart';
 import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
@@ -937,6 +939,7 @@ class SupabaseService {
     required Uint8List bytes,
     required String fileExtension,
     String? productId,
+    int? slot,
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -950,7 +953,11 @@ class SupabaseService {
 
     final idPart =
         (productId != null && productId.isNotEmpty) ? productId : 'nuevo';
-    final path = '$uid/$idPart/${DateTime.now().microsecondsSinceEpoch}.$ext';
+    final slotPart = slot != null && slot >= 1 && slot <= kMaxProductImages
+        ? 's${slot}_'
+        : '';
+    final path =
+        '$uid/$idPart/$slotPart${DateTime.now().microsecondsSinceEpoch}.$ext';
 
     final contentType = switch (ext) {
       'png' => 'image/png',
@@ -978,6 +985,7 @@ class SupabaseService {
     String? category,
     String? compatibility,
     String? imageUrl,
+    List<String>? imageUrls,
     bool isActive = true,
     bool hasWarranty = false,
     Map<String, dynamic>? customFields,
@@ -1000,8 +1008,16 @@ class SupabaseService {
     if (c != null && c.isNotEmpty) payload['category'] = c;
     final comp = compatibility?.trim();
     if (comp != null && comp.isNotEmpty) payload['compatibility'] = comp;
-    final img = imageUrl?.trim();
-    if (img != null && img.isNotEmpty) payload['image_url'] = img;
+    final urls = normalizeProductImageUrls(
+      imageUrls ??
+          (imageUrl != null && imageUrl.trim().isNotEmpty
+              ? [imageUrl.trim()]
+              : const []),
+    );
+    if (urls.isNotEmpty) {
+      payload['image_urls'] = urls;
+      payload['image_url'] = urls.first;
+    }
     if (salePriceUsd != null && salePriceUsd > 0) {
       payload['sale_price_usd'] = salePriceUsd;
     }
@@ -1031,6 +1047,7 @@ class SupabaseService {
     String? category,
     String? compatibility,
     String? imageUrl,
+    List<String>? imageUrls,
     required bool isActive,
     bool hasWarranty = false,
     Map<String, dynamic>? customFields,
@@ -1050,8 +1067,15 @@ class SupabaseService {
     upd['category'] = c;
     final comp = compatibility?.trim();
     upd['compatibility'] = comp;
-    final img = imageUrl?.trim();
-    upd['image_url'] = (img == null || img.isEmpty) ? null : img;
+    final urls = imageUrls != null
+        ? normalizeProductImageUrls(imageUrls)
+        : normalizeProductImageUrls(
+            imageUrl != null && imageUrl.trim().isNotEmpty
+                ? [imageUrl.trim()]
+                : const [],
+          );
+    upd['image_urls'] = urls;
+    upd['image_url'] = urls.isEmpty ? null : urls.first;
     if (clearSalePrice) {
       upd['sale_price_usd'] = null;
     } else if (salePriceUsd != null && salePriceUsd > 0) {
@@ -1070,6 +1094,88 @@ class SupabaseService {
     }
 
     await _client.from('products').update(upd).eq('id', productId);
+  }
+
+  static Future<void> setProductImageUrls({
+    required String productId,
+    required List<String> imageUrls,
+  }) async {
+    final urls = normalizeProductImageUrls(imageUrls);
+    await _client.from('products').update({
+      'image_urls': urls,
+      'image_url': urls.isEmpty ? null : urls.first,
+    }).eq('id', productId);
+  }
+
+  /// Mapa sku (lower) → { id, imageUrls } para carga masiva de fotos.
+  static Future<Map<String, ProductSkuImageIndexEntry>>
+      fetchMyInventorySkuImageIndex({
+    int limit = 5000,
+  }) async {
+    final uid = _currentUserId;
+    if (uid == null) return {};
+
+    final response = await _client
+        .from('products')
+        .select('id, sku, image_urls, image_url')
+        .eq('owner_id', uid)
+        .limit(limit);
+
+    final map = <String, ProductSkuImageIndexEntry>{};
+    for (final row in response as List<dynamic>) {
+      final m = Map<String, dynamic>.from(row as Map);
+      final sku = m['sku']?.toString().trim() ?? '';
+      if (sku.isEmpty) continue;
+      final id = m['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final urls = parseProductImageUrlsJson(
+        m['image_urls'],
+        legacyImageUrl: m['image_url']?.toString(),
+      );
+      map[sku.toLowerCase()] = ProductSkuImageIndexEntry(
+        productId: id,
+        sku: sku,
+        imageUrls: urls,
+      );
+    }
+    return map;
+  }
+
+  static Future<ProductImageBulkResult> importadorBulkSetProductImages({
+    required List<Map<String, dynamic>> rows,
+  }) async {
+    if (rows.isEmpty) return const ProductImageBulkResult();
+
+    final res = await _client.rpc(
+      'importador_bulk_set_product_images',
+      params: {'p_rows': rows},
+    );
+
+    if (res is! Map) return const ProductImageBulkResult();
+
+    final errorsRaw = res['errors'];
+    final errors = <ProductImageBulkError>[];
+    if (errorsRaw is List) {
+      for (final e in errorsRaw) {
+        if (e is Map) {
+          errors.add(
+            ProductImageBulkError(
+              message: e['message']?.toString() ?? 'Error',
+            ),
+          );
+        }
+      }
+    }
+
+    return ProductImageBulkResult(
+      updated: res['updated'] is int
+          ? res['updated'] as int
+          : int.tryParse(res['updated']?.toString() ?? '') ?? 0,
+      skipped: res['skipped'] is int
+          ? res['skipped'] as int
+          : int.tryParse(res['skipped']?.toString() ?? '') ?? 0,
+      errors: errors,
+    );
   }
 
   static Future<void> updateProductPriceAndStock({

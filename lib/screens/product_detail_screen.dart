@@ -26,13 +26,28 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ProfileModel? _profile;
+  final PageController _imagePageController = PageController();
+  int _imagePageIndex = 0;
 
   PartModel get part => widget.part;
+
+  List<String> get _galleryUrls {
+    if (part.imageUrls.isNotEmpty) return part.imageUrls;
+    final cover = part.coverImageUrl;
+    if (cover != null && cover.isNotEmpty) return [cover];
+    return const [];
+  }
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _imagePageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -371,16 +386,61 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildHeroImageContent() {
-    return Hero(
-      tag: ProductDetailScreen.heroImageTag(part),
-      child: part.imagenUrl != null && part.imagenUrl!.isNotEmpty
-          ? Image.network(
-              part.imagenUrl!,
-              fit: BoxFit.contain,
-              width: double.infinity,
-              errorBuilder: (_, __, ___) => _imagePlaceholder(),
-            )
-          : _imagePlaceholder(),
+    final urls = _galleryUrls;
+    if (urls.isEmpty) {
+      return _imagePlaceholder();
+    }
+
+    if (urls.length == 1) {
+      return Hero(
+        tag: ProductDetailScreen.heroImageTag(part),
+        child: Image.network(
+          urls.first,
+          fit: BoxFit.contain,
+          width: double.infinity,
+          errorBuilder: (_, __, ___) => _imagePlaceholderInner(),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: PageView.builder(
+            controller: _imagePageController,
+            itemCount: urls.length,
+            onPageChanged: (i) => setState(() => _imagePageIndex = i),
+            itemBuilder: (context, index) {
+              return Image.network(
+                urls[index],
+                fit: BoxFit.contain,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => _imagePlaceholderInner(),
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(urls.length, (i) {
+              final active = i == _imagePageIndex;
+              return Container(
+                width: active ? 8 : 6,
+                height: active ? 8 : 6,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active
+                      ? AppColors.brandOrange
+                      : Colors.grey.shade400,
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
     );
   }
 
@@ -707,6 +767,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _imagePlaceholder() {
+    return Hero(
+      tag: ProductDetailScreen.heroImageTag(part),
+      child: _imagePlaceholderInner(),
+    );
+  }
+
+  Widget _imagePlaceholderInner() {
     return ColoredBox(
       color: Colors.grey.shade100,
       child: Center(

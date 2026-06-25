@@ -1,7 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../models/part_model.dart';
 import '../services/supabase_service.dart';
@@ -10,6 +8,7 @@ import '../utils/app_breakpoints.dart';
 import '../utils/product_volume_tiers.dart';
 import '../widgets/importer_product_commercial_terms_section.dart';
 import '../widgets/product_custom_fields_section.dart';
+import '../widgets/product_image_gallery_editor.dart';
 import '../widgets/product_usd_payment_discount_field.dart';
 
 /// Crear o editar un producto del inventario (importador).
@@ -36,63 +35,14 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   List<ProductVolumeTier> _volumeTiers = [];
   late final TextEditingController _categoryController;
   late final TextEditingController _compatController;
-  late final TextEditingController _imageController;
+  List<ProductImageEditSlot> _imageSlots = [];
   bool _isActive = true;
   bool _hasWarranty = false;
   bool _saving = false;
   bool _pagoSoloDivisas = false;
   Map<String, dynamic> _customFields = const {};
-  Uint8List? _pickedImageBytes;
-  String? _pickedImageExt;
 
   bool get _isEdit => widget.initial != null && widget.initial!.id.isNotEmpty;
-
-  static String _extensionFromXFile(XFile file) {
-    var name = file.name;
-    if (name.isEmpty) name = file.path;
-    if (!name.contains('.')) return 'jpeg';
-    final ext = name.split('.').last.toLowerCase();
-    if (ext == 'jpg') return 'jpeg';
-    return ext;
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    if (source == ImageSource.camera && kIsWeb) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La cámara no está disponible en la versión web.'),
-        ),
-      );
-      return;
-    }
-    try {
-      final x = await ImagePicker().pickImage(
-        source: source,
-        imageQuality: 82,
-        maxWidth: 1600,
-      );
-      if (x == null) return;
-      final bytes = await x.readAsBytes();
-      if (!mounted) return;
-      setState(() {
-        _pickedImageBytes = bytes;
-        _pickedImageExt = _extensionFromXFile(x);
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo obtener la imagen: $e')),
-      );
-    }
-  }
-
-  void _clearPickedImage() {
-    setState(() {
-      _pickedImageBytes = null;
-      _pickedImageExt = null;
-    });
-  }
 
   @override
   void initState() {
@@ -117,7 +67,12 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     );
     _categoryController = TextEditingController(text: p?.category ?? '');
     _compatController = TextEditingController(text: p?.compatibilidad ?? '');
-    _imageController = TextEditingController(text: p?.imagenUrl ?? '');
+    _imageSlots = (p?.imageUrls ?? const [])
+        .map((u) => ProductImageEditSlot.url(u))
+        .toList();
+    if (_imageSlots.isEmpty && (p?.coverImageUrl ?? '').isNotEmpty) {
+      _imageSlots = [ProductImageEditSlot.url(p!.coverImageUrl!)];
+    }
     _isActive = p?.isActive ?? true;
     _hasWarranty = p?.hasWarranty ?? false;
     _customFields = Map<String, dynamic>.from(p?.customFields ?? const {});
@@ -143,7 +98,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _stockController.dispose();
     _categoryController.dispose();
     _compatController.dispose();
-    _imageController.dispose();
     super.dispose();
   }
 
@@ -210,21 +164,15 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
 
     setState(() => _saving = true);
     try {
-      var imageUrl = _imageController.text.trim();
-      if (_pickedImageBytes != null && _pickedImageExt != null) {
-        imageUrl = await SupabaseService.uploadProductImage(
-          bytes: _pickedImageBytes!,
-          fileExtension: _pickedImageExt!,
+      final imageUrls = await resolveProductImageEditSlots(
+        slots: _imageSlots,
+        upload: (bytes, ext, slot) => SupabaseService.uploadProductImage(
+          bytes: bytes,
+          fileExtension: ext,
           productId: _isEdit ? widget.initial!.id : null,
-        );
-        if (mounted) {
-          setState(() {
-            _imageController.text = imageUrl;
-            _pickedImageBytes = null;
-            _pickedImageExt = null;
-          });
-        }
-      }
+          slot: slot,
+        ),
+      );
 
       if (_isEdit) {
         await SupabaseService.updateProduct(
@@ -240,7 +188,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           stock: stock,
           category: _categoryController.text.trim(),
           compatibility: _compatController.text.trim(),
-          imageUrl: imageUrl,
+          imageUrls: imageUrls,
           isActive: _isActive,
           hasWarranty: _hasWarranty,
           customFields: _customFields,
@@ -256,7 +204,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           stock: stock,
           category: _categoryController.text.trim(),
           compatibility: _compatController.text.trim(),
-          imageUrl: imageUrl,
+          imageUrls: imageUrls,
           isActive: _isActive,
           hasWarranty: _hasWarranty,
           customFields: _customFields,
@@ -381,91 +329,10 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   }
 
   Widget _buildImageSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Imagen (opcional)',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _saving ? null : () => _pickImage(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined, size: 20),
-                label: const Text('Galería'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _saving || kIsWeb
-                    ? null
-                    : () => _pickImage(ImageSource.camera),
-                icon: const Icon(Icons.photo_camera_outlined, size: 20),
-                label: const Text('Cámara'),
-              ),
-            ),
-          ],
-        ),
-        if (_pickedImageBytes != null) ...[
-          const SizedBox(height: 8),
-          Stack(
-            alignment: Alignment.topRight,
-            children: [
-              ClipRRect(
-                borderRadius: AppDecorations.radius12,
-                child: Image.memory(
-                  _pickedImageBytes!,
-                  height: 160,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              IconButton.filledTonal(
-                onPressed: _saving ? null : _clearPickedImage,
-                icon: const Icon(Icons.close, size: 20),
-              ),
-            ],
-          ),
-          const Text(
-            'Se subirá al guardar (requiere bucket product-images en Supabase).',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-          ),
-        ] else if (_imageController.text.trim().isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: AppDecorations.radius12,
-            child: Image.network(
-              _imageController.text.trim(),
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 160,
-                color: AppColors.fieldFill,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image_outlined),
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _imageController,
-          decoration: _dec(
-            'URL imagen (opcional)',
-            hint: 'O pega un enlace si ya está alojada',
-          ),
-          keyboardType: TextInputType.url,
-        ),
-      ],
+    return ProductImageGalleryEditor(
+      slots: _imageSlots,
+      enabled: !_saving,
+      onChanged: (next) => setState(() => _imageSlots = next),
     );
   }
 

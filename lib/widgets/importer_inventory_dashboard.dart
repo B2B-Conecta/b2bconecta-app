@@ -8,6 +8,7 @@ import '../screens/importer_product_edit_screen.dart';
 import '../services/catalog_import_orchestrator.dart';
 import '../services/excel_catalog_service.dart';
 import '../services/supabase_service.dart';
+import 'importer_bulk_photos_screen.dart';
 import 'importer_flexible_import_screen.dart';
 import 'product_custom_fields_section.dart';
 import '../theme/app_theme.dart';
@@ -240,7 +241,29 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     ];
   }
 
-  Widget _bulkImportBanner({required bool isDesktop}) {
+  Widget _bulkActionsPanel({required bool isDesktop}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isDesktop)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _bulkCatalogCard(isDesktop: true)),
+              const SizedBox(width: 12),
+              Expanded(child: _bulkPhotosCard(isDesktop: true)),
+            ],
+          )
+        else ...[
+          _bulkCatalogCard(isDesktop: false),
+          const SizedBox(height: 10),
+          _bulkPhotosCard(isDesktop: false),
+        ],
+      ],
+    );
+  }
+
+  Widget _bulkCatalogCard({required bool isDesktop}) {
     return Material(
       color: AppColors.successGreen.withOpacity(0.08),
       borderRadius: AppDecorations.radius12,
@@ -249,129 +272,117 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         onTap: _startBulkImport,
         child: Container(
           width: double.infinity,
-          padding: EdgeInsets.all(isDesktop ? 18 : 14),
+          padding: EdgeInsets.all(isDesktop ? 16 : 14),
           decoration: BoxDecoration(
             borderRadius: AppDecorations.radius12,
-            border: Border.all(
-              color: AppColors.successGreen.withOpacity(0.35),
-            ),
+            border: Border.all(color: AppColors.successGreen.withOpacity(0.35)),
           ),
-          child: isDesktop
-              ? Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.successGreen.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.upload_file,
-                        color: AppColors.successGreen,
-                        size: 28,
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.upload_file, color: AppColors.successGreen.withOpacity(0.9)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Catálogo',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Carga masiva',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 17,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Sube el Excel o CSV de tu ERP (Profit, Saint, AdministraNET…). '
-                            'MotoLink detecta tus columnas y actualiza tu inventario en minutos.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.4,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    FilledButton.icon(
-                      onPressed: _startBulkImport,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.successGreen,
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                      ),
-                      icon: const Icon(Icons.folder_open_outlined),
-                      label: const Text('Elegir archivo'),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.successGreen.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.upload_file,
-                            color: AppColors.successGreen,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Carga masiva',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Sube tu Excel o CSV del ERP. Detectamos SKU, '
-                                'precio y stock automáticamente.',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  height: 1.35,
-                                  color: Colors.grey.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      onPressed: _startBulkImport,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.successGreen,
-                        minimumSize: const Size(double.infinity, 44),
-                      ),
-                      icon: const Icon(Icons.folder_open_outlined),
-                      label: const Text('Elegir archivo Excel o CSV'),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Excel o CSV del ERP → productos, precios y stock.',
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _startBulkImport,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.successGreen,
+                  minimumSize: const Size(0, 40),
                 ),
+                icon: const Icon(Icons.folder_open_outlined, size: 18),
+                label: const Text('Elegir Excel / CSV'),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _bulkPhotosCard({required bool isDesktop}) {
+    return Material(
+      color: AppColors.brandBlue.withOpacity(0.06),
+      borderRadius: AppDecorations.radius12,
+      child: InkWell(
+        borderRadius: AppDecorations.radius12,
+        onTap: _startBulkPhotos,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isDesktop ? 16 : 14),
+          decoration: BoxDecoration(
+            borderRadius: AppDecorations.radius12,
+            border: Border.all(color: AppColors.brandBlue.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.photo_library_outlined, color: AppColors.brandBlue.withOpacity(0.9)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Fotos',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ZIP con fotos nombradas por SKU (hasta 3 por producto).',
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _startBulkPhotos,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.brandBlue,
+                  minimumSize: const Size(0, 40),
+                ),
+                icon: const Icon(Icons.archive_outlined, size: 18),
+                label: const Text('Elegir ZIP de fotos'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startBulkPhotos() async {
+    final result = await ImporterBulkPhotosScreen.open(context);
+    if (!mounted || result == null) return;
+    if (result.updated > 0) {
+      _reload();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Fotos: ${result.updated} producto(s) actualizado(s).',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Widget _bulkImportBanner({required bool isDesktop}) {
+    return _bulkActionsPanel(isDesktop: isDesktop);
   }
 
   Future<void> _exportRegisteredInventory() async {
@@ -464,6 +475,13 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                   'actual, editarlo y volver a subirlo.',
                   style: TextStyle(fontSize: 12.5, height: 1.4),
                 ),
+              ),
+              _helpStep(
+                n: '4',
+                title: 'Fotos en lote (opcional)',
+                body:
+                    'Comprime las fotos en un ZIP nombrado por SKU: ABC123.jpg, '
+                    'ABC123_2.jpg, ABC123_3.jpg (máx. 3 por producto).',
               ),
               const SizedBox(height: 12),
               _helpStep(
@@ -875,9 +893,9 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       child: SizedBox(
         width: size,
         height: size,
-        child: p.imagenUrl != null && p.imagenUrl!.isNotEmpty
+        child: p.coverImageUrl != null && p.coverImageUrl!.isNotEmpty
             ? Image.network(
-                p.imagenUrl!,
+                p.coverImageUrl!,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _thumbPlaceholder(size),
               )

@@ -1,3 +1,4 @@
+import '../utils/product_custom_fields.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/product_catalog_pricing.dart';
 import '../utils/product_volume_tiers.dart';
@@ -30,6 +31,7 @@ class PartModel {
     this.discountRules,
     this.ownerPagoSoloDivisas = false,
     this.hasWarranty = false,
+    this.customFields = const {},
   });
 
   final String id;
@@ -86,6 +88,9 @@ class PartModel {
 
   /// Importador habilitó garantía en este producto (`products.has_warranty`).
   final bool hasWarranty;
+
+  /// Campos ERP adicionales (`products.custom_fields`).
+  final Map<String, dynamic> customFields;
 
   bool get tieneOfertaDirecta => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: precio,
@@ -158,6 +163,7 @@ class PartModel {
       category: _nullableText(json['category']),
       distanceKmFromReference: null,
       hasWarranty: hasWarranty,
+      customFields: parseProductCustomFieldsJson(json['custom_fields']),
     );
   }
 
@@ -186,6 +192,7 @@ class PartModel {
     Map<String, dynamic>? discountRules,
     bool? ownerPagoSoloDivisas,
     bool? hasWarranty,
+    Map<String, dynamic>? customFields,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -215,6 +222,7 @@ class PartModel {
       ownerPagoSoloDivisas:
           ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
       hasWarranty: hasWarranty ?? this.hasWarranty,
+      customFields: customFields ?? this.customFields,
     );
   }
 

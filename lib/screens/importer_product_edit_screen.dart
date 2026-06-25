@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
 import '../utils/product_volume_tiers.dart';
 import '../widgets/importer_product_commercial_terms_section.dart';
+import '../widgets/product_custom_fields_section.dart';
 import '../widgets/product_usd_payment_discount_field.dart';
 
 /// Crear o editar un producto del inventario (importador).
@@ -40,6 +41,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   bool _hasWarranty = false;
   bool _saving = false;
   bool _pagoSoloDivisas = false;
+  Map<String, dynamic> _customFields = const {};
   Uint8List? _pickedImageBytes;
   String? _pickedImageExt;
 
@@ -118,6 +120,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _imageController = TextEditingController(text: p?.imagenUrl ?? '');
     _isActive = p?.isActive ?? true;
     _hasWarranty = p?.hasWarranty ?? false;
+    _customFields = Map<String, dynamic>.from(p?.customFields ?? const {});
     _loadImporterPagoPolicy();
   }
 
@@ -240,6 +243,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           imageUrl: imageUrl,
           isActive: _isActive,
           hasWarranty: _hasWarranty,
+          customFields: _customFields,
         );
       } else {
         await SupabaseService.insertProduct(
@@ -255,6 +259,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           imageUrl: imageUrl,
           isActive: _isActive,
           hasWarranty: _hasWarranty,
+          customFields: _customFields,
         );
       }
       if (!mounted) return;
@@ -527,6 +532,12 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         TextFormField(
           controller: _compatController,
           decoration: _dec('Compatibilidad'),
+        ),
+        const SizedBox(height: 20),
+        ProductCustomFieldsEditor(
+          initial: _customFields,
+          enabled: !_saving,
+          onChanged: (fields) => _customFields = fields,
         ),
       ],
     );

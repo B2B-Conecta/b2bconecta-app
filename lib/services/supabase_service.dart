@@ -3,7 +3,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'catalog_import_validator.dart';
 
+
+import '../models/catalog_import/catalog_import_mapping.dart';
+import '../models/catalog_import/catalog_import_result.dart';
 import '../models/catalog_filters.dart';
 import '../models/catalog_sort_mode.dart';
 import '../models/commission_settlement_model.dart';
@@ -570,6 +574,67 @@ class SupabaseService {
     return int.tryParse(res?.toString() ?? '') ?? 0;
   }
 
+  /// Importador: upsert masivo de productos vía RPC (lotes de ~500 filas).
+  static Future<CatalogImportResult> importadorBulkUpsertProducts({
+    required List<CatalogImportNormalizedRow> rows,
+    CatalogImportOptions options = const CatalogImportOptions(),
+  }) async {
+    if (rows.isEmpty) {
+      return const CatalogImportResult();
+    }
+
+    final payload = rows.map((r) => r.toRpcJson()).toList();
+    final res = await _client.rpc(
+      'importador_bulk_upsert_products',
+      params: <String, dynamic>{
+        'p_rows': payload,
+        'p_options': options.toJson(),
+      },
+    );
+
+    if (res is Map) {
+      return CatalogImportResult.fromRpcJson(Map<String, dynamic>.from(res));
+    }
+    return const CatalogImportResult();
+  }
+
+  /// Ejecuta importación flexible completa: parsea en lotes y persiste cada uno.
+  static Future<CatalogImportResult> runFlexibleCatalogImport({
+    required List<CatalogImportParseBatch> batches,
+    CatalogImportOptions options = const CatalogImportOptions(),
+  }) async {
+    if (options.dryRun) {
+      var validationErrors = <CatalogImportRowError>[];
+      var validCount = 0;
+      for (final batch in batches) {
+        validationErrors = [...validationErrors, ...batch.errors];
+        validCount += batch.validRows.length;
+      }
+      return CatalogImportResult(
+        skipped: validCount,
+        validationErrors: validationErrors,
+        dryRun: true,
+      );
+    }
+
+    var aggregate = const CatalogImportResult();
+    for (final batch in batches) {
+      aggregate = aggregate.merge(
+        CatalogImportResult(
+          validationErrors: batch.errors,
+        ),
+      );
+      if (batch.validRows.isEmpty) continue;
+
+      final rpcResult = await importadorBulkUpsertProducts(
+        rows: batch.validRows,
+        options: options,
+      );
+      aggregate = aggregate.merge(rpcResult);
+    }
+    return aggregate;
+  }
+
   /// Importador: datos de cuenta / instrucciones por método de pago.
   static Future<void> importadorSetPagoMetodoInstrucciones(
     Map<String, String> instrucciones,
@@ -915,6 +980,7 @@ class SupabaseService {
     String? imageUrl,
     bool isActive = true,
     bool hasWarranty = false,
+    Map<String, dynamic>? customFields,
   }) async {
     final uid = _currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -942,6 +1008,9 @@ class SupabaseService {
     if (discountRules != null && discountRules.isNotEmpty) {
       payload['discount_rules'] = discountRules;
     }
+    if (customFields != null && customFields.isNotEmpty) {
+      payload['custom_fields'] = customFields;
+    }
 
     final inserted =
         await _client.from('products').insert(payload).select('id').single();
@@ -964,6 +1033,8 @@ class SupabaseService {
     String? imageUrl,
     required bool isActive,
     bool hasWarranty = false,
+    Map<String, dynamic>? customFields,
+    bool clearCustomFields = false,
   }) async {
     final upd = <String, dynamic>{
       'sku': sku.trim(),
@@ -991,6 +1062,11 @@ class SupabaseService {
     } else if (discountRules != null) {
       upd['discount_rules'] =
           discountRules.isEmpty ? null : discountRules;
+    }
+    if (clearCustomFields) {
+      upd['custom_fields'] = <String, dynamic>{};
+    } else if (customFields != null) {
+      upd['custom_fields'] = customFields;
     }
 
     await _client.from('products').update(upd).eq('id', productId);

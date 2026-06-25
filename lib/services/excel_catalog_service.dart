@@ -6,6 +6,19 @@ import 'package:excel/excel.dart';
 import '../models/part_model.dart';
 import '../utils/product_volume_tiers.dart';
 
+/// Interpretación de una celda de garantía (booleano o días desde ERP).
+class GarantiaParseResult {
+  const GarantiaParseResult({
+    required this.hasWarranty,
+    this.warrantyDays,
+  });
+
+  final bool hasWarranty;
+
+  /// Días de garantía si el ERP envió un número (ej. `30`, `90 días`).
+  final int? warrantyDays;
+}
+
 /// Fila parseada de la plantilla de inventario (.xlsx).
 class ExcelInventoryRow {
   const ExcelInventoryRow({
@@ -350,29 +363,73 @@ class ExcelCatalogService {
     return out;
   }
 
-  /// `si` / `no` (también `1`, `0`, `true`, `false`, `x`).
-  static bool parseGarantiaExcelCell(
+  /// Resultado al interpretar una celda de garantía (si/no o días).
+  static GarantiaParseResult parseGarantiaCell(
     String raw, {
     required int rowIndex,
     required String sku,
   }) {
     final t = raw.trim().toLowerCase();
-    if (t.isEmpty) return false;
+    if (t.isEmpty) {
+      return const GarantiaParseResult(hasWarranty: false);
+    }
     if (t == 'si' ||
         t == 'sí' ||
         t == 'yes' ||
         t == 'true' ||
-        t == '1' ||
         t == 'x') {
-      return true;
+      return const GarantiaParseResult(hasWarranty: true);
     }
-    if (t == 'no' || t == 'false' || t == '0') {
-      return false;
+    if (t == 'no' || t == 'false') {
+      return const GarantiaParseResult(hasWarranty: false);
     }
+
+    final days = _parseWarrantyDays(t);
+    if (days != null) {
+      if (days <= 0) {
+        return const GarantiaParseResult(hasWarranty: false, warrantyDays: 0);
+      }
+      return GarantiaParseResult(hasWarranty: true, warrantyDays: days);
+    }
+
     throw FormatException(
-      'Fila $rowIndex: garantia inválida para SKU $sku '
-      '(use si o no).',
+      'garantía inválida para SKU $sku (use si, no o días como 30).',
     );
+  }
+
+  /// `si` / `no` / días numéricos (`30`, `90 días`, etc.).
+  static bool parseGarantiaExcelCell(
+    String raw, {
+    required int rowIndex,
+    required String sku,
+  }) {
+    return parseGarantiaCell(
+      raw,
+      rowIndex: rowIndex,
+      sku: sku,
+    ).hasWarranty;
+  }
+
+  static int? _parseWarrantyDays(String raw) {
+    final t = raw.trim().toLowerCase();
+    if (t.isEmpty) return null;
+
+    // Valores booleanos numéricos (1 = sí, 0 = no).
+    if (t == '1') return 1;
+    if (t == '0') return 0;
+
+    final normalized = t.replaceAll(',', '.');
+    final asInt = int.tryParse(normalized);
+    if (asInt != null) return asInt;
+
+    final asDouble = double.tryParse(normalized);
+    if (asDouble != null) return asDouble.round();
+
+    final match = RegExp(r'(\d+)').firstMatch(t);
+    if (match != null) {
+      return int.tryParse(match.group(1)!);
+    }
+    return null;
   }
 
   static Data? _col(List<Data?> row, int? i) {

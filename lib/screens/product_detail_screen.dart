@@ -7,7 +7,9 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
 import '../utils/product_catalog_pricing.dart';
+import '../utils/product_custom_fields.dart';
 import '../widgets/catalog_product_price_display.dart';
+import '../widgets/product_custom_fields_section.dart';
 import '../widgets/product_warranty_seal.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
@@ -531,6 +533,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
       if ((part.compatibilidad ?? '').trim().isNotEmpty) const SizedBox(height: 12),
+      ProductCustomFieldsAliadoSpecs(customFields: part.customFields),
+      if (productCustomFieldsDisplayEntries(
+        part.customFields,
+        aliadoView: true,
+      ).isNotEmpty)
+        const SizedBox(height: 12),
       _SpecBlock(
         label: 'Referencia interna (ID)',
         child: SelectableText(

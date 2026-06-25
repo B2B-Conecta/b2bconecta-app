@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import '../models/catalog_import/catalog_import_mapping.dart';
 import '../models/catalog_import/catalog_import_result.dart';
-import 'catalog_import_validator.dart';
 import 'flexible_catalog_import_service.dart';
 import 'supabase_service.dart';
 

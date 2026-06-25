@@ -89,6 +89,27 @@ class CartService extends ChangeNotifier {
     return map;
   }
 
+  /// Agrupa líneas por `ownerId` del importador (checkout logística).
+  Map<String, List<CartLine>> get linesGroupedByImportadorId {
+    final map = <String, List<CartLine>>{};
+    for (final line in _lines) {
+      final id = line.part.ownerId?.trim();
+      if (id == null || id.isEmpty) continue;
+      map.putIfAbsent(id, () => []).add(line);
+    }
+    return map;
+  }
+
+  String importadorDisplayName(String importadorId) {
+    for (final line in _lines) {
+      if (line.part.ownerId == importadorId) {
+        final name = line.part.ownerBusinessName?.trim();
+        if (name != null && name.isNotEmpty) return name;
+      }
+    }
+    return 'Importador';
+  }
+
   void addOrIncrement(
     PartModel part, {
     required double precioUnitarioAliadoRef,

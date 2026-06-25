@@ -250,7 +250,7 @@ from (
     ('c100000b-0000-4000-8000-000000000001'::uuid, 'importador11@motoconecta.seed'),
     ('c100000c-0000-4000-8000-000000000001'::uuid, 'importador12@motoconecta.seed'),
     ('c100000d-0000-4000-8000-000000000001'::uuid, 'importador13@motoconecta.seed'),
-    ('c100000e-0000-4000-8000-000000000001'::uuid, 'importador14@motoconecta.seed'),
+    ('c100000e-0000-4000-8000-000000000001'::uuid, 'importador14@motoconecta.seed'), 
     ('c100000f-0000-4000-8000-000000000001'::uuid, 'importador15@motoconecta.seed'),
     ('c2000001-0000-4000-8000-000000000001'::uuid, 'aliado1@motoconecta.seed'),
     ('c2000002-0000-4000-8000-000000000001'::uuid, 'aliado2@motoconecta.seed'),
@@ -1747,3 +1747,136 @@ values
     'aprobado',
     now()
   );
+
+-- ---------------------------------------------------------------------------
+-- Transportistas demo (importador1 / importador2) — requiere perfiles seed
+-- ---------------------------------------------------------------------------
+insert into public.importer_carriers (
+  importador_id,
+  company_name,
+  contact_name,
+  contact_phone,
+  contact_email,
+  coverage_estados,
+  coverage_ciudades,
+  base_estado,
+  base_ciudad,
+  base_latitude,
+  base_longitude,
+  accepted_pago_metodos,
+  pago_metodo_instrucciones,
+  flete_pago_modo,
+  eta_base_hours,
+  eta_hours_per_km,
+  max_coverage_km,
+  flat_fee_usd,
+  price_per_km_usd,
+  notes,
+  sort_order
+)
+values
+  (
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    'Envíos Rápidos Delta C.A.',
+    'Luis Mendoza',
+    '+58 424-5550101',
+    'logistica@delta-demo.seed',
+    array['Distrito Capital', 'Miranda', 'Aragua']::text[],
+    array['Caracas', 'Los Teques', 'Maracay']::text[],
+    'Distrito Capital',
+    'Caracas',
+    10.4969,
+    -66.8488,
+    array['efectivo', 'zelle_divisas', 'pago_movil']::text[],
+    jsonb_build_object(
+      'efectivo', 'Cobro en USD al momento de la entrega. Contacto: Luis +58 424-5550101',
+      'zelle_divisas', 'Zelle: logistica@delta-demo.seed · Titular: Envíos Rápidos Delta C.A.',
+      'pago_movil', 'Banco de Venezuela · 0414-5550101 · RIF J-12345678-9'
+    ),
+    'incluido_factura',
+    12,
+    0.12,
+    350,
+    5.00,
+    0.08,
+    'Entrega puerta a puerta en el área metropolitana.',
+    1
+  ),
+  (
+    'c1000001-0000-4000-8000-000000000001'::uuid,
+    'Motocargas Express',
+    'Ana Rivas',
+    '+58 412-5550102',
+    'dispatch@motocargas.seed',
+    array['Distrito Capital', 'Miranda']::text[],
+    array['Caracas', 'Petare', 'Guarenas']::text[],
+    'Miranda',
+    'Los Teques',
+    10.3440,
+    -67.0430,
+    array['efectivo', 'transferencia']::text[],
+    jsonb_build_object(
+      'efectivo', 'Efectivo USD contra entrega en zona oeste. Ana Rivas +58 412-5550102',
+      'transferencia', 'Banco Mercantil · Cta corriente 0105-0123-45-6789012345 · Motocargas Express C.A.'
+    ),
+    'pago_separado',
+    8,
+    0.18,
+    120,
+    3.50,
+    0.10,
+    'Ideal para pedidos urgentes en zona metropolitana oeste.',
+    2
+  ),
+  (
+    'c1000002-0000-4000-8000-000000000001'::uuid,
+    'Omega Encomiendas C.A.',
+    'Pedro Salazar',
+    '+58 424-5550201',
+    'envios@omega-demo.seed',
+    array['Aragua', 'Carabobo', 'Lara']::text[],
+    array['Maracay', 'Valencia', 'Barquisimeto']::text[],
+    'Aragua',
+    'Maracay',
+    10.2442,
+    -67.6061,
+    array['efectivo', 'zelle_divisas', 'usdt']::text[],
+    jsonb_build_object(
+      'efectivo', 'Cobro en USD al entregar. Coordinar por WhatsApp +58 424-5550201',
+      'zelle_divisas', 'Zelle: envios@omega-demo.seed · Omega Encomiendas C.A.',
+      'usdt', 'Red TRC20 · Wallet: TOmegaDemoWallet123456789'
+    ),
+    'incluido_factura',
+    24,
+    0.10,
+    500,
+    8.00,
+    0.06,
+    'Cobertura centro-oeste con rastreo por WhatsApp.',
+    1
+  );
+
+insert into public.importer_carrier_drivers (
+  carrier_id,
+  importador_id,
+  driver_name,
+  contact_phone,
+  license_id,
+  sort_order
+)
+select
+  c.id,
+  c.importador_id,
+  v.driver_name,
+  v.contact_phone,
+  v.license_id,
+  v.sort_order
+from public.importer_carriers c
+join (
+  values
+    ('Envíos Rápidos Delta C.A.', 'Carlos Pérez', '+58 414-7000101', 'V-12.345.678', 1),
+    ('Envíos Rápidos Delta C.A.', 'María González', '+58 424-7000102', 'V-98.765.432', 2),
+    ('Motocargas Express', 'José Herrera', '+58 412-7000201', null, 1),
+    ('Omega Encomiendas C.A.', 'Ricardo Blanco', '+58 416-7000301', 'V-11.223.344', 1)
+) as v(company_name, driver_name, contact_phone, license_id, sort_order)
+  on c.company_name = v.company_name;

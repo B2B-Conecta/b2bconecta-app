@@ -1109,10 +1109,10 @@ class _ProductGridCard extends StatelessWidget {
                     children: [
                       Hero(
                         tag: ProductDetailScreen.heroImageTag(part),
-                        child: part.imagenUrl != null &&
-                                part.imagenUrl!.isNotEmpty
+                        child: part.coverImageUrl != null &&
+                                part.coverImageUrl!.isNotEmpty
                             ? Image.network(
-                                part.imagenUrl!,
+                                part.coverImageUrl!,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) =>
                                     _placeholder(compact),

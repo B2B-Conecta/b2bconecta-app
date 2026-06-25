@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pago_metodo.dart';
 import '../models/pago_revision_estado.dart';
 import '../models/profile_model.dart';
@@ -56,7 +55,6 @@ class AliadoOrderPagoSection extends StatefulWidget {
 class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   String? _metodoSeleccionado;
   bool _busy = false;
-  List<AliadoPagoFrecuenteModel> _pagosFrecuentes = [];
 
   List<String> get _metodosPermitidos =>
       widget.request.metodosPagoPermitidos;
@@ -77,25 +75,13 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
-  void _syncMetodoSeleccionado({
-    bool notifyParent = true,
-    bool preferFrecuente = false,
-  }) {
+  void _syncMetodoSeleccionado({bool notifyParent = true}) {
     final permitidos = _metodosPermitidos;
     final m = widget.request.pagoMetodo?.trim();
     if (m != null && m.isNotEmpty && permitidos.contains(m)) {
       _metodoSeleccionado = m;
     } else if (permitidos.isNotEmpty) {
-      String? picked;
-      if (preferFrecuente) {
-        for (final f in _pagosFrecuentes) {
-          if (permitidos.contains(f.pagoMetodo)) {
-            picked = f.pagoMetodo;
-            break;
-          }
-        }
-      }
-      _metodoSeleccionado = picked ?? permitidos.first;
+      _metodoSeleccionado = permitidos.first;
     } else {
       _metodoSeleccionado = null;
     }
@@ -104,25 +90,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
     }
   }
 
-  Future<void> _loadPagosFrecuentes() async {
-    try {
-      final list = await SupabaseService.fetchAliadoPagoFrecuenteImportador(
-        widget.request.ownerId,
-      );
-      if (!mounted) return;
-      setState(() => _pagosFrecuentes = list);
-      _syncMetodoSeleccionado(preferFrecuente: true);
-    } catch (_) {
-      if (!mounted) return;
-      _syncMetodoSeleccionado();
-    }
-  }
-
   @override
   void initState() {
     super.initState();
     _syncMetodoSeleccionado(notifyParent: false);
-    _loadPagosFrecuentes();
   }
 
   @override
@@ -132,15 +103,8 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         oldWidget.request.ownerId != widget.request.ownerId ||
         oldWidget.request.ownerAcceptedPagoMetodos !=
             widget.request.ownerAcceptedPagoMetodos) {
-      _loadPagosFrecuentes();
+      _syncMetodoSeleccionado();
     }
-  }
-
-  List<AliadoPagoFrecuenteModel> get _frecuentesVisibles {
-    final permitidos = _metodosPermitidos.toSet();
-    return _pagosFrecuentes
-        .where((f) => permitidos.contains(f.pagoMetodo))
-        .toList();
   }
 
   void _seleccionarMetodo(String metodo) {
@@ -440,37 +404,6 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 ),
               ),
             ),
-          if (!referenciaHistorica &&
-              puedeCambiarMetodo &&
-              _frecuentesVisibles.isNotEmpty) ...[
-            Text(
-              'Pagos frecuentes con este importador',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final f in _frecuentesVisibles)
-                  FilterChip(
-                    label: Text(
-                      '${PagoMetodo.labelEs(f.pagoMetodo)} · ${f.useCount}×',
-                      style: const TextStyle(fontSize: 11.5),
-                    ),
-                    selected: _metodoSeleccionado == f.pagoMetodo,
-                    onSelected: (_) => _seleccionarMetodo(f.pagoMetodo),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
           if (metodosPermitidos.isEmpty)
             Text(
               'Sin métodos disponibles.',

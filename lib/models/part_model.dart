@@ -1,3 +1,5 @@
+import '../utils/product_custom_fields.dart';
+import '../utils/product_images.dart';
 import '../utils/broker_pricing.dart';
 import '../utils/product_catalog_pricing.dart';
 import '../utils/product_volume_tiers.dart';
@@ -17,6 +19,7 @@ class PartModel {
     required this.precio,
     required this.stock,
     this.imagenUrl,
+    this.imageUrls = const [],
     this.sku,
     this.isActive = true,
     this.category,
@@ -30,6 +33,7 @@ class PartModel {
     this.discountRules,
     this.ownerPagoSoloDivisas = false,
     this.hasWarranty = false,
+    this.customFields = const {},
   });
 
   final String id;
@@ -52,6 +56,9 @@ class PartModel {
   final double precio;
   final int stock;
   final String? imagenUrl;
+
+  /// Hasta [kMaxProductImages] URLs (`products.image_urls`). Portada = índice 0.
+  final List<String> imageUrls;
 
   /// Llave de negocio por importador (tabla `products.sku`).
   final String? sku;
@@ -87,6 +94,13 @@ class PartModel {
   /// Importador habilitó garantía en este producto (`products.has_warranty`).
   final bool hasWarranty;
 
+  /// Campos ERP adicionales (`products.custom_fields`).
+  final Map<String, dynamic> customFields;
+
+  /// URL de portada para listados (compat legacy + multi-foto).
+  String? get coverImageUrl =>
+      productCoverImageUrl(imageUrls, legacy: imagenUrl);
+
   bool get tieneOfertaDirecta => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: precio,
         salePriceUsd: salePriceUsd,
@@ -115,6 +129,10 @@ class PartModel {
     final precioRaw = json['price_usd'] ?? json['price'] ?? json['precio'];
     final saleRaw = json['sale_price_usd'];
     final imagenRaw = json['image_url'] ?? json['imagen_url'];
+    final imageUrls = parseProductImageUrlsJson(
+      json['image_urls'],
+      legacyImageUrl: imagenRaw?.toString(),
+    );
 
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
     final loc = _ownerLocationFromProfiles(json['profiles']);
@@ -152,12 +170,17 @@ class PartModel {
       salePriceUsd: _asNullableDouble(saleRaw),
       discountRules: _discountRulesFromJson(json['discount_rules']),
       stock: _asInt(json['stock']),
-      imagenUrl: _nullableUrl(imagenRaw),
+      imagenUrl: productCoverImageUrl(
+        imageUrls,
+        legacy: _nullableUrl(imagenRaw),
+      ),
+      imageUrls: imageUrls,
       sku: _nullableText(json['sku']),
       isActive: isActive,
       category: _nullableText(json['category']),
       distanceKmFromReference: null,
       hasWarranty: hasWarranty,
+      customFields: parseProductCustomFieldsJson(json['custom_fields']),
     );
   }
 
@@ -173,6 +196,7 @@ class PartModel {
     double? precio,
     int? stock,
     String? imagenUrl,
+    List<String>? imageUrls,
     String? sku,
     bool? isActive,
     String? category,
@@ -186,6 +210,7 @@ class PartModel {
     Map<String, dynamic>? discountRules,
     bool? ownerPagoSoloDivisas,
     bool? hasWarranty,
+    Map<String, dynamic>? customFields,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -199,6 +224,7 @@ class PartModel {
       precio: precio ?? this.precio,
       stock: stock ?? this.stock,
       imagenUrl: imagenUrl ?? this.imagenUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
       sku: sku ?? this.sku,
       isActive: isActive ?? this.isActive,
       category: category ?? this.category,
@@ -215,6 +241,7 @@ class PartModel {
       ownerPagoSoloDivisas:
           ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
       hasWarranty: hasWarranty ?? this.hasWarranty,
+      customFields: customFields ?? this.customFields,
     );
   }
 

@@ -30,12 +30,41 @@ Future<bool> advanceImporterOrderGroup(
   }
 
   if (nextStatus == TransactionRequestStatus.enTransito) {
+    final hasCarriers = await SupabaseService.importadorHasActiveCarriers(
+      lines.first.ownerId,
+    );
+
     for (final r in lines) {
       if (!r.hasProveedorFactura) {
         messenger?.showSnackBar(
           const SnackBar(
             content: Text(
               'Adjunte la factura del proveedor antes de marcar «En tránsito».',
+            ),
+          ),
+        );
+        return false;
+      }
+
+      if (hasCarriers && !r.hasImporterCarrierSelected) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'El aliado debe seleccionar un transportista antes de marcar «En tránsito».',
+            ),
+          ),
+        );
+        return false;
+      }
+
+      if (hasCarriers &&
+          r.carrierFletePagoSeparado &&
+          !r.hasFleteFactura) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Adjunte la factura del flete (pago separado al transportista) '
+              'antes de marcar «En tránsito».',
             ),
           ),
         );

@@ -1,10 +1,16 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../models/catalog_import/catalog_import_mapping.dart';
+import '../models/catalog_import/catalog_import_result.dart';
 import '../models/part_model.dart';
 import '../screens/importer_product_edit_screen.dart';
+import '../services/catalog_import_orchestrator.dart';
 import '../services/excel_catalog_service.dart';
 import '../services/supabase_service.dart';
+import 'importer_bulk_photos_screen.dart';
+import 'importer_flexible_import_screen.dart';
+import 'product_custom_fields_section.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
 import '../utils/excel_file_export.dart';
@@ -14,8 +20,6 @@ import '../utils/product_volume_tiers.dart';
 import 'importer_bulk_usd_discount_dialog.dart';
 import 'importer_promo_widgets.dart';
 import 'main_shell_tab.dart';
-
-enum _SkuConflictAction { update, ignore }
 
 enum _InventorySelectionMode { none, visibility, delete }
 
@@ -30,7 +34,7 @@ const _kInventoryCategories = <String>[
   'Transmisión',
 ];
 
-/// Vista "Mi inventario" para importadores: métricas, lista, carga Excel, FAB.
+/// Vista "Mi inventario" para importadores: métricas, lista, carga masiva, FAB.
 class ImporterInventoryDashboard extends StatefulWidget {
   const ImporterInventoryDashboard({super.key});
 
@@ -43,7 +47,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   final _searchController = TextEditingController();
   Future<InventoryMetrics>? _metricsFuture;
   Future<List<PartModel>>? _partsFuture;
-  bool _importing = false;
   String _categoryFilter = 'Todas';
   bool _filterLowStock = false;
   bool _filterHidden = false;
@@ -217,78 +220,169 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     return [
       _inventoryToolbarIcon(
         icon: Icons.help_outline,
-        tooltip: 'Ayuda',
-        onPressed: _importing ? null : _showHelpDialog,
-      ),
-      _inventoryToolbarIcon(
-        icon: Icons.table_chart_outlined,
-        tooltip: 'Descargar plantilla Excel',
-        onPressed: _importing ? null : _downloadTemplate,
-        backgroundColor: AppColors.brandBlue,
-        foregroundColor: Colors.white,
+        tooltip: 'Cómo funciona la carga masiva',
+        onPressed: _showHelpDialog,
       ),
       _inventoryToolbarIcon(
         icon: Icons.download_outlined,
-        tooltip: 'Exportar inventario actual',
-        onPressed: _importing ? null : _exportRegisteredInventory,
-        backgroundColor: AppColors.brandOrange,
+        tooltip: 'Exportar inventario a Excel',
+        onPressed: _exportRegisteredInventory,
+        backgroundColor: AppColors.brandBlue,
         foregroundColor: Colors.white,
       ),
       if (!_pagoSoloDivisas)
         _inventoryToolbarIcon(
           icon: Icons.percent_outlined,
           tooltip: 'Actualizar descuentos USD (masivo)',
-          onPressed: _importing ? null : _openBulkUsdDiscountDialog,
+          onPressed: _openBulkUsdDiscountDialog,
           backgroundColor: AppColors.brandOrange.withOpacity(0.92),
           foregroundColor: Colors.white,
         ),
-      _inventoryToolbarIcon(
-        icon: Icons.upload_file,
-        tooltip: 'Carga masiva',
-        onPressed: _importing ? null : _pickAndImport,
-        backgroundColor: AppColors.successGreen,
-        foregroundColor: Colors.white,
-        iconWidget: _importing
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.upload_file, size: 20),
-      ),
     ];
   }
 
-  Future<void> _downloadTemplate() async {
-    try {
-      final bytes = ExcelCatalogService.buildTemplateBytes();
-      final result = await saveExcelForExport(
-        name: 'motolink_plantilla_inventario',
-        bytes: bytes,
-      );
-      if (!mounted) return;
-      if (result == ExcelExportResult.cancelled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Descarga de plantilla cancelada.')),
-        );
-        return;
-      }
+  Widget _bulkActionsPanel({required bool isDesktop}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isDesktop)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _bulkCatalogCard(isDesktop: true)),
+              const SizedBox(width: 12),
+              Expanded(child: _bulkPhotosCard(isDesktop: true)),
+            ],
+          )
+        else ...[
+          _bulkCatalogCard(isDesktop: false),
+          const SizedBox(height: 10),
+          _bulkPhotosCard(isDesktop: false),
+        ],
+      ],
+    );
+  }
+
+  Widget _bulkCatalogCard({required bool isDesktop}) {
+    return Material(
+      color: AppColors.successGreen.withOpacity(0.08),
+      borderRadius: AppDecorations.radius12,
+      child: InkWell(
+        borderRadius: AppDecorations.radius12,
+        onTap: _startBulkImport,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isDesktop ? 16 : 14),
+          decoration: BoxDecoration(
+            borderRadius: AppDecorations.radius12,
+            border: Border.all(color: AppColors.successGreen.withOpacity(0.35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.upload_file, color: AppColors.successGreen.withOpacity(0.9)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Catálogo',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Excel o CSV del ERP → productos, precios y stock.',
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _startBulkImport,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.successGreen,
+                  minimumSize: const Size(0, 40),
+                ),
+                icon: const Icon(Icons.folder_open_outlined, size: 18),
+                label: const Text('Elegir Excel / CSV'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bulkPhotosCard({required bool isDesktop}) {
+    return Material(
+      color: AppColors.brandBlue.withOpacity(0.06),
+      borderRadius: AppDecorations.radius12,
+      child: InkWell(
+        borderRadius: AppDecorations.radius12,
+        onTap: _startBulkPhotos,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isDesktop ? 16 : 14),
+          decoration: BoxDecoration(
+            borderRadius: AppDecorations.radius12,
+            border: Border.all(color: AppColors.brandBlue.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.photo_library_outlined, color: AppColors.brandBlue.withOpacity(0.9)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Fotos',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ZIP con fotos nombradas por SKU (hasta 3 por producto).',
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _startBulkPhotos,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.brandBlue,
+                  minimumSize: const Size(0, 40),
+                ),
+                icon: const Icon(Icons.archive_outlined, size: 18),
+                label: const Text('Elegir ZIP de fotos'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startBulkPhotos() async {
+    final result = await ImporterBulkPhotosScreen.open(context);
+    if (!mounted || result == null) return;
+    if (result.updated > 0) {
+      _reload();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            excelExportSavedMessage('Plantilla lista para descargar.'),
+            'Fotos: ${result.updated} producto(s) actualizado(s).',
           ),
+          behavior: SnackBarBehavior.floating,
         ),
       );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo generar la plantilla: $e')),
-      );
     }
+  }
+
+  Widget _bulkImportBanner({required bool isDesktop}) {
+    return _bulkActionsPanel(isDesktop: isDesktop);
   }
 
   Future<void> _exportRegisteredInventory() async {
@@ -332,31 +426,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
   }
 
-  Future<_SkuConflictAction?> _askSkuConflict(String sku) async {
-    return showDialog<_SkuConflictAction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('SKU existente'),
-        content: Text(
-          'El SKU "$sku" ya está en tu inventario. ¿Qué deseas hacer?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(ctx, _SkuConflictAction.ignore),
-            child: const Text('Ignorar'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(ctx, _SkuConflictAction.update),
-            child: const Text('Actualizar precio y stock'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _showHelpDialog() async {
     await showDialog<void>(
       context: context,
@@ -367,73 +436,60 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                '1. Descargar plantilla',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              _helpStep(
+                n: '1',
+                title: 'Exporta desde tu ERP',
+                body:
+                    'Genera un listado en Excel (.xlsx) o CSV desde Profit, Saint, '
+                    'AdministraNET o tu hoja de cálculo. No necesitas adaptar el '
+                    'archivo a una plantilla MotoLink.',
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Columnas obligatorias: sku, nombre, precio, stock. '
-                'Opcionales: descripcion, precio_oferta_usd, descuento_pago_usd_pct, '
-                'categoria, compatibilidad y garantia (si/no). '
-                'Los tramos por volumen y la foto se configuran en la app, no en Excel. '
-                'La plantilla trae una fila de ejemplo con SKU que empieza por '
-                '"EJEMPLO"; no se importa. Puedes borrarla.',
-                style: TextStyle(
-                  color: Colors.orange.shade900,
-                  fontWeight: FontWeight.w600,
+              _helpStep(
+                n: '2',
+                title: 'Sube y confirma columnas',
+                body:
+                    'Toca «Elegir archivo». MotoLink sugiere automáticamente qué '
+                    'columna es SKU, nombre, precio y stock. Revisa el mapeo y '
+                    'ajusta si hace falta. Las demás columnas pueden guardarse '
+                    'como datos internos.',
+              ),
+              _helpStep(
+                n: '3',
+                title: 'Importa',
+                body:
+                    'Elige si los productos nuevos entran en pausa o visibles '
+                    'para aliados, y confirma. Los códigos existentes se '
+                    'actualizan según la regla que elijas (todo el producto o '
+                    'solo precio y stock).',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.brandBlueContainer.withOpacity(0.4),
+                  borderRadius: AppDecorations.radius12,
+                ),
+                child: const Text(
+                  'Tip: usa «Exportar inventario» para descargar tu catálogo '
+                  'actual, editarlo y volver a subirlo.',
+                  style: TextStyle(fontSize: 12.5, height: 1.4),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Tip: también puedes usar "Exportar inventario actual" para '
-                'descargar un Excel con tus productos ya registrados y editarlo.',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+              _helpStep(
+                n: '4',
+                title: 'Fotos en lote (opcional)',
+                body:
+                    'Comprime las fotos en un ZIP nombrado por SKU: ABC123.jpg, '
+                    'ABC123_2.jpg, ABC123_3.jpg (máx. 3 por producto).',
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Importante: los productos nuevos que entren por Excel quedan '
-                'ocultos para aliados hasta que actives la visibilidad en la app.',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.brandBlue,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '2. Llenar datos',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'El SKU identifica cada repuesto dentro de tu cuenta. Precio y stock '
-                'deben ser números válidos. Sube la imagen y los descuentos por '
-                'cantidad al editar el producto en la app.',
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '3. Cargar archivo',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Usa "Carga masiva" para seleccionar el .xlsx. Si un SKU ya existe, '
-                'podrás actualizar solo precio y stock o ignorar la fila '
-                '(la visibilidad del existente no cambia).',
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '4. Gestionar visibilidad',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Usa el interruptor en cada fila, «Gestionar visibilidad» con la cinta '
-                'inferior, «Eliminar varios» o mantén pulsado un producto para borrar '
-                'varios a la vez. También puedes usar «Modo pausa» al editar.',
+              const SizedBox(height: 12),
+              _helpStep(
+                n: '·',
+                title: 'Visibilidad en la app',
+                body:
+                    'Activa o pausa productos con el interruptor de cada fila, '
+                    '«Gestionar visibilidad» o al editar el repuesto.',
               ),
             ],
           ),
@@ -448,10 +504,58 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     );
   }
 
-  Future<void> _pickAndImport() async {
+  Widget _helpStep({
+    required String n,
+    required String title,
+    required String body,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 13,
+            backgroundColor: AppColors.brandBlue,
+            child: Text(
+              n,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startBulkImport() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['xlsx'],
+      allowedExtensions: const ['xlsx', 'csv'],
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
@@ -469,101 +573,60 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       return;
     }
 
-    List<ExcelInventoryRow> rows;
+    final name = file.name;
+    final isCsv = name.toLowerCase().endsWith('.csv');
+    final fileMeta = CatalogImportFileMeta(
+      name: name,
+      format: isCsv
+          ? CatalogImportFileFormat.csv
+          : CatalogImportFileFormat.xlsx,
+    );
+
+    CatalogImportPreview preview;
     try {
-      rows = ExcelCatalogService.parseInventoryBytes(bytes);
+      preview = CatalogImportOrchestrator.preview(
+        bytes: bytes,
+        fileMeta: fileMeta,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Archivo inválido: $e')),
+        SnackBar(content: Text('No se pudo leer el archivo: $e')),
       );
       return;
     }
 
-    if (rows.isEmpty) {
+    if (preview.headers.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay filas de datos en el archivo.')),
+        const SnackBar(content: Text('El archivo no tiene cabeceras.')),
       );
       return;
     }
 
-    setState(() => _importing = true);
-    var ok = 0;
-    var skipped = 0;
-    try {
-      for (final row in rows) {
-        final existingId =
-            await SupabaseService.findProductIdByOwnerSku(row.sku);
-        if (existingId != null && existingId.isNotEmpty) {
-          final action = await _askSkuConflict(row.sku);
-          if (action == null || action == _SkuConflictAction.ignore) {
-            skipped++;
-            continue;
-          }
-          final existingRules =
-              await SupabaseService.fetchProductDiscountRulesById(existingId);
-          await SupabaseService.updateProductPriceAndStock(
-            productId: existingId,
-            priceUsd: row.precio,
-            stock: row.stock,
-            salePriceUsd: row.precioOfertaUsd,
-            discountRules: row.discountRules(
-              pagoSoloDivisas: _pagoSoloDivisas,
-              preserveVolumeTiersFrom: existingRules,
-            ),
-            hasWarranty: row.hasWarranty,
-          );
-          ok++;
-        } else {
-          try {
-            await SupabaseService.insertProduct(
-              sku: row.sku,
-              name: row.nombre,
-              description: row.descripcion,
-              priceUsd: row.precio,
-              salePriceUsd: row.precioOfertaUsd,
-              discountRules: row.discountRules(
-                pagoSoloDivisas: _pagoSoloDivisas,
-              ),
-              stock: row.stock,
-              category: row.categoria,
-              compatibility: row.compatibilidad,
-              imageUrl: row.urlImagen,
-              isActive: false,
-              hasWarranty: row.hasWarranty,
-            );
-            ok++;
-          } catch (e) {
-            if (!mounted) return;
-            await showDialog<void>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Error al insertar'),
-                content: Text('SKU ${row.sku}: $e'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cerrar'),
-                  ),
-                ],
-              ),
-            );
-          }
-        }
-      }
-      if (!mounted) return;
+    if (!mounted) return;
+
+    final importResult = await ImporterFlexibleImportScreen.open(
+      context,
+      fileName: name,
+      bytes: bytes,
+      fileMeta: fileMeta,
+      preview: preview,
+      pagoSoloDivisas: _pagoSoloDivisas,
+    );
+
+    if (!mounted || importResult == null) return;
+    if (!importResult.dryRun && importResult.successCount > 0) {
+      _reload();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Importación terminada: $ok filas aplicadas. '
-            '${skipped > 0 ? '$skipped ignoradas.' : ''}',
+            'Carga masiva: ${importResult.inserted} nuevo(s), '
+            '${importResult.updated} actualizado(s).',
           ),
+          behavior: SnackBarBehavior.floating,
         ),
       );
-      _reload();
-    } finally {
-      if (mounted) setState(() => _importing = false);
     }
   }
 
@@ -830,9 +893,9 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       child: SizedBox(
         width: size,
         height: size,
-        child: p.imagenUrl != null && p.imagenUrl!.isNotEmpty
+        child: p.coverImageUrl != null && p.coverImageUrl!.isNotEmpty
             ? Image.network(
-                p.imagenUrl!,
+                p.coverImageUrl!,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _thumbPlaceholder(size),
               )
@@ -928,6 +991,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               ),
             ),
           ),
+        ProductCustomFieldsChips(customFields: p.customFields),
       ],
     );
   }
@@ -1065,6 +1129,10 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             ),
             const ImporterThirdPartyAdsCarousel(),
             const ImporterActivePromoBanner(),
+            Padding(
+              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
+              child: _bulkImportBanner(isDesktop: isDesktop),
+            ),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: hPad),
               child: isDesktop
@@ -1372,14 +1440,48 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: hPad + 8),
             child: Center(
-              child: Text(
-                hasFilters
-                    ? 'Sin resultados con los filtros actuales. Prueba quitar filtros o actualizar.'
-                    : 'Aún no tienes productos. Añade uno o importa Excel.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 48,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    hasFilters
+                        ? 'Sin resultados con los filtros actuales.'
+                        : 'Tu inventario está vacío',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    hasFilters
+                        ? 'Prueba quitar filtros o actualizar la lista.'
+                        : 'Sube el Excel de tu ERP o añade productos uno a uno.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                  if (!hasFilters) ...[
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: _startBulkImport,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.successGreen,
+                        minimumSize: const Size(0, 44),
+                      ),
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('Carga masiva'),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

@@ -4,8 +4,11 @@ import 'qty_adjustment_status.dart';
 import 'pago_metodo.dart';
 import 'pago_metodo_instrucciones.dart';
 import 'carrier_flete_pago_modo.dart';
+import 'carrier_decision.dart';
 import 'pago_revision_estado.dart';
 import 'transaction_request_status.dart';
+import '../utils/order_flow_copy/order_vocab.dart';
+import '../utils/order_flow_copy/order_status_flow_copy.dart';
 import '../utils/business_calendar.dart';
 import '../utils/order_payment_pricing.dart';
 import '../utils/product_volume_tiers.dart';
@@ -131,6 +134,19 @@ class TransactionRequestModel {
     this.fletePagoEstadoRevision,
     this.fleteComprobanteRechazoNota,
     this.fletePagoAprobadoAt,
+    this.carrierDecision = CarrierDecision.notApplicable,
+    this.carrierDecisionAt,
+    this.pickupLocationMode,
+    this.pickupConfirmedAt,
+    this.pickupLabel,
+    this.pickupEstado,
+    this.pickupCiudad,
+    this.pickupDireccion,
+    this.pickupLatitude,
+    this.pickupLongitude,
+    this.pickupMapsUrl,
+    this.pickupLocationId,
+    this.pickupCarrierId,
   });
 
   final String id;
@@ -224,6 +240,45 @@ class TransactionRequestModel {
   final String? fletePagoEstadoRevision;
   final String? fleteComprobanteRechazoNota;
   final DateTime? fletePagoAprobadoAt;
+
+  final String carrierDecision;
+  final DateTime? carrierDecisionAt;
+  final String? pickupLocationMode;
+  final DateTime? pickupConfirmedAt;
+  final String? pickupLabel;
+  final String? pickupEstado;
+  final String? pickupCiudad;
+  final String? pickupDireccion;
+  final double? pickupLatitude;
+  final double? pickupLongitude;
+  final String? pickupMapsUrl;
+  final String? pickupLocationId;
+  final String? pickupCarrierId;
+
+  bool get hasPickupConfirmed => pickupConfirmedAt != null;
+
+  bool get carrierDecisionResolved => CarrierDecision.isResolved(carrierDecision);
+
+  bool get aliadoDebeDecidirTransportista =>
+      status == TransactionRequestStatus.pedidoListo &&
+      carrierDecision == CarrierDecision.pending;
+
+  bool get importadorPuedeConfirmarRecoleccion =>
+      status == TransactionRequestStatus.pedidoListo &&
+      carrierDecision != CarrierDecision.pending &&
+      importadorTransporteResueltoPorAliado &&
+      !hasPickupConfirmed;
+
+  /// Recolección visible solo tras decisión del aliado (elegir, omitir o sin catálogo).
+  bool get importadorMuestraSeccionRecoleccion =>
+      status == TransactionRequestStatus.pedidoListo &&
+      carrierDecision != CarrierDecision.pending &&
+      importadorTransporteResueltoPorAliado;
+
+  bool get importadorTransporteResueltoPorAliado =>
+      carrierDecision == CarrierDecision.selected ||
+      carrierDecision == CarrierDecision.skipped ||
+      carrierDecision == CarrierDecision.notApplicable;
 
   /// Factura digital del importador (Storage `order-invoices`).
   final String? proveedorFacturaStoragePath;
@@ -452,7 +507,8 @@ class TransactionRequestModel {
       PagoMetodoInstrucciones.forMetodo(carrierPagoInstruccionesEffective, metodo);
 
   bool get aliadoPuedeElegirTransportista =>
-      status == TransactionRequestStatus.pedidoListo;
+      status == TransactionRequestStatus.pedidoListo &&
+      carrierDecision == CarrierDecision.pending;
 
   /// Negocio nota vs factura fiscal: solo en el chat con el importador (sin selector en app).
   bool get aliadoDebeElegirDocumentTypeAntesDePago => false;
@@ -577,8 +633,8 @@ class TransactionRequestModel {
   String statusLabelConMorosidad({bool aliadoViewer = false}) {
     final base = statusLabelEs(aliadoViewer: aliadoViewer);
     if (!esPedidoMoroso) return base;
-    if (base.contains('Moroso')) return base;
-    return '$base · Moroso';
+    if (base.contains(OrderVocab.chipPagoPendiente)) return base;
+    return '$base${OrderStatusFlowCopy.morosoListSuffix}';
   }
 
   /// Admin puede anular con motivo: alineado a `admin_anula_pedido_por_motolink` (no pendiente ni entregado).
@@ -587,8 +643,20 @@ class TransactionRequestModel {
         .contains(status);
   }
 
-  /// Ubicación fiscal del importador (recolección), desde el perfil del owner.
+  /// Ubicación de recolección (snapshot confirmado o perfil importador).
   String? get ownerUbicacionFiscalMultilineaEs {
+    if (hasPickupConfirmed) {
+      final parts = <String>[];
+      final label = pickupLabel?.trim();
+      final e = pickupEstado?.trim();
+      final c = pickupCiudad?.trim();
+      final d = pickupDireccion?.trim();
+      if (label != null && label.isNotEmpty) parts.add(label);
+      if (e != null && e.isNotEmpty) parts.add(e);
+      if (c != null && c.isNotEmpty) parts.add(c);
+      if (d != null && d.isNotEmpty) parts.add(d);
+      if (parts.isNotEmpty) return parts.join('\n');
+    }
     final parts = <String>[];
     final e = ownerEstado?.trim();
     final c = ownerCiudad?.trim();
@@ -602,6 +670,20 @@ class TransactionRequestModel {
 
   /// Una línea para URLs de mapas / geocodificación (origen recolección).
   String get ownerUbicacionUnaLineaParaMapa {
+    if (hasPickupConfirmed) {
+      final m = pickupDireccion?.trim();
+      if (m != null && m.isNotEmpty) {
+        final city = pickupCiudad?.trim();
+        final state = pickupEstado?.trim();
+        final extra = [city, state].whereType<String>().where((s) => s.isNotEmpty);
+        if (extra.isNotEmpty) {
+          return '$m, ${extra.join(', ')}';
+        }
+        return m;
+      }
+      final label = pickupLabel?.trim();
+      if (label != null && label.isNotEmpty) return label;
+    }
     final m = ownerUbicacionFiscalMultilineaEs?.trim();
     if (m != null && m.isNotEmpty) {
       return m.replaceAll('\n', ', ');
@@ -1016,6 +1098,20 @@ class TransactionRequestModel {
       fleteComprobanteRechazoNota:
           _nullableText(json['flete_comprobante_rechazo_nota']),
       fletePagoAprobadoAt: _parseDate(json['flete_pago_aprobado_at']),
+      carrierDecision:
+          json['carrier_decision']?.toString() ?? CarrierDecision.notApplicable,
+      carrierDecisionAt: _parseDate(json['carrier_decision_at']),
+      pickupLocationMode: _nullableText(json['pickup_location_mode']),
+      pickupConfirmedAt: _parseDate(json['pickup_confirmed_at']),
+      pickupLabel: _nullableText(json['pickup_label']),
+      pickupEstado: _nullableText(json['pickup_estado']),
+      pickupCiudad: _nullableText(json['pickup_ciudad']),
+      pickupDireccion: _nullableText(json['pickup_direccion']),
+      pickupLatitude: _asNullableDouble(json['pickup_latitude']),
+      pickupLongitude: _asNullableDouble(json['pickup_longitude']),
+      pickupMapsUrl: _nullableText(json['pickup_maps_url']),
+      pickupLocationId: _nullableText(json['pickup_location_id']),
+      pickupCarrierId: _nullableText(json['pickup_carrier_id']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_home_role.dart';
+import '../models/pickup_location_mode.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
@@ -8,8 +9,12 @@ import '../theme/app_theme.dart';
 import '../utils/ves_amount_format.dart';
 import '../widgets/courier_timeline_widget.dart';
 import '../widgets/aliado_transit_eta_banner.dart';
+import '../widgets/importer_confirm_pickup_section.dart';
 import '../widgets/importer_aliado_solicitud_section.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
+import '../utils/order_flow_copy/order_vocab.dart';
+import '../utils/order_pickup_flow_copy.dart';
 import '../widgets/order_card_collapsible_layout.dart';
 import '../widgets/order_commission_summary.dart';
 import '../widgets/transaction_request_admin_sections.dart';
@@ -159,7 +164,15 @@ class _TransactionRequestDetailScreenState
                   const SizedBox(height: 12),
                 ],
                 if (anyPedidoListo) ...[
-                  _pedidoListoPickupBanner(),
+                  if (lines.any((x) => x.hasPickupConfirmed))
+                    PickupLocationDisplaySection(
+                      request: lines.firstWhere(
+                        (x) => x.hasPickupConfirmed,
+                        orElse: () => r,
+                      ),
+                    )
+                  else
+                    _pedidoListoPickupBanner(),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -198,7 +211,7 @@ class _TransactionRequestDetailScreenState
                       )
                       .importadorCancelacionMotivo!
                       .trim(),
-                  title: 'Pedido cancelado por el proveedor',
+                  title: OrderActionsFlowCopy.pedidoCanceladoPorImportador,
                   tone: _NoteCardTone.warning,
                 ),
                 const SizedBox(height: 12),
@@ -263,8 +276,7 @@ class _TransactionRequestDetailScreenState
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                'Este pedido está entregado pero Pendiente por pagar: falta que el aliado complete el '
-                'comprobante o que MotoLink apruebe el pago.',
+                OrderActionsFlowCopy.pagoPendienteBanner,
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -283,6 +295,11 @@ class _TransactionRequestDetailScreenState
     return widget.homeRole == AppHomeRole.administrador;
   }
 
+  bool _showPickupSection(TransactionRequestModel r) {
+    if (r.status == TransactionRequestStatus.pedidoListo) return true;
+    return r.hasPickupConfirmed;
+  }
+
   Widget _pedidoListoPickupBanner() {
     return Material(
       color: Colors.teal.shade50,
@@ -297,8 +314,7 @@ class _TransactionRequestDetailScreenState
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Importador confirmó pedido listo para recolección: coordine el retiro de la carga y, '
-                'cuando corresponda, marque «En tránsito» desde Pedidos activos.',
+                OrderPickupFlowCopy.detalleListoEsperando,
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -410,7 +426,7 @@ class _TransactionRequestDetailScreenState
     final estadoChip = isGroup && statusSet.length > 1
         ? 'Varios estados'
         : (r.esPedidoMoroso
-            ? '${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)} · Moroso'
+            ? '${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)} · ${OrderVocab.chipPagoPendiente}'
             : r.statusLabelEs(
                 aliadoViewer: widget.homeRole == AppHomeRole.aliado));
     return DecoratedBox(
@@ -561,6 +577,18 @@ class _TransactionRequestDetailScreenState
             ),
           ),
         ],
+      ],
+      if (_showPickupSection(refLine)) ...[
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: OrderPickupFlowCopy.recoleccionTitulo,
+          subtitle: refLine.hasPickupConfirmed
+              ? PickupLocationMode.labelEs(refLine.pickupLocationMode)
+              : OrderPickupFlowCopy.recoleccionPendienteGenerico,
+          infoMessage: OrderSectionHelp.puntoRecoleccion,
+          initiallyExpanded: refLine.hasPickupConfirmed,
+          child: PickupLocationDisplaySection(request: refLine),
+        ),
       ],
       const SizedBox(height: kOrderCardSectionGap),
       OrderCardCollapsibleSection(
@@ -729,6 +757,10 @@ class _TransactionRequestDetailScreenState
           children: [
             _summaryReferenceBlock(r),
             const SizedBox(height: 14),
+            if (_showPickupSection(r)) ...[
+              PickupLocationDisplaySection(request: r),
+              const SizedBox(height: 14),
+            ],
             TransactionRequestDestinoEntregaSection(
               request: r,
             ),

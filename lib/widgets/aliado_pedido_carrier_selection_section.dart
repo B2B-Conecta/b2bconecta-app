@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../models/importer_carrier_model.dart';
 import '../models/transaction_request_model.dart';
+import '../models/carrier_decision.dart';
 import '../models/carrier_flete_pago_modo.dart';
+import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/carrier_eta_format.dart';
+import '../utils/order_pickup_flow_copy.dart';
+import '../utils/b2b_orders_panel_layout.dart';
+import 'b2b_order_panel_widgets.dart';
 import 'importer_carrier_form.dart';
 
 /// Aliado: elegir transportista cuando el pedido está listo para despacho.
@@ -43,13 +48,19 @@ class _AliadoPedidoCarrierSelectionSectionState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.request.id != widget.request.id ||
         oldWidget.request.status != widget.request.status ||
+        oldWidget.request.carrierDecision != widget.request.carrierDecision ||
         oldWidget.request.importerCarrierId != widget.request.importerCarrierId) {
       _load();
     }
   }
 
   Future<void> _load() async {
-    if (!widget.request.aliadoPuedeElegirTransportista) {
+    final r = widget.request;
+    final shouldQuery = r.status == TransactionRequestStatus.pedidoListo &&
+        (r.carrierDecision == CarrierDecision.pending ||
+            r.carrierDecision == CarrierDecision.notApplicable);
+
+    if (!shouldQuery) {
       setState(() {
         _loading = false;
         _hasCarriers = false;
@@ -57,6 +68,9 @@ class _AliadoPedidoCarrierSelectionSectionState
       });
       return;
     }
+
+    final wasNotApplicable =
+        r.carrierDecision == CarrierDecision.notApplicable;
 
     setState(() {
       _loading = true;
@@ -72,6 +86,9 @@ class _AliadoPedidoCarrierSelectionSectionState
         _hasCarriers = rows.isNotEmpty;
         _loading = false;
       });
+      if (wasNotApplicable && rows.isNotEmpty) {
+        widget.onChanged();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -106,12 +123,56 @@ class _AliadoPedidoCarrierSelectionSectionState
         requestId: widget.request.id,
         carrierId: picked.carrierId,
         driverId: picked.driverId,
+        fletePagoModo: picked.fletePagoModo,
       );
       if (!mounted) return;
       widget.onChanged();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Transportista seleccionado.'),
+          content: Text('Transportista elegido. El importador verá su selección.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _selecting = false);
+    }
+  }
+
+  Future<void> _skipCarrier() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(OrderPickupFlowCopy.aliadoSkipDialogTitulo),
+        content: const Text(OrderPickupFlowCopy.aliadoSkipDialogCuerpo),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _selecting = true);
+    try {
+      await SupabaseService.aliadoSkipCarrierForPedido(
+        requestId: widget.request.id,
+      );
+      if (!mounted) return;
+      widget.onChanged();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(OrderPickupFlowCopy.aliadoSkipExito),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -127,7 +188,30 @@ class _AliadoPedidoCarrierSelectionSectionState
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.request.aliadoPuedeElegirTransportista) {
+    final r = widget.request;
+    if (r.status != TransactionRequestStatus.pedidoListo) {
+      return const SizedBox.shrink();
+    }
+
+    if (r.carrierDecision == CarrierDecision.skipped) {
+      return B2bPanelSectionCard(
+        tint: Colors.blueGrey.shade50,
+        icon: Icons.storefront_outlined,
+        title: OrderPickupFlowCopy.aliadoEntregaPropiaTitulo,
+        subtitle: OrderPickupFlowCopy.aliadoEntregaPropiaCuerpo,
+      );
+    }
+
+    if (r.carrierDecision == CarrierDecision.selected &&
+        r.hasImporterCarrierSelected) {
+      return _buildSelectedCarrierCard(r, allowChange: false);
+    }
+
+    final awaitingCarrierChoice = r.status == TransactionRequestStatus.pedidoListo &&
+        (r.carrierDecision == CarrierDecision.pending ||
+            r.carrierDecision == CarrierDecision.notApplicable);
+
+    if (!awaitingCarrierChoice) {
       return const SizedBox.shrink();
     }
     if (_loading) {
@@ -142,107 +226,179 @@ class _AliadoPedidoCarrierSelectionSectionState
         ),
       );
     }
-    if (!_hasCarriers) return const SizedBox.shrink();
+    if (!_hasCarriers) {
+      if (r.carrierDecision == CarrierDecision.notApplicable) {
+        return const SizedBox.shrink();
+      }
+      return _buildEmptyCarriersCard();
+    }
 
-    final r = widget.request;
     final selected = r.hasImporterCarrierSelected;
 
-    return Material(
-      color: Colors.teal.shade50,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.local_shipping_outlined, color: Colors.teal.shade800),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        selected
-                            ? 'Transportista seleccionado'
-                            : 'Elija un transportista',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Colors.teal.shade900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        selected
-                            ? 'El importador podrá despachar cuando adjunte la(s) factura(s) requerida(s).'
-                            : 'El importador marcó el pedido listo. Seleccione quién entregará la mercancía.',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.35,
-                          color: Colors.teal.shade900.withOpacity(0.85),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return _buildSelectedCarrierCard(r, allowChange: true, selected: selected);
+  }
+
+  Widget _buildEmptyCarriersCard() {
+    return B2bPanelSectionCard(
+      tint: Colors.amber.shade50,
+      icon: Icons.local_shipping_outlined,
+      title: OrderPickupFlowCopy.aliadoSinTransportistasElegiblesTitulo,
+      subtitle: OrderPickupFlowCopy.aliadoSinTransportistasElegiblesCuerpo,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null) ...[
+            Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+            const SizedBox(height: 8),
+          ],
+          OutlinedButton.icon(
+            onPressed: _selecting ? null : _skipCarrier,
+            style: OutlinedButton.styleFrom(
+              minimumSize: b2bActionButtonMinSize(context),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
-            ],
-            if (selected) ...[
-              const SizedBox(height: 10),
+            icon: const Icon(Icons.storefront_outlined),
+            label: const Text(OrderPickupFlowCopy.aliadoSkipBoton),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCarrierChoiceActions({required bool selected}) {
+    final density = B2bOrderCardDensityScope.of(context);
+    final outlinedStyle = OutlinedButton.styleFrom(
+      minimumSize: density.actionButtonMinSize,
+      padding: density.buttonPadding,
+      textStyle: TextStyle(fontSize: density.buttonTextSize),
+      visualDensity: density.buttonVisualDensity,
+    );
+    final filledStyle = FilledButton.styleFrom(
+      backgroundColor: AppColors.brandBlue,
+      minimumSize: density.actionButtonMinSize,
+      padding: density.buttonPadding,
+      textStyle: TextStyle(fontSize: density.buttonTextSize),
+      visualDensity: density.buttonVisualDensity,
+    );
+
+    return B2bActionButtonRow(
+      secondary: OutlinedButton.icon(
+        onPressed: _selecting ? null : _skipCarrier,
+        style: outlinedStyle,
+        icon: const Icon(Icons.storefront_outlined),
+        label: const Text(OrderPickupFlowCopy.aliadoSkipBoton),
+      ),
+      primary: FilledButton.icon(
+        onPressed: _selecting ? null : _openPicker,
+        style: filledStyle,
+        icon: _selecting
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Icon(selected ? Icons.swap_horiz : Icons.local_shipping_outlined),
+        label: Text(
+          selected
+              ? OrderPickupFlowCopy.aliadoCambiarTransportista
+              : OrderPickupFlowCopy.aliadoElegirTransportista,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedCarrierCard(
+    TransactionRequestModel r, {
+    required bool allowChange,
+    bool selected = true,
+  }) {
+    return B2bPanelSectionCard(
+      tint: Colors.teal.shade50,
+      icon: Icons.local_shipping_outlined,
+      title: selected
+          ? OrderPickupFlowCopy.aliadoTransporteElegidoTitulo
+          : OrderPickupFlowCopy.aliadoTransporteTitulo,
+      subtitle: selected
+          ? OrderPickupFlowCopy.aliadoTransporteElegidoCuerpo(
+              r.carrierDisplayCompanyName,
+            )
+          : OrderPickupFlowCopy.aliadoTransporteIntro,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null) ...[
+            Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+            const SizedBox(height: 8),
+          ],
+          if (selected) ...[
+            Text(
+              r.carrierCompanyName ?? 'Transportista',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (r.carrierFletePagoModoSnapshot != null) ...[
+              const SizedBox(height: 4),
               Text(
-                r.carrierCompanyName ?? 'Transportista',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                CarrierFletePagoModo.labelEs(r.carrierFletePagoModoSnapshot),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
               ),
-              if (r.carrierFletePagoModoSnapshot != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  CarrierFletePagoModo.labelEs(r.carrierFletePagoModoSnapshot),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-                ),
-              ],
-              if (r.carrierFeeUsdSnapshot != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Flete estimado: ${CarrierEtaFormat.feeLabel(r.carrierFeeUsdSnapshot)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-                ),
-              ],
             ],
-            const SizedBox(height: 10),
-            FilledButton.icon(
-              onPressed: _selecting ? null : _openPicker,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.brandBlue,
+            if (r.carrierFeeUsdSnapshot != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Flete estimado: ${CarrierEtaFormat.feeLabel(r.carrierFeeUsdSnapshot)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
               ),
-              icon: _selecting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Icon(selected ? Icons.swap_horiz : Icons.local_shipping_outlined),
-              label: Text(selected ? 'Cambiar transportista' : 'Ver opciones'),
+            ],
+            const SizedBox(height: 6),
+            Text(
+              OrderPickupFlowCopy.aliadoTransportePendienteFactura,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: Colors.teal.shade900.withOpacity(0.85),
+              ),
             ),
           ],
-        ),
+          if (allowChange) ...[
+            if (selected) const SizedBox(height: 10),
+            if (!selected)
+              _buildCarrierChoiceActions(selected: selected)
+            else
+              FilledButton.icon(
+                onPressed: _selecting ? null : _openPicker,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.brandBlue,
+                ),
+                icon: _selecting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.swap_horiz),
+                label: const Text(OrderPickupFlowCopy.aliadoCambiarTransportista),
+              ),
+          ],
+        ],
       ),
     );
   }
 }
 
 class _CarrierPickResult {
-  const _CarrierPickResult({required this.carrierId, this.driverId});
+  const _CarrierPickResult({
+    required this.carrierId,
+    this.driverId,
+    required this.fletePagoModo,
+  });
   final String carrierId;
   final String? driverId;
+  final String fletePagoModo;
 }
 
 class _CarrierPickerSheet extends StatefulWidget {
@@ -263,12 +419,29 @@ class _CarrierPickerSheet extends StatefulWidget {
 class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
   String? _carrierId;
   String? _driverId;
+  late String _fletePagoModo;
+
+  ImporterCarrierModel? get _selectedCarrier {
+    if (_carrierId == null) return null;
+    for (final c in widget.carriers) {
+      if (c.id == _carrierId) return c;
+    }
+    return null;
+  }
+
+  void _syncFleteModoFromCarrier() {
+    final carrier = _selectedCarrier;
+    if (carrier == null) return;
+    _fletePagoModo = carrier.fletePagoModo;
+  }
 
   @override
   void initState() {
     super.initState();
     _carrierId = widget.selectedCarrierId;
     _driverId = widget.selectedDriverId;
+    _fletePagoModo = CarrierFletePagoModo.incluidoFactura;
+    if (_carrierId != null) _syncFleteModoFromCarrier();
   }
 
   @override
@@ -288,7 +461,7 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
             children: [
               const Expanded(
                 child: Text(
-                  'Transportistas disponibles',
+                  'Transportistas del importador',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -311,6 +484,7 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
                       onTap: () => setState(() {
                         _carrierId = carrier.id;
                         _driverId = null;
+                        _syncFleteModoFromCarrier();
                       }),
                       onDriverChanged: (driverId) =>
                           setState(() => _driverId = driverId),
@@ -321,6 +495,38 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
               ),
             ),
           ),
+          if (_carrierId != null) ...[
+            const SizedBox(height: 12),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                OrderPickupFlowCopy.aliadoFleteFacturaTitulo,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              OrderPickupFlowCopy.aliadoFleteFacturaIntro,
+              style: TextStyle(fontSize: 12.5, height: 1.35),
+            ),
+            const SizedBox(height: 8),
+            RadioListTile<String>(
+              value: CarrierFletePagoModo.incluidoFactura,
+              groupValue: _fletePagoModo,
+              onChanged: (v) => setState(() => _fletePagoModo = v!),
+              contentPadding: EdgeInsets.zero,
+              title: const Text(OrderPickupFlowCopy.aliadoFleteIncluidoTitulo),
+              subtitle: const Text(OrderPickupFlowCopy.aliadoFleteIncluidoCuerpo),
+            ),
+            RadioListTile<String>(
+              value: CarrierFletePagoModo.pagoSeparado,
+              groupValue: _fletePagoModo,
+              onChanged: (v) => setState(() => _fletePagoModo = v!),
+              contentPadding: EdgeInsets.zero,
+              title: const Text(OrderPickupFlowCopy.aliadoFleteSeparadoTitulo),
+              subtitle: const Text(OrderPickupFlowCopy.aliadoFleteSeparadoCuerpo),
+            ),
+          ],
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _carrierId == null
@@ -330,10 +536,11 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
                       _CarrierPickResult(
                         carrierId: _carrierId!,
                         driverId: _driverId,
+                        fletePagoModo: _fletePagoModo,
                       ),
                     ),
             style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
-            child: const Text('Confirmar transportista'),
+            child: const Text('Usar este transportista'),
           ),
         ],
       ),
@@ -379,6 +586,17 @@ class _CarrierOptionCard extends StatelessWidget {
                 carrier.companyName,
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
+              if (!carrier.coversDestination) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Cobertura no confirmada para su dirección',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.amber.shade900,
+                  ),
+                ),
+              ],
               const SizedBox(height: 4),
               Text(
                 CarrierFletePagoModo.shortLabelEs(carrier.fletePagoModo),

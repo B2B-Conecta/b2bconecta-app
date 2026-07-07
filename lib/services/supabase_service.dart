@@ -38,6 +38,7 @@ import '../models/pago_revision_estado.dart';
 import '../models/carrier_flete_pago_modo.dart';
 import '../models/importer_carrier_driver_model.dart';
 import '../models/importer_carrier_model.dart';
+import '../models/importer_pickup_location_model.dart';
 import '../models/support_ticket_message_model.dart';
 import '../models/support_ticket_model.dart';
 import '../models/support_ticket_status.dart';
@@ -1276,6 +1277,19 @@ class SupabaseService {
     carrier_company_name_snapshot,
     carrier_accepted_pago_metodos_snapshot,
     carrier_pago_instrucciones_snapshot,
+    carrier_decision,
+    carrier_decision_at,
+    pickup_location_mode,
+    pickup_confirmed_at,
+    pickup_label,
+    pickup_estado,
+    pickup_ciudad,
+    pickup_direccion,
+    pickup_latitude,
+    pickup_longitude,
+    pickup_maps_url,
+    pickup_location_id,
+    pickup_carrier_id,
     flete_factura_storage_path,
     flete_factura_file_name,
     flete_factura_submitted_at,
@@ -3563,17 +3577,23 @@ class SupabaseService {
   }
 
   /// Avanza el estado del pedido (importador): pendiente → preparación → listo para despacho.
+  /// Si [ids] tiene varias líneas del mismo carrito, una sola sentencia evita notificaciones duplicadas.
   static Future<void> importerAdvanceTransactionRequest({
     required String id,
     required String newStatus,
+    List<String>? batchIds,
   }) async {
+    final ids = (batchIds != null && batchIds.length > 1)
+        ? batchIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList()
+        : <String>[id];
+
     final rows = await _client
         .from('transaction_requests')
         .update({
           'status': newStatus,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', id)
+        .inFilter('id', ids)
         .select('id');
     final list = rows as List<dynamic>?;
     if (list == null || list.isEmpty) {
@@ -4415,6 +4435,7 @@ class SupabaseService {
     required String requestId,
     required String carrierId,
     String? driverId,
+    String? fletePagoModo,
   }) async {
     await _client.rpc(
       'aliado_select_carrier_for_pedido',
@@ -4422,6 +4443,92 @@ class SupabaseService {
         'p_request_id': requestId.trim(),
         'p_carrier_id': carrierId.trim(),
         'p_driver_id': driverId?.trim(),
+        if (fletePagoModo != null) 'p_flete_pago_modo': fletePagoModo.trim(),
+      },
+    );
+  }
+
+  static Future<void> aliadoSkipCarrierForPedido({
+    required String requestId,
+  }) async {
+    await _client.rpc(
+      'aliado_skip_carrier_for_pedido',
+      params: {'p_request_id': requestId.trim()},
+    );
+  }
+
+  static Future<List<ImporterPickupLocationModel>> listMyImporterPickupLocations() async {
+    final response = await _client.rpc('list_importer_pickup_locations');
+    final list = response as List<dynamic>? ?? const [];
+    return list
+        .map(
+          (row) => ImporterPickupLocationModel.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
+        .toList();
+  }
+
+  static Future<String> upsertImporterPickupLocation({
+    String? id,
+    required String label,
+    String? estado,
+    String? ciudad,
+    required String direccion,
+    double? latitude,
+    double? longitude,
+    String? mapsUrl,
+    String? contactName,
+    String? contactPhone,
+    bool isActive = true,
+    bool isDefault = false,
+    int sortOrder = 0,
+  }) async {
+    final res = await _client.rpc(
+      'upsert_importer_pickup_location',
+      params: <String, dynamic>{
+        'p_id': id,
+        'p_label': label.trim(),
+        'p_estado': estado?.trim(),
+        'p_ciudad': ciudad?.trim(),
+        'p_direccion': direccion.trim(),
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+        'p_maps_url': mapsUrl?.trim(),
+        'p_contact_name': contactName?.trim(),
+        'p_contact_phone': contactPhone?.trim(),
+        'p_is_active': isActive,
+        'p_is_default': isDefault,
+        'p_sort_order': sortOrder,
+      },
+    );
+    return res?.toString() ?? '';
+  }
+
+  static Future<void> setImporterDefaultPickupPreferences({
+    required String mode,
+    String? pickupLocationId,
+  }) async {
+    await _client.rpc(
+      'set_importer_default_pickup_preferences',
+      params: <String, dynamic>{
+        'p_mode': mode,
+        'p_pickup_location_id': pickupLocationId,
+      },
+    );
+  }
+
+  static Future<void> importerConfirmPickupLocation({
+    required String requestId,
+    required String mode,
+    String? pickupLocationId,
+  }) async {
+    await _client.rpc(
+      'importer_confirm_pickup_location',
+      params: <String, dynamic>{
+        'p_request_id': requestId.trim(),
+        'p_mode': mode,
+        'p_pickup_location_id': pickupLocationId,
       },
     );
   }

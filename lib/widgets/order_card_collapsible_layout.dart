@@ -7,36 +7,10 @@ import 'importer_aliado_solicitud_section.dart';
 import 'order_commission_summary.dart';
 import 'profile_section_helpers.dart';
 
+export '../utils/order_flow_copy/order_section_help.dart';
+
 /// Espaciado estándar entre bloques colapsables dentro de una ficha expandida.
 const double kOrderCardSectionGap = 8;
-
-/// Textos de ayuda (icono ℹ️) en fichas y secciones de pedido.
-abstract final class OrderSectionHelp {
-  static const aliadoKycCredit =
-      'Use este expediente para evaluar solicitudes de crédito B2B con el aliado.';
-  static const aliadoCancelPending =
-      'Hasta que el proveedor emita su factura. Motivo obligatorio.';
-  static const adminAnularPedido =
-      'Cierra el pedido en curso; requiere motivo. Inventario puede revertirse.';
-  static const carritoMaestroAliado =
-      'Un solo pedido en MotoLink: destino y productos compartidos. '
-      'Elija un proveedor abajo para ver su envío, factura y pago.';
-  static const chatPedido =
-      'Desde que el pedido está pendiente, aliado e importador pueden escribir aquí '
-      '(coordinación de cantidad, plazos y logística). MotoLink puede leer el hilo en tiempo real.';
-  static const pagoAliadoMetodo =
-      'Condiciones en el chat del pedido; aquí método y comprobante.';
-  static const pagoAliadoArchivo =
-      'Documentación archivada · solo consulta.';
-  static const adminPreTransit =
-      'La factura comercial la emite el importador. Tras registrarla, el aliado '
-      'puede declarar pago; en tránsito solo con factura cargada.';
-  static const evidenciaPedido =
-      'Archivos del pedido (conservados al cerrar). Abrir con enlace temporal.';
-  static const cicloEnvioPago =
-      'El comprobante de pago y su aprobación quedan en el expediente del pedido '
-      '(apartado de pago del aliado, activo tras la factura del importador); no forman parte de este cronograma.';
-}
 
 /// Subtítulo de una línea para nombre + ubicación de contraparte.
 String orderCardPartySubtitle({

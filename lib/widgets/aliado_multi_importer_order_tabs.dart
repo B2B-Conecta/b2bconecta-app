@@ -8,6 +8,7 @@ import '../utils/ves_amount_format.dart';
 import 'aliado_transit_eta_banner.dart';
 import 'courier_timeline_widget.dart';
 import 'moroso_order_visual.dart';
+import '../utils/order_flow_copy/order_vocab.dart';
 import 'importer_aliado_solicitud_section.dart';
 import 'order_card_collapsible_layout.dart';
 import 'profile_section_helpers.dart';
@@ -378,7 +379,7 @@ class _ImporterSelectorChip extends StatelessWidget {
               if (chunk.any((r) => r.esPedidoMoroso)) ...[
                 const SizedBox(height: 2),
                 Text(
-                  'Moroso',
+                  OrderVocab.chipPagoPendiente,
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,

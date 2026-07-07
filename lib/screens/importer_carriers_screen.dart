@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
 import '../widgets/importer_carrier_form.dart';
+import '../widgets/importer_pickup_locations_panel.dart';
 
 /// Importador: gestión de empresas de transporte y conductores.
 class ImporterCarriersScreen extends StatefulWidget {
@@ -109,7 +110,19 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
           : _error != null
               ? Center(child: Text(_error!))
               : _carriers.isEmpty
-                  ? _EmptyCarriersState(onCreate: () => _openCarrierForm())
+                  ? ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        isWide ? 24 : 16,
+                        12,
+                        isWide ? 24 : 16,
+                        88,
+                      ),
+                      children: [
+                        const ImporterPickupLocationsPanel(),
+                        const SizedBox(height: 20),
+                        _EmptyCarriersState(onCreate: () => _openCarrierForm()),
+                      ],
+                    )
                   : Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
@@ -122,10 +135,14 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
                             isWide ? 24 : 16,
                             88,
                           ),
-                          itemCount: _carriers.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemCount: _carriers.length + 1,
+                          separatorBuilder: (_, index) =>
+                              SizedBox(height: index == 0 ? 16 : 12),
                           itemBuilder: (context, index) {
-                            final c = _carriers[index];
+                            if (index == 0) {
+                              return const ImporterPickupLocationsPanel();
+                            }
+                            final c = _carriers[index - 1];
                             return _CarrierCard(
                               carrier: c,
                               onEdit: () => _openCarrierForm(c),

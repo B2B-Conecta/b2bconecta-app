@@ -16,11 +16,13 @@ import 'importer_order_invoice_section.dart';
 import 'importer_order_flete_invoice_section.dart';
 import 'importer_order_flete_comprobante_section.dart';
 import 'importer_order_carrier_summary_section.dart';
+import 'importer_confirm_pickup_section.dart';
 import 'importer_order_pago_verification_section.dart';
 import 'order_rating_sheet.dart';
 import 'importer_notificar_ajuste_cantidad_dialog.dart';
 import 'main_shell_tab.dart';
 import '../models/importer_pedidos_filters_draft.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 import '../utils/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
 import 'order_list_filter_bar.dart';
@@ -625,6 +627,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       );
     }
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final listPad = B2bOrdersPanelLayout.listHorizontalPadding(screenWidth);
     final filtered = _filtered;
     final groups = _groupsForDisplay(filtered);
     return Stack(
@@ -636,7 +640,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               const ImporterThirdPartyAdsCarousel(),
               const ImporterActivePromoBanner(),
               const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                padding: EdgeInsets.fromLTRB(0, 8, 0, 0),
                 child: ImporterKycApprovedAliadosPanel(),
               ),
               OrderListFilterBar(
@@ -672,7 +676,12 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         onRefresh: _load,
                         child: ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          padding: EdgeInsets.fromLTRB(
+                            listPad,
+                            0,
+                            listPad,
+                            B2bOrdersPanelLayout.listBottomPadding(screenWidth),
+                          ),
                           itemCount: groups.length,
                           itemBuilder: (context, i) {
                             final g = groups[i];
@@ -757,27 +766,16 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                   if (g.any((r) =>
                                       r.status ==
                                       TransactionRequestStatus.pedidoListo)) ...[
-                                    FutureBuilder<bool>(
-                                      future: SupabaseService
-                                          .importadorHasActiveCarriers(
-                                        g.first.ownerId,
-                                      ),
-                                      builder: (context, snap) {
-                                        if (snap.data != true) {
-                                          return const SizedBox.shrink();
-                                        }
-                                        return Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            ImporterOrderCarrierSummarySection(
-                                              lines: g,
-                                            ),
-                                            const SizedBox(height: 12),
-                                          ],
-                                        );
-                                      },
+                                    ImporterOrderCarrierSummarySection(
+                                      lines: g,
                                     ),
+                                    if (g.first.importadorMuestraSeccionRecoleccion) ...[
+                                      const SizedBox(height: 12),
+                                      ImporterConfirmPickupSection(
+                                        lines: g,
+                                        onChanged: _load,
+                                      ),
+                                    ],
                                   ],
                                   if (g.length == 1) ...[
                                     ImporterOrderPagoVerificationSection(

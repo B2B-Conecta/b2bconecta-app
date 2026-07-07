@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../models/carrier_decision.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
+import '../utils/order_flow_copy/order_payment_flow_copy.dart';
+import '../utils/order_pickup_flow_copy.dart';
 import '../widgets/importer_transit_eta_dialog.dart';
 
 /// Avanza el estado de una o varias líneas del importador (con ETA si pasa a en tránsito).
@@ -19,10 +23,7 @@ Future<bool> advanceImporterOrderGroup(
     if (r.qtyAdjustmentPendienteAliado) {
       messenger?.showSnackBar(
         const SnackBar(
-          content: Text(
-            'Esperando respuesta del aliado sobre la propuesta de cantidad. '
-            'No puede avanzar el pedido hasta que la acepte o la rechace.',
-          ),
+          content: Text(OrderActionsFlowCopy.bloqueoQtyPendiente),
         ),
       );
       return false;
@@ -30,42 +31,50 @@ Future<bool> advanceImporterOrderGroup(
   }
 
   if (nextStatus == TransactionRequestStatus.enTransito) {
-    final hasCarriers = await SupabaseService.importadorHasActiveCarriers(
-      lines.first.ownerId,
-    );
-
     for (final r in lines) {
       if (!r.hasProveedorFactura) {
         messenger?.showSnackBar(
           const SnackBar(
-            content: Text(
-              'Adjunte la factura del proveedor antes de marcar «En tránsito».',
-            ),
+            content: Text(OrderPaymentFlowCopy.bloqueoSinFacturaImportador),
           ),
         );
         return false;
       }
 
-      if (hasCarriers && !r.hasImporterCarrierSelected) {
+      if (r.carrierDecision == CarrierDecision.pending) {
         messenger?.showSnackBar(
           const SnackBar(
-            content: Text(
-              'El aliado debe seleccionar un transportista antes de marcar «En tránsito».',
-            ),
+            content: Text(OrderPickupFlowCopy.bloqueoEsperaAliadoTransporte),
           ),
         );
         return false;
       }
 
-      if (hasCarriers &&
+      if (!r.hasPickupConfirmed) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text(OrderPickupFlowCopy.bloqueoFaltaRecoleccion),
+          ),
+        );
+        return false;
+      }
+
+      if (r.carrierDecision == CarrierDecision.selected &&
+          !r.hasImporterCarrierSelected) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text(OrderPickupFlowCopy.bloqueoFaltaTransportista),
+          ),
+        );
+        return false;
+      }
+
+      if (r.carrierDecision == CarrierDecision.selected &&
           r.carrierFletePagoSeparado &&
           !r.hasFleteFactura) {
         messenger?.showSnackBar(
           const SnackBar(
-            content: Text(
-              'Adjunte la factura del flete (pago separado al transportista) '
-              'antes de marcar «En tránsito».',
-            ),
+            content: Text(OrderPaymentFlowCopy.bloqueoSinFacturaFlete),
           ),
         );
         return false;
@@ -96,12 +105,12 @@ Future<bool> advanceImporterOrderGroup(
   }
 
   try {
-    for (final r in lines) {
-      await SupabaseService.importerAdvanceTransactionRequest(
-        id: r.id,
-        newStatus: nextStatus,
-      );
-    }
+    final ids = lines.map((r) => r.id).toList();
+    await SupabaseService.importerAdvanceTransactionRequest(
+      id: lines.first.id,
+      newStatus: nextStatus,
+      batchIds: ids.length > 1 ? ids : null,
+    );
     return true;
   } catch (e) {
     if (context.mounted) {

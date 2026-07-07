@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../models/carrier_decision.dart';
 import '../models/carrier_flete_pago_modo.dart';
 import '../models/transaction_request_model.dart';
-import '../theme/app_theme.dart';
+import '../models/transaction_request_status.dart';
 import '../utils/carrier_eta_format.dart';
+import '../utils/order_pickup_flow_copy.dart';
+import 'b2b_order_panel_widgets.dart';
 
-/// Importador: transportista elegido por el aliado.
+/// Importador: paso 1 del flujo (decisión de transporte del aliado).
 class ImporterOrderCarrierSummarySection extends StatelessWidget {
   const ImporterOrderCarrierSummarySection({
     super.key,
@@ -14,62 +17,98 @@ class ImporterOrderCarrierSummarySection extends StatelessWidget {
 
   final List<TransactionRequestModel> lines;
 
+  TransactionRequestModel get _ref => lines.first;
+
   @override
   Widget build(BuildContext context) {
-    final withCarrier =
-        lines.where((r) => r.hasImporterCarrierSelected).toList();
-    if (withCarrier.isEmpty) {
-      return Material(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Icon(Icons.local_shipping_outlined, color: Colors.orange.shade900),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Esperando que el aliado seleccione un transportista.',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
+    final r = _ref;
+    if (r.status != TransactionRequestStatus.pedidoListo) {
+      return const SizedBox.shrink();
+    }
+
+    return switch (r.carrierDecision) {
+      CarrierDecision.pending => _banner(
+          color: Colors.orange,
+          icon: Icons.local_shipping_outlined,
+          title: OrderPickupFlowCopy.importadorEsperaAliadoTitulo,
+          body: OrderPickupFlowCopy.importadorEsperaAliadoCuerpo,
         ),
+      CarrierDecision.skipped => _banner(
+          color: Colors.blueGrey,
+          icon: Icons.check_circle_outline,
+          title: OrderPickupFlowCopy.importadorAliadoSinPlataformaTitulo,
+          body: OrderPickupFlowCopy.importadorAliadoSinPlataformaCuerpo,
+        ),
+      CarrierDecision.selected => _selectedSummary(r),
+      CarrierDecision.notApplicable => _banner(
+          color: Colors.blueGrey,
+          icon: Icons.inventory_2_outlined,
+          title: OrderPickupFlowCopy.importadorSinTransportistasTitulo,
+          body: OrderPickupFlowCopy.importadorSinTransportistasCuerpo,
+        ),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
+  Widget _banner({
+    required MaterialColor color,
+    required IconData icon,
+    required String title,
+    required String body,
+  }) {
+    return B2bPanelSectionCard(
+      tint: color.shade50,
+      icon: icon,
+      title: title,
+      subtitle: body,
+    );
+  }
+
+  Widget _selectedSummary(TransactionRequestModel r) {
+    if (!r.hasImporterCarrierSelected) {
+      return _banner(
+        color: Colors.orange,
+        icon: Icons.local_shipping_outlined,
+        title: OrderPickupFlowCopy.importadorTransportistaPendienteTitulo,
+        body: OrderPickupFlowCopy.importadorTransportistaPendienteCuerpo,
       );
     }
 
-    final r = withCarrier.first;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Transportista del aliado',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: AppColors.textPrimary,
+    return B2bPanelSectionCard(
+      icon: Icons.local_shipping_outlined,
+      title: OrderPickupFlowCopy.importadorTransportistaElegidoTitulo,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            r.carrierDisplayCompanyName ?? 'Transportista',
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          r.carrierCompanyName ?? 'Transportista',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          CarrierFletePagoModo.labelEs(r.carrierFletePagoModoSnapshot),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-        ),
-        if (r.carrierFeeUsdSnapshot != null) ...[
           const SizedBox(height: 4),
           Text(
-            'Flete estimado: ${CarrierEtaFormat.feeLabel(r.carrierFeeUsdSnapshot)}',
+            CarrierFletePagoModo.labelEs(r.carrierFletePagoModoSnapshot),
             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
+          if (r.carrierFeeUsdSnapshot != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Flete estimado: ${CarrierEtaFormat.feeLabel(r.carrierFeeUsdSnapshot)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ],
+          if (!r.hasPickupConfirmed) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Siguiente paso: elija el punto de recolección.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

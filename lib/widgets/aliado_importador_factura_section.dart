@@ -5,6 +5,8 @@ import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/order_flow_copy/order_payment_flow_copy.dart';
+import 'b2b_order_panel_widgets.dart';
 
 /// Factura que adjunta el importador; el aliado la revisa antes de pagar.
 class AliadoImportadorFacturaSection extends StatelessWidget {
@@ -42,88 +44,35 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = _ref;
     if (r == null) {
-      return Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(compact ? 10 : 12, compact ? 8 : 10, 12, 10),
-        decoration: BoxDecoration(
-          color: Colors.amber.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.amber.shade300),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.receipt_long_outlined, size: 20, color: Colors.amber.shade900),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'El importador aún no adjunta su factura. Cuando la suba, podrá '
-                'registrar aquí el pago correspondiente a este proveedor.',
-                style: TextStyle(
-                  fontSize: compact ? 11 : 11.5,
-                  height: 1.35,
-                  color: Colors.amber.shade900,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
+      return B2bPanelSectionCard(
+        tint: Colors.amber.shade50,
+        icon: Icons.receipt_long_outlined,
+        title: OrderPaymentFlowCopy.aliadoEsperaFactura,
       );
     }
 
     final path = r.proveedorFacturaStoragePath!.trim();
     final name = r.proveedorFacturaFileName?.trim();
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(compact ? 10 : 12, compact ? 8 : 10, 12, 10),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.blue.shade200),
-      ),
+    return B2bPanelSectionCard(
+      tint: Colors.blue.shade50,
+      icon: Icons.description_outlined,
+      title: 'Factura del importador',
+      subtitle: [
+        if (name != null && name.isNotEmpty) name,
+        if (r.proveedorFacturaSubmittedAt != null)
+          'Recibida: ${formatEsShortDateTime(r.proveedorFacturaSubmittedAt)}',
+      ].join(' · '),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Icon(Icons.description_outlined, size: 20, color: Colors.blue.shade800),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Factura del importador',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: compact ? 12 : 13,
-                    color: Colors.blue.shade900,
-                  ),
-                ),
-              ),
-              Icon(Icons.check_circle, size: 18, color: Colors.green.shade700),
-            ],
-          ),
-          if (name != null && name.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800),
-            ),
-          ],
-          if (r.proveedorFacturaSubmittedAt != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              'Recibida: ${formatEsShortDateTime(r.proveedorFacturaSubmittedAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-            ),
-          ],
-          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => _abrir(context, path),
             icon: const Icon(Icons.visibility_outlined, size: 18),
-            label: const Text('Ver factura del proveedor'),
+            label: const Text(OrderPaymentFlowCopy.aliadoVerFactura),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.brandBlue,
+              minimumSize: b2bActionButtonMinSize(context),
             ),
           ),
           if (!compact) ...[

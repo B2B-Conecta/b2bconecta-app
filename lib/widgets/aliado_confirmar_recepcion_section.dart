@@ -3,23 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
-
-/// Datos de un bloque «confirmar recepción» (una línea o un importador en carrito).
-class AliadoConfirmarRecepcionBloque {
-  const AliadoConfirmarRecepcionBloque({
-    this.importadorNombre,
-    required this.busy,
-    required this.puedeConfirmar,
-    required this.onConfirmar,
-    this.pagoPendienteEnTransito = false,
-  });
-
-  final String? importadorNombre;
-  final bool busy;
-  final bool puedeConfirmar;
-  final VoidCallback onConfirmar;
-  final bool pagoPendienteEnTransito;
-}
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
 
 /// Recepción en taller: se muestra al inicio de la ficha expandida del pedido.
 class AliadoConfirmarRecepcionSection extends StatelessWidget {
@@ -55,8 +39,8 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
               Expanded(
                 child: Text(
                   varios
-                      ? 'Recepción en su taller (por proveedor)'
-                      : 'Recepción en su taller',
+                      ? OrderActionsFlowCopy.recepcionTituloMulti
+                      : OrderActionsFlowCopy.recepcionTitulo,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
@@ -69,9 +53,8 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             varios
-                ? 'Confirme la mercancía de cada importador cuando la reciba. '
-                    'Después podrá gestionar el pago de cada proveedor.'
-                : 'Confirme cuando la mercancía llegue a su taller.',
+                ? OrderActionsFlowCopy.recepcionIntroMulti
+                : OrderActionsFlowCopy.recepcionIntro,
             style: TextStyle(
               fontSize: 11.5,
               height: 1.35,
@@ -119,26 +102,18 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                     label: Text(
                       b.busy
                           ? 'Confirmando…'
-                          : 'Confirmar recepción en tu taller',
+                          : varios
+                              ? OrderActionsFlowCopy.recepcionBoton
+                              : OrderActionsFlowCopy.recepcionBotonTaller,
                     ),
                   ),
                   if (b.pagoPendienteEnTransito) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
-                      'Puede confirmar entrega con pago aún pendiente.',
+                      'Puede confirmar la recepción aunque el pago siga pendiente.',
                       style: TextStyle(
                         fontSize: 11,
-                        height: 1.3,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Confirme al recibir la mercancía.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        height: 1.3,
+                        height: 1.35,
                         color: Colors.grey.shade700,
                       ),
                     ),
@@ -151,6 +126,23 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Datos de un bloque «confirmar recepción» (una línea o un importador en carrito).
+class AliadoConfirmarRecepcionBloque {
+  const AliadoConfirmarRecepcionBloque({
+    this.importadorNombre,
+    required this.busy,
+    required this.puedeConfirmar,
+    required this.onConfirmar,
+    this.pagoPendienteEnTransito = false,
+  });
+
+  final String? importadorNombre;
+  final bool busy;
+  final bool puedeConfirmar;
+  final VoidCallback onConfirmar;
+  final bool pagoPendienteEnTransito;
 }
 
 /// Construye bloques de recepción para todas las líneas / importadores en tránsito.

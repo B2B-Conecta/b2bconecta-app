@@ -7,6 +7,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/order_flow_copy/order_payment_flow_copy.dart';
 
 /// Factura del proveedor (PDF o imagen).
 class ImporterOrderInvoiceSection extends StatefulWidget {
@@ -127,7 +128,7 @@ class _ImporterOrderInvoiceSectionState
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Factura del proveedor adjuntada.'),
+          content: Text(OrderPaymentFlowCopy.importadorFacturaExito),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -156,8 +157,8 @@ class _ImporterOrderInvoiceSectionState
         if (!widget.hideMajorTitle) ...[
           Text(
             soloLectura
-                ? 'Factura del proveedor (referencia)'
-                : 'Factura del proveedor',
+                ? OrderPaymentFlowCopy.importadorFacturaTituloReferencia
+                : OrderPaymentFlowCopy.importadorFacturaTitulo,
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
@@ -168,14 +169,12 @@ class _ImporterOrderInvoiceSectionState
         ],
         Text(
           soloLectura
-              ? 'Archivo adjunto · solo consulta.'
+              ? OrderPaymentFlowCopy.importadorFacturaSoloLectura
               : (_unArchivoVariasLineas
-                  ? 'Un solo PDF o imagen para este pedido; '
-                      'adjúntelo en preparación o al marcar listo para despacho.'
+                  ? OrderPaymentFlowCopy.importadorFacturaAyudaCarrito
                   : (widget.useCompactHelp
-                      ? 'Adjunte o actualice el archivo si MotoLink lo requiere antes de «En tránsito».'
-                      : 'Adjunte PDF o imagen en preparación o al marcar listo para despacho; '
-                          'lo pediremos antes de indicar «En tránsito».')),
+                      ? OrderPaymentFlowCopy.importadorFacturaAyudaCompacta
+                      : OrderPaymentFlowCopy.importadorFacturaAyuda)),
           style: TextStyle(
             fontSize: 11,
             height: 1.35,
@@ -187,7 +186,7 @@ class _ImporterOrderInvoiceSectionState
           Text(
             _filaFacturaVisual.proveedorFacturaFileName?.trim().isNotEmpty == true
                 ? 'Archivo: ${_filaFacturaVisual.proveedorFacturaFileName}'
-                : 'Factura registrada',
+                : OrderPaymentFlowCopy.importadorFacturaRegistrada,
             style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
           ),
           Text(

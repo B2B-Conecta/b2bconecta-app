@@ -7,6 +7,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/order_flow_copy/order_payment_flow_copy.dart';
 import '../utils/app_date_format.dart';
 
 /// Factura del flete cuando el pago al transportista es separado.
@@ -112,7 +113,7 @@ class _ImporterOrderFleteInvoiceSectionState
         const SizedBox(height: 6),
         Text(
           'Pago separado al transportista (${CarrierFletePagoModo.shortLabelEs(r.carrierFletePagoModoSnapshot)}). '
-          'Adjunte la factura del flete además de la del proveedor antes de «En tránsito».',
+          '${OrderPaymentFlowCopy.importadorFleteAyuda}',
           style: TextStyle(fontSize: 11, height: 1.35, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 8),

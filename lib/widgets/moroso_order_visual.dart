@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../models/transaction_request_model.dart';
-import '../models/pago_revision_estado.dart';
+import '../utils/order_flow_copy/order_payment_flow_copy.dart';
+import '../utils/order_flow_copy/order_vocab.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 
-/// Etiqueta de estado en listas (sin «Moroso»; usar [MorosoOrderStatusChip] aparte).
+/// Etiqueta de estado en listas (sin chip de pago; usar [MorosoOrderStatusChip] aparte).
 String orderListStatusLabel(
   TransactionRequestModel r, {
   bool aliadoViewer = false,
 }) =>
     r.statusLabelEs(aliadoViewer: aliadoViewer);
 
-/// Chips de cabecera: estado logístico + moroso (si aplica).
+/// Chips de cabecera: estado logístico + pago pendiente (si aplica).
 class OrderStatusHeaderChips extends StatelessWidget {
   const OrderStatusHeaderChips({
     super.key,
@@ -23,6 +25,7 @@ class OrderStatusHeaderChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final density = B2bOrderCardDensityScope.of(context);
     return Wrap(
       spacing: 4,
       runSpacing: 2,
@@ -31,7 +34,7 @@ class OrderStatusHeaderChips extends StatelessWidget {
         Chip(
           label: Text(
             statusLabel,
-            style: const TextStyle(fontSize: 10),
+            style: TextStyle(fontSize: density.chipLabelSize),
           ),
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
@@ -43,7 +46,7 @@ class OrderStatusHeaderChips extends StatelessWidget {
   }
 }
 
-/// Chip naranja «Moroso» (único indicador en ficha colapsada).
+/// Chip «Pago pendiente» en ficha colapsada.
 class MorosoOrderStatusChip extends StatelessWidget {
   const MorosoOrderStatusChip({super.key});
 
@@ -51,7 +54,7 @@ class MorosoOrderStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Chip(
       label: const Text(
-        'Moroso',
+        OrderVocab.chipPagoPendiente,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w800,
@@ -83,7 +86,9 @@ class MorosoOrderDetailNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!request.esPedidoMoroso) return const SizedBox.shrink();
 
-    final msg = _detailMessage(request, aliadoViewer: aliadoViewer);
+    final msg = aliadoViewer
+        ? OrderPaymentFlowCopy.morosoDetalleAliado(request)
+        : OrderPaymentFlowCopy.morosoDetalleImportador(request);
 
     return Container(
       width: double.infinity,
@@ -117,55 +122,6 @@ class MorosoOrderDetailNotice extends StatelessWidget {
       ),
     );
   }
-}
-
-String _detailMessage(
-  TransactionRequestModel request, {
-  required bool aliadoViewer,
-}) {
-  final impPend = request.pagoImportadorPendienteTrasEntrega;
-  final fletePend = request.pagoFletePendienteTrasEntrega;
-
-  if (aliadoViewer) {
-    if (impPend && fletePend) {
-      return 'Pagos pendientes: comprobante al importador (factura del proveedor) y '
-          'pago del flete al transportista. Regístrelos en las secciones correspondientes.';
-    }
-    if (fletePend) {
-      if (!request.hasFleteComprobantePago) {
-        return 'Pago del flete pendiente. Registre el comprobante en la sección '
-            '«Flete (pago separado)».';
-      }
-      if (request.fletePagoEstadoRevisionEfectivo ==
-          PagoRevisionEstado.enRevision) {
-        return 'Comprobante del flete en revisión por el importador.';
-      }
-      if (request.fletePagoEstadoRevisionEfectivo ==
-          PagoRevisionEstado.rechazado) {
-        return 'Comprobante del flete no aceptado. Adjunte uno nuevo en la sección '
-            '«Flete (pago separado)».';
-      }
-      return 'Pago del flete pendiente de confirmación por el importador.';
-    }
-    if (!request.hasProveedorFactura) {
-      return 'Pago pendiente tras la recepción. Cuando el importador adjunte su factura, '
-          'registre su comprobante en la sección de pago.';
-    }
-    return 'Pago pendiente de aprobación por el importador. Registre o actualice su comprobante '
-        'en la sección de pago.';
-  }
-
-  if (impPend && fletePend) {
-    return 'Entregado con pagos pendientes: comprobante al importador y pago del flete.';
-  }
-  if (fletePend) {
-    return 'Entregado con pago del flete pendiente de confirmación por el importador.';
-  }
-  if (!request.hasProveedorFactura) {
-    return 'Entregado sin pago aprobado. Factura del importador pendiente; '
-        'el aliado debe registrar comprobante cuando corresponda.';
-  }
-  return 'Pago pendiente de verificación. Revise el comprobante del aliado.';
 }
 
 /// En la ficha del pedido: sin aviso extra si está colapsada (basta el chip).

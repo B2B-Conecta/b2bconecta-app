@@ -76,7 +76,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final hasIncomingCallback = hasAuthCallbackInUri(uri);
 
     _initialLinkError = link.errorMessage;
-    _awaitingPasswordRecovery = link.isPasswordRecovery;
+    _awaitingPasswordRecovery =
+        link.isPasswordRecovery || pendingRecoveryRequest;
 
     if (_initialLinkError != null) {
       clearAuthUriCallback();
@@ -86,6 +87,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _resolvingAuthCallback = true;
       _startAuthCallbackTimeout();
       await _resolveAuthCallback(uri, link);
+    } else if (pendingRecoveryRequest &&
+        Supabase.instance.client.auth.currentSession != null) {
+      _awaitingPasswordRecovery = true;
+      _bootstrapWithoutCallback(expectAuthCallback: false);
     } else if (pendingRecoveryRequest) {
       // Usuario pidió reset; Supabase puede estar procesando el intent en paralelo.
       _awaitingInitialAuthEvent = true;
@@ -190,31 +195,34 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       var redirectType = link.isPasswordRecovery ? 'recovery' : null;
 
       if (uri.queryParameters.containsKey('code')) {
-        if (session == null) {
-          try {
-            final response =
-                await Supabase.instance.client.auth.getSessionFromUrl(uri);
-            session = response.session;
-            redirectType = response.redirectType ?? redirectType;
-          } on AuthException catch (e) {
+        try {
+          final response =
+              await Supabase.instance.client.auth.getSessionFromUrl(uri);
+          session = response.session;
+          redirectType = response.redirectType ?? redirectType;
+        } on AuthException catch (e) {
+          if (session == null) {
             _initialLinkError = AuthService.mapAuthErrorMessage(e.message);
             await _signOutAfterLinkError();
             return;
           }
-        } else {
-          // Supabase Auth pudo haber canjeado el code antes que AuthGate.
           redirectType ??=
               (await AuthRecoveryStorage.peekPendingPasswordRecovery())
                   ? 'recovery'
                   : null;
         }
+      } else if (session != null) {
+        redirectType ??=
+            (await AuthRecoveryStorage.peekPendingPasswordRecovery())
+                ? 'recovery'
+                : null;
       }
 
       clearAuthUriCallback();
 
       final pendingRecovery = redirectType == 'recovery' ||
           _awaitingPasswordRecovery ||
-          await AuthRecoveryStorage.consumePendingPasswordRecovery();
+          await AuthRecoveryStorage.peekPendingPasswordRecovery();
 
       if (pendingRecovery && session != null) {
         _awaitingPasswordRecovery = true;
@@ -265,9 +273,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
       unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
-      if (!_resolvingAuthCallback) {
-        _applyAuthState(data);
-      }
+      _applyAuthState(data);
       return;
     }
 
@@ -289,8 +295,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _bootstrapResolved) return;
         final pending =
-            await AuthRecoveryStorage.consumePendingPasswordRecovery();
-        if (pending || _awaitingPasswordRecovery) {
+            await AuthRecoveryStorage.peekPendingPasswordRecovery();
+        if (pending) {
           _awaitingPasswordRecovery = true;
         }
         _bootstrapResolved = true;
@@ -300,6 +306,22 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return;
     }
 
+    if (data.session != null &&
+        !_awaitingPasswordRecovery &&
+        (data.event == AuthChangeEvent.signedIn ||
+            data.event == AuthChangeEvent.initialSession)) {
+      unawaited(_applyAuthStateMaybeRecovery(data));
+      return;
+    }
+
+    _applyAuthState(data);
+  }
+
+  Future<void> _applyAuthStateMaybeRecovery(AuthState data) async {
+    if (!_awaitingPasswordRecovery &&
+        await AuthRecoveryStorage.peekPendingPasswordRecovery()) {
+      _awaitingPasswordRecovery = true;
+    }
     _applyAuthState(data);
   }
 
@@ -361,7 +383,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final session =
         _authState!.session ?? Supabase.instance.client.auth.currentSession;
 
-    if (session != null && _awaitingPasswordRecovery) {
+    if (session != null &&
+        shouldForcePasswordRecoveryScreen(
+          awaitingPasswordRecovery: _awaitingPasswordRecovery,
+          pendingPasswordRecovery: false,
+        )) {
       return const RecoverPasswordScreen(key: ValueKey('recover_password'));
     }
 

@@ -11,6 +11,7 @@ class PartModel {
     required this.id,
     this.ownerId,
     this.ownerBusinessName,
+    this.ownerLogoStoragePath,
     this.ownerEstado,
     this.ownerCiudad,
     required this.nombre,
@@ -43,6 +44,9 @@ class PartModel {
 
   /// Nombre comercial del dueño (join `profiles`).
   final String? ownerBusinessName;
+
+  /// Foto de perfil del importador (`profiles.logo_storage_path`).
+  final String? ownerLogoStoragePath;
 
   /// Ubicación del importador (`profiles.estado` / `ciudad`).
   final String? ownerEstado;
@@ -135,6 +139,8 @@ class PartModel {
     );
 
     final ownerBusinessName = _ownerBusinessNameFromProfiles(json['profiles']);
+    final ownerLogoStoragePath =
+        _ownerLogoStoragePathFromProfiles(json['profiles']);
     final loc = _ownerLocationFromProfiles(json['profiles']);
     final ownerLatLng = _ownerLatLngFromProfiles(json['profiles']);
     final rep = _ownerReputationFromProfiles(json['profiles']);
@@ -155,6 +161,7 @@ class PartModel {
       id: json['id']?.toString() ?? '',
       ownerId: _nullableUuid(json['owner_id']),
       ownerBusinessName: ownerBusinessName,
+      ownerLogoStoragePath: ownerLogoStoragePath,
       ownerEstado: loc.$1,
       ownerCiudad: loc.$2,
       ownerLatitude: ownerLatLng.$1,
@@ -188,6 +195,7 @@ class PartModel {
     String? id,
     String? ownerId,
     String? ownerBusinessName,
+    String? ownerLogoStoragePath,
     String? ownerEstado,
     String? ownerCiudad,
     String? nombre,
@@ -216,6 +224,8 @@ class PartModel {
       id: id ?? this.id,
       ownerId: ownerId ?? this.ownerId,
       ownerBusinessName: ownerBusinessName ?? this.ownerBusinessName,
+      ownerLogoStoragePath:
+          ownerLogoStoragePath ?? this.ownerLogoStoragePath,
       ownerEstado: ownerEstado ?? this.ownerEstado,
       ownerCiudad: ownerCiudad ?? this.ownerCiudad,
       nombre: nombre ?? this.nombre,
@@ -323,17 +333,23 @@ class PartModel {
 
   /// PostgREST devuelve `profiles` como objeto anidado al hacer select con join.
   static String? _ownerBusinessNameFromProfiles(dynamic profiles) {
+    return _profileFieldFromProfiles(profiles, 'business_name');
+  }
+
+  static String? _ownerLogoStoragePathFromProfiles(dynamic profiles) {
+    return _profileFieldFromProfiles(profiles, 'logo_storage_path');
+  }
+
+  static String? _profileFieldFromProfiles(dynamic profiles, String field) {
     if (profiles == null) return null;
     if (profiles is Map) {
       final m = Map<String, dynamic>.from(profiles);
-      return _nullableText(m['business_name']);
+      return _nullableText(m[field]);
     }
     if (profiles is List && profiles.isNotEmpty) {
       final first = profiles.first;
       if (first is Map) {
-        return _nullableText(
-          Map<String, dynamic>.from(first)['business_name'],
-        );
+        return _nullableText(Map<String, dynamic>.from(first)[field]);
       }
     }
     return null;

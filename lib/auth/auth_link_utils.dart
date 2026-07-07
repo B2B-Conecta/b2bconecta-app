@@ -49,6 +49,13 @@ AuthLinkParseResult parseAuthUriFragment(Uri uri) {
   return const AuthLinkParseResult(isPasswordRecovery: false);
 }
 
+/// Recuperación PKCE: el flag local persiste aunque `detectSessionInUri` consuma el `code`.
+bool shouldForcePasswordRecoveryScreen({
+  required bool awaitingPasswordRecovery,
+  required bool pendingPasswordRecovery,
+}) =>
+    awaitingPasswordRecovery || pendingPasswordRecovery;
+
 Map<String, String> _authParamsFromUri(Uri uri) {
   if (uri.fragment.isNotEmpty) {
     return Uri.splitQueryString(uri.fragment);

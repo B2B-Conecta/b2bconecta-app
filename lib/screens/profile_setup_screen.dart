@@ -73,7 +73,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> _onProfileSaved() async {
     await _softRefreshProfile();
     if (!mounted) return;
-    widget.onProfileComplete();
+    _maybeAdvanceToMainApp();
   }
 
   @override

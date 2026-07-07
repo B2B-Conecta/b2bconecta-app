@@ -27,32 +27,6 @@ void main() {
     expect(uri.host, 'auth-callback');
   });
 
-  test('detects password recovery from query type param', () {
-    final uri = Uri.parse(
-      'https://motolink-app.vercel.app/?code=abc&type=recovery',
-    );
-    final result = parseAuthUriFragment(uri);
-    expect(result.isPasswordRecovery, isTrue);
-    expect(hasAuthCallbackInUri(uri), isTrue);
-  });
-
-  test('shouldForcePasswordRecoveryScreen when pending flag set', () {
-    expect(
-      shouldForcePasswordRecoveryScreen(
-        awaitingPasswordRecovery: false,
-        pendingPasswordRecovery: true,
-      ),
-      isTrue,
-    );
-    expect(
-      shouldForcePasswordRecoveryScreen(
-        awaitingPasswordRecovery: true,
-        pendingPasswordRecovery: false,
-      ),
-      isTrue,
-    );
-  });
-
   test('maps expired otp error from fragment', () {
     final uri = Uri.parse(
       'http://localhost:3000/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired',

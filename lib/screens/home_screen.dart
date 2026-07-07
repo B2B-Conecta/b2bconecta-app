@@ -18,7 +18,6 @@ import '../widgets/aliado_catalog_filters_sheet.dart';
 import '../widgets/aliado_promo_campaign_widgets.dart';
 import '../widgets/catalog_product_price_display.dart';
 import '../widgets/product_warranty_seal.dart';
-import '../widgets/importer_catalog_logo.dart';
 import '../widgets/importer_inventory_dashboard.dart';
 import '../widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
@@ -1148,29 +1147,16 @@ class _ProductGridCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        ImporterCatalogLogo(
-                          storagePath: part.ownerLogoStoragePath,
-                          size: compact ? 14 : 16,
-                        ),
-                        if (part.ownerLogoStoragePath?.trim().isNotEmpty ==
-                            true)
-                          SizedBox(width: compact ? 4 : 5),
-                        Expanded(
-                          child: Text(
-                            importerLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: compact ? 9 : 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                              height: 1.1,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      importerLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact ? 9 : 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        height: 1.1,
+                      ),
                     ),
                     if (!compact && locLine.isNotEmpty)
                       Text(

@@ -88,9 +88,6 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return r != null && r.isNotEmpty;
   }
 
-  /// Onboarding inicial: ocultar secciones del panel principal (p. ej. reputación).
-  bool get _isOnboarding => widget.onEnterApp != null;
-
   /// Solo cuentas ya registradas como broker en BD; el autoregistro no ofrece este rol.
   bool get _showAdministradorRoleOption {
     return widget.initial?.role?.trim().toLowerCase() == 'administrador';
@@ -832,15 +829,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               profile: widget.initial!,
               onSaved: widget.onRelatedDataChanged,
             ),
-            if (!_isOnboarding) ...[
+            const SizedBox(height: 12),
+            const ImporterCommissionSettlementsSection(),
+            const SizedBox(height: 8),
+            _reputationTabHint(context),
+            if (widget.afterReputation != null) ...[
               const SizedBox(height: 12),
-              const ImporterCommissionSettlementsSection(),
-              const SizedBox(height: 8),
-              _reputationTabHint(context),
-              if (widget.afterReputation != null) ...[
-                const SizedBox(height: 12),
-                widget.afterReputation!,
-              ],
+              widget.afterReputation!,
             ],
           ],
           if (_showAliadoKycSection) ...[

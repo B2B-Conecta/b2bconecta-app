@@ -779,8 +779,8 @@ class SupabaseService {
     const rep =
         'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d';
     return _catalogNeedsProfileInner(filters)
-        ? 'profiles!inner(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)'
-        : 'profiles(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
+        ? 'profiles!inner(business_name, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)'
+        : 'profiles(business_name, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
   }
 
   /// Métricas del inventario del usuario actual (importador).

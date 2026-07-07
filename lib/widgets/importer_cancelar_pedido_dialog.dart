@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Importador (proveedor): cancelar pedido en gestión con motivo obligatorio.
-/// Tras confirmar, la app abre el mismo cuestionario bucket para valorar al aliado.
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
+
+/// Importador: cancelar pedido en gestión con motivo obligatorio.
 Future<String?> showImporterCancelarPedidoDialog(
   BuildContext context, {
   required String productName,
@@ -11,14 +12,13 @@ Future<String?> showImporterCancelarPedidoDialog(
     context: context,
     builder: (ctx) {
       return AlertDialog(
-        title: const Text('Cancelar pedido (proveedor)'),
+        title: const Text(OrderActionsFlowCopy.importadorCancelarTitulo),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'El pedido "$productName" se cerrará y se notificará al aliado y a MotoLink. '
-              'Indique un motivo; después podrá valorar al aliado.',
+              OrderActionsFlowCopy.importadorCancelarIntro(productName),
               style: const TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),
@@ -28,7 +28,7 @@ Future<String?> showImporterCancelarPedidoDialog(
               maxLength: 4000,
               autofocus: true,
               decoration: const InputDecoration(
-                labelText: 'Motivo (obligatorio)',
+                labelText: OrderActionsFlowCopy.cancelarMotivoObligatorio,
                 alignLabelWithHint: true,
                 border: OutlineInputBorder(),
               ),
@@ -38,7 +38,7 @@ Future<String?> showImporterCancelarPedidoDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Volver'),
+            child: const Text(OrderActionsFlowCopy.cancelarVolver),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -49,7 +49,7 @@ Future<String?> showImporterCancelarPedidoDialog(
               if (ctrl.text.trim().length < 3) return;
               Navigator.pop(ctx, true);
             },
-            child: const Text('Confirmar cancelación'),
+            child: const Text(OrderActionsFlowCopy.cancelarConfirmar),
           ),
         ],
       );

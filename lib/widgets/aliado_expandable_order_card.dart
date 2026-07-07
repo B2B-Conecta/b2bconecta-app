@@ -9,6 +9,7 @@ import '../utils/ves_amount_format.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import '../utils/aliado_order_grouping.dart';
 import '../utils/importer_order_date.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 import 'importer_order_date_badge.dart';
 import 'aliado_multi_importer_order_tabs.dart';
 import 'courier_timeline_widget.dart';
@@ -69,6 +70,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final density = B2bOrderCardDensity.of(width);
     final lines = (checkoutGroupLines != null && checkoutGroupLines!.isNotEmpty)
         ? checkoutGroupLines!
         : <TransactionRequestModel>[request];
@@ -115,8 +118,10 @@ class AliadoExpandableOrderCard extends StatelessWidget {
         ? lines.any(ImporterOrderDate.isAbierto)
         : ImporterOrderDate.isAbierto(r);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+    return B2bOrderCardDensityScope(
+      density: density,
+      child: Card(
+      margin: EdgeInsets.only(bottom: density.cardMarginBottom),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -126,7 +131,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
             child: InkWell(
               onTap: onToggle,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                padding: density.cardHeaderPadding,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -149,13 +154,13 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: density.isDesktop ? 6 : 8),
                           if (showHeadline) ...[
                             Text(
                               tracking,
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
-                                fontSize: 11,
+                                fontSize: density.trackingHeadlineSize,
                                 color: isCheckoutGroup &&
                                         !lines.every((x) =>
                                             x.status == lines.first.status)
@@ -170,7 +175,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                             : AppColors.brandBlue,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: density.isDesktop ? 2 : 4),
                           ],
                           Text(
                             isCheckoutGroup
@@ -178,14 +183,14 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 : r.etiquetaProductoAliado,
                             maxLines: expanded ? 3 : 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
-                              fontSize: 15,
+                              fontSize: density.productTitleSize,
                             ),
                           ),
                           if (isCheckoutGroup &&
                               distinctImporterIds.length > 1) ...[
-                            const SizedBox(height: 6),
+                            SizedBox(height: density.isDesktop ? 4 : 6),
                             _MultiImporterPagoResumenChip(lines: lines),
                           ],
                           if (!isCheckoutGroup && r.productSku != null) ...[
@@ -193,18 +198,18 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             Text(
                               'SKU: ${r.productSku}',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: density.skuTextSize,
                                 color: Colors.grey.shade700,
                               ),
                             ),
                           ],
-                          const SizedBox(height: 4),
+                          SizedBox(height: density.isDesktop ? 2 : 4),
                           Text(
                             isCheckoutGroup
                                 ? _checkoutGroupResumen(lines)
                                 : _lineaPrecioResumenAliado(r),
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: density.metaTextSize,
                               color: Colors.grey.shade800,
                               fontWeight: FontWeight.w600,
                             ),
@@ -215,11 +220,11 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             _DescuentoDivisasFichaChip(request: r),
                           ],
                           if (!expanded) ...[
-                            const SizedBox(height: 4),
+                            SizedBox(height: density.isDesktop ? 2 : 4),
                             Text(
                               lines.first.destinoEntregaLineaCompactaEs,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: density.secondaryTextSize,
                                 color: Colors.grey.shade700,
                                 height: 1.25,
                               ),
@@ -229,11 +234,11 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               r.aliadoPagoEstadoResumenEs != null &&
                               !r.pedidoEntregadoYPagado &&
                               !r.pagoMotolinkPendienteTrasEntrega) ...[
-                            const SizedBox(height: 4),
+                            SizedBox(height: density.isDesktop ? 2 : 4),
                             Text(
                               r.aliadoPagoEstadoResumenEs!,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: density.secondaryTextSize,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.brandBlue.withOpacity(0.95),
                                 height: 1.25,
@@ -292,6 +297,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                     ),
                     Icon(
                       expanded ? Icons.expand_less : Icons.expand_more,
+                      size: density.isDesktop ? 20 : 24,
                       color: AppColors.textSecondary,
                     ),
                   ],
@@ -302,28 +308,38 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           if (ratingBar != null) ratingBar!,
           if (collapsedAccessory != null) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: EdgeInsets.fromLTRB(
+                density.cardExpandedPadding.left,
+                0,
+                density.cardExpandedPadding.right,
+                density.isDesktop ? 6 : 8,
+              ),
               child: collapsedAccessory!,
             ),
           ],
           if (onCancelarSolicitudPendiente != null &&
               lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: EdgeInsets.fromLTRB(
+                density.cardExpandedPadding.left,
+                0,
+                density.cardExpandedPadding.right,
+                density.isDesktop ? 6 : 8,
+              ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
+                  if (density.isDesktop)
+                    OutlinedButton.icon(
                       onPressed: cancelarSolicitudPendienteBusy
                           ? null
                           : onCancelarSolicitudPendiente,
                       icon: cancelarSolicitudPendienteBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                          ? SizedBox(
+                              width: density.buttonIconSize,
+                              height: density.buttonIconSize,
+                              child: const CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.delete_outline, size: 20),
+                          : Icon(Icons.delete_outline, size: density.buttonIconSize),
                       label: Text(
                         cancelarSolicitudPendienteBusy
                             ? 'Cancelando…'
@@ -331,14 +347,39 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ? 'Cancelar carrito'
                                 : 'Cancelar pedido',
                       ),
-                      style: OutlinedButton.styleFrom(
+                      style: density.outlinedButtonStyle(
                         foregroundColor: Colors.red.shade800,
                       ),
+                    )
+                  else
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: cancelarSolicitudPendienteBusy
+                            ? null
+                            : onCancelarSolicitudPendiente,
+                        icon: cancelarSolicitudPendienteBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.delete_outline, size: 20),
+                        label: Text(
+                          cancelarSolicitudPendienteBusy
+                              ? 'Cancelando…'
+                              : isCheckoutGroup
+                                  ? 'Cancelar carrito'
+                                  : 'Cancelar pedido',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade800,
+                        ),
+                      ),
                     ),
-                  ),
-                  const ProfileInfoIcon(
+                  ProfileInfoIcon(
                     title: 'Cancelar pedido',
                     message: OrderSectionHelp.aliadoCancelPending,
+                    iconSize: density.isDesktop ? 16 : 18,
                   ),
                 ],
               ),
@@ -349,8 +390,15 @@ class AliadoExpandableOrderCard extends StatelessWidget {
             curve: Curves.easeInOut,
             alignment: Alignment.topCenter,
             child: expanded
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                ? B2bOrdersPanelLayout.expandedContent(
+                    context,
+                    Builder(
+                      builder: (ctx) {
+                        final sectionGap = B2bOrdersPanelLayout.sectionGap(
+                          MediaQuery.sizeOf(ctx).width,
+                        );
+                        return Padding(
+                    padding: density.cardExpandedPadding,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -358,11 +406,12 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           alignment: Alignment.centerRight,
                           child: TextButton.icon(
                             onPressed: onToggle,
-                            icon: const Icon(Icons.close, size: 18),
+                            icon: Icon(Icons.close, size: density.isDesktop ? 16 : 18),
                             label: const Text('Cerrar'),
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.textSecondary,
-                              visualDensity: VisualDensity.compact,
+                              visualDensity: density.buttonVisualDensity,
+                              textStyle: TextStyle(fontSize: density.buttonTextSize),
                             ),
                           ),
                         ),
@@ -385,7 +434,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               allLines: lines,
                               porImportador: porImportador,
                             ),
-                            const SizedBox(height: kOrderCardSectionGap),
+                            SizedBox(height: sectionGap),
                           ],
                           OrderCardCollapsibleSection(
                             title: 'Entrega',
@@ -396,7 +445,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             ),
                           ),
                           if (!useMultiImporterTabs) ...[
-                            const SizedBox(height: kOrderCardSectionGap),
+                            SizedBox(height: sectionGap),
                             if (consolidarDatosImportador)
                               OrderCardCollapsibleSection(
                                 title: 'Importador',
@@ -411,7 +460,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 ),
                               ),
                             if (consolidarDatosImportador)
-                              const SizedBox(height: kOrderCardSectionGap),
+                              SizedBox(height: sectionGap),
                             OrderCardCollapsibleSection(
                               title: 'Productos',
                               subtitle: orderCardProductosSubtitle(
@@ -428,7 +477,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 hideSectionTitle: true,
                               ),
                             ),
-                            const SizedBox(height: kOrderCardSectionGap),
+                            SizedBox(height: sectionGap),
                             OrderCardCollapsibleSection(
                               title: 'Seguimiento',
                               subtitle: orderCardTimelineSubtitle(
@@ -449,6 +498,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                       compact: true,
                                       viewerRole: AppHomeRole.aliado,
                                       showHeading: false,
+                                      embedded: true,
                                     ),
                                     ..._postTimelineBloquesAliado(
                                       lines: lines,
@@ -466,7 +516,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ),
                           ] else ...[
-                            const SizedBox(height: kOrderCardSectionGap),
+                            SizedBox(height: sectionGap),
                             AliadoMultiImporterOrderTabs(
                               allLines: lines,
                               porImportador: porImportador,
@@ -486,7 +536,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               embedded: true,
                             ),
                           ),
-                          const SizedBox(height: kOrderCardSectionGap),
+                          SizedBox(height: sectionGap),
                           OrderCardCollapsibleSection(
                             title: 'Entrega',
                             subtitle: r.destinoEntregaLineaCompactaEs,
@@ -495,7 +545,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               hideSectionTitle: true,
                             ),
                           ),
-                          const SizedBox(height: kOrderCardSectionGap),
+                          SizedBox(height: sectionGap),
                           OrderCardCollapsibleSection(
                             title: 'Productos',
                             subtitle: orderCardProductosSubtitle(
@@ -511,7 +561,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               hideSectionTitle: true,
                             ),
                           ),
-                          const SizedBox(height: kOrderCardSectionGap),
+                          SizedBox(height: sectionGap),
                           OrderCardCollapsibleSection(
                             title: 'Seguimiento',
                             subtitle: orderCardTimelineSubtitle(
@@ -530,6 +580,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                   compact: true,
                                   viewerRole: AppHomeRole.aliado,
                                   showHeading: false,
+                                  embedded: true,
                                 ),
                               ],
                             ),
@@ -537,16 +588,20 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         ],
                         if (!useMultiImporterTabs &&
                             expandedFooter != null) ...[
-                          const SizedBox(height: 12),
+                          SizedBox(height: sectionGap),
                           expandedFooter!,
                         ],
                       ],
                     ),
-                  )
+                  );
+                      },
+                    ),
+                )
                 : const SizedBox.shrink(),
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -580,6 +635,7 @@ List<Widget> _postTimelineBloquesAliado({
           compact: true,
           viewerRole: AppHomeRole.aliado,
           showHeading: false,
+          embedded: true,
         ),
       );
     }

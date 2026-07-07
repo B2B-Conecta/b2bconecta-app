@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
 
 /// Aliado: aceptar o rechazar propuesta formal de menor cantidad (estado `pendiente`).
 class AliadoQtyAdjustmentActions extends StatefulWidget {
@@ -64,7 +65,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Propuesta de cantidad del proveedor',
+            OrderActionsFlowCopy.qtyTitulo,
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
@@ -73,7 +74,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
           ),
           const SizedBox(height: 6),
           Text(
-            'Solicitaste $snap uds; el proveedor ofrece ${off ?? '—'} uds.',
+            OrderActionsFlowCopy.qtyCuerpo(snap, off),
             style: TextStyle(
               fontSize: 12.5,
               height: 1.35,
@@ -83,7 +84,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
           if (note != null && note.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Nota: $note',
+              '${OrderActionsFlowCopy.qtyNotaPrefijo} $note',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
@@ -97,7 +98,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
               Expanded(
                 child: OutlinedButton(
                   onPressed: _busy ? null : () => _respond(false),
-                  child: Text(_busy ? '…' : 'Rechazar'),
+                  child: Text(_busy ? '…' : OrderActionsFlowCopy.qtyRechazar),
                 ),
               ),
               const SizedBox(width: 10),
@@ -107,7 +108,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
                     backgroundColor: AppColors.brand,
                   ),
                   onPressed: _busy ? null : () => _respond(true),
-                  child: Text(_busy ? '…' : 'Aceptar'),
+                  child: Text(_busy ? '…' : OrderActionsFlowCopy.qtyAceptar),
                 ),
               ),
             ],

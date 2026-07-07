@@ -6,6 +6,7 @@ import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_experience_utils.dart';
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
 import '../utils/order_rating_eligibility.dart';
 import 'aliado_order_experience_display.dart';
 import 'order_rating_form.dart';
@@ -326,8 +327,8 @@ class _AliadoOrderRatingSheetBodyState extends State<_AliadoOrderRatingSheetBody
       return AliadoOrderExperienceRegisteredCard(
         request: widget.request,
         scopeLabel: widget.bundleImportadorId != null
-            ? 'Valoración de este proveedor'
-            : 'Valoración de este pedido',
+            ? OrderActionsFlowCopy.valoracionEsteImportador
+            : OrderActionsFlowCopy.valoracionEstePedido,
         bundleCheckoutGroupId: widget.bundleCheckoutGroupId,
         bundleImportadorId: widget.bundleImportadorId,
         questionnaire: _questionnaire,
@@ -348,12 +349,12 @@ class _AliadoOrderRatingSheetBodyState extends State<_AliadoOrderRatingSheetBody
 
     return OrderRatingForm(
       title: esCancelacion
-          ? 'Valorar tras la cancelación'
-          : 'Calificá cada aspecto del servicio',
+          ? OrderActionsFlowCopy.valorarTrasCancelacion
+          : OrderActionsFlowCopy.valorarServicioTitulo,
       subtitle: esCancelacion
-          ? 'Su motivo quedó registrado. Califique al proveedor; puede ampliar el comentario.'
-          : 'Deslizá cada categoría (1 = Muy mal … 5 = Excelente). '
-              'El promedio define la valoración general. Podés añadir un comentario opcional.',
+          ? OrderActionsFlowCopy.valorarCancelacionSubtitulo
+          : '${OrderActionsFlowCopy.valorarServicioSubtitulo} '
+              '${OrderActionsFlowCopy.valorarComentarioOpcional}',
       questionnaire: _questionnaire!,
       busy: _busy,
       emphasized: true,

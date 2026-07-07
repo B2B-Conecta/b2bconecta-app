@@ -9,6 +9,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 import 'order_commission_summary.dart';
 import '../models/kyc_approved_aliado_model.dart';
 import '../models/kyc_status.dart';
@@ -454,31 +455,33 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final density = B2bOrderCardDensityScope.of(context);
     final r = request;
     final usa = r.destinoEntregaUsaPerfil;
     final texto = r.destinoEntregaTexto?.trim();
     final fiscalBloque = r.aliadoDireccionFiscalMultilineaEs;
+    final bodySize = density.contentBodySize;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!hideSectionTitle) ...[
-          const Text(
+          Text(
             'Destino de entrega',
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              fontSize: 13,
+              fontSize: density.contentTitleSize,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: density.isDesktop ? 4 : 6),
         ],
         if (usa) ...[
           if (fiscalBloque != null && fiscalBloque.isNotEmpty)
             Text(
               fiscalBloque,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: bodySize,
                 color: Colors.grey.shade800,
                 height: 1.4,
               ),
@@ -487,7 +490,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
             Text(
               'Dirección fiscal del aliado aún no disponible en esta vista.',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: bodySize,
                 color: Colors.grey.shade700,
                 height: 1.35,
               ),
@@ -498,7 +501,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
                 ? texto
                 : 'Otro destino (sin texto guardado)',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: bodySize,
               color: Colors.grey.shade800,
               height: 1.35,
             ),

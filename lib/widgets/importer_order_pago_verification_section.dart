@@ -8,6 +8,7 @@ import '../models/transaction_request_status.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import 'b2b_order_panel_widgets.dart';
 
 /// Verificación del comprobante declarado por el aliado (Zelle, Pago Móvil, Binance, transferencia, efectivo).
 class ImporterOrderPagoVerificationSection extends StatefulWidget {
@@ -140,9 +141,19 @@ class _ImporterOrderPagoVerificationSectionState
 
   static bool _puedeConfirmarPago(TransactionRequestModel r) {
     if (r.status == TransactionRequestStatus.rechazado) return false;
-    if (r.pagoEstadoRevisionEfectivo != PagoRevisionEstado.enRevision) {
+
+    final pe = r.pagoEstadoRevisionEfectivo;
+    if (pe == PagoRevisionEstado.aprobado || pe == PagoRevisionEstado.rechazado) {
       return false;
     }
+
+    final enRevision = pe == PagoRevisionEstado.enRevision;
+    final morosoConComprobante = r.status == TransactionRequestStatus.entregado &&
+        r.esPedidoMoroso &&
+        pe == PagoRevisionEstado.pendiente &&
+        (r.hasComprobantePago || r.pagoMetodo?.trim() == PagoMetodo.efectivo);
+
+    if (!enRevision && !morosoConComprobante) return false;
     if (r.hasComprobantePago) return true;
     return r.pagoMetodo?.trim() == PagoMetodo.efectivo;
   }
@@ -194,14 +205,9 @@ class _ImporterOrderPagoVerificationSectionState
 
     final algunoRechazado =
         _lines.any((r) => r.status == TransactionRequestStatus.rechazado);
-    final todosEnRevision = _lines.every(
-      (r) => r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.enRevision,
-    );
     final todosConfirmables = _lines.every(_puedeConfirmarPago);
-    final mostrarAcciones = !algunoRechazado &&
-        todosEnRevision &&
-        todosConfirmables &&
-        pathsDistintos <= 1;
+    final mostrarAcciones =
+        !algunoRechazado && todosConfirmables && pathsDistintos <= 1;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -292,26 +298,19 @@ class _ImporterOrderPagoVerificationSectionState
           ],
           if (mostrarAcciones) ...[
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _setEstado(context, PagoRevisionEstado.aprobado),
-                    child: Text(_labelConfirmarPago(ref)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _setEstado(context, PagoRevisionEstado.rechazado),
-                    child: const Text('Rechazar'),
-                  ),
-                ),
-              ],
+            B2bActionButtonRow(
+              secondary: OutlinedButton(
+                onPressed: _busy
+                    ? null
+                    : () => _setEstado(context, PagoRevisionEstado.rechazado),
+                child: const Text('Rechazar'),
+              ),
+              primary: FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () => _setEstado(context, PagoRevisionEstado.aprobado),
+                child: Text(_labelConfirmarPago(ref)),
+              ),
             ),
           ],
           if (!_lines.any(_puedeConfirmarPago))
@@ -393,28 +392,35 @@ class _ImporterOrderPagoVerificationSectionState
               label: const Text('Ver comprobante'),
             ),
           ],
+          if (r.esPedidoMoroso &&
+              r.status == TransactionRequestStatus.entregado &&
+              mostrarAcciones) ...[
+            const SizedBox(height: 6),
+            Text(
+              'El aliado recibió el pedido con pago pendiente. Revise el comprobante y confirme el pago.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.35,
+                color: Colors.orange.shade900,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           if (mostrarAcciones) ...[
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _setEstado(context, PagoRevisionEstado.aprobado),
-                    child: Text(_labelConfirmarPago(r)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _setEstado(context, PagoRevisionEstado.rechazado),
-                    child: const Text('Rechazar'),
-                  ),
-                ),
-              ],
+            B2bActionButtonRow(
+              secondary: OutlinedButton(
+                onPressed: _busy
+                    ? null
+                    : () => _setEstado(context, PagoRevisionEstado.rechazado),
+                child: const Text('Rechazar'),
+              ),
+              primary: FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () => _setEstado(context, PagoRevisionEstado.aprobado),
+                child: Text(_labelConfirmarPago(r)),
+              ),
             ),
           ],
           if (!_puedeConfirmarPago(r) &&

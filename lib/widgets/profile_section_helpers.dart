@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 
 /// Icono (i) que muestra ayuda breve en un diálogo.
 class ProfileInfoIcon extends StatelessWidget {
@@ -140,12 +141,15 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
 
   @override
   Widget build(BuildContext context) {
+    final density = B2bOrderCardDensityScope.of(context);
+    final radius = BorderRadius.circular(density.sectionBorderRadius);
+
     return Material(
       color: Colors.white,
-      borderRadius: AppDecorations.radius12,
+      borderRadius: radius,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: AppDecorations.radius12,
+          borderRadius: radius,
           border: Border.all(color: Colors.grey.shade300),
         ),
         child: Column(
@@ -153,9 +157,9 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
           children: [
             InkWell(
               onTap: () => setState(() => _open = !_open),
-              borderRadius: AppDecorations.radius12,
+              borderRadius: radius,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                padding: density.sectionHeaderPadding,
                 child: Row(
                   children: [
                     Expanded(
@@ -164,8 +168,8 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
                         children: [
                           Text(
                             widget.title,
-                            style: const TextStyle(
-                              fontSize: 13.5,
+                            style: TextStyle(
+                              fontSize: density.sectionTitleSize,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary,
                             ),
@@ -175,7 +179,7 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
                             Text(
                               widget.subtitle!,
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: density.sectionSubtitleSize,
                                 color: Colors.grey.shade700,
                               ),
                             ),
@@ -187,10 +191,12 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
                       ProfileInfoIcon(
                         message: widget.infoMessage!,
                         title: widget.infoTitle ?? widget.title,
+                        iconSize: density.isDesktop ? 16 : 18,
                       ),
                     ...widget.trailingActions,
                     Icon(
                       _open ? Icons.expand_less : Icons.expand_more,
+                      size: density.isDesktop ? 20 : 24,
                       color: AppColors.textSecondary,
                     ),
                   ],
@@ -199,7 +205,7 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
             ),
             if (_open)
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: density.sectionBodyPadding,
                 child: widget.child,
               ),
           ],

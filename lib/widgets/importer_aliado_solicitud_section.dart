@@ -6,6 +6,7 @@ import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/aliado_order_grouping.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 import '../utils/ves_amount_format.dart';
 
 /// Vista importador vs aliado: de dónde salen las partidas (`order_items` / fila).
@@ -28,17 +29,23 @@ List<PedidoProductoLineUi> transactionRequestLineasDesgloseForViewer(
 }
 
 /// Tarjeta de una partida (nombre, SKU opcional, unds, REF).
-Widget pedidoProductoLineCard(PedidoProductoLineUi p, bool compact) {
+Widget pedidoProductoLineCard(
+  BuildContext context,
+  PedidoProductoLineUi p,
+  bool compact,
+) {
+  final density = B2bOrderCardDensityScope.of(context);
+  final web = density.isDesktop && compact;
   final sku = p.sku?.trim();
   return Container(
     width: double.infinity,
     padding: EdgeInsets.symmetric(
-      horizontal: compact ? 8 : 10,
-      vertical: compact ? 6 : 8,
+      horizontal: web ? 8 : (compact ? 8 : 10),
+      vertical: web ? 5 : (compact ? 6 : 8),
     ),
     decoration: BoxDecoration(
       color: AppColors.surfaceTinted,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(web ? 6 : 8),
       border: Border.all(color: Colors.grey.shade200),
     ),
     child: Column(
@@ -48,7 +55,7 @@ Widget pedidoProductoLineCard(PedidoProductoLineUi p, bool compact) {
           p.nombre,
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: compact ? 12.0 : 12.5,
+            fontSize: web ? 11.0 : (compact ? 12.0 : 12.5),
           ),
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
@@ -58,7 +65,7 @@ Widget pedidoProductoLineCard(PedidoProductoLineUi p, bool compact) {
           Text(
             'SKU: $sku',
             style: TextStyle(
-              fontSize: compact ? 10 : 10.5,
+              fontSize: web ? 9.5 : (compact ? 10 : 10.5),
               color: Colors.grey.shade700,
             ),
           ),
@@ -67,7 +74,7 @@ Widget pedidoProductoLineCard(PedidoProductoLineUi p, bool compact) {
         Text(
           '${p.cantidad} uds · ${formatRefAmount(p.precioRef)} REF',
           style: TextStyle(
-            fontSize: compact ? 11 : 11.5,
+            fontSize: web ? 10.5 : (compact ? 11 : 11.5),
             fontWeight: FontWeight.w600,
             color: Colors.grey.shade900,
           ),
@@ -108,8 +115,10 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (lines.isEmpty) return const SizedBox.shrink();
 
-    final titleSize = compact ? 12.5 : 13.5;
-    final helpSize = compact ? 10.0 : 10.5;
+    final density = B2bOrderCardDensityScope.of(context);
+    final web = density.isDesktop && compact;
+    final titleSize = web ? 11.5 : (compact ? 12.5 : 13.5);
+    final helpSize = web ? 9.5 : (compact ? 10.0 : 10.5);
     var chunks = groupCheckoutLinesByImportador(lines);
     if (chunks.isEmpty) {
       chunks = <List<TransactionRequestModel>>[lines];
@@ -154,7 +163,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
               }(),
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                fontSize: compact ? 11.5 : 12,
+                fontSize: web ? 10.5 : (compact ? 11.5 : 12),
                 color: AppColors.brandBlue,
               ),
             ),
@@ -193,7 +202,7 @@ class _LineDesgloseBlock extends StatelessWidget {
       children: [
         for (var j = 0; j < partidas.length; j++) ...[
           if (j > 0) SizedBox(height: compact ? 4 : 6),
-          pedidoProductoLineCard(partidas[j], compact),
+          pedidoProductoLineCard(context, partidas[j], compact),
         ],
       ],
     );
@@ -222,10 +231,11 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
     final r = request;
     final uid = SupabaseService.currentUserId;
     final partidas = r.lineasProductoDesglose(forImportadorUserId: uid);
-    return _buildDesglose(r, partidas);
+    return _buildDesglose(context, r, partidas);
   }
 
   Widget _buildDesglose(
+    BuildContext context,
     TransactionRequestModel r,
     List<PedidoProductoLineUi> partidas,
   ) {
@@ -310,7 +320,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           if (showRows)
             for (var i = 0; i < partidas.length; i++) ...[
               if (i > 0) SizedBox(height: compact ? 4 : 6),
-              pedidoProductoLineCard(partidas[i], compact),
+              pedidoProductoLineCard(context, partidas[i], compact),
             ],
         ],
       ),
@@ -395,7 +405,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
           if (showRows)
             for (var i = 0; i < lines.length; i++) ...[
               if (i > 0) SizedBox(height: compact ? 4 : 6),
-              _itemLine(lines[i], compact, uid),
+              _itemLine(context, lines[i], compact, uid),
             ],
         ],
       ),
@@ -403,6 +413,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
   }
 
   Widget _itemLine(
+    BuildContext context,
     TransactionRequestModel r,
     bool compact,
     String? importadorUid,
@@ -410,14 +421,14 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
     final partidas =
         r.lineasProductoDesglose(forImportadorUserId: importadorUid);
     if (partidas.length == 1) {
-      return pedidoProductoLineCard(partidas.single, compact);
+      return pedidoProductoLineCard(context, partidas.single, compact);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var j = 0; j < partidas.length; j++) ...[
           if (j > 0) SizedBox(height: compact ? 4 : 6),
-          pedidoProductoLineCard(partidas[j], compact),
+          pedidoProductoLineCard(context, partidas[j], compact),
         ],
       ],
     );

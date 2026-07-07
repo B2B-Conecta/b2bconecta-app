@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
+
 /// Pide al importador el ETA (días y horas) antes de marcar el pedido en tránsito.
 /// Devuelve `(días, horas)` o `null` si canceló.
 Future<({int days, int hours})?> showImporterTransitEtaDialog(
@@ -46,8 +48,7 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
     final h = int.parse(_hoursCtrl.text.trim());
     if (d == 0 && h == 0) {
       setState(() {
-        _inlineError =
-            'Indique al menos un día o una hora mayor que cero.';
+        _inlineError = OrderActionsFlowCopy.transitEtaErrorCero;
       });
       return;
     }
@@ -57,20 +58,18 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Tiempo estimado de tránsito'),
+      title: const Text(OrderActionsFlowCopy.transitEtaTitulo),
       content: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Indique cuándo estima que la mercancía llegará al taller del aliado. '
-              'El aliado verá este plazo en el seguimiento del pedido.',
+            const Text(
+              OrderActionsFlowCopy.transitEtaIntro,
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.35,
-                color: Colors.grey.shade800,
               ),
             ),
             const SizedBox(height: 14),
@@ -78,7 +77,7 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
               controller: _daysCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Días (0–365)',
+                labelText: OrderActionsFlowCopy.transitEtaDias,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -100,7 +99,7 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
               controller: _hoursCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Horas (0–23)',
+                labelText: OrderActionsFlowCopy.transitEtaHoras,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -138,7 +137,7 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('Confirmar y marcar en tránsito'),
+          child: const Text(OrderActionsFlowCopy.transitEtaConfirmar),
         ),
       ],
     );

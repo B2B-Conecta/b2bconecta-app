@@ -6,6 +6,7 @@ import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 
 /// «Recibido» se cierra al tomar el pedido en operación (en preparación o posterior).
 bool _recibidoDoneMotoconecta(TransactionRequestModel r) {
@@ -132,6 +133,9 @@ class CourierTimelineWidget extends StatelessWidget {
 
     /// En listados con varias líneas, mostrar el título solo en la primera instancia del widget.
     this.showHeading = true,
+
+    /// Dentro de una sección colapsable: sin caja blanca ni sombra extra.
+    this.embedded = false,
   });
 
   final TransactionRequestModel request;
@@ -142,6 +146,9 @@ class CourierTimelineWidget extends StatelessWidget {
 
   /// Si es false, no se muestra el rótulo «Seguimiento del envío» (evita duplicados en el mismo panel).
   final bool showHeading;
+
+  /// Sin decoración exterior cuando ya está dentro de otra tarjeta.
+  final bool embedded;
 
   Future<void> _openMaps(BuildContext context, String url) async {
     final uri = Uri.tryParse(url.trim());
@@ -229,6 +236,36 @@ class CourierTimelineWidget extends StatelessWidget {
     final barProgress = _timelineBarProgress(r);
 
     final headingSize = compact ? 12.5 : 13.5;
+    final timelineBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ProgressBar(
+          steps: steps,
+          compact: compact,
+          progressValue: barProgress,
+          showStepIcons: !embedded,
+        ),
+        SizedBox(height: compact ? 10 : 14),
+        ...List.generate(steps.length, (i) {
+          final s = steps[i];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (i > 0)
+                Divider(
+                  height: compact ? 12 : 16,
+                  color: Colors.grey.shade200,
+                ),
+              _StepRow(
+                step: s,
+                compact: compact,
+              ),
+            ],
+          );
+        }),
+      ],
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -243,51 +280,32 @@ class CourierTimelineWidget extends StatelessWidget {
           ),
           SizedBox(height: compact ? 6 : 8),
         ],
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(compact ? 10 : 14, compact ? 10 : 14,
-                compact ? 10 : 14, compact ? 10 : 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _ProgressBar(
-                  steps: steps,
-                  compact: compact,
-                  progressValue: barProgress,
+        if (embedded)
+          timelineBody
+        else
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                SizedBox(height: compact ? 10 : 14),
-                ...List.generate(steps.length, (i) {
-                  final s = steps[i];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (i > 0)
-                        Divider(
-                            height: compact ? 12 : 16,
-                            color: Colors.grey.shade200),
-                      _StepRow(
-                        step: s,
-                        compact: compact,
-                      ),
-                    ],
-                  );
-                }),
               ],
             ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                compact ? 10 : 14,
+                compact ? 10 : 14,
+                compact ? 10 : 14,
+                compact ? 10 : 14,
+              ),
+              child: timelineBody,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -415,14 +433,18 @@ class _ProgressBar extends StatelessWidget {
     required this.steps,
     required this.compact,
     required this.progressValue,
+    this.showStepIcons = true,
   });
 
   final List<_CourierStep> steps;
   final bool compact;
   final double progressValue;
+  final bool showStepIcons;
 
   @override
   Widget build(BuildContext context) {
+    final density = B2bOrderCardDensityScope.of(context);
+    final web = density.isDesktop && compact;
     final progress = progressValue.clamp(0.0, 1.0);
 
     return Column(
@@ -432,21 +454,27 @@ class _ProgressBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
             value: progress.clamp(0.0, 1.0),
-            minHeight: compact ? 5 : 7,
+            minHeight: web ? 4 : (compact ? 5 : 7),
             backgroundColor: Colors.grey.shade200,
             color: AppColors.brand,
           ),
         ),
-        SizedBox(height: compact ? 6 : 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: steps.map((s) {
-            final color = s.done
-                ? AppColors.brand
-                : (s.current ? AppColors.brandBlue : Colors.grey.shade400);
-            return Icon(s.icon, size: compact ? 18 : 22, color: color);
-          }).toList(),
-        ),
+        if (showStepIcons) ...[
+          SizedBox(height: web ? 4 : (compact ? 6 : 8)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: steps.map((s) {
+              final color = s.done
+                  ? AppColors.brand
+                  : (s.current ? AppColors.brandBlue : Colors.grey.shade400);
+              return Icon(
+                s.icon,
+                size: web ? 14 : (compact ? 18 : 22),
+                color: color,
+              );
+            }).toList(),
+          ),
+        ],
       ],
     );
   }
@@ -460,24 +488,30 @@ class _StepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final density = B2bOrderCardDensityScope.of(context);
+    final web = density.isDesktop && compact;
     final s = step;
     final color = s.done
         ? AppColors.brand
         : (s.current ? AppColors.brandBlue : Colors.grey.shade400);
+    final iconBox = web ? 26.0 : (compact ? 32.0 : 36.0);
+    final iconSize = web ? 13.0 : (compact ? 16.0 : 18.0);
+    final titleSize = web ? 11.0 : (compact ? 12.0 : 13.0);
+    final subSize = web ? 9.5 : (compact ? 10.0 : 11.0);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: compact ? 32 : 36,
-          height: compact ? 32 : 36,
+          width: iconBox,
+          height: iconBox,
           decoration: BoxDecoration(
             color: color.withOpacity(0.12),
             shape: BoxShape.circle,
             border: Border.all(color: color.withOpacity(0.5)),
           ),
-          child: Icon(s.icon, size: compact ? 16 : 18, color: color),
+          child: Icon(s.icon, size: iconSize, color: color),
         ),
-        SizedBox(width: compact ? 8 : 10),
+        SizedBox(width: web ? 6 : (compact ? 8 : 10)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,7 +523,7 @@ class _StepRow extends StatelessWidget {
                       s.title,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: compact ? 12 : 13,
+                        fontSize: titleSize,
                         color: AppColors.textPrimary,
                       ),
                     ),
@@ -497,7 +531,7 @@ class _StepRow extends StatelessWidget {
                   if (s.done)
                     Icon(
                       Icons.check_circle,
-                      size: compact ? 17 : 19,
+                      size: web ? 15 : (compact ? 17 : 19),
                       color: AppColors.brand,
                     ),
                 ],
@@ -505,20 +539,22 @@ class _StepRow extends StatelessWidget {
               Text(
                 s.subtitle,
                 style: TextStyle(
-                  fontSize: compact ? 10 : 11,
+                  fontSize: subSize,
                   color: Colors.grey.shade700,
                   height: 1.25,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                s.at != null ? formatEsShortDateTime(s.at) : '—',
-                style: TextStyle(
-                  fontSize: compact ? 10 : 11,
-                  fontWeight: FontWeight.w600,
-                  color: s.done ? Colors.grey.shade800 : Colors.grey.shade500,
+              if (s.at != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  formatEsShortDateTime(s.at),
+                  style: TextStyle(
+                    fontSize: subSize,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
                 ),
-              ),
+              ],
               if (s.trailing != null) ...[
                 const SizedBox(height: 4),
                 s.trailing!,

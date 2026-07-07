@@ -12,8 +12,12 @@
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
 #
-# Móvil (APK / iOS — deep link, ver mobile-staging.env):
+# Móvil (APK / iOS — deep link custom scheme, ver mobile-staging.env):
 #   com.carlosf12.motolinkProApp://auth-callback
+#
+# Android App Links (https) NO están configurados: el correo debe redirigir al
+# custom scheme anterior, no solo a motolink-app.vercel.app. assetlinks.json
+# solo aplica si añades intent-filter https con android:autoVerify="true".
 #
 # Production (when motolink.app DNS is live):
 #   https://motolink.app/**

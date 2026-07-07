@@ -5,6 +5,7 @@ import '../models/aliado_doc_type.dart';
 import '../models/profile_document_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 import 'kyc_status_highlight_widgets.dart';
 
 /// Perfil fiscal de la contraparte en un pedido; KYC solo para aliados.
@@ -132,6 +133,8 @@ class _TransactionRequestCounterpartyProfileSectionState
 
   @override
   Widget build(BuildContext context) {
+    final density = B2bOrderCardDensityScope.of(context);
+    final web = density.isDesktop;
     final dirParts = <String>[
       if (widget.direccion?.trim().isNotEmpty == true) widget.direccion!.trim(),
       if (widget.ciudad?.trim().isNotEmpty == true) widget.ciudad!.trim(),
@@ -142,11 +145,13 @@ class _TransactionRequestCounterpartyProfileSectionState
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceTinted.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(web ? 8 : 12),
         border: Border.all(color: Colors.grey.shade300),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: web
+            ? const EdgeInsets.fromLTRB(10, 8, 10, 8)
+            : const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,35 +164,35 @@ class _TransactionRequestCounterpartyProfileSectionState
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
                       _logoUrl!,
-                      width: 52,
-                      height: 52,
+                      width: web ? 40 : 52,
+                      height: web ? 40 : 52,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _logoPlaceholder(),
+                      errorBuilder: (_, __, ___) => _logoPlaceholder(web),
                     ),
                   )
                 else
-                  _logoPlaceholder(),
-                const SizedBox(width: 10),
+                  _logoPlaceholder(web),
+                SizedBox(width: web ? 8 : 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.partyLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          fontSize: 12,
+                          fontSize: density.contentSmallSize,
                           color: AppColors.brandBlue,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: web ? 2 : 4),
                       Text(
                         widget.businessName?.trim().isNotEmpty == true
                             ? widget.businessName!.trim()
                             : '—',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                          fontSize: density.contentTitleSize,
                         ),
                       ),
                       if (!_isImportador) ...[
@@ -201,45 +206,56 @@ class _TransactionRequestCounterpartyProfileSectionState
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: web ? 6 : 8),
             if (widget.rif != null && widget.rif!.trim().isNotEmpty)
               Text(
                 'RIF: ${widget.rif!.trim()}',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                style: TextStyle(
+                  fontSize: density.contentBodySize,
+                  color: Colors.grey.shade800,
+                ),
               ),
             if (widget.phone != null && widget.phone!.trim().isNotEmpty)
               Text(
                 'Tel: ${widget.phone!.trim()}',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                style: TextStyle(
+                  fontSize: density.contentBodySize,
+                  color: Colors.grey.shade800,
+                ),
               ),
             if (dirLine != null)
               Text(
                 'Dirección fiscal: $dirLine',
-                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+                style: TextStyle(
+                  fontSize: density.contentBodySize,
+                  height: 1.35,
+                  color: Colors.grey.shade800,
+                ),
               ),
             if (widget.fiscalMapsUrl?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 6),
+              SizedBox(height: web ? 4 : 6),
               TextButton.icon(
                 onPressed: _openMaps,
-                icon: const Icon(Icons.map_outlined, size: 18),
+                icon: Icon(Icons.map_outlined, size: density.buttonIconSize),
                 label: const Text('Ver ubicación en Maps'),
                 style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+                  visualDensity: density.buttonVisualDensity,
                   padding: EdgeInsets.zero,
+                  textStyle: TextStyle(fontSize: density.buttonTextSize),
                 ),
               ),
             ],
             if (widget.loadApprovedDocuments && !_isImportador) ...[
-              const SizedBox(height: 10),
+              SizedBox(height: web ? 8 : 10),
               Text(
                 'Documentación verificada',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: density.contentBodySize,
                   fontWeight: FontWeight.w800,
                   color: Colors.grey.shade800,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: web ? 4 : 6),
               if (_loadingDocs)
                 const SizedBox(
                   width: 20,
@@ -249,7 +265,10 @@ class _TransactionRequestCounterpartyProfileSectionState
               else if (_docs.isEmpty)
                 Text(
                   'Sin documentos aprobados visibles en este pedido.',
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+                  style: TextStyle(
+                    fontSize: density.contentSmallSize,
+                    color: Colors.grey.shade700,
+                  ),
                 )
               else
                 Wrap(
@@ -258,10 +277,13 @@ class _TransactionRequestCounterpartyProfileSectionState
                   children: [
                     for (final d in _docs)
                       ActionChip(
-                        avatar: const Icon(Icons.description_outlined, size: 16),
+                        avatar: Icon(
+                          Icons.description_outlined,
+                          size: density.isDesktop ? 14 : 16,
+                        ),
                         label: Text(
                           AliadoDocType.labelEs(d.docType),
-                          style: const TextStyle(fontSize: 11),
+                          style: TextStyle(fontSize: density.contentSmallSize),
                         ),
                         onPressed: () => _openDoc(d),
                       ),
@@ -274,15 +296,20 @@ class _TransactionRequestCounterpartyProfileSectionState
     );
   }
 
-  Widget _logoPlaceholder() {
+  Widget _logoPlaceholder([bool web = false]) {
+    final size = web ? 40.0 : 52.0;
     return Container(
-      width: 52,
-      height: 52,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: AppColors.brandBlueContainer.withOpacity(0.6),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Icon(Icons.storefront_outlined, color: AppColors.brandBlue),
+      child: Icon(
+        Icons.storefront_outlined,
+        color: AppColors.brandBlue,
+        size: web ? 20 : 24,
+      ),
     );
   }
 }

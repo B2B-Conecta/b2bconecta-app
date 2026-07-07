@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
+
 /// Devuelve el motivo o null si cancela.
 Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) async {
   final ctrl = TextEditingController();
@@ -7,14 +9,13 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
     context: context,
     builder: (ctx) {
       return AlertDialog(
-        title: const Text('Cancelar pedido'),
+        title: const Text(OrderActionsFlowCopy.cancelarPedidoTitulo),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Puede cancelar hasta que el proveedor emita su factura. '
-              'Indique el motivo; después podrá valorar el servicio.',
+              OrderActionsFlowCopy.aliadoCancelarIntro,
               style: TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),
@@ -24,7 +25,7 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
               maxLength: 4000,
               autofocus: true,
               decoration: const InputDecoration(
-                labelText: 'Motivo de la cancelación',
+                labelText: OrderActionsFlowCopy.cancelarMotivoLabel,
                 alignLabelWithHint: true,
                 border: OutlineInputBorder(),
               ),
@@ -34,7 +35,7 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Volver'),
+            child: const Text(OrderActionsFlowCopy.cancelarVolver),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -45,7 +46,7 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
               if (ctrl.text.trim().length < 3) return;
               Navigator.pop(ctx, true);
             },
-            child: const Text('Confirmar cancelación'),
+            child: const Text(OrderActionsFlowCopy.cancelarConfirmar),
           ),
         ],
       );

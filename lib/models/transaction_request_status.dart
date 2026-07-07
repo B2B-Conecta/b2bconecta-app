@@ -1,3 +1,5 @@
+import '../utils/order_flow_copy/order_status_flow_copy.dart';
+
 /// Estados de `transaction_requests` (B2B).
 abstract final class TransactionRequestStatus {
   static const pendiente = 'pendiente';
@@ -142,28 +144,7 @@ abstract final class TransactionRequestStatus {
     entregado,
   ];
 
-  static String labelEs(String status) {
-    switch (status) {
-      case pendiente:
-        return 'Pendiente de revisión';
-      case aprobadoAdmin:
-        return 'Aprobado (referencia)';
-      case rechazado:
-        return 'Rechazado';
-      case enPreparacion:
-        return 'En preparación';
-      case pedidoListo:
-        return 'Listo para despacho';
-      case enTransito:
-        return 'En tránsito';
-      case enviado:
-        return 'Enviado';
-      case entregado:
-        return 'Entregado';
-      default:
-        return status;
-    }
-  }
+  static String labelEs(String status) => OrderStatusFlowCopy.labelEs(status);
 
   /// Siguiente estado que puede aplicar el importador, o null si es terminal.
   /// Ciclo: pendiente → en preparación → listo para despacho → en tránsito.
@@ -191,92 +172,35 @@ abstract final class TransactionRequestStatus {
     return null;
   }
 
-  static String importerFilterStatusLabelEs(String status) {
-    if (status == pendiente) return 'Pedido nuevo';
-    return labelEs(status);
-  }
+  static String importerFilterStatusLabelEs(String status) =>
+      OrderStatusFlowCopy.importerFilterLabelEs(status);
 
-  static String actionLabelForNext(String nextStatus) {
-    switch (nextStatus) {
-      case enPreparacion:
-        return 'Marcar en preparación';
-      case pedidoListo:
-        return 'Marcar listo para despacho';
-      case enTransito:
-        return 'Marcar en tránsito';
-      case enviado:
-        return 'Marcar enviado';
-      case entregado:
-        return 'Confirmar recepción en tu taller';
-      default:
-        return 'Avanzar';
-    }
-  }
+  static String actionLabelForNext(String nextStatus) =>
+      OrderStatusFlowCopy.actionLabelForNext(nextStatus);
 
   /// Etiqueta del botón de avance en panel importador (línea o carrito).
   static String importerAdvanceButtonLabel(
     String nextStatus, {
     bool checkoutGroup = false,
-  }) {
-    if (!checkoutGroup) return actionLabelForNext(nextStatus);
-    switch (nextStatus) {
-      case enPreparacion:
-        return 'Preparar carrito';
-      case pedidoListo:
-        return 'Listo para despacho';
-      case enTransito:
-        return 'Despachar carrito';
-      default:
-        return actionLabelForNext(nextStatus);
-    }
-  }
+  }) =>
+      OrderStatusFlowCopy.importerAdvanceButtonLabel(
+        nextStatus,
+        checkoutGroup: checkoutGroup,
+      );
 
-  static String importerOperationalHeadline(String status) {
-    switch (status) {
-      case entregado:
-        return 'Pedido cerrado';
-      case rechazado:
-        return '—';
-      case pedidoListo:
-        return 'Listo para despacho · coordine el transporte';
-      case enTransito:
-        return 'En tránsito · el aliado confirma la recepción';
-      case enviado:
-        return 'En ruta · el aliado confirma la recepción';
-      case enPreparacion:
-        return 'En preparación';
-      case pendiente:
-        return 'Nuevo pedido';
-      default:
-        return 'Pedido activo';
-    }
-  }
+  static String importerOperationalHeadline(String status) =>
+      OrderStatusFlowCopy.importerOperationalHeadline(status);
 
   static String aliadoTrackingHeadline(
     String status, {
     bool canceladoPorAliado = false,
     bool canceladoPorImportador = false,
     bool anuladoPorMotolink = false,
-  }) {
-    switch (status) {
-      case pendiente:
-        return 'Pendiente · el importador confirmará preparación';
-      case enPreparacion:
-        return 'Tu pedido se está preparando';
-      case pedidoListo:
-        return 'Listo para despacho · esperando salida';
-      case enTransito:
-        return 'En camino · confirma al recibir en tu taller';
-      case enviado:
-        return 'En ruta · confirma la recepción cuando llegue';
-      case entregado:
-        return 'Pedido completado';
-      case rechazado:
-        if (canceladoPorAliado) return 'Solicitud cancelada';
-        if (canceladoPorImportador) return 'Pedido cancelado por proveedor';
-        return 'Pedido rechazado';
-      default:
-        return '—';
-    }
-  }
+  }) =>
+      OrderStatusFlowCopy.aliadoTrackingHeadline(
+        status,
+        canceladoPorAliado: canceladoPorAliado,
+        canceladoPorImportador: canceladoPorImportador,
+        anuladoPorMotolink: anuladoPorMotolink,
+      );
 }

@@ -19,6 +19,14 @@ void main() {
     expect(parseAuthUriFragment(uri).isPasswordRecovery, isFalse);
   });
 
+  test('detects Android custom scheme PKCE callback', () {
+    final uri = Uri.parse(
+      'com.carlosf12.motolinkProApp://auth-callback?code=abc-123',
+    );
+    expect(hasAuthCallbackInUri(uri), isTrue);
+    expect(uri.host, 'auth-callback');
+  });
+
   test('maps expired otp error from fragment', () {
     final uri = Uri.parse(
       'http://localhost:3000/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired',

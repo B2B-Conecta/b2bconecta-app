@@ -10,6 +10,9 @@ import '../utils/aliado_order_grouping.dart';
 import '../utils/notification_related_order_match.dart';
 import '../utils/motolink_volume_discount.dart';
 import 'aliado_importador_factura_section.dart';
+import '../utils/order_flow_copy/order_actions_flow_copy.dart';
+import '../utils/order_flow_copy/order_payment_flow_copy.dart';
+import '../utils/order_flow_copy/order_vocab.dart';
 import '../utils/importer_order_date.dart';
 import '../utils/transaction_request_filter_utils.dart';
 import '../utils/ves_amount_format.dart';
@@ -23,6 +26,8 @@ import 'order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
 import 'aliado_pedido_carrier_selection_section.dart';
 import 'aliado_flete_separado_section.dart';
+import 'importer_confirm_pickup_section.dart';
+import '../utils/b2b_orders_panel_layout.dart';
 import '../utils/aliado_multi_importer_payment.dart';
 import 'main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
@@ -324,7 +329,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     if (chips.isEmpty) return null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Wrap(
         spacing: 8,
         runSpacing: 6,
@@ -440,7 +445,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Pedido cancelado. Complete la valoración del proveedor.',
+            OrderActionsFlowCopy.pedidoCanceladoValorar,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -449,9 +454,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       if (!context.mounted) return;
       var msg = e.toString();
       if (msg.contains('emitió su factura')) {
-        msg = 'No puede cancelar: el proveedor ya emitió su factura.';
+        msg = OrderActionsFlowCopy.aliadoNoCancelaFactura;
       } else if (msg.contains('propuesta de cantidad')) {
-        msg = 'Responda primero a la propuesta de cantidad del proveedor.';
+        msg = OrderActionsFlowCopy.aliadoNoCancelaCantidad;
       } else if (msg.contains('ya está cerrado')) {
         msg = 'El pedido ya está cerrado.';
       } else if (msg.contains('Debe indicar un motivo') ||
@@ -635,6 +640,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     return AliadoConfirmarRecepcionSection(bloques: bloques);
   }
 
+  Widget _wrapExpandedFooter(Widget child) => child;
+
   Widget _orderCardFooter(
     BuildContext context,
     List<TransactionRequestModel> g,
@@ -644,7 +651,11 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     if (!isMulti) {
       final r = g.single;
       final pagoSubtitle = r.aliadoPagoEstadoResumenEs?.trim();
-      return Column(
+      final sectionGap = B2bOrdersPanelLayout.sectionGap(
+        MediaQuery.sizeOf(context).width,
+      );
+      return _wrapExpandedFooter(
+        Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (r.qtyAdjustmentPendienteAliado) ...[
@@ -652,26 +663,32 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               request: r,
               onChanged: _refreshExpandedCard,
             ),
-            const SizedBox(height: kOrderCardSectionGap),
+            SizedBox(height: sectionGap),
           ],
           AliadoPedidoCarrierSelectionSection(
             request: r,
             onChanged: _refreshExpandedCard,
           ),
+          if ((r.status == TransactionRequestStatus.pedidoListo ||
+                  r.hasPickupConfirmed) &&
+              r.carrierDecisionResolved) ...[
+            SizedBox(height: sectionGap),
+            PickupLocationDisplaySection(request: r),
+          ],
           if (r.aliadoMuestraSeccionFleteSeparado) ...[
-            const SizedBox(height: kOrderCardSectionGap),
+            SizedBox(height: sectionGap),
             AliadoFleteSeparadoSection(
               request: r,
               onChanged: _refreshExpandedCard,
               compact: true,
             ),
           ],
-          const SizedBox(height: kOrderCardSectionGap),
+          SizedBox(height: sectionGap),
           OrderCardCollapsibleSection(
-            title: 'Pago e factura',
+            title: OrderVocab.seccionPagoFactura,
             subtitle: pagoSubtitle?.isNotEmpty == true
                 ? pagoSubtitle!
-                : 'Factura del importador y comprobante',
+                : OrderPaymentFlowCopy.aliadoSeccionPagoSubtitulo,
             infoMessage: OrderSectionHelp.pagoAliadoMetodo,
             initiallyExpanded: !r.pedidoEntregadoYPagado,
             child: Column(
@@ -699,7 +716,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ],
             ),
           ),
-          const SizedBox(height: kOrderCardSectionGap),
+          SizedBox(height: sectionGap),
           OrderCardCollapsibleSection(
             title: 'Mensajes',
             subtitle: 'Hilo con el importador y MotoLink',
@@ -715,7 +732,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             ),
           ),
         ],
-      );
+      ),
+    );
     }
 
     return const SizedBox.shrink();
@@ -772,6 +790,12 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           request: chunk.first,
           onChanged: _refreshExpandedCard,
         ),
+        if ((chunk.first.status == TransactionRequestStatus.pedidoListo ||
+                chunk.first.hasPickupConfirmed) &&
+            chunk.first.carrierDecisionResolved) ...[
+          const SizedBox(height: 10),
+          PickupLocationDisplaySection(request: chunk.first),
+        ],
         if (chunk.first.aliadoMuestraSeccionFleteSeparado) ...[
           const SizedBox(height: 10),
           AliadoFleteSeparadoSection(
@@ -854,7 +878,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         OrderCardCollapsibleSection(
           title: 'Mensajes',
           subtitle: chunk.length > 1
-              ? 'Hilo con este proveedor en el carrito'
+              ? OrderActionsFlowCopy.carritoChatImportador(chunk.first.ownerBusinessName)
               : 'Hilo con el importador y MotoLink',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
@@ -918,7 +942,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       pendingLabel = 'Valorar a ${importadorLabel.trim()}';
     } else if (pendingImportadores > 1) {
       pendingLabel =
-          'Valorar proveedores ($pendingImportadores pendientes)';
+          OrderActionsFlowCopy.valorarImportadoresPendientes(pendingImportadores);
     }
 
     return OrderRatingPendingBar(
@@ -935,7 +959,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Valorá cada proveedor en su pestaña dentro de este pedido.',
+                OrderActionsFlowCopy.valorarPendienteCarrito,
               ),
               behavior: SnackBarBehavior.floating,
             ),
@@ -1063,7 +1087,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   Widget _sectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
       child: Text(
         title,
         style: const TextStyle(
@@ -1122,6 +1146,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final activeFilterChips = _buildActiveFilterChipsRow();
     final showFilteredCount = filterBadge > 0 ||
         _searchCtrl.text.trim().isNotEmpty;
+    final screenWidth = MediaQuery.sizeOf(context).width;
     final enCursoGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => _esEnCurso(r.status)).toList(),
     );
@@ -1136,27 +1161,35 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: TextField(
-                  controller: _searchCtrl,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => setState(() {}),
-                  decoration: _pedidosSearchDecoration(filterBadge: filterBadge),
+                padding: const EdgeInsets.only(bottom: 8),
+                child: B2bOrdersPanelLayout.listColumn(
+                  context,
+                  TextField(
+                    controller: _searchCtrl,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => setState(() {}),
+                    decoration:
+                        _pedidosSearchDecoration(filterBadge: filterBadge),
+                  ),
                 ),
               ),
-              if (activeFilterChips != null) activeFilterChips,
+              if (activeFilterChips != null)
+                B2bOrdersPanelLayout.listColumn(context, activeFilterChips),
               if (showFilteredCount)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text(
-                    '${filtered.length} de ${_rows.length} pedidos',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
+                B2bOrdersPanelLayout.listColumn(
+                  context,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${filtered.length} de ${_rows.length} pedidos',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-              ),
+                ),
               Expanded(
                 child: filtered.isEmpty
                     ? ListView(
@@ -1181,23 +1214,30 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                       )
                     : RefreshIndicator(
                         onRefresh: _load,
-                        child: ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          children: [
-                            if (enCursoGroups.isNotEmpty) ...[
-                              _sectionTitle('En curso'),
-                              ...enCursoGroups.map(
-                                (g) => _buildOrderCard(context, g),
+                        child: B2bOrdersPanelLayout.listColumn(
+                          context,
+                          ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.only(
+                              bottom: B2bOrdersPanelLayout.listBottomPadding(
+                                screenWidth,
                               ),
+                            ),
+                            children: [
+                              if (enCursoGroups.isNotEmpty) ...[
+                                _sectionTitle('En curso'),
+                                ...enCursoGroups.map(
+                                  (g) => _buildOrderCard(context, g),
+                                ),
+                              ],
+                              if (cerradosGroups.isNotEmpty) ...[
+                                _sectionTitle('Cerrados'),
+                                ...cerradosGroups.map(
+                                  (g) => _buildOrderCard(context, g),
+                                ),
+                              ],
                             ],
-                            if (cerradosGroups.isNotEmpty) ...[
-                              _sectionTitle('Cerrados'),
-                              ...cerradosGroups.map(
-                                (g) => _buildOrderCard(context, g),
-                              ),
-                            ],
-                          ],
+                          ),
                         ),
                       ),
               ),
@@ -1312,9 +1352,9 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surfaceTinted.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -1363,7 +1403,7 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                         Text(
                           discountPreview != null && discountPreview.applies
                               ? 'Monto con descuento: ${formatRefAmount(montoMostrar)} REF'
-                              : 'Monto de este proveedor: ${formatRefAmount(montoMostrar)} REF',
+                              : 'Monto de este importador: ${formatRefAmount(montoMostrar)} REF',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
@@ -1391,11 +1431,11 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                       const SizedBox(height: 4),
                       Text(
                         widget.singleComprobantePorProveedor
-                            ? 'Un solo comprobante cubre todas las líneas de este proveedor; '
+                            ? 'Un solo comprobante cubre todas las líneas de este importador; '
                                 'el importador lo revisa una vez.'
                             : widget.lineCount > 1
-                                ? 'Registre el pago de cada línea de este proveedor.'
-                                : 'Método y comprobante para este proveedor.',
+                                ? 'Registre el pago de cada línea de este importador.'
+                                : 'Método y comprobante para este importador.',
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.35,

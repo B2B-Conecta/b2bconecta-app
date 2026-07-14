@@ -757,10 +757,35 @@ class SupabaseService {
   /// Número total de filas que cumplen [filters] (respeta RLS).
   static Future<int> fetchProductsCount({CatalogFilters? filters}) async {
     final f = filters ?? CatalogFilters.empty;
-    final locIds = await _importerProfileIdsForSearchLocation(f);
+    final searchPlan = await _resolveCatalogSearch(f);
+    if (searchPlan.isEmptyResult) return 0;
     final embed = _catalogProfileSelect(f);
+    final ids = searchPlan.productIds;
+    if (ids != null && ids.length > _maxInFilterIds) {
+      var total = 0;
+      for (var i = 0; i < ids.length; i += _maxInFilterIds) {
+        final end = (i + _maxInFilterIds).clamp(0, ids.length);
+        dynamic q = _client.from('products').select('id, $embed');
+        q = _applyCatalogFilters(
+          q,
+          f,
+          searchLocationImporterIds: searchPlan.locationImporterIds,
+          searchProductIds: ids.sublist(i, end),
+          legacySearchVariants: searchPlan.legacySearchVariants,
+        );
+        final res = await q.count(CountOption.exact);
+        total += (res as PostgrestResponse<dynamic>).count;
+      }
+      return total;
+    }
     dynamic q = _client.from('products').select('id, $embed');
-    q = _applyCatalogFilters(q, f, searchLocationImporterIds: locIds);
+    q = _applyCatalogFilters(
+      q,
+      f,
+      searchLocationImporterIds: searchPlan.locationImporterIds,
+      searchProductIds: ids,
+      legacySearchVariants: searchPlan.legacySearchVariants,
+    );
     final res = await q.count(CountOption.exact);
     return (res as PostgrestResponse<dynamic>).count;
   }
@@ -3613,15 +3638,18 @@ class SupabaseService {
     CatalogFilters? filters,
   }) async {
     final f = filters ?? CatalogFilters.empty;
-    final locIds = await _importerProfileIdsForSearchLocation(f);
+    final searchPlan = await _resolveCatalogSearch(f);
+    if (searchPlan.isEmptyResult) return [];
     final embed = _catalogProfileSelect(f);
-    dynamic query = _client.from('products').select('*, $embed');
-    query = _applyCatalogFilters(query, f, searchLocationImporterIds: locIds);
+    const cap = 800;
+    final list = await _fetchCatalogProductRows(
+      embed: embed,
+      filters: f,
+      searchPlan: searchPlan,
+      rowCap: cap,
+    );
 
     if (f.sortByDistanceFromReference) {
-      const cap = 800;
-      final response = await query.limit(cap);
-      final list = response as List<dynamic>;
       final refLat = f.sortReferenceLat!;
       final refLng = f.sortReferenceLng!;
       final distanceCompare = f.sortMode == CatalogSortMode.reputation
@@ -3643,12 +3671,21 @@ class SupabaseService {
       return withDist.sublist(offset, end);
     }
 
-    final response = await query.limit(800);
-    final list = response as List<dynamic>;
     final parts = list
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
         .toList();
-    if (f.sortMode == CatalogSortMode.reputation) {
+    if (searchPlan.productScores.isNotEmpty) {
+      // Con búsqueda textual: priorizar relevancia RPC, boost/reputación como desempate.
+      parts.sort((a, b) {
+        final sa = searchPlan.productScores[a.id] ?? 0;
+        final sb = searchPlan.productScores[b.id] ?? 0;
+        final byScore = sb.compareTo(sa);
+        if (byScore != 0) return byScore;
+        return f.sortMode == CatalogSortMode.reputation
+            ? comparePartsForCatalogReputation(a, b)
+            : comparePartsForCatalogBoost(a, b);
+      });
+    } else if (f.sortMode == CatalogSortMode.reputation) {
       parts.sort(comparePartsForCatalogReputation);
     } else {
       parts.sort(comparePartsForCatalogBoost);
@@ -3656,6 +3693,51 @@ class SupabaseService {
     if (offset >= parts.length) return [];
     final end = (offset + limit).clamp(0, parts.length);
     return parts.sublist(offset, end);
+  }
+
+  /// Carga filas del catálogo; parte `id.in` en lotes para no saturar la URL.
+  static Future<List<dynamic>> _fetchCatalogProductRows({
+    required String embed,
+    required CatalogFilters filters,
+    required _CatalogSearchPlan searchPlan,
+    required int rowCap,
+  }) async {
+    final ids = searchPlan.productIds;
+    if (ids == null || ids.length <= _maxInFilterIds) {
+      dynamic query = _client.from('products').select('*, $embed');
+      query = _applyCatalogFilters(
+        query,
+        filters,
+        searchLocationImporterIds: searchPlan.locationImporterIds,
+        searchProductIds: ids,
+        legacySearchVariants: searchPlan.legacySearchVariants,
+      );
+      final response = await query.limit(rowCap);
+      return response as List<dynamic>;
+    }
+
+    final out = <dynamic>[];
+    final seen = <String>{};
+    for (var i = 0; i < ids.length && out.length < rowCap; i += _maxInFilterIds) {
+      final end = (i + _maxInFilterIds).clamp(0, ids.length);
+      dynamic query = _client.from('products').select('*, $embed');
+      query = _applyCatalogFilters(
+        query,
+        filters,
+        searchLocationImporterIds: searchPlan.locationImporterIds,
+        searchProductIds: ids.sublist(i, end),
+        legacySearchVariants: searchPlan.legacySearchVariants,
+      );
+      final response = await query.limit(rowCap - out.length);
+      for (final row in response as List<dynamic>) {
+        if (row is! Map) continue;
+        final id = row['id']?.toString() ?? '';
+        if (id.isNotEmpty && !seen.add(id)) continue;
+        out.add(row);
+        if (out.length >= rowCap) break;
+      }
+    }
+    return out;
   }
 
   /// Evita que `%` y `_` del usuario actúen como comodines en `ilike`.
@@ -3667,10 +3749,96 @@ class SupabaseService {
         .trim();
   }
 
+  /// Variantes ligeras ES (plural/singular) para búsqueda cuando la RPC no está
+  /// disponible o como refuerzo del fallback `ilike`.
+  static List<String> _catalogSearchTextVariants(String raw) {
+    final folded = raw
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n');
+    if (folded.isEmpty) return const [];
+    final out = <String>{folded};
+    if (folded.length > 4 && folded.endsWith('es')) {
+      final stem = folded.substring(0, folded.length - 2);
+      if (stem.length >= 3) out.add(stem);
+    } else if (folded.length > 4 &&
+        folded.endsWith('s') &&
+        !folded.endsWith('us') &&
+        !folded.endsWith('is')) {
+      final stem = folded.substring(0, folded.length - 1);
+      if (stem.length >= 3) out.add(stem);
+    } else if (folded.length >= 4 && !folded.endsWith('s')) {
+      out.add('${folded}s');
+      if (RegExp(r'[aeiou]$').hasMatch(folded)) {
+        out.add('${folded}es');
+      }
+    }
+    return out.toList();
+  }
+
   /// PostgREST no puede parsear `profiles.estado` / `profiles.ciudad` dentro de
   /// un `or` en `products` (PGRST100). Buscamos importadores cuyo estado o
   /// ciudad coincidan y unimos con `owner_id.in.(…)`.
   static const _maxSearchLocationImporterIds = 120;
+  static const _maxFuzzySearchProductIds = 800;
+
+  /// Tope por request `id=in.(…)` para no exceder límites de URL de PostgREST.
+  static const _maxInFilterIds = 100;
+
+  /// Plan de búsqueda del catálogo: IDs fuzzy (RPC) o fallback legacy `ilike`.
+  static Future<_CatalogSearchPlan> _resolveCatalogSearch(
+    CatalogFilters filters,
+  ) async {
+    final search = filters.searchQuery?.trim();
+    if (search == null || search.isEmpty) {
+      return const _CatalogSearchPlan();
+    }
+    final safe = _sanitizeIlike(search);
+    if (safe.isEmpty) {
+      return const _CatalogSearchPlan();
+    }
+
+    try {
+      final res = await _client.rpc(
+        'search_catalog_product_ids',
+        params: {
+          'p_query': safe,
+          'p_limit': _maxFuzzySearchProductIds,
+          'p_similarity_threshold': 0.45,
+        },
+      );
+      final list = res as List<dynamic>? ?? const [];
+      final ids = <String>[];
+      final scores = <String, double>{};
+      final seen = <String>{};
+      for (final row in list) {
+        if (row is! Map) continue;
+        final id = row['product_id']?.toString().trim() ?? '';
+        if (id.isEmpty || !seen.add(id)) continue;
+        ids.add(id);
+        final rawScore = row['score'];
+        final score = rawScore is num
+            ? rawScore.toDouble()
+            : double.tryParse(rawScore?.toString() ?? '') ?? 0;
+        scores[id] = score;
+      }
+      // RPC respondió: lista vacía = sin resultados (no caer a ilike literal).
+      return _CatalogSearchPlan(productIds: ids, productScores: scores);
+    } catch (_) {
+      // Migración no aplicada en el proyecto al que apunta `.env` (p.ej. staging).
+      final locIds = await _importerProfileIdsForSearchLocation(filters);
+      return _CatalogSearchPlan(
+        locationImporterIds: locIds,
+        legacySearchVariants: _catalogSearchTextVariants(safe),
+      );
+    }
+  }
 
   static Future<List<String>> _importerProfileIdsForSearchLocation(
     CatalogFilters filters,
@@ -3679,13 +3847,19 @@ class SupabaseService {
     if (search == null || search.isEmpty) return const [];
     final safe = _sanitizeIlike(search);
     if (safe.isEmpty) return const [];
-    final pat = '*$safe*';
+    final variants = _catalogSearchTextVariants(safe);
+    if (variants.isEmpty) return const [];
     try {
+      final orParts = <String>[];
+      for (final v in variants) {
+        orParts.add('estado.ilike.*$v*');
+        orParts.add('ciudad.ilike.*$v*');
+      }
       final res = await _client
           .from('profiles')
           .select('id')
           .eq('role', 'importador')
-          .or('estado.ilike.$pat,ciudad.ilike.$pat');
+          .or(orParts.join(','));
       final list = res as List<dynamic>;
       final ids = list
           .map((e) => (e as Map)['id']?.toString().trim() ?? '')
@@ -3705,20 +3879,35 @@ class SupabaseService {
     dynamic query,
     CatalogFilters filters, {
     List<String> searchLocationImporterIds = const [],
+    List<String>? searchProductIds,
+    List<String> legacySearchVariants = const [],
   }) {
     var q = query;
-    final search = filters.searchQuery?.trim();
-    if (search != null && search.isNotEmpty) {
-      final safe = _sanitizeIlike(search);
-      if (safe.isNotEmpty) {
-        final pat = '*$safe*';
-        if (searchLocationImporterIds.isNotEmpty) {
-          final inList = searchLocationImporterIds.join(',');
-          q = q.or(
-            'name.ilike.$pat,owner_id.in.($inList)',
-          );
-        } else {
-          q = q.ilike('name', '%$safe%');
+    if (searchProductIds != null) {
+      if (searchProductIds.isEmpty) {
+        // Sin matches fuzzy: forzar resultado vacío sin escanear catálogo.
+        q = q.eq('id', '00000000-0000-0000-0000-000000000000');
+      } else {
+        q = q.inFilter('id', searchProductIds);
+      }
+    } else {
+      final search = filters.searchQuery?.trim();
+      if (search != null && search.isNotEmpty) {
+        final safe = _sanitizeIlike(search);
+        final variants = legacySearchVariants.isNotEmpty
+            ? legacySearchVariants
+            : _catalogSearchTextVariants(safe);
+        if (variants.isNotEmpty) {
+          final nameParts = variants.map((v) => 'name.ilike.*$v*').toList();
+          if (searchLocationImporterIds.isNotEmpty) {
+            final inList = searchLocationImporterIds.join(',');
+            nameParts.add('owner_id.in.($inList)');
+          }
+          if (nameParts.length == 1) {
+            q = q.ilike('name', '%${variants.first}%');
+          } else {
+            q = q.or(nameParts.join(','));
+          }
         }
       }
     }
@@ -4934,6 +5123,31 @@ class InventoryMetrics {
   final int totalProducts;
   final int outOfStock;
   final int paused;
+}
+
+/// Resultado de [SupabaseService._resolveCatalogSearch].
+///
+/// - [productIds] `null`: sin filtro fuzzy (sin query, o fallback `ilike`).
+/// - [productIds] vacío: RPC sin matches → 0 resultados.
+/// - [productIds] con valores: filtrar `products.id`.
+class _CatalogSearchPlan {
+  const _CatalogSearchPlan({
+    this.productIds,
+    this.locationImporterIds = const [],
+    this.legacySearchVariants = const [],
+    this.productScores = const {},
+  });
+
+  final List<String>? productIds;
+  final List<String> locationImporterIds;
+
+  /// Usado solo cuando la RPC no está disponible (fallback `ilike`).
+  final List<String> legacySearchVariants;
+
+  /// Scores de relevancia RPC (`product_id` → score). Vacío en fallback.
+  final Map<String, double> productScores;
+
+  bool get isEmptyResult => productIds != null && productIds!.isEmpty;
 }
 
 class NotificationOrderSummary {

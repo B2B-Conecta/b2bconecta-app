@@ -1,26 +1,24 @@
 # Supabase Dashboard → Authentication → URL Configuration
-# Project staging: lwrqjpqyitnveizshawc
 #
-# Canonical staging web origin (keep in sync with config/env/staging.env and Vercel):
+# === MAIN (b2bconecta-db / fzugzjcwdzcwfxgviltw) — plantilla + seed ===
+# Site URL:
+#   https://YOUR_PRODUCTION_DOMAIN
+# Redirect URLs:
+#   https://YOUR_PRODUCTION_DOMAIN/**
+#   http://localhost:3000/**
+#   http://127.0.0.1:3000/**
+#   com.carlosf12.motolinkProApp://auth-callback
+#
+# === DEV (b2bconecta-db-dev / kdrccmqcrruixuworlmz) — data de trabajo ===
+# Site URL (ej. preview):
 #   https://motolink-app.vercel.app
-#
-# Site URL (staging):
-#   https://motolink-app.vercel.app
-#
-# Redirect URLs — add all that apply:
+# Redirect URLs:
 #   https://motolink-app.vercel.app/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
-#
-# Móvil (APK / iOS — deep link custom scheme, ver mobile-staging.env):
 #   com.carlosf12.motolinkProApp://auth-callback
 #
-# Android App Links (https) NO están configurados: el correo debe redirigir al
-# custom scheme anterior, no solo a motolink-app.vercel.app. assetlinks.json
-# solo aplica si añades intent-filter https con android:autoVerify="true".
+# Ver config/ENVIRONMENTS.md
 #
-# Production (when motolink.app DNS is live):
-#   https://motolink.app/**
-#
-# Password recovery on web uses PKCE: the email link must open in the SAME browser
-# (same origin) where the user clicked "Forgot password". See README → Staging web.
+# Password recovery on web uses PKCE: open the email link in the SAME browser
+# where "Forgot password" was clicked.

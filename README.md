@@ -4,19 +4,21 @@ Flutter B2B marketplace (aliados, importadores, administrador). Backend: Supabas
 
 ## Environments
 
+Detalle B2B Conecta (main limpio+seed vs dev con data): **`config/ENVIRONMENTS.md`**.
+
 | Target | Template | Use case |
 |--------|----------|----------|
 | `local` | `config/env/local.env` | Docker Supabase (`supabase start`) |
-| `staging` | `config/env/staging.env` | Web dev against staging API |
-| `mobile-staging` | `config/env/mobile-staging.env` | APK/iOS QA (default release builds) |
-| `production` | `config/env/production.env` | Web production |
-| `mobile-production` | `config/env/mobile-production.env` | Store release builds |
+| `staging` | `config/env/staging.env` | Web → proyecto **DEV** (2º Supabase; data de trabajo) |
+| `mobile-staging` | `config/env/mobile-staging.env` | APK/iOS QA contra DEV |
+| `production` | `config/env/production.env` | Web → **MAIN** (`fzugzjcwdzcwfxgviltw`, seed) |
+| `mobile-production` | `config/env/mobile-production.env` | Store / release contra MAIN |
 
 ```bash
 bash scripts/use_env.sh local          # or staging | mobile-staging | production
 ```
 
-Real API keys go in **gitignored** `config/env/<env>.env.local` (see `staging.env.local.example`).  
+Real API keys go in **gitignored** `config/env/<env>.env.local` (see `config/env/staging.env.local.example`).  
 Security notes: `config/SECURITY.md`.
 
 ### Local Supabase
@@ -60,7 +62,8 @@ bash scripts/configure_supabase_push_secrets.sh staging
 # bash scripts/configure_supabase_push_secrets.sh production
 ```
 
-## Project refs
+## Project refs (B2B Conecta)
 
-- Staging: `lwrqjpqyitnveizshawc`
-- Production: `ufrphhiynowsychgxvkn`
+- Main (plantilla + seed): `fzugzjcwdzcwfxgviltw` (`b2bconecta-db`)
+- Dev (data de trabajo): `kdrccmqcrruixuworlmz` (`b2bconecta-db-dev`)
+- Históricos MotoLink (referencia): staging `lwrqjpqyitnveizshawc`, prod `ufrphhiynowsychgxvkn`

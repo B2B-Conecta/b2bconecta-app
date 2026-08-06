@@ -2,6 +2,7 @@
 .env
 config/push.env
 config/env/*.env.local
+config/migrate-db.env
 
 # Signing & service accounts (never commit)
 **/*.jks

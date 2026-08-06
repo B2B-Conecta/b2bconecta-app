@@ -1,10 +1,9 @@
-# Paste these in Vercel → Project → Settings → Environment Variables
-# Scope: Preview (and Production if this Vercel project is staging-only)
-#
-# Replace YOUR_STAGING_PUBLISHABLE_KEY from Supabase Dashboard (lwrqjpqyitnveizshawc).
+# Vercel → Environment Variables (Preview / app de pruebas)
+# B2B Conecta DEV: b2bconecta-db-dev / kdrccmqcrruixuworlmz
+# Publishable key: Dashboard → API (no commitear el valor real aquí).
 
-NEXT_PUBLIC_SUPABASE_URL=https://lwrqjpqyitnveizshawc.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://kdrccmqcrruixuworlmz.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_STAGING_PUBLISHABLE_KEY
 
-# Must match Supabase Auth Site URL + Redirect URLs (see config/supabase-auth-redirects.example)
+# Must match Supabase Auth Site URL + Redirect URLs (config/supabase-auth-redirects.example)
 SUPABASE_AUTH_REDIRECT_URL=https://motolink-app.vercel.app

@@ -243,10 +243,10 @@ class _AdminEncomiendasReportPanelState
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Estado e importador consultan el servidor. El resto filtra en pantalla.',
+                      'Estado e importador → servidor',
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                         height: 1.3,
                       ),
                     ),
@@ -403,7 +403,7 @@ class _AdminEncomiendasReportPanelState
                       'en el rango y filtros actuales (excepto este tope).',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                         height: 1.3,
                       ),
                     ),
@@ -483,7 +483,7 @@ class _AdminEncomiendasReportPanelState
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: AppColors.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -564,7 +564,9 @@ class _AdminEncomiendasReportPanelState
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: 'Buscar producto, SKU, aliado…',
+                hintText: MediaQuery.sizeOf(context).width < 600
+                    ? 'Producto, SKU, aliado…'
+                    : 'Buscar producto, SKU, aliado…',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 border: const OutlineInputBorder(),
                 isDense: true,
@@ -592,7 +594,7 @@ class _AdminEncomiendasReportPanelState
                     icon: const Icon(Icons.tune, size: 18),
                     label: Text(
                       _activeFilterCount == 0
-                          ? 'Filtros avanzados'
+                          ? 'Filtros'
                           : 'Filtros ($_activeFilterCount)',
                     ),
                     style: OutlinedButton.styleFrom(
@@ -820,7 +822,7 @@ class _AdminEncomiendasReportPanelState
       return Text(
         'Sin filtros locales activos · rango ${_desde.day}/${_desde.month}/${_desde.year} — '
         '${_hasta.day}/${_hasta.month}/${_hasta.year}',
-        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
       );
     }
     return Wrap(spacing: 6, runSpacing: 6, children: chips);
@@ -831,7 +833,7 @@ class _AdminEncomiendasReportPanelState
     if (ranking.isEmpty) {
       return Text(
         'Sin ventas en el período con los filtros actuales.',
-        style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
       );
     }
 
@@ -843,38 +845,39 @@ class _AdminEncomiendasReportPanelState
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: AppColors.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           children: [
             for (var i = 0; i < shown.length; i++) ...[
-              if (i > 0) Divider(height: 1, color: Colors.grey.shade200),
+              if (i > 0) Divider(height: 1, color: AppColors.divider),
               ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
                 leading: CircleAvatar(
                   radius: 14,
                   backgroundColor: i < 3
-                      ? AppColors.brandOrange.withOpacity(0.15)
-                      : Colors.grey.shade200,
+                      ? AppColors.brandAccent.withOpacity(0.18)
+                      : AppColors.surfaceTinted,
                   child: Text(
                     '${i + 1}',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: i < 3
-                          ? AppColors.brandOrange
-                          : Colors.grey.shade700,
+                          ? AppColors.brandAccent
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
                 title: Text(
                   shown[i].productName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 subtitle: Text(
@@ -884,7 +887,7 @@ class _AdminEncomiendasReportPanelState
                     if ((shown[i].importerName ?? '').isNotEmpty)
                       shown[i].importerName!,
                   ].join(' · '),
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -901,7 +904,7 @@ class _AdminEncomiendasReportPanelState
                       '${shown[i].totalRefUsd.toStringAsFixed(2)} REF',
                       style: TextStyle(
                         fontSize: 10.5,
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -919,7 +922,7 @@ class _AdminEncomiendasReportPanelState
     if (list.isEmpty) {
       return Text(
         'Sin resultados con los filtros actuales.',
-        style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
       );
     }
     final totalUsd = list.fold<double>(0, (s, r) => s + r.precioTotal);
@@ -968,17 +971,17 @@ class _AdminEncomiendasReportPanelState
               icon: Icons.inventory_2_outlined,
             ),
             _StatCard(
-              title: 'Total REF (aliado)',
+              title: 'Total REF',
               value: totalUsd.toStringAsFixed(2),
               icon: Icons.payments_outlined,
             ),
             _StatCard(
-              title: 'Factura importador',
+              title: 'Con factura',
               value: '$conFacturaImportador',
               icon: Icons.receipt_long_outlined,
             ),
             _StatCard(
-              title: 'Pagos aprobados',
+              title: 'Pagos OK',
               value: '$pagosAprobados',
               icon: Icons.verified_outlined,
             ),
@@ -988,12 +991,12 @@ class _AdminEncomiendasReportPanelState
               icon: Icons.done_all_outlined,
             ),
             _StatCard(
-              title: 'Nota / Fiscal / Pref. pend.',
+              title: 'Nota / Fiscal / Pend.',
               value: '$prefNota / $prefFiscal / $prefPend',
               icon: Icons.description_outlined,
             ),
             _StatCard(
-              title: 'Valoraciones (prom.)',
+              title: 'Valoraciones',
               value: valorados.isEmpty
                   ? '—'
                   : '${valorados.length} · ${avgStars!.toStringAsFixed(2)} ★',
@@ -1006,20 +1009,29 @@ class _AdminEncomiendasReportPanelState
   }
 
   Widget _sectionSwitcher() {
+    final mobile = MediaQuery.sizeOf(context).width < 600;
     return SegmentedButton<int>(
       showSelectedIcon: false,
-      segments: const [
+      style: mobile
+          ? ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: WidgetStatePropertyAll(
+                TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
+      segments: [
         ButtonSegment(
           value: 0,
-          label: Text('Encomiendas'),
-          icon: Icon(Icons.receipt_long_outlined, size: 18),
+          label: Text(mobile ? 'Pedidos' : 'Encomiendas'),
+          icon: const Icon(Icons.receipt_long_outlined, size: 18),
         ),
         ButtonSegment(
           value: 1,
-          label: Text('Promociones catálogo'),
-          icon: Icon(Icons.campaign_outlined, size: 18),
+          label: Text(mobile ? 'Promos' : 'Promociones'),
+          icon: const Icon(Icons.campaign_outlined, size: 18),
         ),
-        ButtonSegment(
+        const ButtonSegment(
           value: 2,
           label: Text('Usuarios'),
           icon: Icon(Icons.people_outline, size: 18),
@@ -1094,156 +1106,178 @@ class _AdminEncomiendasReportPanelState
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              children: [
-                Text(
-                  'Facturación del importador al aliado, pagos y valoraciones. '
-                  'Ajuste fechas, busque y abra filtros avanzados si necesita afinar el detalle.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _buildCompactFiltersCard(),
-                const SizedBox(height: 12),
-                Material(
-                  color: AppColors.surfaceTinted,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+            child: Builder(
+              builder: (context) {
+                final mobile = MediaQuery.sizeOf(context).width < 600;
+                return ListView(
+                  padding: EdgeInsets.fromLTRB(16, mobile ? 8 : 0, 16, 24),
+                  children: [
+                    _buildCompactFiltersCard(),
+                    const SizedBox(height: 10),
+                    Material(
+                      color: AppColors.surfaceTinted,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(
-                              Icons.table_chart_outlined,
-                              size: 20,
-                              color: AppColors.brandBlue.withOpacity(0.9),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _filtered.isEmpty
-                                    ? 'Sin datos para exportar'
-                                    : '${_filtered.length} pedidos listos para Excel',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13.5,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.table_chart_outlined,
+                                  size: 20,
+                                  color: AppColors.brandAccent,
                                 ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _filtered.isEmpty
+                                        ? 'Sin datos'
+                                        : '${_filtered.length} para Excel',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13.5,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (!mobile)
+                                  Text(
+                                    'Encomiendas + ranking',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton.tonalIcon(
+                              onPressed: (_filtered.isEmpty ||
+                                      _exporting ||
+                                      _loading)
+                                  ? null
+                                  : _exportExcel,
+                              icon: _exporting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.download_outlined),
+                              label: Text(
+                                _exporting
+                                    ? 'Generando…'
+                                    : (mobile
+                                        ? 'Descargar Excel'
+                                        : 'Descargar Excel (.xlsx)'),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Incluye hoja «Encomiendas» (pedidos filtrados) y '
-                          '«Productos mas vendidos» (ranking por unidades).',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            height: 1.35,
-                            color: Colors.grey.shade800,
-                          ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.insights_outlined,
+                          size: 18,
+                          color: AppColors.brandAccent,
                         ),
-                        const SizedBox(height: 10),
-                        FilledButton.tonalIcon(
-                          onPressed: (_filtered.isEmpty || _exporting || _loading)
-                              ? null
-                              : _exportExcel,
-                          icon: _exporting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.download_outlined),
-                          label: Text(
-                            _exporting
-                                ? 'Generando Excel…'
-                                : 'Descargar Excel (.xlsx)',
+                        const SizedBox(width: 6),
+                        Text(
+                          mobile ? 'Resumen' : 'Resumen gerencial',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: mobile ? 14 : 15,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Resumen gerencial',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _summary(),
-                const SizedBox(height: 20),
-                const Text(
-                  'Productos más vendidos',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _topSoldLimit != null
-                      ? 'Ranking según filtros actuales; el detalle muestra solo el top $_topSoldLimit.'
-                      : 'Ranking por unidades en el rango y filtros actuales (sin tope).',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.35,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _topSoldProductsSection(),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Detalle',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
+                    const SizedBox(height: 8),
+                    _summary(),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.trending_up,
+                          size: 18,
+                          color: AppColors.brandAccent,
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            mobile ? 'Top ventas' : 'Productos más vendidos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: mobile ? 14 : 15,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (_topSoldLimit != null)
+                          Text(
+                            'Top $_topSoldLimit',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                      ],
                     ),
-                    Text(
-                      '${_filtered.length} filas',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const SizedBox(height: 8),
+                    _topSoldProductsSection(),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.list_alt_outlined,
+                          size: 18,
+                          color: AppColors.brandAccent,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Detalle',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: mobile ? 14 : 15,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${_filtered.length}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 8),
+                    if (_filtered.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Text(
+                            _loading ? 'Cargando…' : 'Sin resultados',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._filtered.map(_detailTile),
                   ],
-                ),
-                const SizedBox(height: 8),
-                if (_filtered.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text(
-                        _loading
-                            ? 'Cargando…'
-                            : 'Ajuste filtros o amplíe el rango de fechas.',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ),
-                  )
-                else
-                  ..._filtered.map(_detailTile),
-              ],
+                );
+              },
             ),
           ),
         ),
@@ -1286,7 +1320,7 @@ class _AdminEncomiendasReportPanelState
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: AppColors.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1313,19 +1347,19 @@ class _AdminEncomiendasReportPanelState
               const SizedBox(height: 2),
               Text(
                 'SKU ${r.productSku!.trim()}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ],
             const SizedBox(height: 6),
             Text(
               '${formatEsShortDateTime(r.createdAt)} · '
               '${r.precioTotal.toStringAsFixed(2)} REF · ${r.cantidad} uds.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 4),
             Text(
               '${r.aliadoBusinessName ?? "Aliado"} → ${r.ownerBusinessName ?? "Importador"}',
-              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1371,7 +1405,7 @@ class _AdminEncomiendasReportPanelState
                   fontSize: 11,
                   height: 1.3,
                   fontStyle: FontStyle.italic,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -1420,10 +1454,10 @@ class _MiniChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = highlighted ? AppColors.brandBlue : Colors.grey.shade800;
+    final fg = highlighted ? AppColors.brandAccent : AppColors.textPrimary;
     final bg = highlighted
-        ? AppColors.brandBlue.withOpacity(0.08)
-        : Colors.grey.shade100;
+        ? AppColors.brandBlueContainer
+        : AppColors.surfaceTinted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1478,7 +1512,7 @@ class _StatCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                   height: 1.2,
                 ),
               ),

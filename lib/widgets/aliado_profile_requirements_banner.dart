@@ -100,7 +100,7 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
                 style: TextStyle(
                   fontSize: compact ? 11 : 11.5,
                   height: 1.25,
-                  color: ok ? Colors.grey.shade800 : Colors.grey.shade600,
+                  color: ok ? AppColors.textPrimary : AppColors.textSecondary,
                   fontWeight: ok ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),

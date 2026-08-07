@@ -170,7 +170,7 @@ class _OrderRatingSheetScaffold extends StatelessWidget {
                             headerSubtitle,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade700,
+                              color: AppColors.textSecondary,
                               height: 1.3,
                             ),
                           ),

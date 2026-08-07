@@ -146,7 +146,7 @@ class _TransactionRequestCounterpartyProfileSectionState
       decoration: BoxDecoration(
         color: AppColors.surfaceTinted.withOpacity(0.45),
         borderRadius: BorderRadius.circular(web ? 8 : 12),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Padding(
         padding: web
@@ -212,7 +212,7 @@ class _TransactionRequestCounterpartyProfileSectionState
                 'RIF: ${widget.rif!.trim()}',
                 style: TextStyle(
                   fontSize: density.contentBodySize,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             if (widget.phone != null && widget.phone!.trim().isNotEmpty)
@@ -220,7 +220,7 @@ class _TransactionRequestCounterpartyProfileSectionState
                 'Tel: ${widget.phone!.trim()}',
                 style: TextStyle(
                   fontSize: density.contentBodySize,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             if (dirLine != null)
@@ -229,7 +229,7 @@ class _TransactionRequestCounterpartyProfileSectionState
                 style: TextStyle(
                   fontSize: density.contentBodySize,
                   height: 1.35,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             if (widget.fiscalMapsUrl?.trim().isNotEmpty == true) ...[
@@ -252,7 +252,7 @@ class _TransactionRequestCounterpartyProfileSectionState
                 style: TextStyle(
                   fontSize: density.contentBodySize,
                   fontWeight: FontWeight.w800,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
               SizedBox(height: web ? 4 : 6),
@@ -267,7 +267,7 @@ class _TransactionRequestCounterpartyProfileSectionState
                   'Sin documentos aprobados visibles en este pedido.',
                   style: TextStyle(
                     fontSize: density.contentSmallSize,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                   ),
                 )
               else

@@ -70,7 +70,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Pedido maestro',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
@@ -86,7 +86,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.35,
-                        color: Colors.grey.shade800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -230,7 +230,7 @@ class _SectionHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
             color: AppColors.textPrimary,
@@ -242,7 +242,7 @@ class _SectionHeading extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             height: 1.3,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -319,7 +319,7 @@ class _ImporterSelectorChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? AppColors.brandBlue : Colors.grey.shade300,
+              color: selected ? AppColors.brandBlue : AppColors.borderSubtle,
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -364,7 +364,7 @@ class _ImporterSelectorChip extends StatelessWidget {
                 'Envío: $envio',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
               ),
               Text(
                 fasePagoBloqueLabelEs(fase),
@@ -399,13 +399,13 @@ class _ImporterSelectorChip extends StatelessWidget {
       case AliadoImportadorPagoFase.pagoConfirmado:
         return Colors.green.shade800;
       case AliadoImportadorPagoFase.comprobanteEnRevision:
-        return Colors.orange.shade900;
+        return AppColors.brandBlue;
       case AliadoImportadorPagoFase.pendientePago:
         return AppColors.brandBlue;
       case AliadoImportadorPagoFase.esperandoFacturaProveedor:
         return Colors.amber.shade900;
       default:
-        return Colors.grey.shade700;
+        return AppColors.textSecondary;
     }
   }
 }
@@ -438,7 +438,7 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300, width: 1.2),
+        border: Border.all(color: AppColors.borderSubtle, width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -454,7 +454,7 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
               children: [
                 Text(
                   'Proveedor $importerIndex de $importerTotal · $name',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
                     color: AppColors.textPrimary,
@@ -467,7 +467,7 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -476,7 +476,7 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

@@ -1,7 +1,7 @@
 import 'product_volume_tiers.dart';
 
 /// Cascada E4 para precios aliado (catálogo y preview; checkout en servidor).
-/// Sin markup MotoLink: lista/oferta del importador → % volumen → línea USD opcional.
+/// Sin markup B2B Conecta: lista/oferta del importador → % volumen → línea USD opcional.
 abstract final class ProductCatalogPricing {
 
   /// Descuento en la línea USD del catálogo (pago en divisas / Zelle), % sobre precio REF.

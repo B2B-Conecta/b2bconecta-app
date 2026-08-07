@@ -208,7 +208,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                                 'notificación diaria a usuarios',
                                 style: TextStyle(
                                   fontSize: 10.5,
-                                  color: Colors.grey.shade700,
+                                  color: AppColors.textSecondary,
                                   height: 1.25,
                                 ),
                               ),

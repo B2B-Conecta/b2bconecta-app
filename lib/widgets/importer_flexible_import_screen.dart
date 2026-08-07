@@ -13,7 +13,7 @@ import '../utils/product_custom_fields.dart';
 import 'importer_import_visibility_section.dart';
 import 'product_custom_fields_section.dart';
 
-/// Wizard de carga masiva: mapeo dinámico de columnas ERP → MotoLink.
+/// Wizard de carga masiva: mapeo dinámico de columnas ERP → B2B Conecta.
 class ImporterFlexibleImportScreen extends StatefulWidget {
   const ImporterFlexibleImportScreen({
     super.key,
@@ -96,7 +96,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.description:
         'Detalle técnico, referencia OEM o notas del repuesto.',
     CatalogImportField.priceUsd:
-        'Precio mayorista en dólares (USD). MotoLink no convierte a Bs en la importación.',
+        'Precio mayorista en dólares (USD). B2B Conecta no convierte a Bs en la importación.',
     CatalogImportField.salePriceUsd:
         'Precio promocional en USD, si aplica. Debe ser menor al precio de lista.',
     CatalogImportField.stock:
@@ -365,7 +365,7 @@ class _ImporterFlexibleImportScreenState
                   'Actívalos en Mi inventario cuando quieras publicarlos.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.orange.shade900,
+                    color: AppColors.brandAccent,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -504,7 +504,7 @@ class _ImporterFlexibleImportScreenState
               padding: const EdgeInsets.only(left: 4, top: 4),
               child: Text(
                 hint,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   color: AppColors.textSecondary,
                   height: 1.35,
@@ -556,7 +556,7 @@ class _ImporterFlexibleImportScreenState
                         const SizedBox(height: 4),
                         Text(
                           subtitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
                             color: AppColors.textSecondary,
                             height: 1.4,
@@ -589,7 +589,7 @@ class _ImporterFlexibleImportScreenState
           '$ext · ${widget.preview.headers.length} columnas · '
           '${estimate ?? '?'} repuestos aprox.',
       child: const Text(
-        'Exporta tu listado tal como sale del ERP. MotoLink reconoce '
+        'Exporta tu listado tal como sale del ERP. B2B Conecta reconoce '
         'automáticamente SKU, nombre, precio y stock.',
         style: TextStyle(fontSize: 12.5, height: 1.45),
       ),
@@ -733,7 +733,7 @@ class _ImporterFlexibleImportScreenState
                     ),
                     Text(
                       detail,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
@@ -895,7 +895,7 @@ class _ImporterFlexibleImportScreenState
       title: 'Datos extra del ERP (opcional)',
       subtitle: _captureUnmapped && _unmappedHeaders().isNotEmpty
           ? '${_unmappedHeaders().length} columna(s) se guardarán automáticamente. '
-              'Puedes mapear manualmente abajo o dejar que MotoLink las capture.'
+              'Puedes mapear manualmente abajo o dejar que B2B Conecta las capture.'
           : 'Marca, ubicación, código de barras… Usa el ojo para visibilidad aliado.',
       child: content,
     );
@@ -1129,7 +1129,7 @@ class _ImporterFlexibleImportScreenState
             'O se guardarán automáticamente al importar (toggle en paso 3).',
             style: TextStyle(
               fontSize: 11,
-              color: Colors.orange.shade900,
+              color: AppColors.brandAccent,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1255,7 +1255,7 @@ class _ImporterFlexibleImportScreenState
                               const SizedBox(height: 4),
                               Text(
                                 _upsertModeDescription(mode),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11.5,
                                   color: AppColors.textSecondary,
                                   height: 1.35,
@@ -1316,7 +1316,7 @@ class _ImporterFlexibleImportScreenState
         title: 'Revisar sin guardar',
         subtitle:
             'Valida el archivo y muestra errores antes de modificar tu '
-            'inventario en MotoLink.',
+            'inventario en B2B Conecta.',
         value: _dryRun,
         onChanged: _importing ? null : (v) => setState(() => _dryRun = v),
       ),
@@ -1414,7 +1414,7 @@ class _ImporterFlexibleImportScreenState
       icon: Icons.table_chart_outlined,
       title: 'Vista previa del archivo',
       subtitle:
-          'Azul = catálogo MotoLink · Naranja = dato ERP · Gris = sin asignar',
+          'Azul = catálogo B2B Conecta · Azul acento = dato ERP · Gris = sin asignar',
       child: _PreviewTable(
         headers: widget.preview.headers,
         rows: widget.preview.sampleRows,
@@ -1464,7 +1464,7 @@ class _ImporterFlexibleImportScreenState
                         ready ? Icons.check_circle : Icons.info_outline,
                         color: ready
                             ? AppColors.successGreen
-                            : AppColors.brandOrange,
+                            : AppColors.brandAccent,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -1492,7 +1492,7 @@ class _ImporterFlexibleImportScreenState
                             ready ? Icons.check_circle : Icons.info_outline,
                             color: ready
                                 ? AppColors.successGreen
-                                : AppColors.brandOrange,
+                                : AppColors.brandAccent,
                             size: 18,
                           ),
                           const SizedBox(width: 8),
@@ -1628,7 +1628,7 @@ class _ImporterFlexibleImportScreenState
           child: Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
-              'Tu Excel o CSV → inventario MotoLink en 3 pasos',
+              'Tu Excel o CSV → inventario B2B Conecta en 3 pasos',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary.withOpacity(0.95),
@@ -1676,7 +1676,7 @@ class _ImporterFlexibleImportScreenState
                   const SizedBox(height: 8),
                   Text(
                     '$_processedRows de ${estimate ?? '?'} filas procesadas',
-                    style: const TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                   if (partial != null) ...[
                     const SizedBox(height: 14),
@@ -1718,7 +1718,7 @@ class _OptionsSubheading extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           hint,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
           ),
@@ -1755,12 +1755,12 @@ class _ImportOptionTile extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
       decoration: BoxDecoration(
         color: data.value
-            ? AppColors.brandOrange.withOpacity(0.08)
+            ? AppColors.brandAccent.withOpacity(0.08)
             : AppColors.fieldFill,
         borderRadius: AppDecorations.radius12,
         border: Border.all(
           color: data.value
-              ? AppColors.brandOrange.withOpacity(0.45)
+              ? AppColors.brandAccent.withOpacity(0.45)
               : Colors.transparent,
         ),
       ),
@@ -1776,7 +1776,7 @@ class _ImportOptionTile extends StatelessWidget {
             child: Icon(
               data.icon,
               size: 20,
-              color: data.value ? AppColors.brandOrange : AppColors.brandBlue,
+              color: data.value ? AppColors.brandAccent : AppColors.brandBlue,
             ),
           ),
           const SizedBox(width: 10),
@@ -1794,7 +1794,7 @@ class _ImportOptionTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   data.subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     color: AppColors.textSecondary,
                     height: 1.35,
@@ -1828,7 +1828,7 @@ class _PreviewTable extends StatelessWidget {
 
   Color _headerColor(String h) {
     if (coreHeaders.contains(h)) return AppColors.brandBlue;
-    if (erpHeaders.contains(h)) return AppColors.brandOrange;
+    if (erpHeaders.contains(h)) return AppColors.brandAccent;
     return AppColors.textPrimary;
   }
 

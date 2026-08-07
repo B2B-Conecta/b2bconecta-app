@@ -159,7 +159,7 @@ class _ImporterOrderInvoiceSectionState
             soloLectura
                 ? OrderPaymentFlowCopy.importadorFacturaTituloReferencia
                 : OrderPaymentFlowCopy.importadorFacturaTitulo,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
               color: AppColors.textPrimary,
@@ -178,7 +178,7 @@ class _ImporterOrderInvoiceSectionState
           style: TextStyle(
             fontSize: 11,
             height: 1.35,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 8),
@@ -187,11 +187,11 @@ class _ImporterOrderInvoiceSectionState
             _filaFacturaVisual.proveedorFacturaFileName?.trim().isNotEmpty == true
                 ? 'Archivo: ${_filaFacturaVisual.proveedorFacturaFileName}'
                 : OrderPaymentFlowCopy.importadorFacturaRegistrada,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
           Text(
             'Fecha: ${formatEsShortDateTime(_filaFacturaVisual.proveedorFacturaSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(

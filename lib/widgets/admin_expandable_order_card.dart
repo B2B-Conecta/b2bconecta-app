@@ -104,9 +104,10 @@ class AdminExpandableOrderCard extends StatelessWidget {
                             titulo,
                             maxLines: expanded ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           if (!expanded) ...[
@@ -119,7 +120,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   height: 1.3,
-                                  color: Colors.grey.shade800,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -138,7 +139,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                 'SKU: ${r.productSku}',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey.shade700,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -147,7 +148,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               resumen,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade800,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -156,7 +157,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               r.destinoEntregaLineaCompactaEs,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade700,
+                                color: AppColors.textSecondary,
                                 height: 1.25,
                               ),
                             ),
@@ -268,7 +269,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                     if (orderCardCommissionSubtitle([r]) != null) ...[
                       const SizedBox(height: kOrderCardSectionGap),
                       OrderCardCollapsibleSection(
-                        title: 'Comisión MotoLink',
+                        title: 'Comisión B2B Conecta',
                         subtitle: orderCardCommissionSubtitle([r]),
                         infoMessage:
                             'Comisión devengada o estimada según el estado del pedido.',

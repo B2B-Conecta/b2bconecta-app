@@ -80,9 +80,9 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   }
 
   Color _statusColor() {
-    if (_ticket.isClosed) return Colors.grey.shade700;
+    if (_ticket.isClosed) return AppColors.textSecondary;
     if (_ticket.status == 'en_revision') return AppColors.brandBlue;
-    return AppColors.brandOrange;
+    return AppColors.brand;
   }
 
   @override
@@ -154,7 +154,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -174,7 +174,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                         '${_ticket.creatorDisplayName}',
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: Colors.grey.shade800,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -186,7 +186,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                         'Pedido vinculado: ${_ticket.relatedTransactionRequestId}',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -196,7 +196,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                       'Creado ${formatEsShortDateTime(_ticket.createdAt)}',
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],

@@ -6,7 +6,7 @@ import '../theme/app_theme.dart';
 
 /// Borde de tarjeta por estado de revisión de un documento (admin y aliado).
 Color kycDocumentReviewTileBorderColor({required bool has, String? status}) {
-  if (!has) return Colors.grey.shade300;
+  if (!has) return AppColors.borderSubtle;
   switch (status) {
     case DocumentReviewStatus.aprobado:
       return const Color(0xFFA5D6A7);
@@ -17,7 +17,7 @@ Color kycDocumentReviewTileBorderColor({required bool has, String? status}) {
     case DocumentReviewStatus.pendiente:
       return AppColors.brandBlue.withOpacity(0.35);
     default:
-      return Colors.grey.shade300;
+      return AppColors.borderSubtle;
   }
 }
 
@@ -39,7 +39,7 @@ class KycDocumentReviewStatusHighlight extends StatelessWidget {
     if (!hasFile) {
       return _statusPill(
         backgroundColor: Colors.grey.shade200,
-        foregroundColor: Colors.grey.shade800,
+        foregroundColor: AppColors.textPrimary,
         borderColor: Colors.grey.shade400,
         icon: Icons.folder_off_outlined,
         label: statusLabel,

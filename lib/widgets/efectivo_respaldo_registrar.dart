@@ -5,7 +5,7 @@ import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
-/// Foto de respaldo del cobro en efectivo (MotoLink).
+/// Foto de respaldo del cobro en efectivo (B2B Conecta).
 /// Puede registrarse durante tránsito o después de entregado (solo una vez).
 class EfectivoRespaldoRegistrar extends StatefulWidget {
   const EfectivoRespaldoRegistrar({
@@ -75,7 +75,7 @@ class _EfectivoRespaldoRegistrarState extends State<EfectivoRespaldoRegistrar> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Cobro en efectivo',
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -86,7 +86,7 @@ class _EfectivoRespaldoRegistrarState extends State<EfectivoRespaldoRegistrar> {
         const SizedBox(height: 6),
         Text(
           'Adjunte una foto clara como respaldo del cobro en efectivo (solo una vez por pedido).',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade700, height: 1.25),
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.25),
         ),
         const SizedBox(height: 10),
         SizedBox(

@@ -303,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
           content: const Text(
             'Active el GPS y conceda permiso de ubicación para ordenar por cercanía.',
           ),
-          backgroundColor: Colors.orange.shade900,
+          backgroundColor: AppColors.brandBlue,
         ),
       );
       return false;
@@ -444,11 +444,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Badge(
               isLabelVisible: filterBadge > 0,
               label: Text('$filterBadge'),
-              backgroundColor: AppColors.brandOrange,
+              backgroundColor: AppColors.brand,
               child: Icon(
                 Icons.tune,
                 color: filterBadge > 0
-                    ? AppColors.brandOrange
+                    ? AppColors.brand
                     : AppColors.textSecondary,
               ),
             ),
@@ -461,22 +461,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return InputDecoration(
       hintText: 'Buscar repuesto…',
-      hintStyle: const TextStyle(color: AppColors.textSecondary),
-      prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+      hintStyle: TextStyle(color: AppColors.textSecondary),
+      prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: AppColors.fieldFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       suffixIcon: suffix,
     );
@@ -490,9 +490,9 @@ class _HomeScreenState extends State<HomeScreen> {
       label: Text(label),
       deleteIcon: const Icon(Icons.close, size: 16),
       onDeleted: onDeleted,
-      backgroundColor: AppColors.brandOrange.withOpacity(0.12),
-      side: BorderSide(color: AppColors.brandOrange.withOpacity(0.35)),
-      labelStyle: const TextStyle(
+      backgroundColor: AppColors.brand.withOpacity(0.12),
+      side: BorderSide(color: AppColors.brand.withOpacity(0.35)),
+      labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
@@ -673,7 +673,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.brandOrange,
+                              color: AppColors.brand,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -710,7 +710,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppColors.brandBlue,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Panel de intermediación',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -722,12 +722,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 10),
                 Text(
                   'Revisa y aprueba solicitudes en la pestaña «Bandeja». '
-                  'Los importadores solo ven pedidos que MotoLink haya validado.',
+                  'Los importadores solo ven pedidos que B2B Conecta haya validado.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 15,
                     height: 1.4,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -820,12 +820,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 label: const Text('Filtros'),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.brandBlue,
+                                  foregroundColor: AppColors.brandAccent,
+                                  backgroundColor: AppColors.fieldFill,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
                                     vertical: 14,
                                   ),
-                                  side: BorderSide(color: Colors.grey.shade300),
+                                  side: BorderSide(color: AppColors.borderSubtle),
                                 ),
                               ),
                             ],
@@ -891,7 +892,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: const Icon(Icons.campaign_outlined, size: 18),
                           label: Text('Promociones (${promos.length})'),
                           style: TextButton.styleFrom(
-                            foregroundColor: AppColors.brandOrange,
+                            foregroundColor: AppColors.brand,
                             textStyle: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
@@ -936,7 +937,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 'No se pudieron cargar los repuestos.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Colors.grey.shade800,
+                                  color: AppColors.textPrimary,
                                   fontSize: 16,
                                 ),
                               ),
@@ -945,7 +946,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 '${snapshot.error}',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Colors.grey.shade600,
+                                  color: AppColors.textSecondary,
                                   fontSize: 13,
                                 ),
                               ),
@@ -962,7 +963,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _activeFilters.hasAnyFilter
                                       ? 'No hay resultados con esos filtros.'
                                       : 'No hay repuestos disponibles.',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       color: AppColors.textSecondary),
                                 ),
                               ),
@@ -1091,9 +1092,9 @@ class _ProductGridCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(compact ? 12 : 14),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.borderSubtle),
           boxShadow: AppDecorations.cardShadow,
         ),
         child: Padding(
@@ -1180,7 +1181,7 @@ class _ProductGridCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                           height: 1.1,
                         ),
                       ),
@@ -1203,7 +1204,7 @@ class _ProductGridCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: compact ? 9 : 9.5,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.grey.shade800,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
@@ -1245,7 +1246,7 @@ class _ProductGridCard extends StatelessWidget {
                         ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                       ),
                     ),
-                    Divider(height: 1, color: Colors.grey.shade200),
+                    Divider(height: 1, color: AppColors.borderSubtle),
                     const SizedBox(height: 3),
                     Row(
                       children: [
@@ -1284,11 +1285,11 @@ class _ProductGridCard extends StatelessWidget {
 
   Widget _placeholder(bool compact) {
     return ColoredBox(
-      color: Colors.grey.shade200,
+      color: AppColors.borderSubtle,
       child: Icon(
         Icons.precision_manufacturing_outlined,
         size: compact ? 32 : 40,
-        color: Colors.grey.shade500,
+        color: AppColors.textMuted,
       ),
     );
   }
@@ -1303,11 +1304,11 @@ class _LoadingState extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(12),
           boxShadow: AppDecorations.cardShadow,
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(

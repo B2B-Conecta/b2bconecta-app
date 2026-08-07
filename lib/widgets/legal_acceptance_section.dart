@@ -47,7 +47,7 @@ class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                       color: AppColors.textPrimary,
@@ -63,7 +63,7 @@ class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.5,
-                        color: Colors.grey.shade800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -173,7 +173,7 @@ class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
                       body: PrivacyPolicyConfig.body,
                     ),
                   ),
-                  _plain(' de MotoLink.'),
+                  _plain(' de B2B Conecta.'),
                 ],
               ),
             ),

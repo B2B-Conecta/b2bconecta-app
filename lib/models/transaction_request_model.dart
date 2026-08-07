@@ -285,7 +285,7 @@ class TransactionRequestModel {
   final String? proveedorFacturaFileName;
   final DateTime? proveedorFacturaSubmittedAt;
 
-  /// Estimación de tránsito (registra MotoLink al pasar a `en_transito`).
+  /// Estimación de tránsito (registra B2B Conecta al pasar a `en_transito`).
   final int? transitEtaDays;
   final int? transitEtaHours;
   final DateTime? transitEtaSetAt;
@@ -299,7 +299,7 @@ class TransactionRequestModel {
   final String? pagoComprobanteRechazoNota;
   final DateTime? pagoAprobadoAt;
 
-  /// Foto respaldo de cobro en efectivo (`order-payment-proofs`), registra MotoLink.
+  /// Foto respaldo de cobro en efectivo (`order-payment-proofs`), registra B2B Conecta.
   final String? efectivoRespaldoStoragePath;
   final String? efectivoRespaldoFileName;
   final DateTime? efectivoRespaldoSubmittedAt;
@@ -309,7 +309,7 @@ class TransactionRequestModel {
   final String? destinoEntregaTexto;
   final String? destinoEntregaMapsUrl;
 
-  /// URL de Google Maps de la ruta publicada por MotoLink (visible en tránsito).
+  /// URL de Google Maps de la ruta publicada por B2B Conecta (visible en tránsito).
   final String? adminRutaMapsUrl;
 
   /// A6: nota de entrega vs factura fiscal; `null` hasta que el aliado elija.
@@ -336,7 +336,7 @@ class TransactionRequestModel {
   /// Operador importador que aprueba pago / primera gestión auditada (`transaction_requests.confirmado_por`).
   final String? confirmadoPor;
 
-  /// Tasa MotoLink al checkout (fracción; 0.05 = 5 %).
+  /// Tasa B2B Conecta al checkout (fracción; 0.05 = 5 %).
   final double commissionRateSnapshot;
 
   /// Comisión devengada al marcar Recibido (Minuta #7 C1).
@@ -609,7 +609,7 @@ class TransactionRequestModel {
       !anuladoPorMotolink &&
       !qtyAdjustmentPendienteAliado;
 
-  /// Distingue rechazo inicial, anulación MotoLink (post-aprobación) y cancelación por aliado.
+  /// Distingue rechazo inicial, anulación B2B Conecta (post-aprobación) y cancelación por aliado.
   String statusLabelEs({bool aliadoViewer = false}) {
     if (status == TransactionRequestStatus.rechazado && canceladoPorAliado) {
       return aliadoViewer ? 'Cancelada por usted' : 'Cancelada por el aliado';
@@ -621,7 +621,7 @@ class TransactionRequestModel {
           : 'Cancelada por el importador';
     }
     if (status == TransactionRequestStatus.rechazado && anuladoPorMotolink) {
-      return 'Anulada por MotoLink';
+      return 'Anulada por B2B Conecta';
     }
     if (aliadoViewer && status == TransactionRequestStatus.entregado) {
       return 'Recibido';
@@ -919,7 +919,7 @@ class TransactionRequestModel {
     }
   }
 
-  /// MotoLink puede subir foto respaldo del cobro en efectivo si aplica.
+  /// B2B Conecta puede subir foto respaldo del cobro en efectivo si aplica.
   bool get puedeRegistrarRespaldoEfectivo {
     if (pagoMetodo?.trim() != PagoMetodo.efectivo) return false;
     if (hasEfectivoRespaldo) return false;

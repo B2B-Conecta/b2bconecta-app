@@ -43,15 +43,15 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
       fillColor: AppColors.fieldFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -84,7 +84,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           title: const Text('Contraseña actualizada'),
           content: const Text(
             'Tu contraseña se ha guardado. Inicia sesión de nuevo con el correo '
-            'y la nueva contraseña para entrar a MotoLink.',
+            'y la nueva contraseña para entrar a B2B Conecta.',
           ),
           actions: [
             FilledButton(
@@ -124,32 +124,15 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
     await AuthService.signOut();
   }
 
-  Widget _buildRecoveryIcon() {
-    return Container(
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        color: AppColors.brandBlueContainer,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Icon(
-        Icons.lock_reset_rounded,
-        size: 32,
-        color: AppColors.brandBlue,
-      ),
-    );
-  }
-
   Widget _buildRecoveryHeader({required bool compact}) {
     return Column(
       children: [
-        if (!compact) ...[
-          const MotoLinkProLogo(height: MotoLinkProLogoHeights.login),
-          const SizedBox(height: 20),
-        ],
-        _buildRecoveryIcon(),
-        SizedBox(height: compact ? 18 : 20),
-        const Text(
+        // Un solo logo; sin icono decorativo adicional de marca.
+        MotoLinkProLogo(
+          height: compact ? 72 : MotoLinkProLogoHeights.login,
+        ),
+        SizedBox(height: compact ? 18 : 22),
+        Text(
           'Recuperación de cuenta',
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -166,7 +149,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           style: TextStyle(
             fontSize: 15,
             height: 1.45,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -284,15 +267,16 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
   }
 
   Widget _buildRecoveryCard({required bool showHeader}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.white,
+      color: isDark ? AppColors.surfaceTinted : AppColors.white,
       elevation: 0,
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.borderSubtle),
           boxShadow: AppDecorations.cardShadow,
         ),
         child: Padding(
@@ -304,7 +288,26 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (showHeader) ...[
-                  _buildRecoveryHeader(compact: true),
+                  // Desktop: logo en panel izquierdo; aquí solo título.
+                  Text(
+                    'Recuperación de cuenta',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Define una contraseña nueva. Luego deberás iniciar sesión otra vez.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 28),
                 ],
                 _buildFormFields(),
@@ -327,9 +330,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0D47A1),
+            AppColors.black,
             AppColors.brandBlue,
-            Color(0xFF1976D2),
+            AppColors.brandAccent,
           ],
         ),
       ),
@@ -340,40 +343,26 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const MotoLinkProLogo(height: 64, forceWhite: true),
+              const SizedBox(height: 28),
               const Text(
-                'Restablece\n tu acceso',
+                'Restablece\ntu acceso',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.white,
                   height: 1.15,
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Por seguridad, define una contraseña nueva y vuelve a '
-                'iniciar sesión para continuar en MotoLink.',
+                'Elige una contraseña segura para volver a entrar al marketplace.',
                 style: TextStyle(
                   fontSize: 15.5,
                   height: 1.5,
-                  color: Colors.white.withOpacity(0.88),
+                  color: AppColors.white.withOpacity(0.88),
                 ),
-              ),
-              const SizedBox(height: 32),
-              const _RecoveryBrandingBullet(
-                icon: Icons.mark_email_read_outlined,
-                label: 'Enlace verificado desde tu correo',
-              ),
-              const SizedBox(height: 12),
-              const _RecoveryBrandingBullet(
-                icon: Icons.security_outlined,
-                label: 'Sesión temporal hasta guardar la contraseña',
-              ),
-              const SizedBox(height: 12),
-              const _RecoveryBrandingBullet(
-                icon: Icons.login_outlined,
-                label: 'Inicio de sesión con la nueva clave',
               ),
             ],
           ),
@@ -436,43 +425,6 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           );
         },
       ),
-    );
-  }
-}
-
-class _RecoveryBrandingBullet extends StatelessWidget {
-  const _RecoveryBrandingBullet({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.14),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.95),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

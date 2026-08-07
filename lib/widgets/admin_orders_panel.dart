@@ -331,7 +331,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                   label: Text(
                     _anularMotolinkBusyId == r.id
                         ? 'Anulando…'
-                        : 'Anular pedido (MotoLink)',
+                        : 'Anular pedido (B2B Conecta)',
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red.shade800,
@@ -378,7 +378,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         const SizedBox(height: kOrderCardSectionGap),
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con aliado, importador y supervisión MotoLink',
+          subtitle: 'Hilo con aliado, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-admin-${r.id}'),
@@ -428,7 +428,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         const SizedBox(height: kOrderCardSectionGap),
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con aliado, importador y supervisión MotoLink',
+          subtitle: 'Hilo con aliado, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-admin-closed-${primary.id}'),
@@ -557,7 +557,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                       size: 16,
                       color: _hasDateFilter
                           ? AppColors.brandBlue
-                          : Colors.grey.shade600,
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -574,7 +574,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                                 Text(
                                   'Ningún pedido coincide con los filtros.',
                                   style: TextStyle(
-                                    color: Colors.grey.shade700,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                                 TextButton(

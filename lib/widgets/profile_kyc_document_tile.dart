@@ -37,7 +37,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: AppDecorations.radius12,
@@ -56,9 +56,10 @@ class ProfileKycDocumentTile extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
@@ -79,7 +80,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 reviewedHint!,
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
               ),
             ],
             if (reviewNote != null && reviewNote!.isNotEmpty) ...[
@@ -89,7 +90,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.3,
-                  color: Colors.orange.shade900,
+                  color: AppColors.brandBlue,
                 ),
               ),
             ],
@@ -124,9 +125,9 @@ class _CompactDocStatusLine extends StatelessWidget {
         ),
       DocumentReviewStatus.enRevision => (
           Icons.schedule,
-          Colors.orange.shade800,
+          AppColors.brandAccent,
         ),
-      _ when !hasFile => (Icons.upload_file_outlined, Colors.grey.shade600),
+      _ when !hasFile => (Icons.upload_file_outlined, AppColors.textSecondary),
       _ => (Icons.description_outlined, AppColors.brandBlue),
     };
     return Row(

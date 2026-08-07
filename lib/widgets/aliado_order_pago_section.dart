@@ -341,7 +341,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -351,7 +351,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
           if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty) ...[
             Text(
               'Método: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 8),
           ],
@@ -370,7 +370,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             'Aquí podrá registrar método de pago y comprobante cuando el pedido lo permita.',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade700,
+              color: AppColors.textSecondary,
               height: 1.25,
             ),
           ),
@@ -381,7 +381,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             const SizedBox(height: 12),
           ],
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Método de pago',
             style: TextStyle(
               fontWeight: FontWeight.w700,
@@ -400,7 +400,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ),
@@ -433,7 +433,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty
                   ? PagoMetodo.labelEs(r.pagoMetodo!)
                   : '—',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
             ),
           if (metodoPreview != null) ...[
             if (metodoPreview.trim().isNotEmpty &&
@@ -467,7 +467,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                       : 'Declare el pago en efectivo. Una foto con la cámara es opcional.',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                     height: 1.25,
                   ),
                 ),
@@ -490,7 +490,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -501,7 +501,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                       : 'Esperando confirmación del importador. Puede adjuntar una foto opcional.',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                     height: 1.25,
                   ),
                 ),
@@ -530,7 +530,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                     : 'Use cámara, galería o suba imagen/PDF legible.',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                   height: 1.25,
                 ),
               ),
@@ -560,7 +560,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 _metodoSeleccionado == PagoMetodo.efectivo
                     ? 'En revisión; el importador confirmará la recepción del efectivo.'
                     : 'En revisión; puede reemplazar el archivo con las opciones de arriba.',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
           if (!referenciaHistorica && pe == PagoRevisionEstado.aprobado)

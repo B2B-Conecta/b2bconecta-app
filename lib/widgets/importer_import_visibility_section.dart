@@ -84,7 +84,7 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
             color: selected
-                ? AppColors.brandOrange.withOpacity(0.08)
+                ? AppColors.brand.withOpacity(0.08)
                 : AppColors.fieldFill,
             borderRadius: AppDecorations.radius12,
             child: InkWell(
@@ -99,7 +99,7 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
                   borderRadius: AppDecorations.radius12,
                   border: Border.all(
                     color: selected
-                        ? AppColors.brandOrange.withOpacity(0.45)
+                        ? AppColors.brand.withOpacity(0.45)
                         : Colors.transparent,
                   ),
                 ),
@@ -116,7 +116,7 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
                         option.icon,
                         size: 20,
                         color: selected
-                            ? AppColors.brandOrange
+                            ? AppColors.brand
                             : AppColors.brandBlue,
                       ),
                     ),
@@ -135,7 +135,7 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             option.subtitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11.5,
                               color: AppColors.textSecondary,
                               height: 1.35,
@@ -147,7 +147,7 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
                     Radio<ImporterNewProductsVisibility>(
                       value: option,
                       groupValue: value,
-                      activeColor: AppColors.brandOrange,
+                      activeColor: AppColors.brand,
                       onChanged: enabled && onChanged != null
                           ? (v) {
                               if (v != null) onChanged!(v);
@@ -188,7 +188,7 @@ Future<ImporterNewProductsVisibility?> showImporterImportVisibilityDialog(
                 '(según tu elección en conflicto de SKU).',
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                   height: 1.4,
                 ),
               ),
@@ -202,7 +202,7 @@ Future<ImporterNewProductsVisibility?> showImporterImportVisibilityDialog(
                 'Solo aplica a códigos que aún no están en tu inventario.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 10),

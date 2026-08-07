@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../utils/commission_settlement_filter_utils.dart';
 import 'commission_settlement_list_filter_bar.dart';
@@ -76,7 +77,7 @@ class _CommissionSettlementFiltersSheetState
             width: 60,
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
+              color: AppColors.borderSubtle,
               borderRadius: BorderRadius.circular(999),
             ),
           ),

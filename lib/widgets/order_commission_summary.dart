@@ -25,7 +25,7 @@ List<TransactionRequestModel> orderLinesEligibleForCommission(
       .toList();
 }
 
-/// Comisión MotoLink unificada: un total por pedido/proveedor y desglose opcional.
+/// Comisión B2B Conecta unificada: un total por pedido/proveedor y desglose opcional.
 class OrderCommissionSummary extends StatelessWidget {
   const OrderCommissionSummary({
     super.key,
@@ -49,7 +49,7 @@ class OrderCommissionSummary extends StatelessWidget {
       final chunk = orderLinesEligibleForCommission(importerChunk!);
       if (chunk.isEmpty) return const SizedBox.shrink();
       return _CommissionBox(
-        title: 'Comisión MotoLink (este proveedor)',
+        title: 'Comisión B2B Conecta (este proveedor)',
         lines: chunk,
         totalUsd: chunkCommissionUsd(chunk),
         todasDevengadas: chunk.every((r) => r.comisionDevengada),
@@ -67,8 +67,8 @@ class OrderCommissionSummary extends StatelessWidget {
 
     return _CommissionBox(
       title: eligible.length > 1
-          ? 'Comisión MotoLink (pedido)'
-          : 'Comisión MotoLink',
+          ? 'Comisión B2B Conecta (pedido)'
+          : 'Comisión B2B Conecta',
       lines: eligible,
       totalUsd: totalUsd,
       todasDevengadas: todasDevengadas,
@@ -125,9 +125,9 @@ class _CommissionBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.teal.shade50,
+        color: AppColors.brandBlueContainer,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.teal.shade200),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -136,12 +136,12 @@ class _CommissionBox extends StatelessWidget {
           if (!suppressOuterTitle) ...[
             Row(
               children: [
-                Icon(Icons.payments_outlined, size: 18, color: Colors.teal.shade800),
+                Icon(Icons.payments_outlined, size: 18, color: AppColors.brandAccent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 12.5,
                       color: AppColors.textPrimary,
@@ -156,13 +156,17 @@ class _CommissionBox extends StatelessWidget {
             'Tasa $pct % · '
             '${todasDevengadas ? 'Devengada' : 'Pendiente de recibir'}: '
             'USD ${totalUsd.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 12, height: 1.35),
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: AppColors.textPrimary,
+            ),
           ),
           if (todasDevengadas && latestDevengadaAt != null) ...[
             const SizedBox(height: 4),
             Text(
               'Devengada: ${formatEsShortDateTime(latestDevengadaAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
           if (breakdownMode != _BreakdownMode.none) ...[
@@ -172,7 +176,7 @@ class _CommissionBox extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
-                color: Colors.grey.shade700,
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 4),
@@ -210,7 +214,7 @@ class _CommissionBox extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: Colors.grey.shade900,
+              color: AppColors.textPrimary,
             ),
           ),
           if (chunk.length > 1)
@@ -243,7 +247,7 @@ class _CommissionBox extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 3),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10.5, color: Colors.grey.shade800),
+        style: TextStyle(fontSize: 10.5, color: AppColors.textPrimary),
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 import '../models/carrier_decision.dart';
 import '../models/carrier_flete_pago_modo.dart';
 import '../models/transaction_request_model.dart';
@@ -28,20 +30,20 @@ class ImporterOrderCarrierSummarySection extends StatelessWidget {
 
     return switch (r.carrierDecision) {
       CarrierDecision.pending => _banner(
-          color: Colors.orange,
+          tint: AppColors.brandBlueContainer,
           icon: Icons.local_shipping_outlined,
           title: OrderPickupFlowCopy.importadorEsperaAliadoTitulo,
           body: OrderPickupFlowCopy.importadorEsperaAliadoCuerpo,
         ),
       CarrierDecision.skipped => _banner(
-          color: Colors.blueGrey,
+          tint: Colors.blueGrey.shade50,
           icon: Icons.check_circle_outline,
           title: OrderPickupFlowCopy.importadorAliadoSinPlataformaTitulo,
           body: OrderPickupFlowCopy.importadorAliadoSinPlataformaCuerpo,
         ),
       CarrierDecision.selected => _selectedSummary(r),
       CarrierDecision.notApplicable => _banner(
-          color: Colors.blueGrey,
+          tint: Colors.blueGrey.shade50,
           icon: Icons.inventory_2_outlined,
           title: OrderPickupFlowCopy.importadorSinTransportistasTitulo,
           body: OrderPickupFlowCopy.importadorSinTransportistasCuerpo,
@@ -51,13 +53,13 @@ class ImporterOrderCarrierSummarySection extends StatelessWidget {
   }
 
   Widget _banner({
-    required MaterialColor color,
+    required Color tint,
     required IconData icon,
     required String title,
     required String body,
   }) {
     return B2bPanelSectionCard(
-      tint: color.shade50,
+      tint: tint,
       icon: icon,
       title: title,
       subtitle: body,
@@ -67,7 +69,7 @@ class ImporterOrderCarrierSummarySection extends StatelessWidget {
   Widget _selectedSummary(TransactionRequestModel r) {
     if (!r.hasImporterCarrierSelected) {
       return _banner(
-        color: Colors.orange,
+        tint: AppColors.brandBlueContainer,
         icon: Icons.local_shipping_outlined,
         title: OrderPickupFlowCopy.importadorTransportistaPendienteTitulo,
         body: OrderPickupFlowCopy.importadorTransportistaPendienteCuerpo,
@@ -87,13 +89,13 @@ class ImporterOrderCarrierSummarySection extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             CarrierFletePagoModo.labelEs(r.carrierFletePagoModoSnapshot),
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           if (r.carrierFeeUsdSnapshot != null) ...[
             const SizedBox(height: 4),
             Text(
               'Flete estimado: ${CarrierEtaFormat.feeLabel(r.carrierFeeUsdSnapshot)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
           if (!r.hasPickupConfirmed) ...[
@@ -103,7 +105,7 @@ class ImporterOrderCarrierSummarySection extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
           ],

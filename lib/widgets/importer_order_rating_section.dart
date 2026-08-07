@@ -166,7 +166,7 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Divider(height: 20),
-        const Text(
+        Text(
           'Valorar aliado (post-entrega)',
           style: TextStyle(
             fontWeight: FontWeight.w800,

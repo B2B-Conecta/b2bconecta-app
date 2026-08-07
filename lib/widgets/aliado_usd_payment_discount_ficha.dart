@@ -30,9 +30,9 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
       width: double.infinity,
       padding: pad,
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: AppColors.successGreen.withOpacity(0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.green.shade300),
+        border: Border.all(color: AppColors.successGreen.withOpacity(0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +43,7 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
               Icon(
                 Icons.savings_outlined,
                 size: compact ? 18 : 20,
-                color: Colors.green.shade800,
+                color: AppColors.successGreen,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -55,7 +55,7 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
                       style: TextStyle(
                         fontSize: compact ? 11.5 : 12.5,
                         fontWeight: FontWeight.w800,
-                        color: Colors.green.shade900,
+                        color: AppColors.textPrimary,
                         height: 1.25,
                       ),
                     ),
@@ -69,22 +69,22 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
                           formatRefAmount(preview.baseRef),
                           style: TextStyle(
                             fontSize: compact ? 11 : 12,
-                            color: Colors.grey.shade600,
+                            color: AppColors.textSecondary,
                             decoration: TextDecoration.lineThrough,
-                            decorationColor: Colors.grey.shade600,
+                            decorationColor: AppColors.textSecondary,
                           ),
                         ),
                         Icon(
                           Icons.arrow_forward,
                           size: 14,
-                          color: Colors.green.shade700,
+                          color: AppColors.successGreen,
                         ),
                         Text(
                           '${formatRefAmount(preview.total)} REF',
                           style: TextStyle(
                             fontSize: compact ? 13 : 14,
                             fontWeight: FontWeight.w800,
-                            color: Colors.green.shade900,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         if (pctLabel != null)
@@ -94,16 +94,18 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.green.shade100,
+                              color: AppColors.successGreen.withOpacity(0.16),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.green.shade300),
+                              border: Border.all(
+                                color: AppColors.successGreen.withOpacity(0.4),
+                              ),
                             ),
                             child: Text(
                               '−$pctLabel%',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.green.shade900,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
@@ -112,11 +114,11 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
                     if (preview.ahorro > 0.0001) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Ahorro: ${formatRefAmount(preview.ahorro)} REF en este pedido',
+                        'Ahorro: ${formatRefAmount(preview.ahorro)} REF',
                         style: TextStyle(
                           fontSize: compact ? 10.5 : 11,
                           fontWeight: FontWeight.w600,
-                          color: Colors.green.shade800,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -127,7 +129,7 @@ class AliadoUsdPaymentDiscountFichaBanner extends StatelessWidget {
           ),
           if (!compact) ...[
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'El total se actualiza al registrar el comprobante con este método.',
               style: TextStyle(
                 fontSize: 10,

@@ -6,6 +6,6 @@ enum AppHomeRole {
   /// Vista de aliado (taller, etc.).
   aliado,
 
-  /// Broker MotoLink: bandeja de aprobación.
+  /// Broker B2B Conecta: bandeja de aprobación.
   administrador,
 }

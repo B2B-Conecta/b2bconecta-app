@@ -249,7 +249,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
             style: TextStyle(
               fontSize: 13,
               height: 1.45,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
         ],
@@ -289,7 +289,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
               const SizedBox(height: 6),
               Text(
                 'Comprime las fotos de tu proveedor en un .zip',
-                style: TextStyle(color: Colors.grey.shade700),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -329,7 +329,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
             _statRow(
               Icons.help_outline,
               '${preview.unknownSkus.length} SKU sin producto en inventario',
-              color: Colors.orange.shade800,
+              color: AppColors.brandAccent,
             ),
           if (preview.overLimitSkus.isNotEmpty)
             _statRow(
@@ -405,7 +405,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
                             ),
                             Text(
                               mode.subtitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
                               ),

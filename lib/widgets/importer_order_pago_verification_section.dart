@@ -214,7 +214,7 @@ class _ImporterOrderPagoVerificationSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Comprobante de pago del aliado',
             style: TextStyle(
               fontWeight: FontWeight.w800,
@@ -227,7 +227,7 @@ class _ImporterOrderPagoVerificationSectionState
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Hay comprobantes distintos entre líneas (datos anteriores). Use «Ver comprobante»; si no coincide, contacte a MotoLink.',
+                'Hay comprobantes distintos entre líneas (datos anteriores). Use «Ver comprobante»; si no coincide, contacte a B2B Conecta.',
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.amber.shade900,
@@ -243,7 +243,7 @@ class _ImporterOrderPagoVerificationSectionState
               '${_lines.map((r) => _etiquetaEstado(r.pagoEstadoRevisionEfectivo)).join(", ")}',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.orange.shade900,
+                color: AppColors.brandBlue,
                 height: 1.3,
               ),
             ),
@@ -253,13 +253,13 @@ class _ImporterOrderPagoVerificationSectionState
             ref.pagoMetodo != null && ref.pagoMetodo!.trim().isNotEmpty
                 ? 'Método declarado: ${PagoMetodo.labelEs(ref.pagoMetodo!)}'
                 : 'Método declarado: —',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
           if (ref.comprobantePagoSubmittedAt != null) ...[
             const SizedBox(height: 4),
             Text(
               'Registrado: ${formatEsShortDateTime(ref.comprobantePagoSubmittedAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
           const SizedBox(height: 6),
@@ -320,7 +320,7 @@ class _ImporterOrderPagoVerificationSectionState
                 ref.pagoMetodo?.trim() == PagoMetodo.efectivo
                     ? 'El aliado puede declarar pago en efectivo desde su ficha del pedido.'
                     : 'El aliado declara método y comprobante en su ficha del pedido.',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
         ],
@@ -339,7 +339,7 @@ class _ImporterOrderPagoVerificationSectionState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!widget.hideMajorTitle) ...[
-            const Text(
+            Text(
               'Pago del aliado',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
@@ -353,13 +353,13 @@ class _ImporterOrderPagoVerificationSectionState
             r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty
                 ? 'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}'
                 : 'Método declarado: —',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
           if (r.comprobantePagoSubmittedAt != null) ...[
             const SizedBox(height: 4),
             Text(
               'Registrado: ${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
           const SizedBox(height: 6),
@@ -401,7 +401,7 @@ class _ImporterOrderPagoVerificationSectionState
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.35,
-                color: Colors.orange.shade900,
+                color: AppColors.brandBlue,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -432,7 +432,7 @@ class _ImporterOrderPagoVerificationSectionState
                 r.pagoMetodo?.trim() == PagoMetodo.efectivo
                     ? 'El aliado puede declarar pago en efectivo desde su ficha del pedido.'
                     : 'El aliado puede declarar método y adjuntar comprobante desde su ficha del pedido.',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
         ],

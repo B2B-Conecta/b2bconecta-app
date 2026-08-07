@@ -34,8 +34,8 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300, width: 1.2),
-        color: Colors.white,
+        border: Border.all(color: AppColors.borderSubtle, width: 1.2),
+        color: AppColors.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -79,12 +79,12 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: Colors.grey.shade700,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           Text(
                             name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
                               color: AppColors.textPrimary,
@@ -136,7 +136,7 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Colors.grey.shade900,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -174,11 +174,11 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
       case AliadoImportadorPagoFase.esperandoFacturaProveedor:
         return Colors.amber.shade900;
       case AliadoImportadorPagoFase.comprobanteEnRevision:
-        return Colors.orange.shade900;
+        return AppColors.brandBlue;
       case AliadoImportadorPagoFase.pendientePago:
         return AppColors.brandBlue;
       default:
-        return Colors.grey.shade700;
+        return AppColors.textSecondary;
     }
   }
 }
@@ -199,18 +199,18 @@ class _PasoChip extends StatelessWidget {
     final bg = done
         ? Colors.green.shade50
         : active
-            ? Colors.orange.shade50
-            : Colors.grey.shade100;
+            ? AppColors.brandBlueContainer
+            : AppColors.surfaceTinted;
     final border = done
         ? Colors.green.shade300
         : active
-            ? Colors.orange.shade300
-            : Colors.grey.shade300;
+            ? AppColors.brandAccent.withOpacity(0.55)
+            : AppColors.borderSubtle;
     final fg = done
         ? Colors.green.shade900
         : active
-            ? Colors.orange.shade900
-            : Colors.grey.shade700;
+            ? AppColors.brandBlue
+            : AppColors.textSecondary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

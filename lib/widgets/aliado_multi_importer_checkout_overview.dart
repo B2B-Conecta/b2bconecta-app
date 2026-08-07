@@ -51,7 +51,7 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Carrito con $nImp importadores',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
                     color: AppColors.textPrimary,
@@ -67,7 +67,7 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
             style: TextStyle(
               fontSize: 11.5,
               height: 1.35,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -131,7 +131,7 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
                           '${formatRefAmount(monto)} REF · ${fasePagoBloqueLabelEs(fase)}',
                           style: TextStyle(
                             fontSize: 10.5,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -152,13 +152,13 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
       case AliadoImportadorPagoFase.pagoConfirmado:
         return Colors.green.shade700;
       case AliadoImportadorPagoFase.comprobanteEnRevision:
-        return Colors.orange.shade800;
+        return AppColors.brandAccent;
       case AliadoImportadorPagoFase.pendientePago:
         return AppColors.brandBlue;
       case AliadoImportadorPagoFase.esperandoFacturaProveedor:
         return Colors.amber.shade900;
       default:
-        return Colors.grey.shade600;
+        return AppColors.textSecondary;
     }
   }
 

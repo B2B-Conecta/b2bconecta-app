@@ -88,7 +88,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
           ],

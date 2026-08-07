@@ -1,33 +1,41 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/theme_controller.dart';
 
-/// Fila compacta y uniforme: Cámara · Galería · Archivo.
+/// Acciones de captura/selección de medios.
+///
+/// Con [iconOnly] muestra solo iconos compactos (perfil, logos).
+/// Sin él, muestra chips con etiqueta (KYC, comprobantes).
 class MediaPickActionChips extends StatelessWidget {
   const MediaPickActionChips({
     super.key,
     required this.onCamera,
     required this.onGallery,
     required this.onFile,
+    this.onDelete,
     this.enabled = true,
     this.busy = false,
     this.fileLabel = 'Archivo',
     this.maxWidth = 280,
+    this.iconOnly = false,
   });
 
   final VoidCallback? onCamera;
   final VoidCallback? onGallery;
   final VoidCallback? onFile;
+  final VoidCallback? onDelete;
   final bool enabled;
   final bool busy;
   final String fileLabel;
   final double maxWidth;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
     if (busy) {
       return const SizedBox(
-        height: 44,
+        height: 40,
         child: Center(
           child: SizedBox(
             width: 20,
@@ -39,6 +47,40 @@ class MediaPickActionChips extends StatelessWidget {
     }
 
     final active = enabled;
+    if (iconOnly) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MediaPickIconButton(
+            icon: Icons.photo_camera_outlined,
+            tooltip: 'Cámara',
+            onTap: active ? onCamera : null,
+          ),
+          const SizedBox(width: 4),
+          _MediaPickIconButton(
+            icon: Icons.photo_library_outlined,
+            tooltip: 'Galería',
+            onTap: active ? onGallery : null,
+          ),
+          const SizedBox(width: 4),
+          _MediaPickIconButton(
+            icon: Icons.upload_file_outlined,
+            tooltip: fileLabel,
+            onTap: active ? onFile : null,
+          ),
+          if (onDelete != null) ...[
+            const SizedBox(width: 4),
+            _MediaPickIconButton(
+              icon: Icons.delete_outline,
+              tooltip: 'Quitar',
+              onTap: active ? onDelete : null,
+              destructive: true,
+            ),
+          ],
+        ],
+      );
+    }
+
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
       child: Row(
@@ -72,6 +114,66 @@ class MediaPickActionChips extends StatelessWidget {
   }
 }
 
+class _MediaPickIconButton extends StatelessWidget {
+  const _MediaPickIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        final active = onTap != null;
+        final accent = ThemeController.instance.isDark
+            ? AppColors.brandAccent
+            : AppColors.brandBlue;
+        final color = !active
+            ? AppColors.textMuted
+            : destructive
+                ? Colors.red.shade400
+                : accent;
+
+        return Tooltip(
+          message: tooltip,
+          child: Material(
+            color: AppColors.fieldFill,
+            shape: CircleBorder(
+              side: BorderSide(
+                color: active ? accent.withOpacity(0.45) : AppColors.borderSubtle,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              customBorder: const CircleBorder(),
+              child: Builder(
+                builder: (context) {
+                  final compact = MediaQuery.sizeOf(context).width < 600;
+                  final box = compact ? 36.0 : 40.0;
+                  return SizedBox(
+                    width: box,
+                    height: box,
+                    child: Icon(icon, size: compact ? 18 : 20, color: color),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _MediaPickChip extends StatelessWidget {
   const _MediaPickChip({
     required this.icon,
@@ -87,12 +189,12 @@ class _MediaPickChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = onTap != null;
     final borderColor =
-        active ? AppColors.brand.withOpacity(0.4) : Colors.grey.shade300;
-    final iconColor = active ? AppColors.brand : Colors.grey.shade500;
-    final textColor = active ? AppColors.textPrimary : Colors.grey.shade500;
+        active ? AppColors.brandAccent.withOpacity(0.45) : AppColors.borderSubtle;
+    final iconColor = active ? AppColors.brandAccent : AppColors.textMuted;
+    final textColor = active ? AppColors.textPrimary : AppColors.textMuted;
 
     return Material(
-      color: active ? Colors.white : Colors.grey.shade50,
+      color: active ? AppColors.card : AppColors.surfaceTinted,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),

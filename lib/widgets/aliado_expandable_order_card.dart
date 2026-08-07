@@ -199,7 +199,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               'SKU: ${r.productSku}',
                               style: TextStyle(
                                 fontSize: density.skuTextSize,
-                                color: Colors.grey.shade700,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -210,7 +210,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 : _lineaPrecioResumenAliado(r),
                             style: TextStyle(
                               fontSize: density.metaTextSize,
-                              color: Colors.grey.shade800,
+                              color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -225,7 +225,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               lines.first.destinoEntregaLineaCompactaEs,
                               style: TextStyle(
                                 fontSize: density.secondaryTextSize,
-                                color: Colors.grey.shade700,
+                                color: AppColors.textSecondary,
                                 height: 1.25,
                               ),
                             ),
@@ -617,7 +617,7 @@ List<Widget> _postTimelineBloquesAliado({
   if (timelinePorLinea) {
     for (var i = 0; i < lines.length; i++) {
       if (out.isNotEmpty) {
-        out.add(Divider(height: 1, color: Colors.grey.shade300));
+        out.add(Divider(height: 1, color: AppColors.borderSubtle));
         out.add(const SizedBox(height: 12));
       }
       if (!consolidarDatosImportador) {
@@ -643,7 +643,7 @@ List<Widget> _postTimelineBloquesAliado({
     if (!consolidarDatosImportador) {
       for (var i = 0; i < lines.length; i++) {
         if (i > 0) {
-          out.add(Divider(height: 1, color: Colors.grey.shade300));
+          out.add(Divider(height: 1, color: AppColors.borderSubtle));
           out.add(const SizedBox(height: 12));
         }
         out.add(TransactionRequestImporterContactSection(

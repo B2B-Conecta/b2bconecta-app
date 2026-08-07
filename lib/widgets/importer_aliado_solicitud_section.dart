@@ -46,7 +46,7 @@ Widget pedidoProductoLineCard(
     decoration: BoxDecoration(
       color: AppColors.surfaceTinted,
       borderRadius: BorderRadius.circular(web ? 6 : 8),
-      border: Border.all(color: Colors.grey.shade200),
+      border: Border.all(color: AppColors.borderSubtle),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,6 +56,7 @@ Widget pedidoProductoLineCard(
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: web ? 11.0 : (compact ? 12.0 : 12.5),
+            color: AppColors.textPrimary,
           ),
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
@@ -66,7 +67,7 @@ Widget pedidoProductoLineCard(
             'SKU: $sku',
             style: TextStyle(
               fontSize: web ? 9.5 : (compact ? 10 : 10.5),
-              color: Colors.grey.shade700,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -76,7 +77,7 @@ Widget pedidoProductoLineCard(
           style: TextStyle(
             fontSize: web ? 10.5 : (compact ? 11 : 11.5),
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade900,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -146,7 +147,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
               'Precios en REF = precio lista del importador (con oferta o volumen si aplican).',
               style: TextStyle(
                 fontSize: helpSize,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 height: 1.3,
               ),
             ),
@@ -270,7 +271,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
             '${r.precioTotalBsUi != null ? ' · ~${formatVesAmount(r.precioTotalBsUi!)} Bs' : ''}',
             style: TextStyle(
               fontSize: bodySize * 0.95,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
               height: 1.3,
             ),
           ),
@@ -290,7 +291,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
               'Zelle, Binance, USDT o efectivo aplican descuento en divisas al registrar el pago.',
               style: TextStyle(
                 fontSize: compact ? 10 : 10.5,
-                color: Colors.grey.shade700,
+                color: AppColors.textSecondary,
                 height: 1.25,
               ),
             ),
@@ -301,7 +302,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
               'REF = precio lista del importador (con oferta o volumen si aplican).',
               style: TextStyle(
                 fontSize: compact ? 9.5 : 10.5,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 height: 1.3,
               ),
             ),
@@ -376,7 +377,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
             '${formatRefAmount(totalRef)} REF',
             style: TextStyle(
               fontSize: bodySize * 0.95,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
               height: 1.3,
             ),
           ),
@@ -386,7 +387,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
               'REF = precio lista del importador (con oferta o volumen si aplican).',
               style: TextStyle(
                 fontSize: compact ? 9.5 : 10.5,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 height: 1.3,
               ),
             ),

@@ -124,7 +124,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
           style: TextStyle(
             fontSize: compact ? 11 : 12,
             fontWeight: FontWeight.w700,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
             letterSpacing: 0.2,
           ),
         ),
@@ -141,16 +141,18 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: AppColors.successGreen.withOpacity(0.12),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade200),
+              border: Border.all(
+                color: AppColors.successGreen.withOpacity(0.35),
+              ),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.payments_outlined,
                   size: 18,
-                  color: Colors.green.shade800,
+                  color: AppColors.successGreen,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -162,7 +164,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Colors.green.shade900,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -171,7 +173,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                         style: TextStyle(
                           fontSize: compact ? 14 : 15,
                           fontWeight: FontWeight.w800,
-                          color: Colors.green.shade800,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -214,7 +216,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             style: TextStyle(
               fontSize: strikeSize,
               decoration: TextDecoration.lineThrough,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
               height: 1.1,
             ),
@@ -224,7 +226,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
           style: TextStyle(
             fontSize: refSize,
             fontWeight: FontWeight.w900,
-            color: hasStrike ? Colors.green.shade700 : AppColors.brand,
+            color: hasStrike ? AppColors.successGreen : AppColors.brandAccent,
             height: 1.05,
           ),
         ),
@@ -263,9 +265,9 @@ class CatalogProductOfferChips extends StatelessWidget {
       chips.add(
         _OfferChipData(
           label: 'Oferta',
-          bg: Colors.orange.shade50,
-          fg: Colors.orange.shade900,
-          border: Colors.orange.shade200,
+          bg: AppColors.brandBlueContainer,
+          fg: AppColors.brandAccent,
+          border: AppColors.brandAccent.withOpacity(0.35),
         ),
       );
     }
@@ -275,9 +277,9 @@ class CatalogProductOfferChips extends StatelessWidget {
       chips.add(
         _OfferChipData(
           label: vol,
-          bg: Colors.teal.shade50,
-          fg: Colors.teal.shade900,
-          border: Colors.teal.shade200,
+          bg: AppColors.brandBlueContainer,
+          fg: AppColors.textPrimary,
+          border: AppColors.borderSubtle,
         ),
       );
     }
@@ -291,9 +293,9 @@ class CatalogProductOfferChips extends StatelessWidget {
       chips.add(
         _OfferChipData(
           label: zelle,
-          bg: Colors.green.shade50,
-          fg: Colors.green.shade900,
-          border: Colors.green.shade200,
+          bg: AppColors.successGreen.withOpacity(0.12),
+          fg: AppColors.textPrimary,
+          border: AppColors.successGreen.withOpacity(0.35),
         ),
       );
     }

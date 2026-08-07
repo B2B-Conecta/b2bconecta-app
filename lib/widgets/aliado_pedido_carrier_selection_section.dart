@@ -341,14 +341,14 @@ class _AliadoPedidoCarrierSelectionSectionState
               const SizedBox(height: 4),
               Text(
                 CarrierFletePagoModo.labelEs(r.carrierFletePagoModoSnapshot),
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
               ),
             ],
             if (r.carrierFeeUsdSnapshot != null) ...[
               const SizedBox(height: 4),
               Text(
                 'Flete estimado: ${CarrierEtaFormat.feeLabel(r.carrierFeeUsdSnapshot)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
               ),
             ],
             const SizedBox(height: 6),
@@ -573,7 +573,7 @@ class _CarrierOptionCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppColors.brandOrange : Colors.grey.shade300,
+            color: selected ? AppColors.brand : AppColors.borderSubtle,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -600,7 +600,7 @@ class _CarrierOptionCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 CarrierFletePagoModo.shortLabelEs(carrier.fletePagoModo),
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 6),
               Wrap(

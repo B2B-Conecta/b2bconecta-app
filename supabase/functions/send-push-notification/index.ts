@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "user_id required" }, 400);
   }
 
-  const title = payload.title?.trim() || "MotoLink";
+  const title = payload.title?.trim() || "B2B Conecta";
   const body = payload.body?.trim() || title;
   const type = payload.type?.trim() || "mensaje";
   const relatedId = payload.related_id?.trim() ?? "";

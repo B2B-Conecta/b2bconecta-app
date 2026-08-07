@@ -7,11 +7,11 @@ abstract final class OrderSectionHelp {
   static const adminAnularPedido =
       'Cierra el pedido en curso; requiere motivo. El inventario puede revertirse.';
   static const carritoMaestroAliado =
-      'Un solo pedido en MotoLink: destino y productos compartidos. '
+      'Un solo pedido en B2B Conecta: destino y productos compartidos. '
       'Elija un importador abajo para ver envío, factura y pago.';
   static const chatPedido =
       'Desde que el pedido está pendiente, aliado e importador pueden escribir aquí '
-      '(cantidad, plazos y logística). MotoLink puede leer el hilo.';
+      '(cantidad, plazos y logística). B2B Conecta puede leer el hilo.';
   static const pagoAliadoMetodo =
       'Revise la factura, elija el método y adjunte el comprobante.';
   static const pagoAliadoArchivo =

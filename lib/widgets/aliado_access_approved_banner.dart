@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 
-/// Banner destacado cuando MotoLink valida el acceso de un aliado a la plataforma.
+/// Banner destacado cuando B2B Conecta valida el acceso de un aliado a la plataforma.
 class AliadoAccessApprovedBanner extends StatelessWidget {
   const AliadoAccessApprovedBanner({
     super.key,
@@ -71,7 +71,7 @@ class AliadoAccessApprovedBanner extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: onDismiss,
-                icon: const Icon(
+                icon: Icon(
                   Icons.close,
                   size: 20,
                   color: AppColors.textSecondary,

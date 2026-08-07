@@ -25,7 +25,7 @@ class ProfileDocumentModel {
   /// Versión vigente del tipo de documento (solo una por `doc_type`).
   final bool isCurrent;
 
-  /// Revisión individual MotoLink (`pendiente` … `aprobado`).
+  /// Revisión individual B2B Conecta (`pendiente` … `aprobado`).
   final String? reviewStatus;
 
   /// Comentario del broker al aprobar/rechazar (visible para el aliado si aplica).

@@ -56,7 +56,7 @@ class _MainShellState extends State<MainShell> {
   late final NotificationProvider _notifications;
   bool _showAliadoAccessApprovedBanner = false;
   String _aliadoAccessApprovedMessage =
-      'Su acceso a MotoLink está habilitado. Ya puede operar en la plataforma.';
+      'Su acceso a B2B Conecta está habilitado. Ya puede operar en la plataforma.';
 
   @override
   void initState() {
@@ -163,7 +163,7 @@ class _MainShellState extends State<MainShell> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -191,53 +191,49 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.local_shipping,
       label: 'Pedidos',
       title: 'Pedidos',
-      subtitle:
-          'Use «En curso», «Cerrados» o «Todos» y filtre por estado o búsqueda.',
+      subtitle: 'En curso · Cerrados · Todos',
     ),
     AdminShellDestination(
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics,
       label: 'Reportes',
-      title: 'Reportes de encomiendas',
+      title: 'Reportes',
+      subtitle: 'Encomiendas · Promos · Usuarios',
     ),
     AdminShellDestination(
       icon: Icons.star_rate_outlined,
       selectedIcon: Icons.star_rate,
       label: 'Valoraciones',
       title: 'Valoraciones',
-      subtitle:
-          'Expediente aliado ↔ importador tras la entrega. Filtre por dirección y despliegue el detalle.',
+      subtitle: 'Aliado ↔ importador',
     ),
     AdminShellDestination(
       icon: Icons.payments_outlined,
       selectedIcon: Icons.payments,
       label: 'Comisiones',
-      title: 'Comisiones MotoLink',
-      subtitle:
-          'Devengo al marcar Recibido · corte semanal y facturación por importador.',
+      title: 'Comisiones',
+      subtitle: 'Devengo · cortes · facturación',
     ),
     AdminShellDestination(
       icon: Icons.verified_user_outlined,
       selectedIcon: Icons.verified_user,
       label: 'KYC',
-      title: 'Verificación KYC',
-      subtitle:
-          'Revise documentación de aliados e importadores; apruebe por archivo o el estado global.',
+      title: 'KYC',
+      subtitle: 'Documentos · aprobación',
     ),
     AdminShellDestination(
       icon: Icons.support_agent_outlined,
       selectedIcon: Icons.support_agent,
       label: 'Soporte',
-      title: 'Atención al cliente',
-      subtitle:
-          'Reclamos de aliados e importadores. Responda y cierre cuando quede resuelto.',
+      title: 'Soporte',
+      subtitle: 'Reclamos · respuesta',
     ),
     AdminShellDestination(
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
       label: 'Perfil',
-      title: 'Mi perfil',
-      subtitle: 'Datos de la cuenta broker MotoLink.',
+      title: 'Perfil',
+      subtitle: 'Cuenta broker',
     ),
   ];
 
@@ -247,29 +243,28 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.grid_view,
       label: 'Catálogo',
       title: 'Catálogo',
-      subtitle:
-          'Explore repuestos de importadores, filtre por categoría y agregue al carrito.',
+      subtitle: 'Repuestos · filtros · carrito',
     ),
     ShellDestination(
       icon: Icons.shopping_cart_outlined,
       selectedIcon: Icons.shopping_cart,
       label: 'Pedidos',
-      title: 'Mis pedidos',
-      subtitle: 'Siga el estado de sus encomiendas y gestione entregas.',
+      title: 'Pedidos',
+      subtitle: 'En curso · entregas',
     ),
     ShellDestination(
       icon: Icons.star_outline,
       selectedIcon: Icons.star,
       label: 'Reputación',
       title: 'Reputación',
-      subtitle: 'Valoraciones recibidas y resumen semanal de su desempeño.',
+      subtitle: 'Valoraciones · resumen',
     ),
     ShellDestination(
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
       label: 'Perfil',
-      title: 'Mi perfil',
-      subtitle: 'Datos comerciales, KYC, soporte y configuración de cuenta.',
+      title: 'Perfil',
+      subtitle: 'Datos · KYC · cuenta',
     ),
   ];
 
@@ -279,28 +274,28 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.inventory_2,
       label: 'Inventario',
       title: 'Inventario',
-      subtitle: 'Publique repuestos, precios y stock para la red de aliados.',
+      subtitle: 'Stock · precios · catálogo',
     ),
     ShellDestination(
       icon: Icons.shopping_cart_outlined,
       selectedIcon: Icons.shopping_cart,
       label: 'Pedidos',
-      title: 'Pedidos activos',
-      subtitle: 'Encomiendas en curso y historial de ventas a aliados.',
+      title: 'Pedidos',
+      subtitle: 'En curso · historial',
     ),
     ShellDestination(
       icon: Icons.star_outline,
       selectedIcon: Icons.star,
       label: 'Reputación',
       title: 'Reputación',
-      subtitle: 'Valoraciones de aliados y métricas de servicio.',
+      subtitle: 'Métricas · comentarios',
     ),
     ShellDestination(
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
       label: 'Perfil',
-      title: 'Mi perfil',
-      subtitle: 'Datos comerciales, KYC, soporte y configuración de cuenta.',
+      title: 'Perfil',
+      subtitle: 'Datos · cuenta',
     ),
   ];
 
@@ -340,7 +335,6 @@ class _MainShellState extends State<MainShell> {
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,
-    String? subtitle,
   }) {
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -354,32 +348,17 @@ class _MainShellState extends State<MainShell> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if (subtitle != null && subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      height: 1.35,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ],
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
+          // En móvil omitimos subtítulos largos: el contenido habla por sí solo.
           Expanded(child: child),
         ],
       ),
@@ -423,7 +402,6 @@ class _MainShellState extends State<MainShell> {
           for (var i = 0; i < panels.length; i++)
             _adminOrdersScaffold(
               title: _adminDestinations[i].title,
-              subtitle: _adminDestinations[i].subtitle,
               child: panels[i],
             ),
           _ProfileTab(
@@ -485,7 +463,7 @@ class _MainShellState extends State<MainShell> {
             IconButton(
               tooltip: 'Carrito',
               onPressed: _openAliadoCart,
-              icon: Icon(Icons.shopping_cart_outlined, color: Colors.grey.shade700),
+              icon: Icon(Icons.shopping_cart_outlined, color: AppColors.textSecondary),
             ),
             if (n > 0)
               Positioned(
@@ -494,7 +472,7 @@ class _MainShellState extends State<MainShell> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.brandOrange,
+                    color: AppColors.brand,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
@@ -849,7 +827,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   Widget _buildSupportEntryCard() {
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -868,7 +846,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Atención al cliente',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
@@ -878,12 +856,12 @@ class _ProfileTabState extends State<_ProfileTab> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Abra un reclamo con el equipo MotoLink '
+                      'Abra un reclamo con el equipo B2B Conecta '
                       '(máx. 3 abiertos).',
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.35,
-                        color: Colors.grey.shade800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -891,7 +869,7 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
               const Icon(
                 Icons.chevron_right,
-                color: AppColors.brandOrange,
+                color: AppColors.brand,
               ),
             ],
           ),
@@ -902,7 +880,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   Widget _buildCarriersEntryCard() {
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -927,7 +905,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Transportistas',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
@@ -942,7 +920,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.35,
-                        color: Colors.grey.shade800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -950,7 +928,7 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
               const Icon(
                 Icons.chevron_right,
-                color: AppColors.brandOrange,
+                color: AppColors.brand,
               ),
             ],
           ),

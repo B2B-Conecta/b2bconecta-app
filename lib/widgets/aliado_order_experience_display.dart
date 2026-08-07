@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 import '../models/rating_questionnaire_model.dart';
 import '../models/transaction_request_model.dart';
 import '../services/supabase_service.dart';
@@ -57,13 +59,13 @@ class AliadoOrderExperienceStatusChip extends StatelessWidget {
     if (pendiente) {
       return Chip(
         avatar:
-            Icon(Icons.star_outline, size: 16, color: Colors.orange.shade800),
+            Icon(Icons.star_outline, size: 16, color: AppColors.brandAccent),
         label: const Text(
           'Valoración pendiente',
           style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
         ),
-        backgroundColor: Colors.orange.shade50,
-        side: BorderSide(color: Colors.orange.shade200),
+        backgroundColor: AppColors.brandBlueContainer,
+        side: BorderSide(color: AppColors.brandAccent.withOpacity(0.35)),
         visualDensity: VisualDensity.compact,
         padding: EdgeInsets.zero,
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -240,7 +242,7 @@ class _AliadoOrderExperienceRegisteredCardState
             const SizedBox(height: 6),
             Text(
               'Registrada el ${formatEsShortDateTime(at)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
           if (comment.isNotEmpty) ...[
@@ -250,7 +252,7 @@ class _AliadoOrderExperienceRegisteredCardState
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 2),
@@ -279,7 +281,7 @@ class _AliadoOrderExperienceRegisteredCardState
                 const SizedBox(width: 8),
                 Text(
                   'Cargando detalle opcional…',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -297,7 +299,7 @@ class _AliadoOrderExperienceRegisteredCardState
             style: TextStyle(
               fontSize: 10.5,
               height: 1.3,
-              color: Colors.grey.shade700,
+              color: AppColors.textSecondary,
             ),
           ),
         ],

@@ -141,13 +141,13 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                           ),
                         ),
                         child: Text(
-                          'Comuníquese con el equipo MotoLink por incidencias de '
+                          'Comuníquese con el equipo B2B Conecta por incidencias de '
                           'cuenta, pagos, pedidos, verificación o fallas de la plataforma. '
                           'Puede tener hasta 3 reclamos abiertos a la vez.',
                           style: TextStyle(
                             fontSize: 13,
                             height: 1.4,
-                            color: Colors.grey.shade800,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -157,7 +157,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
-                          color: Colors.grey.shade700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -167,16 +167,16 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                           child: Text(
                             'No tiene reclamos todavía.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade700),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         )
                       else
                         ..._rows.map((t) {
                           final color = t.isClosed
-                              ? Colors.grey.shade700
+                              ? AppColors.textSecondary
                               : (t.status == SupportTicketStatus.enRevision
                                   ? AppColors.brandBlue
-                                  : AppColors.brandOrange);
+                                  : AppColors.brand);
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Material(
@@ -227,7 +227,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                                             t.categoryLabel,
                                             style: TextStyle(
                                               fontSize: 11,
-                                              color: Colors.grey.shade600,
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                         ],
@@ -245,7 +245,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                                         formatEsShortDateTime(t.createdAt),
                                         style: TextStyle(
                                           fontSize: 11.5,
-                                          color: Colors.grey.shade600,
+                                          color: AppColors.textSecondary,
                                         ),
                                       ),
                                     ],

@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/commission_settlement_model.dart';
@@ -7,7 +9,7 @@ import '../services/supabase_service.dart';
 import '../utils/app_date_format.dart';
 import '../utils/commission_settlement_fiscal.dart';
 
-/// Importador: registrar comprobante de pago de comisión MotoLink por corte.
+/// Importador: registrar comprobante de pago de comisión B2B Conecta por corte.
 class ImporterCommissionPagoSection extends StatefulWidget {
   const ImporterCommissionPagoSection({
     super.key,
@@ -85,7 +87,7 @@ class _ImporterCommissionPagoSectionState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Comprobante enviado. MotoLink revisará el pago y le notificará.',
+            'Comprobante enviado. B2B Conecta revisará el pago y le notificará.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -108,8 +110,8 @@ class _ImporterCommissionPagoSectionState
         padding: const EdgeInsets.only(top: 8),
         child: Text(
           s.paidAt != null
-              ? 'Pago confirmado por MotoLink (${formatEsShortDateTime(s.paidAt)}).'
-              : 'Pago confirmado por MotoLink.',
+              ? 'Pago confirmado por B2B Conecta (${formatEsShortDateTime(s.paidAt)}).'
+              : 'Pago confirmado por B2B Conecta.',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -126,9 +128,9 @@ class _ImporterCommissionPagoSectionState
       padding: const EdgeInsets.only(top: 10),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
+          color: AppColors.brandBlueContainer,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.orange.shade200),
+          border: Border.all(color: AppColors.brandAccent.withOpacity(0.35)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(10),
@@ -136,11 +138,11 @@ class _ImporterCommissionPagoSectionState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Pago de comisión a MotoLink',
+                'Pago de comisión a B2B Conecta',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: Colors.grey.shade900,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -154,7 +156,7 @@ class _ImporterCommissionPagoSectionState
                 'Base comisión USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
                 'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} % '
                 'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 6),
               Text(
@@ -165,8 +167,8 @@ class _ImporterCommissionPagoSectionState
                   color: s.pagoRechazado
                       ? Colors.red.shade800
                       : s.pagoEnRevision
-                          ? Colors.orange.shade900
-                          : Colors.grey.shade800,
+                          ? AppColors.brandBlue
+                          : AppColors.textPrimary,
                 ),
               ),
               if (s.pagoRechazado && s.pagoRechazoNota != null &&
@@ -181,7 +183,7 @@ class _ImporterCommissionPagoSectionState
                 const SizedBox(height: 4),
                 Text(
                   'Enviado: ${formatEsShortDateTime(s.pagoComprobanteSubmittedAt)}',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                 ),
               ],
               const SizedBox(height: 8),

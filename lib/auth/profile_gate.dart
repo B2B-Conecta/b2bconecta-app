@@ -48,7 +48,7 @@ class _ProfileGateState extends State<ProfileGate> {
       future: _profileFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: AppColors.background,
             body: Center(
               child: Column(
@@ -86,14 +86,14 @@ class _ProfileGateState extends State<ProfileGate> {
                       'No se pudo cargar el perfil.',
                       textAlign: TextAlign.center,
                       style:
-                          TextStyle(color: Colors.grey.shade800, fontSize: 16),
+                          TextStyle(color: AppColors.textPrimary, fontSize: 16),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '${snapshot.error}',
                       textAlign: TextAlign.center,
                       style:
-                          TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                          TextStyle(color: AppColors.textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
                     FilledButton(

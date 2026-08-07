@@ -166,7 +166,7 @@ class _CheckoutCarrierSelectionSheetState
           Text(
             'Elija la empresa de transporte de cada importador. '
             'Compare ETA, distancia y métodos de pago aceptados.',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           if (_loading)
@@ -280,8 +280,8 @@ class _ImporterCarrierPicker extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: selected
-                              ? AppColors.brandOrange
-                              : Colors.grey.shade300,
+                              ? AppColors.brand
+                              : AppColors.borderSubtle,
                           width: selected ? 1.5 : 1,
                         ),
                         color: selected
@@ -304,7 +304,7 @@ class _ImporterCarrierPicker extends StatelessWidget {
                                 carrier.contactName!,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade700,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             const SizedBox(height: 6),
@@ -337,7 +337,7 @@ class _ImporterCarrierPicker extends StatelessWidget {
                               'Pagos: ${carrier.pagoMetodosLabel}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade700,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             if (selected && carrier.drivers.isNotEmpty) ...[

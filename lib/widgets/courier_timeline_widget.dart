@@ -97,7 +97,7 @@ String _enPreparacionSubtitle(
     if (p != null && p.isNotEmpty) {
       return 'Preparación en su almacén · $p';
     }
-    return 'Preparación en su almacén (pedido del aliado vía MotoLink)';
+    return 'Preparación en su almacén (pedido del aliado vía B2B Conecta)';
   }
   final p = r.resumenProveedoresLineaTimeline;
   if (p != null && p.isNotEmpty) {
@@ -254,7 +254,7 @@ class CourierTimelineWidget extends StatelessWidget {
               if (i > 0)
                 Divider(
                   height: compact ? 12 : 16,
-                  color: Colors.grey.shade200,
+                  color: AppColors.divider,
                 ),
               _StepRow(
                 step: s,
@@ -285,12 +285,12 @@ class CourierTimelineWidget extends StatelessWidget {
         else
           DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.card,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: AppColors.borderSubtle),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: AppColors.black.withOpacity(0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -321,7 +321,7 @@ class CourierTimelineWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showHeading) ...[
-          const Text(
+          Text(
             'Seguimiento del envío',
             style: TextStyle(
               fontWeight: FontWeight.w800,
@@ -347,7 +347,7 @@ class CourierTimelineWidget extends StatelessWidget {
                     Expanded(
                       child: Text(
                         anulM
-                            ? 'Pedido anulado por MotoLink · '
+                            ? 'Pedido anulado por B2B Conecta · '
                                 '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
                             : (cancelImp
                                 ? 'Pedido cancelado por proveedor · '
@@ -369,7 +369,7 @@ class CourierTimelineWidget extends StatelessWidget {
                 if (anulM && mAnula != null && mAnula.trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
-                    'Motivo (MotoLink): $mAnula',
+                    'Motivo (B2B Conecta): $mAnula',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.3,
@@ -455,7 +455,7 @@ class _ProgressBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress.clamp(0.0, 1.0),
             minHeight: web ? 4 : (compact ? 5 : 7),
-            backgroundColor: Colors.grey.shade200,
+            backgroundColor: AppColors.borderSubtle,
             color: AppColors.brand,
           ),
         ),
@@ -466,7 +466,9 @@ class _ProgressBar extends StatelessWidget {
             children: steps.map((s) {
               final color = s.done
                   ? AppColors.brand
-                  : (s.current ? AppColors.brandBlue : Colors.grey.shade400);
+                  : (s.current
+                      ? AppColors.brandAccent
+                      : AppColors.textMuted);
               return Icon(
                 s.icon,
                 size: web ? 14 : (compact ? 18 : 22),
@@ -493,7 +495,7 @@ class _StepRow extends StatelessWidget {
     final s = step;
     final color = s.done
         ? AppColors.brand
-        : (s.current ? AppColors.brandBlue : Colors.grey.shade400);
+        : (s.current ? AppColors.brandAccent : AppColors.textMuted);
     final iconBox = web ? 26.0 : (compact ? 32.0 : 36.0);
     final iconSize = web ? 13.0 : (compact ? 16.0 : 18.0);
     final titleSize = web ? 11.0 : (compact ? 12.0 : 13.0);
@@ -540,7 +542,7 @@ class _StepRow extends StatelessWidget {
                 s.subtitle,
                 style: TextStyle(
                   fontSize: subSize,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                   height: 1.25,
                 ),
               ),
@@ -551,7 +553,7 @@ class _StepRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: subSize,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],

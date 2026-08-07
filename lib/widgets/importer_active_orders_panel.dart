@@ -305,7 +305,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             avatar: Icon(
               Icons.calendar_month_outlined,
               size: 16,
-              color: _hasDateFilter ? AppColors.brandBlue : Colors.grey.shade600,
+              color: _hasDateFilter ? AppColors.brandBlue : AppColors.textSecondary,
             ),
             labelStyle: TextStyle(
               fontWeight: _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
@@ -329,7 +329,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               avatar: Icon(
                 Icons.warning_amber_rounded,
                 size: 16,
-                color: _morosoOnly ? Colors.red.shade800 : Colors.grey.shade600,
+                color: _morosoOnly ? Colors.red.shade800 : AppColors.textSecondary,
               ),
             ),
         ],
@@ -612,12 +612,12 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 100),
+          children: [
+            const SizedBox(height: 100),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Aparecen aquí los pedidos que MotoLink te asigne. En «Nuevos» ves lo último.',
+                'Sin pedidos asignados',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary, height: 1.35),
               ),
@@ -660,7 +660,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                               children: [
                                 Text(
                                   'Ningún pedido coincide con los filtros.',
-                                  style: TextStyle(color: Colors.grey.shade700),
+                                  style: TextStyle(color: AppColors.textSecondary),
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,

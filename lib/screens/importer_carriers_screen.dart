@@ -193,7 +193,7 @@ class _EmptyCarriersState extends StatelessWidget {
                 'Registre empresas de transporte con cobertura, tarifas y métodos de pago. '
                 'Los aliados las verán al confirmar pedidos.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                style: TextStyle(color: AppColors.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -275,7 +275,7 @@ class _CarrierCard extends StatelessWidget {
                           if (!carrier.isActive)
                             _StatusChip(
                               label: 'Inactivo',
-                              color: Colors.grey.shade600,
+                              color: AppColors.textSecondary,
                               background: Colors.grey.shade200,
                             ),
                         ],
@@ -285,7 +285,7 @@ class _CarrierCard extends StatelessWidget {
                         contactParts.join(' · '),
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -304,7 +304,7 @@ class _CarrierCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.payments_outlined,
-                    size: 16, color: Colors.grey.shade600),
+                    size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -314,7 +314,7 @@ class _CarrierCard extends StatelessWidget {
                         'Métodos de pago',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -387,17 +387,17 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
+        Icon(icon, size: 16, color: AppColors.textSecondary),
         const SizedBox(width: 8),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
               children: [
                 TextSpan(
                   text: '$label: ',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -559,7 +559,7 @@ class _CarrierDriversScreenState extends State<_CarrierDriversScreen> {
                           child: Text(
                             'Agregue conductores de confianza para este transportista.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade700),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         ),
                       )

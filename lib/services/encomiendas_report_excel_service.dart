@@ -119,7 +119,7 @@ class EncomiendasReportExcelService {
     var row = startRow;
     sheet
         .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
-        .value = TextCellValue('MotoLink — Reporte de encomiendas');
+        .value = TextCellValue('B2B Conecta — Reporte de encomiendas');
     row++;
     final stamp = meta.generatedAt ?? DateTime.now();
     sheet

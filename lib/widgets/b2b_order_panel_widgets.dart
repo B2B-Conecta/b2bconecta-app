@@ -66,7 +66,7 @@ class B2bPanelSectionCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: density.panelCardSubtitleSize,
                               height: 1.35,
-                              color: Colors.grey.shade800,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],

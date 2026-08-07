@@ -131,7 +131,7 @@ class _ImporterPickupLocationsPanelState
             ),
             Text(
               OrderPickupFlowCopy.ubicacionesIntro,
-              style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
             if (_loading)
@@ -150,7 +150,7 @@ class _ImporterPickupLocationsPanelState
             else if (_locations.where((l) => l.isActive).isEmpty)
               Text(
                 OrderPickupFlowCopy.ubicacionesVacias,
-                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
               )
             else
               ..._locations.where((l) => l.isActive).map(
@@ -216,7 +216,7 @@ class _LocationTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               location.ubicacionMultilinea,
-              style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
             Row(

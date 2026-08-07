@@ -193,11 +193,11 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                 final t = visible[i];
                                 final expanded = _expandedTicketId == t.id;
                                 final color = t.isClosed
-                                    ? Colors.grey.shade700
+                                    ? AppColors.textSecondary
                                     : (t.status ==
                                             SupportTicketStatus.enRevision
                                         ? AppColors.brandBlue
-                                        : AppColors.brandOrange);
+                                        : AppColors.brand);
                                 return Card(
                                   clipBehavior: Clip.antiAlias,
                                   child: InkWell(
@@ -236,7 +236,7 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                                 t.categoryLabel,
                                                 style: TextStyle(
                                                   fontSize: 11,
-                                                  color: Colors.grey.shade600,
+                                                  color: AppColors.textSecondary,
                                                 ),
                                               ),
                                             ],
@@ -255,7 +255,7 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                             '${t.creatorDisplayName}',
                                             style: TextStyle(
                                               fontSize: 12.5,
-                                              color: Colors.grey.shade800,
+                                              color: AppColors.textPrimary,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
@@ -263,7 +263,7 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                             formatEsShortDateTime(t.createdAt),
                                             style: TextStyle(
                                               fontSize: 11.5,
-                                              color: Colors.grey.shade600,
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                           if (expanded) ...[

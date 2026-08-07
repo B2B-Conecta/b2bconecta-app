@@ -140,7 +140,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
       padding: const EdgeInsets.only(top: 20, bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.5,
@@ -169,13 +169,13 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: AppColors.borderSubtle,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Filtros de pedidos',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
@@ -184,7 +184,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Estado, morosidad y rango de fechas. Cerrados: fecha de cierre; '
                   'activos: fecha de alta.',
                   style: TextStyle(
@@ -259,7 +259,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                     Icons.warning_amber_rounded,
                     color: _morosoOnly
                         ? Colors.red.shade800
-                        : Colors.grey.shade600,
+                        : AppColors.textSecondary,
                   ),
                 ),
                 _sectionTitle('FECHA DEL PEDIDO'),

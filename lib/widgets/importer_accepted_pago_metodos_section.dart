@@ -267,7 +267,7 @@ class _ImporterAcceptedPagoMetodosSectionState
                 border: Border.all(
                   color: _pagoSoloDivisas
                       ? Colors.green.shade400
-                      : Colors.grey.shade300,
+                      : AppColors.borderSubtle,
                 ),
               ),
               child: Padding(
@@ -398,7 +398,7 @@ class _ImporterPagoMetodoTileState extends State<_ImporterPagoMetodoTile> {
             border: Border.all(
               color: widget.checked
                   ? AppColors.brandBlue.withOpacity(0.35)
-                  : Colors.grey.shade300,
+                  : AppColors.borderSubtle,
             ),
           ),
           child: Column(
@@ -455,7 +455,7 @@ class _ImporterPagoMetodoTileState extends State<_ImporterPagoMetodoTile> {
                     'Datos registrados · toque ⌄ para editar',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),

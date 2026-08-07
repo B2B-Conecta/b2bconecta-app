@@ -101,8 +101,9 @@ class _CommissionSettlementListFilterBarState
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: 'Buscar importador, RIF o referencia',
+            hintStyle: AppColors.hintStyle,
             prefixIcon:
-                const Icon(Icons.search, color: AppColors.textSecondary),
+                Icon(Icons.search, color: AppColors.textSecondary),
             suffixIcon: widget.searchController.text.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear, size: 20),
@@ -114,18 +115,18 @@ class _CommissionSettlementListFilterBarState
                   )
                 : null,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.fieldFill,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 10,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -144,18 +145,18 @@ class _CommissionSettlementListFilterBarState
             prefixIcon:
                 const Icon(Icons.storefront_outlined, size: 20),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.fieldFill,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 10,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
             ),
           ),
           items: [
@@ -183,7 +184,7 @@ class _CommissionSettlementListFilterBarState
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
             const Spacer(),

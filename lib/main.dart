@@ -6,11 +6,14 @@ import 'app_scaffold_messenger.dart';
 import 'auth/auth_gate.dart';
 import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await PushNotificationService.instance.initialize();
+  ThemeController.instance.attach();
+  await ThemeController.instance.load();
 
   final url = dotenv.env['NEXT_PUBLIC_SUPABASE_URL']?.trim();
   final anonKey = (dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY'] ??
@@ -28,7 +31,6 @@ void main() async {
   await Supabase.initialize(
     url: url,
     anonKey: anonKey,
-    // PKCE + deep links: necesario para que el enlace del correo (recuperación) abra sesión en la app.
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
       detectSessionInUri: true,
@@ -42,12 +44,32 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MotoLink',
-      debugShowCheckedModeBanner: false,
-      scaffoldMessengerKey: scaffoldMessengerKey,
-      theme: buildAppTheme(),
-      home: const AuthGate(),
+    final themeController = ThemeController.instance;
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) {
+        AppColors.brightness = themeController.effectiveBrightness;
+        final mode = themeController.mode;
+        return MaterialApp(
+          title: 'B2B Conecta',
+          debugShowCheckedModeBanner: false,
+          scaffoldMessengerKey: scaffoldMessengerKey,
+          navigatorKey: rootNavigatorKey,
+          theme: buildAppTheme(),
+          darkTheme: buildAppDarkTheme(),
+          // Solo claro/oscuro (nunca system).
+          themeMode: mode,
+          builder: (context, child) {
+            AppColors.brightness = themeController.effectiveBrightness;
+            // Key fuerza reconstrucción completa de la UI al cambiar tono.
+            return KeyedSubtree(
+              key: ValueKey<String>('theme-${mode.name}'),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: const AuthGate(),
+        );
+      },
     );
   }
 }

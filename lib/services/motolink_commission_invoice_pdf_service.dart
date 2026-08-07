@@ -8,7 +8,7 @@ import '../utils/commission_settlement_fiscal.dart';
 import '../utils/ves_amount_format.dart';
 import 'motolink_commission_settlement_pdf_layout.dart';
 
-/// Factura fiscal de comisión MotoLink → importador (corte semanal).
+/// Factura fiscal de comisión B2B Conecta → importador (corte semanal).
 class MotolinkCommissionInvoicePdfService {
   MotolinkCommissionInvoicePdfService._();
 
@@ -49,7 +49,7 @@ class MotolinkCommissionInvoicePdfService {
     final ivaPct = CommissionSettlementFiscal.ivaPct;
     final serviceDesc =
         'Servicio de intermediación digital y uso de plataforma tecnológica '
-        'MotoLink, según corte de cuenta referencia $ref';
+        'B2B Conecta, según corte de cuenta referencia $ref';
 
     final tasaTxt =
         formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4);
@@ -59,7 +59,7 @@ class MotolinkCommissionInvoicePdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(28),
         footer: (ctx) => MotolinkCommissionSettlementPdfLayout.pageFooter(
-          'Documento fiscal por intermediación B2B (comisión MotoLink + IVA). '
+          'Documento fiscal por intermediación B2B (comisión B2B Conecta + IVA). '
           'Sujeto a validación con su contador. '
           'Tasa BCV referencia emisión: $tasaTxt.',
         ),

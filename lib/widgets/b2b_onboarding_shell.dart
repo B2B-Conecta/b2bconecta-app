@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
+import 'motolink_pro_logo.dart';
 
 /// Layout onboarding / registro B2B: panel de marca en escritorio + formulario centrado.
 class B2bOnboardingShell extends StatelessWidget {
@@ -49,14 +50,16 @@ class B2bOnboardingShell extends StatelessWidget {
                       maxWidth: AppBreakpoints.formMaxWidth,
                     ),
                     child: Material(
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.surfaceTinted
+                          : AppColors.white,
                       elevation: 0,
                       borderRadius: BorderRadius.circular(20),
                       clipBehavior: Clip.antiAlias,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade200),
+                          border: Border.all(color: AppColors.borderSubtle),
                           boxShadow: AppDecorations.cardShadow,
                         ),
                         child: Padding(
@@ -87,9 +90,9 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0D47A1),
+            AppColors.black,
             AppColors.brandBlue,
-            Color(0xFF1976D2),
+            AppColors.brandAccent,
           ],
         ),
       ),
@@ -100,12 +103,15 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Un solo logo de plataforma en el panel; el formulario no lo repite.
+              const MotoLinkProLogo(height: 64, forceWhite: true),
+              const SizedBox(height: 28),
               const Text(
                 'Complete su perfil B2B',
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.white,
                   height: 1.15,
                   letterSpacing: -0.5,
                 ),
@@ -113,11 +119,11 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Registre su negocio, verifique documentos y acceda al catálogo, '
-                'pedidos y operaciones de MotoLink.',
+                'pedidos y operaciones.',
                 style: TextStyle(
                   fontSize: 15.5,
                   height: 1.5,
-                  color: Colors.white.withOpacity(0.88),
+                  color: AppColors.white.withOpacity(0.88),
                 ),
               ),
               const SizedBox(height: 32),
@@ -133,7 +139,7 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
               const SizedBox(height: 12),
               const _BrandingBullet(
                 icon: Icons.dashboard_outlined,
-                label: 'Acceso al panel cuando MotoLink apruebe',
+                label: 'Acceso al panel cuando se apruebe su cuenta',
               ),
             ],
           ),

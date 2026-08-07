@@ -190,13 +190,13 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 80),
+          children: [
+            const SizedBox(height: 80),
             Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'No hay solicitudes aprobadas por MotoLink pendientes de tu primera acción para este producto.',
+                  'No hay solicitudes aprobadas por B2B Conecta pendientes de tu primera acción para este producto.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
@@ -234,7 +234,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
                       size: 16,
                       color: _hasDateFilter
                           ? AppColors.brandBlue
-                          : Colors.grey.shade600,
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -250,7 +250,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
                               children: [
                                 Text(
                                   'Ningún pedido coincide con los filtros.',
-                                  style: TextStyle(color: Colors.grey.shade700),
+                                  style: TextStyle(color: AppColors.textSecondary),
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,

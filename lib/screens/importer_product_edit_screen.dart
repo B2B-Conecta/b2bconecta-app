@@ -284,9 +284,9 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       data: SwitchThemeData(
         trackOutlineColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.disabled)) {
-            return Colors.grey.shade300;
+            return AppColors.borderSubtle;
           }
-          return AppColors.brandOrange.withOpacity(0.85);
+          return AppColors.brand.withOpacity(0.85);
         }),
         trackOutlineWidth: WidgetStateProperty.all(1.8),
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -294,13 +294,13 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
             return Colors.grey.shade400;
           }
           if (states.contains(WidgetState.selected)) {
-            return AppColors.brandOrange;
+            return AppColors.brand;
           }
           return Colors.white;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.brandOrange.withOpacity(0.22);
+            return AppColors.brand.withOpacity(0.22);
           }
           return Colors.transparent;
         }),
@@ -313,7 +313,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               : 'Producto en pausa (oculto para aliados)',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: _isActive ? AppColors.successGreen : Colors.orange.shade800,
+            color: _isActive ? AppColors.successGreen : AppColors.brandAccent,
           ),
         ),
         subtitle: Text(

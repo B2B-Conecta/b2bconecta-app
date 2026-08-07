@@ -134,7 +134,7 @@ class NotificationProvider extends ChangeNotifier {
     _items.insert(0, n);
     _enrichOrderContext();
     notifyListeners();
-    final title = n.title.trim().isNotEmpty ? n.title : 'MotoLink';
+    final title = n.title.trim().isNotEmpty ? n.title : 'B2B Conecta';
     final body = n.body.trim().isNotEmpty ? n.body : title;
     final accessApproved = isAliadoAccessApprovedNotification(
       type: n.type,

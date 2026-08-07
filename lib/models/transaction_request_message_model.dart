@@ -1,4 +1,4 @@
-/// Mensaje aliado ↔ MotoLink en un pedido (`transaction_request_messages`).
+/// Mensaje aliado ↔ B2B Conecta en un pedido (`transaction_request_messages`).
 class TransactionRequestMessageModel {
   const TransactionRequestMessageModel({
     required this.id,

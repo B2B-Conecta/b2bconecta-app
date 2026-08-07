@@ -20,7 +20,7 @@ import 'commission_settlement_list_filter_bar.dart';
 import 'commission_settlement_filters_sheet.dart';
 import 'main_shell_tab.dart';
 
-/// Admin: cortes semanales, facturación y cobro de comisiones MotoLink.
+/// Admin: cortes semanales, facturación y cobro de comisiones B2B Conecta.
 class AdminCommissionSettlementsPanel extends StatefulWidget {
   const AdminCommissionSettlementsPanel({super.key});
 
@@ -429,7 +429,7 @@ class _AdminCommissionSettlementsPanelState
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: Colors.grey.shade800,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -585,7 +585,7 @@ class _AdminCommissionSettlementsPanelState
                   'Referencia: $previewRef\n'
                   'Formato: ML-COM-{año}-{secuencia}. '
                   'Esta acción es irreversible.',
-          style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade800),
+          style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
@@ -895,7 +895,7 @@ class _AdminCommissionSettlementsPanelState
       case 'pagado':
         return Colors.green.shade700;
       case 'emitido':
-        return Colors.orange.shade800;
+        return AppColors.brandAccent;
       case 'anulado':
         return Colors.grey;
       default:
@@ -964,7 +964,7 @@ class _AdminCommissionSettlementsPanelState
                   icon: Badge(
                     isLabelVisible: _activeFilterCount > 0,
                     label: Text('$_activeFilterCount'),
-                    backgroundColor: AppColors.brandOrange,
+                    backgroundColor: AppColors.brand,
                     child: const Icon(Icons.tune),
                   ),
                   label: const Text('Filtros'),
@@ -975,9 +975,8 @@ class _AdminCommissionSettlementsPanelState
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Text(
-                    'No hay cortes. Genere el de la semana anterior cuando existan '
-                    'pedidos entregados con comisión devengada.',
-                    style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                    'Sin cortes · genere semana anterior',
+                    style: TextStyle(color: AppColors.textSecondary, height: 1.35),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -988,7 +987,7 @@ class _AdminCommissionSettlementsPanelState
                     children: [
                       Text(
                         'Ningún corte coincide con los filtros.',
-                        style: TextStyle(color: Colors.grey.shade700),
+                        style: TextStyle(color: AppColors.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                       TextButton(
@@ -1072,13 +1071,13 @@ class _AdminCommissionSettlementsPanelState
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: s.isDeliveryNote
-                          ? Colors.grey.shade100
-                          : Colors.blue.shade50,
+                          ? AppColors.surfaceTinted
+                          : AppColors.brandBlueContainer,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: s.isDeliveryNote
-                            ? Colors.grey.shade300
-                            : Colors.blue.shade200,
+                            ? AppColors.borderSubtle
+                            : AppColors.brandAccent.withOpacity(0.45),
                       ),
                     ),
                     child: Text(
@@ -1087,8 +1086,8 @@ class _AdminCommissionSettlementsPanelState
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: s.isDeliveryNote
-                            ? Colors.grey.shade800
-                            : Colors.blue.shade900,
+                            ? AppColors.textPrimary
+                            : AppColors.brandAccent,
                       ),
                     ),
                   ),
@@ -1114,7 +1113,7 @@ class _AdminCommissionSettlementsPanelState
                     : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
                         'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
                         'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
             if (s.invoiceReference != null && s.invoiceReference!.isNotEmpty)
@@ -1122,7 +1121,7 @@ class _AdminCommissionSettlementsPanelState
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Ref.: ${s.invoiceReference}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ),
           ],
@@ -1152,8 +1151,8 @@ class _AdminCommissionSettlementsPanelState
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: s.pagoEnRevision
-                          ? Colors.orange.shade900
-                          : Colors.grey.shade800,
+                          ? AppColors.brandBlue
+                          : AppColors.textPrimary,
                     ),
                   ),
                 if (s.pagoRechazado && s.pagoRechazoNota != null &&
@@ -1189,7 +1188,7 @@ class _AdminCommissionSettlementsPanelState
                                       .deliveryNote,
                                 ),
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.grey.shade600,
+                          foregroundColor: AppColors.textSecondary,
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                         ),
@@ -1288,16 +1287,20 @@ class _CommissionSummaryCard extends StatelessWidget {
     }
 
     return Material(
-      color: Colors.grey.shade100,
+      color: AppColors.surfaceTinted,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Resumen de cortes',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1305,16 +1308,16 @@ class _CommissionSummaryCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _chip('Borrador', borrador, AppColors.brandBlue),
-                _chip('Emitido', emitido, Colors.orange.shade800),
-                _chip('Pago en revisión', enRevision, Colors.deepOrange),
-                _chip('Pagado', pagado, Colors.green.shade700),
+                _chip('Emitido', emitido, AppColors.brandAccent),
+                _chip('Pago en revisión', enRevision, AppColors.brandAccent),
+                _chip('Pagado', pagado, AppColors.successGreen),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               'USD pendiente de cobro (emitido): ${usdEmitido.toStringAsFixed(2)} · '
               'USD cobrado (pagado): ${usdPagado.toStringAsFixed(2)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
           ],
         ),
@@ -1370,37 +1373,44 @@ class _ConfigCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Reglas y cortes',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
-              'La comisión se devenga cuando el aliado marca Recibido. '
-              'La tasa se fija en el checkout según el volumen del mes o un override por importador.',
+              'Devengo al marcar Recibido · tasa por volumen o override',
               style: TextStyle(
                 fontSize: 12,
-                height: 1.35,
-                color: Colors.grey.shade800,
+                height: 1.3,
+                color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 14),
-            const Text(
+            const SizedBox(height: 12),
+            Text(
               'Tasas',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 6),
             _configRow(
               icon: Icons.percent,
-              title: 'Tasa global (reserva)',
-              subtitle: '${defaultRatePct.toStringAsFixed(2)} % si no aplica un tramo',
+              title: 'Tasa global',
+              subtitle: '${defaultRatePct.toStringAsFixed(2)} %',
               actionLabel: 'Editar',
               onAction: onEditRate,
             ),
             const SizedBox(height: 6),
             _configRow(
               icon: Icons.stacked_line_chart,
-              title: 'Tramos por volumen mensual',
+              title: 'Tramos volumen',
               subtitle: volumeTiersSummary,
               actionLabel: 'Tramos',
               onAction: onEditVolumeTiers,
@@ -1408,27 +1418,30 @@ class _ConfigCard extends StatelessWidget {
             const SizedBox(height: 6),
             _configRow(
               icon: Icons.store_outlined,
-              title: 'Tasa fija por importador',
-              subtitle: 'Opcional; anula tramos y volumen',
+              title: 'Tasa por importador',
+              subtitle: 'Override opcional',
               actionLabel: 'Configurar',
               onAction: onEditImportadorRate,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Text(
-              'Emisión habitual: ML-COM- con IVA. '
-              'Alternativa ML-NOT- (sin IVA): botón secundario al emitir.',
+              'ML-COM- (IVA) · ML-NOT- (sin IVA)',
               style: TextStyle(
                 fontSize: 11,
-                height: 1.35,
-                color: Colors.grey.shade700,
+                height: 1.3,
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 16),
             const Divider(height: 1),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Generar cortes en borrador',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Row(
@@ -1450,8 +1463,8 @@ class _ConfigCard extends StatelessWidget {
                     icon: const Icon(Icons.today_outlined, size: 18),
                     label: const Text('Semana actual'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.deepOrange.shade800,
-                      side: BorderSide(color: Colors.deepOrange.shade300),
+                      foregroundColor: AppColors.brandAccent,
+                      side: BorderSide(color: AppColors.brandAccent),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
@@ -1462,7 +1475,7 @@ class _ConfigCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 '«Semana actual» solo para pruebas en desarrollo.',
-                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
               ),
             ),
           ],
@@ -1481,14 +1494,14 @@ class _ConfigCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: AppColors.fieldFill,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: AppColors.brandBlue),
+          Icon(icon, size: 20, color: AppColors.brandAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1496,9 +1509,10 @@ class _ConfigCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1507,7 +1521,7 @@ class _ConfigCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.3,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

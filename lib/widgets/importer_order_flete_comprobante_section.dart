@@ -142,7 +142,7 @@ class _ImporterOrderFleteComprobanteSectionState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'Comprobante de pago del flete',
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -155,7 +155,7 @@ class _ImporterOrderFleteComprobanteSectionState
           carrier != null && carrier.isNotEmpty
               ? 'Pago del aliado al transportista $carrier.'
               : 'Pago del aliado al transportista.',
-          style: TextStyle(fontSize: 11, height: 1.35, color: Colors.grey.shade700),
+          style: TextStyle(fontSize: 11, height: 1.35, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
         if (!r.hasFleteComprobantePago)
@@ -191,20 +191,20 @@ class _ImporterOrderFleteComprobanteSectionState
           if (r.fletePagoMetodo != null && r.fletePagoMetodo!.trim().isNotEmpty)
             Text(
               'Método: ${PagoMetodo.labelEs(r.fletePagoMetodo!)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
           if (r.fleteComprobantePagoFileName?.trim().isNotEmpty == true) ...[
             const SizedBox(height: 2),
             Text(
               'Archivo: ${r.fleteComprobantePagoFileName}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
           ],
           if (r.fleteComprobanteSubmittedAt != null) ...[
             const SizedBox(height: 2),
             Text(
               'Recibido: ${formatEsShortDateTime(r.fleteComprobanteSubmittedAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
           const SizedBox(height: 6),

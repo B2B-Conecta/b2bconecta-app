@@ -102,7 +102,7 @@ class _ImporterPedidosFiltersSheetState
           width: 40,
           height: 4,
           decoration: BoxDecoration(
-            color: Colors.grey.shade300,
+            color: AppColors.borderSubtle,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -133,7 +133,7 @@ class _ImporterPedidosFiltersSheetState
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
             'Pedidos cerrados: fecha de cierre. Pedidos activos: fecha de alta.',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.35),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.35),
           ),
         ),
         Expanded(
@@ -215,14 +215,14 @@ class _DateField extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: AppColors.borderSubtle),
           borderRadius: BorderRadius.circular(12),
           color: Colors.white,
         ),
         child: Row(
           children: [
             Icon(Icons.calendar_today_outlined,
-                size: 18, color: Colors.grey.shade600),
+                size: 18, color: AppColors.textSecondary),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -233,7 +233,7 @@ class _DateField extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   Text(

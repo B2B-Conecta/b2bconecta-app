@@ -90,7 +90,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return 'No se pudo identificar al importador.';
     }
     if (_pedidosSuspendidosMorosidad) {
-      return 'MotoLink suspendió nuevos pedidos en su cuenta por morosidad.';
+      return 'B2B Conecta suspendió nuevos pedidos en su cuenta por morosidad.';
     }
     if (part.stock < 1) return 'Sin stock disponible.';
     return null;
@@ -134,7 +134,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.35,
-                      color: Colors.grey.shade800,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -259,7 +259,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildMobileLayout(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: Column(
         children: [
           Expanded(
@@ -344,7 +344,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         AspectRatio(
           aspectRatio: 1,
           child: Material(
-            color: Colors.white,
+            color: AppColors.surfaceTinted,
             child: _buildHeroImageContent(),
           ),
         ),
@@ -352,8 +352,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           top: MediaQuery.paddingOf(context).top + 4,
           right: 8,
           child: Material(
-            color: Colors.white.withOpacity(0.92),
-            shape: const CircleBorder(),
+            color: AppColors.card.withOpacity(0.92),
+            shape: CircleBorder(
+              side: BorderSide(color: AppColors.borderSubtle),
+            ),
             child: IconButton(
               icon: const Icon(Icons.close),
               color: AppColors.textPrimary,
@@ -367,14 +369,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildDesktopImageCard() {
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       elevation: 0,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.borderSubtle),
           boxShadow: AppDecorations.cardShadow,
         ),
         child: AspectRatio(
@@ -433,7 +435,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: active
-                      ? AppColors.brandOrange
+                      ? AppColors.brand
                       : Colors.grey.shade400,
                 ),
               );
@@ -451,7 +453,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         alignment: Alignment.centerLeft,
         child: Text(
           'SKU: $_skuDisplay',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
           ),
@@ -461,7 +463,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (_importerLine.isNotEmpty) ...[
         Text(
           _importerLine,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.3,
@@ -474,7 +476,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Row(
           children: [
             Icon(Icons.location_on_outlined,
-                size: 15, color: Colors.grey.shade600),
+                size: 15, color: AppColors.textSecondary),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
@@ -482,7 +484,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ),
@@ -501,7 +503,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
           ],
@@ -520,18 +522,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       SizedBox(height: desktop ? 16 : 8),
       Material(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: desktop ? Colors.white : AppColors.fieldFill.withOpacity(0.35),
+            color: AppColors.card,
             borderRadius: BorderRadius.circular(12),
-            border: desktop
-                ? Border.all(color: Colors.grey.shade200)
-                : null,
+            border: Border.all(color: AppColors.borderSubtle),
           ),
           child: Padding(
-            padding: EdgeInsets.all(desktop ? 16 : 0),
+            padding: const EdgeInsets.all(14),
             child: CatalogProductPriceDisplay(
               listPriceUsd: part.precio,
               salePriceUsd: part.salePriceUsd,
@@ -549,9 +549,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.teal.shade50,
+            color: AppColors.brandBlueContainer,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.teal.shade200),
+            border: Border.all(color: AppColors.borderSubtle),
           ),
           child: Text(
             ProductCatalogPricing.volumeIncentiveBadgeEs(part.discountRules)!,
@@ -559,7 +559,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               fontSize: 13,
               height: 1.35,
               fontWeight: FontWeight.w600,
-              color: Colors.teal.shade900,
+              color: AppColors.textPrimary,
             ),
           ),
         ),
@@ -575,7 +575,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: TextStyle(
               fontSize: 14,
               height: 1.45,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
         ),
@@ -588,7 +588,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: TextStyle(
               fontSize: 14,
               height: 1.45,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
         ),
@@ -608,7 +608,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             height: 1.5,
             fontFamily: 'monospace',
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
       ),
@@ -617,7 +617,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         'Puedes copiar el ID para soporte o seguimiento interno.',
         style: TextStyle(
           fontSize: 11,
-          color: Colors.grey.shade600,
+          color: AppColors.textSecondary,
           fontStyle: FontStyle.italic,
         ),
       ),
@@ -637,10 +637,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       decoration: desktop
           ? BoxDecoration(
-              color: inStock ? Colors.green.shade50 : Colors.orange.shade50,
+              color: inStock ? Colors.green.shade50 : AppColors.brandBlueContainer,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: inStock ? Colors.green.shade200 : Colors.orange.shade200,
+                color: inStock ? Colors.green.shade200 : AppColors.brandAccent.withOpacity(0.35),
               ),
             )
           : null,
@@ -650,7 +650,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: inStock ? AppColors.successGreen : Colors.orange.shade700,
+              color: inStock ? AppColors.successGreen : AppColors.brandAccent,
               shape: BoxShape.circle,
             ),
           ),
@@ -660,7 +660,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: TextStyle(
               fontSize: desktop ? 15 : 14,
               fontWeight: FontWeight.w700,
-              color: inStock ? Colors.green.shade800 : Colors.orange.shade900,
+              color: inStock ? Colors.green.shade800 : AppColors.brandBlue,
             ),
           ),
         ],
@@ -675,14 +675,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         if (part.stock < 1)
           _AlertBanner(
             text: 'Sin stock disponible',
-            color: Colors.orange.shade900,
-            background: Colors.orange.shade50,
-            border: Colors.orange.shade200,
+            color: AppColors.brandBlue,
+            background: AppColors.brandBlueContainer,
+            border: AppColors.brandAccent.withOpacity(0.35),
           ),
         if (_pedidosSuspendidosMorosidad)
           _AlertBanner(
             text:
-                'Nuevos pedidos suspendidos por MotoLink (morosidad). Complete pagos en pedidos entregados.',
+                'Nuevos pedidos suspendidos por B2B Conecta (morosidad). Complete pagos en pedidos entregados.',
             color: Colors.red.shade900,
             background: Colors.red.shade50,
             border: Colors.red.shade200,
@@ -744,10 +744,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         MediaQuery.paddingOf(context).bottom + 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.borderSubtle)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: AppColors.black.withOpacity(0.12),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),
@@ -840,8 +841,9 @@ class _SpecBlock extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.fieldFill,
+        color: AppColors.card,
         borderRadius: AppDecorations.radius12,
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -852,7 +854,7 @@ class _SpecBlock extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.6,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),

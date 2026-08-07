@@ -77,7 +77,7 @@ class ProductImageGalleryEditor extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'Fotos del producto',
               style: TextStyle(
                 fontSize: 12,
@@ -88,7 +88,7 @@ class ProductImageGalleryEditor extends StatelessWidget {
             const Spacer(),
             Text(
               '$count / $kMaxProductImages',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 color: AppColors.textSecondary,
               ),
@@ -108,7 +108,7 @@ class ProductImageGalleryEditor extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Toca un recuadro vacío para agregar. La primera foto es la portada.',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ],
       ],
@@ -192,7 +192,7 @@ class ProductImageGalleryEditor extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
         ),
       ],
     );

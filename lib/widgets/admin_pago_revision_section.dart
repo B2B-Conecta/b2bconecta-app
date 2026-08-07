@@ -121,7 +121,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
             children: [
               Text(
                 'Motivo opcional; puede enviar otro comprobante.',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -184,7 +184,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.includeSectionTitle) ...[
-          const Text(
+          Text(
             'Pago del aliado',
             style: TextStyle(
               fontWeight: FontWeight.w700,
@@ -235,13 +235,13 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
         if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty)
           Text(
             'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
         if (r.hasComprobantePago) ...[
           Text(
             'Comprobante: ${r.comprobantePagoFileName ?? 'archivo'} · '
             '${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 6),
           OutlinedButton.icon(

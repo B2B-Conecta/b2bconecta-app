@@ -109,14 +109,16 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: AppColors.borderSubtle),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: expanded ? AppColors.surfaceTinted.withOpacity(0.35) : Colors.white,
+            color: expanded
+                ? AppColors.surfaceTinted.withOpacity(0.55)
+                : Colors.transparent,
             child: InkWell(
               onTap: onToggle,
               child: Padding(
@@ -158,7 +160,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                     Row(
                       children: [
                         Icon(Icons.storefront_outlined,
-                            size: 14, color: Colors.grey.shade600),
+                            size: 14, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -168,7 +170,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade800,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -178,14 +180,14 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                     Row(
                       children: [
                         Icon(Icons.payments_outlined,
-                            size: 14, color: Colors.grey.shade600),
+                            size: 14, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Text(
                           '${formatRefAmount(totalRef)} REF',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Colors.grey.shade900,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         if (!expanded) ...[
@@ -197,7 +199,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade600,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -320,7 +322,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         height: 1.3,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -439,7 +441,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         if (orderCardCommissionSubtitle(lines) != null) ...[
                           const SizedBox(height: kOrderCardSectionGap),
                           OrderCardCollapsibleSection(
-                            title: 'Comisión MotoLink',
+                            title: 'Comisión B2B Conecta',
                             subtitle: orderCardCommissionSubtitle(lines),
                             child: OrderCommissionSummary(
                               lines: orderLinesEligibleForCommission(lines),
@@ -562,7 +564,7 @@ class _DetailSummaryStrip extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.local_shipping_outlined,
-                  size: 15, color: Colors.grey.shade700),
+                  size: 15, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -570,7 +572,7 @@ class _DetailSummaryStrip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.3,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),

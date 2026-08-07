@@ -230,17 +230,18 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   InputDecoration _pedidosSearchDecoration({required int filterBadge}) {
     return InputDecoration(
       hintText: 'Buscar por producto, SKU o importador…',
-      prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+      hintStyle: AppColors.hintStyle,
+      prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: AppColors.fieldFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -262,11 +263,11 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             icon: Badge(
               isLabelVisible: filterBadge > 0,
               label: Text('$filterBadge'),
-              backgroundColor: AppColors.brandOrange,
+              backgroundColor: AppColors.brand,
               child: Icon(
                 Icons.tune,
                 color: filterBadge > 0
-                    ? AppColors.brandOrange
+                    ? AppColors.brand
                     : AppColors.textSecondary,
               ),
             ),
@@ -281,14 +282,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     required VoidCallback onDeleted,
     Color? accent,
   }) {
-    final color = accent ?? AppColors.brandBlue;
+    final color = accent ?? AppColors.brandAccent;
     return InputChip(
       label: Text(label),
       deleteIcon: const Icon(Icons.close, size: 16),
       onDeleted: onDeleted,
       backgroundColor: color.withOpacity(0.12),
       side: BorderSide(color: color.withOpacity(0.35)),
-      labelStyle: const TextStyle(
+      labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
@@ -535,7 +536,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           const SnackBar(
             content: Text(
               'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
-              'sigue pendiente de registrar o aprobar por MotoLink. Revise la ficha del pedido.',
+              'sigue pendiente de registrar o aprobar por B2B Conecta. Revise la ficha del pedido.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -544,7 +545,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción confirmada. El pedido queda cerrado y registrado para MotoLink.',
+              'Recepción confirmada. El pedido queda cerrado y registrado para B2B Conecta.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -577,7 +578,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           const SnackBar(
             content: Text(
               'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
-              'sigue pendiente de registrar o aprobar por MotoLink. Revise la ficha del pedido.',
+              'sigue pendiente de registrar o aprobar por B2B Conecta. Revise la ficha del pedido.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -586,7 +587,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción confirmada. El pedido queda cerrado y registrado para MotoLink.',
+              'Recepción confirmada. El pedido queda cerrado y registrado para B2B Conecta.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -719,7 +720,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           SizedBox(height: sectionGap),
           OrderCardCollapsibleSection(
             title: 'Mensajes',
-            subtitle: 'Hilo con el importador y MotoLink',
+            subtitle: 'Hilo con el importador y B2B Conecta',
             infoMessage: OrderSectionHelp.chatPedido,
             child: OrderMotolinkThreadSection(
               key: ValueKey<String>('trm-aliado-${r.id}'),
@@ -879,7 +880,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           title: 'Mensajes',
           subtitle: chunk.length > 1
               ? OrderActionsFlowCopy.carritoChatImportador(chunk.first.ownerBusinessName)
-              : 'Hilo con el importador y MotoLink',
+              : 'Hilo con el importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>(
@@ -1090,7 +1091,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       padding: const EdgeInsets.only(top: 12, bottom: 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w800,
           fontSize: 13,
           color: AppColors.textSecondary,
@@ -1126,12 +1127,12 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 100),
+          children: [
+            const SizedBox(height: 100),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Tras aprobación MotoLink, aquí verás pedidos en curso y cerrados.',
+                'Sin pedidos aún',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
               ),
@@ -1182,7 +1183,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
                       '${filtered.length} de ${_rows.length} pedidos',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w500,
@@ -1201,7 +1202,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                               children: [
                                 Text(
                                   'Ningún pedido coincide con los filtros.',
-                                  style: TextStyle(color: Colors.grey.shade700),
+                                  style: TextStyle(color: AppColors.textSecondary),
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,
@@ -1264,7 +1265,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   }
 }
 
-/// Contenedor único de pasarela MotoLink por bloque importador–aliado en el pie del pedido.
+/// Contenedor único de pasarela B2B Conecta por bloque importador–aliado en el pie del pedido.
 class _PasarelaPagoMotoLinkCard extends StatefulWidget {
   const _PasarelaPagoMotoLinkCard({
     required this.lineCount,
@@ -1379,8 +1380,8 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                                 widget.pagoTotal != null &&
                                 widget.pagoTotal! > 1
                             ? 'Su pago ${widget.pagoIndex} de ${widget.pagoTotal}'
-                            : 'Pasarela de pago MotoLink',
-                        style: const TextStyle(
+                            : 'Pasarela de pago B2B Conecta',
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
                           color: AppColors.textPrimary,
@@ -1394,7 +1395,7 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -1421,9 +1422,9 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                             'Antes del descuento: ${formatRefAmount(montoBase)} REF',
                             style: TextStyle(
                               fontSize: 10.5,
-                              color: Colors.grey.shade600,
+                              color: AppColors.textSecondary,
                               decoration: TextDecoration.lineThrough,
-                              decorationColor: Colors.grey.shade600,
+                              decorationColor: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -1439,7 +1440,7 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.35,
-                          color: Colors.grey.shade700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],

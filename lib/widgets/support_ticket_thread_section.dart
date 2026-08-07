@@ -128,7 +128,7 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Conversación',
                 style: TextStyle(
@@ -163,7 +163,7 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
         else if (_items.isEmpty)
           Text(
             'Sin mensajes en este reclamo.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           )
         else
           ListView.separated(
@@ -177,15 +177,15 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
               final label = mine
                   ? 'Tú'
                   : (m.isFromAdmin
-                      ? 'MotoLink'
+                      ? 'B2B Conecta'
                       : (m.isFromImportador ? 'Importador' : 'Aliado'));
               final align =
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
               final bg = m.isFromAdmin
-                  ? AppColors.surfaceTinted.withOpacity(0.55)
+                  ? AppColors.surfaceTinted
                   : (mine
-                      ? AppColors.brandBlue.withOpacity(0.12)
-                      : Colors.grey.shade200);
+                      ? AppColors.brandBlueContainer
+                      : AppColors.fieldFill);
 
               return Column(
                 crossAxisAlignment: align,
@@ -195,7 +195,7 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -203,13 +203,17 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
                     decoration: BoxDecoration(
                       color: bg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: AppColors.borderSubtle),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                       child: Text(
                         m.body,
-                        style: const TextStyle(fontSize: 13, height: 1.35),
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ),
@@ -254,7 +258,7 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Este reclamo está cerrado.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
       ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../models/importador_received_rating_model.dart';
 import '../models/profile_model.dart';
@@ -97,12 +98,10 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ProfileCollapsibleSection(
-          title: 'Reputación en MotoLink',
+          title: 'Reputación',
           subtitle: _reputationSubtitle(cnt, hasDimensions),
           initiallyExpanded: hasDimensions,
-          infoMessage:
-              'Desglose por categoría (escala 1–5) según valoraciones de aliados. '
-              'Mejorar estas métricas aumenta su visibilidad en el catálogo.',
+          infoMessage: 'Desglose 1–5 · últimas 100 valoraciones',
           child: _reputationBody(
             cnt: cnt,
             hasDimensions: hasDimensions,
@@ -112,12 +111,10 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
         ),
         const SizedBox(height: 12),
         ProfileCollapsibleSection(
-          title: 'Comentarios de clientes',
+          title: 'Comentarios',
           subtitle: _commentsSubtitle(),
           initiallyExpanded: false,
-          infoMessage:
-              'Comentarios anónimos (solo ciudad del aliado). '
-              'Úselos para mejorar catálogo y despacho.',
+          infoMessage: 'Anónimos · solo ciudad',
           trailingActions: [
             IconButton(
               onPressed: _loading ? null : _load,
@@ -159,21 +156,20 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
     }
     if (cnt > 0) {
       return Text(
-        'Las valoraciones aún no incluyen desglose por categoría. '
-        'Las nuevas mostrarán Calidad, Despacho, Empaque, Comunicación y Socio B2B.',
+        'Sin desglose por categoría',
         style: TextStyle(
-          fontSize: 11,
-          height: 1.4,
-          color: Colors.grey.shade800,
+          fontSize: 12,
+          height: 1.35,
+          color: AppColors.textSecondary,
         ),
       );
     }
     return Text(
-      'Aún no tiene valoraciones. Los talleres calificarán su servicio al cerrar pedidos entregados.',
+      'Sin valoraciones aún',
       style: TextStyle(
-        fontSize: 11.5,
+        fontSize: 12,
         height: 1.35,
-        color: Colors.grey.shade800,
+        color: AppColors.textSecondary,
       ),
     );
   }
@@ -200,7 +196,7 @@ class _ImporterReputationPanelState extends State<ImporterReputationPanel> {
     if (_ratings.isEmpty) {
       return Text(
         'Sin comentarios todavía.',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
       );
     }
     return ReceivedRatingsCarousel(

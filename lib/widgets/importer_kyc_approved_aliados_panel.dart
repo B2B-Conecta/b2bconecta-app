@@ -58,7 +58,7 @@ Future<void> showImporterAliadoKycDetailSheet(
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -167,8 +167,7 @@ class _ImporterKycApprovedAliadosPanelState
       subtitle: _sectionSubtitle(),
       initiallyExpanded: false,
       infoMessage:
-          'Talleres con KYC aprobado por MotoLink. Consulte datos fiscales y '
-          'documentación antes de aceptar pedidos a crédito.',
+          'Aliados con KYC aprobado',
       trailingActions: [
         IconButton(
           onPressed: _loading ? null : _load,
@@ -215,12 +214,12 @@ class _ImporterKycApprovedAliadosPanelState
             if (_rows.isEmpty)
               Text(
                 'Aún no hay aliados con KYC aprobado en la plataforma.',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               )
             else if (filtered.isEmpty)
               Text(
                 'Ningún aliado coincide con la búsqueda.',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               )
             else
               ...filtered.map((a) => _AliadoKycListTile(
@@ -281,7 +280,7 @@ class _AliadoKycListTile extends StatelessWidget {
                           loc,
                           style: TextStyle(
                             fontSize: 11.5,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -303,7 +302,7 @@ class _AliadoKycListTile extends StatelessWidget {
                   color: AppColors.brandBlue,
                   size: 20,
                 ),
-                Icon(Icons.chevron_right, color: Colors.grey.shade600),
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
               ],
             ),
           ),

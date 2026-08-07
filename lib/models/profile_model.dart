@@ -51,7 +51,7 @@ class ProfileModel {
   final String? businessName;
   final String? rif;
 
-  /// `importador`, `aliado` o `administrador` (broker MotoLink).
+  /// `importador`, `aliado` o `administrador` (broker B2B Conecta).
   final String? role;
   final String? phone;
   final DateTime? createdAt;
@@ -60,7 +60,7 @@ class ProfileModel {
   final int? creditScore;
   final double? creditLimit;
 
-  /// Verificación documental MotoLink (`pendiente` … `aprobado`); solo aliados.
+  /// Verificación documental B2B Conecta (`pendiente` … `aprobado`); solo aliados.
   final String? kycStatus;
 
   /// Acceso a la app (solo aliados): `draft` … `active` | `rejected`.
@@ -81,7 +81,7 @@ class ProfileModel {
   /// Legado en base de datos (`credito_preactivado_por_admin`); ya no usado en UI.
   final bool creditoPreactivadoPorAdmin;
 
-  /// MotoLink suspendió nuevos pedidos por morosidad (entregas con pago sin aprobar).
+  /// B2B Conecta suspendió nuevos pedidos por morosidad (entregas con pago sin aprobar).
   final bool pedidosSuspendidosMorosidad;
 
   /// Estado / ciudad (Venezuela u otro) para catálogo y pedidos.
@@ -183,7 +183,7 @@ class ProfileModel {
     return true;
   }
 
-  /// Aliado en revisión MotoLink (no borrador ni activo).
+  /// Aliado en revisión B2B Conecta (no borrador ni activo).
   bool get needsAliadoPendingReviewScreen {
     if (!isAliado || hasActiveAccountAccess) return false;
     final access = accountAccessStatus?.trim();

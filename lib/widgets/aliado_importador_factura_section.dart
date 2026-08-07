@@ -82,7 +82,7 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10.5,
                 height: 1.3,
-                color: Colors.grey.shade700,
+                color: AppColors.textSecondary,
               ),
             ),
           ],

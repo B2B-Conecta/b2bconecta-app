@@ -152,7 +152,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
       padding: const EdgeInsets.only(top: 20, bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.5,
@@ -204,13 +204,13 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: AppColors.borderSubtle,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Filtros',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
@@ -219,7 +219,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Categoría, descuentos, ubicación, precio, reputación, proveedores y orden.',
                   style: TextStyle(
                     fontSize: 13,
@@ -244,7 +244,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       label: Text(label),
                       selected: selected,
                       onSelected: (_) => setState(() => _category = label),
-                      selectedColor: AppColors.brandOrange,
+                      selectedColor: AppColors.brand,
                       checkmarkColor: Colors.white,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.w600,
@@ -269,7 +269,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       setState(() => _sortMode = v);
                     },
                     contentPadding: EdgeInsets.zero,
-                    activeColor: AppColors.brandOrange,
+                    activeColor: AppColors.brand,
                     title: Text(
                       mode.labelEs,
                       style: const TextStyle(
@@ -291,7 +291,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   );
                 }),
                 _sectionTitle('REPUTACIÓN DEL PROVEEDOR'),
-                const Text(
+                Text(
                   'Solo productos de importadores que cumplan el umbral (ventana móvil de 100 valoraciones).',
                   style: TextStyle(
                     fontSize: 12,
@@ -300,7 +300,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Promedio mínimo',
                   style: TextStyle(
                     fontSize: 12,
@@ -318,7 +318,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       label: Text(preset.label),
                       selected: selected,
                       onSelected: (_) => setState(() => _minRatingAvg = preset.minAvg),
-                      selectedColor: AppColors.brandOrange,
+                      selectedColor: AppColors.brand,
                       checkmarkColor: Colors.white,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.w600,
@@ -335,7 +335,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   }).toList(),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Cantidad mínima de valoraciones',
                   style: TextStyle(
                     fontSize: 12,
@@ -354,7 +354,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       selected: selected,
                       onSelected: (_) =>
                           setState(() => _minRatingCount = preset.minCount),
-                      selectedColor: AppColors.brandOrange,
+                      selectedColor: AppColors.brand,
                       checkmarkColor: Colors.white,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.w600,
@@ -397,7 +397,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   ],
                 ),
                 _sectionTitle('DESCUENTOS'),
-                const Text(
+                Text(
                   'Oferta directa, descuento por volumen o % extra en la línea USD (Zelle/divisas).',
                   style: TextStyle(
                     fontSize: 12,
@@ -411,7 +411,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   selected: _onlyWithCommercialDiscount,
                   onSelected: (v) =>
                       setState(() => _onlyWithCommercialDiscount = v),
-                  selectedColor: AppColors.brandOrange,
+                  selectedColor: AppColors.brand,
                   checkmarkColor: Colors.white,
                   labelStyle: TextStyle(
                     fontWeight: FontWeight.w600,
@@ -497,7 +497,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                           ? 'No hay proveedores disponibles.'
                           : 'Ningún proveedor coincide con la búsqueda.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 13,
                       ),
@@ -519,7 +519,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       },
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
-                      activeColor: AppColors.brandOrange,
+                      activeColor: AppColors.brand,
                       title: Text(
                         o.businessName,
                         style: const TextStyle(

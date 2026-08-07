@@ -77,7 +77,7 @@ class ProfileSectionHeader extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.6,
@@ -141,16 +141,32 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
 
   @override
   Widget build(BuildContext context) {
-    final density = B2bOrderCardDensityScope.of(context);
-    final radius = BorderRadius.circular(density.sectionBorderRadius);
+    // En fichas de pedido usa densidad compacta; en perfil (sin scope) usa aire usable.
+    final orderDensity = B2bOrderCardDensityScope.maybeOf(context);
+    final compact = orderDensity != null;
+    final radius = BorderRadius.circular(compact ? 8 : 14);
+    final mobileForm = !compact && MediaQuery.sizeOf(context).width < 600;
+    final headerPad = orderDensity?.sectionHeaderPadding ??
+        (mobileForm
+            ? const EdgeInsets.fromLTRB(14, 12, 10, 12)
+            : const EdgeInsets.fromLTRB(16, 14, 12, 14));
+    final bodyPad = orderDensity?.sectionBodyPadding ??
+        (mobileForm
+            ? const EdgeInsets.fromLTRB(14, 4, 14, 14)
+            : const EdgeInsets.fromLTRB(16, 4, 16, 16));
+    final titleSize =
+        orderDensity?.sectionTitleSize ?? (mobileForm ? 14.5 : 15.0);
+    final subtitleSize =
+        orderDensity?.sectionSubtitleSize ?? (mobileForm ? 12.0 : 12.5);
 
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: radius,
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: AppColors.borderSubtle),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,7 +175,7 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
               onTap: () => setState(() => _open = !_open),
               borderRadius: radius,
               child: Padding(
-                padding: density.sectionHeaderPadding,
+                padding: headerPad,
                 child: Row(
                   children: [
                     Expanded(
@@ -169,18 +185,19 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
                           Text(
                             widget.title,
                             style: TextStyle(
-                              fontSize: density.sectionTitleSize,
+                              fontSize: titleSize,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary,
                             ),
                           ),
                           if (widget.subtitle != null) ...[
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3),
                             Text(
                               widget.subtitle!,
                               style: TextStyle(
-                                fontSize: density.sectionSubtitleSize,
-                                color: Colors.grey.shade700,
+                                fontSize: subtitleSize,
+                                color: AppColors.textSecondary,
+                                height: 1.3,
                               ),
                             ),
                           ],
@@ -191,23 +208,25 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
                       ProfileInfoIcon(
                         message: widget.infoMessage!,
                         title: widget.infoTitle ?? widget.title,
-                        iconSize: density.isDesktop ? 16 : 18,
+                        iconSize: compact ? 16 : 18,
                       ),
                     ...widget.trailingActions,
                     Icon(
                       _open ? Icons.expand_less : Icons.expand_more,
-                      size: density.isDesktop ? 20 : 24,
+                      size: compact ? 20 : 24,
                       color: AppColors.textSecondary,
                     ),
                   ],
                 ),
               ),
             ),
-            if (_open)
+            if (_open) ...[
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
               Padding(
-                padding: density.sectionBodyPadding,
+                padding: bodyPad,
                 child: widget.child,
               ),
+            ],
           ],
         ),
       ),

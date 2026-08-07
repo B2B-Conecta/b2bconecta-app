@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../app_scaffold_messenger.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
+import '../widgets/theme_mode_bubble.dart';
 
 /// Contraseña y datos básicos de la sesión (actualización de credenciales).
 class AccountSettingsScreen extends StatefulWidget {
@@ -68,6 +70,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
   Future<void> _signOut() async {
     await AuthService.signOut();
+    if (!mounted) return;
+    // Por si el stack no se limpia aún vía AuthGate.
+    popNavigationToRoot();
   }
 
   InputDecoration _inputDecoration({
@@ -83,15 +88,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       fillColor: AppColors.fieldFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
     );
@@ -100,9 +105,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   Widget _settingsCard({required Widget child}) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: AppDecorations.radius12,
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.borderSubtle),
         boxShadow: AppDecorations.cardShadow,
       ),
       child: child,
@@ -115,7 +120,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -128,7 +133,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             style: TextStyle(
               fontSize: 14,
               height: 1.45,
-              color: Colors.grey.shade700,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -164,14 +169,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     'Correo de la sesión',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     email.isEmpty ? '—' : email,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -304,7 +309,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         'Volverás a la pantalla de inicio de sesión.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -312,7 +317,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 ),
                 Icon(
                   Icons.chevron_right,
-                  color: Colors.grey.shade500,
+                  color: AppColors.textMuted,
                 ),
               ],
             ),
@@ -329,14 +334,23 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surfaceTinted,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
+        title: Text(
           'Cuenta y seguridad',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: ThemeModeBubble(compact: true),
+          ),
+        ],
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -360,7 +374,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (isWide) ...[
-                        const Text(
+                        Text(
                           'Ajustes de cuenta',
                           style: TextStyle(
                             fontSize: 26,
@@ -375,7 +389,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           style: TextStyle(
                             fontSize: 15,
                             height: 1.45,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -386,7 +400,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.4,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -398,7 +412,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.4,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -410,7 +424,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.4,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 10),

@@ -15,11 +15,13 @@ class ImporterOrderDateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = isActive ? AppColors.brandBlue.withOpacity(0.1) : Colors.grey.shade100;
-    final fg = isActive ? AppColors.brandBlue : Colors.grey.shade800;
+    final bg = isActive
+        ? AppColors.brandBlue.withOpacity(0.18)
+        : AppColors.surfaceTinted;
+    final fg = isActive ? AppColors.brandAccent : AppColors.textPrimary;
     final border = isActive
         ? AppColors.brandBlue.withOpacity(0.35)
-        : Colors.grey.shade300;
+        : AppColors.borderSubtle;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

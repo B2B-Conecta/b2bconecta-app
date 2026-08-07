@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 
 import '../utils/product_volume_tiers.dart';
@@ -107,14 +108,14 @@ class _ProductVolumeTiersEditorState extends State<ProductVolumeTiersEditor> {
         const SizedBox(height: 4),
         Text(
           'Ej.: desde 12 unidades, 5 % adicional sobre el precio mayorista. '
-          'Se suma en checkout antes de la comisión MotoLink.',
-          style: TextStyle(fontSize: 11.5, height: 1.35, color: Colors.grey.shade700),
+          'Se suma en checkout antes de la comisión B2B Conecta.',
+          style: TextStyle(fontSize: 11.5, height: 1.35, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
         if (_tiers.isEmpty)
           Text(
             'Sin tramos configurados.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           )
         else
           ..._tiers.map(

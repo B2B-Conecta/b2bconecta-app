@@ -118,7 +118,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.brandOrange.withOpacity(0.92),
+                              color: AppColors.brand.withOpacity(0.92),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -174,7 +174,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: i == _page
-                        ? AppColors.brandOrange
+                        ? AppColors.brand
                         : Colors.grey.shade400,
                   ),
                 ),
@@ -236,7 +236,7 @@ Future<void> showAliadoPromoPopupDialog({
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.brandOrange.withOpacity(0.12),
+                          color: AppColors.brand.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -244,7 +244,7 @@ Future<void> showAliadoPromoPopupDialog({
                           style: TextStyle(
                             color: campaign.isThirdParty
                                 ? AppColors.brandBlue
-                                : AppColors.brandOrange,
+                                : AppColors.brand,
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                           ),
@@ -255,7 +255,7 @@ Future<void> showAliadoPromoPopupDialog({
                         campaign.isPopup ? 'Pop-up' : 'Banner',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -386,7 +386,7 @@ Future<void> showAliadoActivePromotionsSheet({
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
                 'Puede volver a ver las campañas publicitarias cuando quiera.',
-                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
               ),
             ),
             ConstrainedBox(
@@ -458,7 +458,7 @@ Future<void> showAliadoActivePromotionsSheet({
                                       c.isPopup ? 'Pop-up' : 'Banner',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ],
@@ -469,7 +469,7 @@ Future<void> showAliadoActivePromotionsSheet({
                               padding: EdgeInsets.only(right: 12),
                               child: Icon(
                                 Icons.chevron_right,
-                                color: AppColors.brandOrange,
+                                color: AppColors.brand,
                               ),
                             ),
                           ],

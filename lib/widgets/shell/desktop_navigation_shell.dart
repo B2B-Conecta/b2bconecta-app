@@ -73,7 +73,7 @@ class DesktopNavigationShell extends StatelessWidget {
                     children: [
                       Text(
                         dest.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -90,7 +90,7 @@ class DesktopNavigationShell extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14.5,
                               height: 1.45,
-                              color: Colors.grey.shade700,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -142,7 +142,7 @@ class _DesktopSideRail extends StatelessWidget {
       child: Container(
         width: extended ? 232 : 80,
         decoration: BoxDecoration(
-          border: Border(right: BorderSide(color: Colors.grey.shade200)),
+          border: Border(right: BorderSide(color: AppColors.borderSubtle)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,7 +153,10 @@ class _DesktopSideRail extends StatelessWidget {
                 crossAxisAlignment:
                     extended ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                 children: [
-                  MotoLinkProLogo(height: extended ? 42 : 34),
+                  // Un solo logo: horizontal si hay espacio; isotipo si está colapsado.
+                  extended
+                      ? MotoLinkProLogo(height: 42)
+                      : const B2bConectaMark(size: 36),
                   if (extended) ...[
                     const SizedBox(height: 10),
                     Text(
@@ -161,7 +164,7 @@ class _DesktopSideRail extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -223,7 +226,7 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
         child: Material(
-          color: Colors.white,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             onTap: onOpenSettings,
@@ -232,7 +235,7 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: AppColors.borderSubtle),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -241,7 +244,7 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
                     displayName,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -253,7 +256,7 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
                     role,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -291,11 +294,11 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
         child: IconButton(
           onPressed: onOpenSettings,
           style: IconButton.styleFrom(
-            backgroundColor: Colors.white,
-            side: BorderSide(color: Colors.grey.shade200),
+            backgroundColor: AppColors.card,
+            side: BorderSide(color: AppColors.borderSubtle),
             minimumSize: const Size(48, 48),
           ),
-          icon: Icon(Icons.settings_outlined, color: Colors.grey.shade700),
+          icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
         ),
       ),
     );
@@ -320,10 +323,10 @@ class _RailNavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = selected
-        ? AppColors.brandOrange.withOpacity(0.12)
+        ? AppColors.brand.withOpacity(0.12)
         : Colors.transparent;
-    final fg = selected ? AppColors.brandOrange : AppColors.textPrimary;
-    final iconColor = selected ? AppColors.brandOrange : Colors.grey.shade700;
+    final fg = selected ? AppColors.brand : AppColors.textPrimary;
+    final iconColor = selected ? AppColors.brand : AppColors.textSecondary;
 
     return Material(
       color: bg,
@@ -336,7 +339,7 @@ class _RailNavTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: selected
                 ? Border(
-                    left: BorderSide(color: AppColors.brandOrange, width: 3),
+                    left: BorderSide(color: AppColors.brand, width: 3),
                   )
                 : null,
           ),

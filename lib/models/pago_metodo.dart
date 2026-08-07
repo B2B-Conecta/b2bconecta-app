@@ -9,7 +9,7 @@ abstract final class PagoMetodo {
   static const usdt = 'usdt';
   static const efectivo = 'efectivo';
 
-  /// Legado: línea MotoLink en plataforma (pedidos históricos; ya no se ofrece en UI nueva).
+  /// Legado: línea B2B Conecta en plataforma (pedidos históricos; ya no se ofrece en UI nueva).
   static const creditoSistema = 'credito_sistema';
 
   /// Métodos estándar que puede ofrecer un importador.

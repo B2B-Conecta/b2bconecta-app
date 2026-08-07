@@ -102,7 +102,7 @@ class _ImporterOrderFleteInvoiceSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Factura del flete',
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -114,7 +114,7 @@ class _ImporterOrderFleteInvoiceSectionState
         Text(
           'Pago separado al transportista (${CarrierFletePagoModo.shortLabelEs(r.carrierFletePagoModoSnapshot)}). '
           '${OrderPaymentFlowCopy.importadorFleteAyuda}',
-          style: TextStyle(fontSize: 11, height: 1.35, color: Colors.grey.shade700),
+          style: TextStyle(fontSize: 11, height: 1.35, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
         if (r.hasFleteFactura) ...[
@@ -122,11 +122,11 @@ class _ImporterOrderFleteInvoiceSectionState
             r.fleteFacturaFileName?.trim().isNotEmpty == true
                 ? 'Archivo: ${r.fleteFacturaFileName}'
                 : 'Factura de flete registrada',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
           Text(
             'Fecha: ${formatEsShortDateTime(r.fleteFacturaSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(

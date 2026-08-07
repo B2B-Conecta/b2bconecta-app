@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../models/commission_settlement_model.dart';
 import '../services/supabase_service.dart';
@@ -62,7 +63,7 @@ class _CommissionSettlementLinesSectionState
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
@@ -72,7 +73,7 @@ class _CommissionSettlementLinesSectionState
               'No forma parte del total a pagar de la factura de comisión.',
               style: TextStyle(
                 fontSize: 10,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 height: 1.35,
               ),
             ),
@@ -82,7 +83,7 @@ class _CommissionSettlementLinesSectionState
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 4),

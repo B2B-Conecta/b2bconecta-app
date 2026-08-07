@@ -1,6 +1,6 @@
 import '../models/catalog_import/catalog_import_field.dart';
 
-/// Sugiere columnas del archivo ERP para cada campo MotoLink.
+/// Sugiere columnas del archivo ERP para cada campo B2B Conecta.
 class CatalogImportHeaderGuess {
   CatalogImportHeaderGuess._();
 

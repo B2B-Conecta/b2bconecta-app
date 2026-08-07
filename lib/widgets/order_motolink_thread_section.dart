@@ -12,7 +12,7 @@ import 'main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
 import 'profile_section_helpers.dart';
 
-/// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión MotoLink.
+/// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión B2B Conecta.
 class OrderMotolinkThreadSection extends StatefulWidget {
   const OrderMotolinkThreadSection({
     super.key,
@@ -237,7 +237,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
         Row(
           children: [
             if (!widget.suppressBuiltinTitle)
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Chat del pedido',
                   style: TextStyle(
@@ -279,7 +279,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             canReply
                 ? 'Aún no hay mensajes. Escriba aquí si tiene dudas sobre este pedido.'
                 : 'Sin mensajes en este pedido.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           )
         else
           ListView.separated(
@@ -293,14 +293,14 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
               final label = mine
                   ? 'Tú'
                   : (m.isFromAdmin
-                      ? 'MotoLink'
+                      ? 'B2B Conecta'
                       : (m.isFromImportador ? 'Importador' : 'Aliado'));
               final align =
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
               final bg = m.isFromAdmin
                   ? AppColors.surfaceTinted.withOpacity(0.55)
                   : (m.isFromImportador
-                      ? Colors.orange.shade50
+                      ? AppColors.brandBlueContainer
                       : (mine
                           ? AppColors.brandBlue.withOpacity(0.12)
                           : Colors.grey.shade200));
@@ -313,7 +313,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -321,7 +321,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                     decoration: BoxDecoration(
                       color: bg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: AppColors.borderSubtle),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),

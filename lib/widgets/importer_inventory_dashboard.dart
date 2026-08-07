@@ -235,7 +235,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
           icon: Icons.percent_outlined,
           tooltip: 'Actualizar descuentos USD (masivo)',
           onPressed: _openBulkUsdDiscountDialog,
-          backgroundColor: AppColors.brandOrange.withOpacity(0.92),
+          backgroundColor: AppColors.brand.withOpacity(0.92),
           foregroundColor: Colors.white,
         ),
     ];
@@ -295,7 +295,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               const SizedBox(height: 6),
               Text(
                 'Excel o CSV del ERP → productos, precios y stock.',
-                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
@@ -346,7 +346,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               const SizedBox(height: 6),
               Text(
                 'ZIP con fotos nombradas por SKU (hasta 3 por producto).',
-                style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
@@ -442,13 +442,13 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 body:
                     'Genera un listado en Excel (.xlsx) o CSV desde Profit, Saint, '
                     'AdministraNET o tu hoja de cálculo. No necesitas adaptar el '
-                    'archivo a una plantilla MotoLink.',
+                    'archivo a una plantilla B2B Conecta.',
               ),
               _helpStep(
                 n: '2',
                 title: 'Sube y confirma columnas',
                 body:
-                    'Toca «Elegir archivo». MotoLink sugiere automáticamente qué '
+                    'Toca «Elegir archivo». B2B Conecta sugiere automáticamente qué '
                     'columna es SKU, nombre, precio y stock. Revisa el mapeo y '
                     'ajusta si hace falta. Las demás columnas pueden guardarse '
                     'como datos internos.',
@@ -541,7 +541,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.4,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -847,7 +847,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               fontWeight: FontWeight.w700,
               color: p.isActive
                   ? AppColors.successGreen
-                  : Colors.orange.shade800,
+                  : AppColors.brandAccent,
             ),
           ),
           const SizedBox(height: 2),
@@ -855,9 +855,9 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             data: SwitchThemeData(
               trackOutlineColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.disabled)) {
-                  return Colors.grey.shade300;
+                  return AppColors.borderSubtle;
                 }
-                return AppColors.brandOrange.withOpacity(0.85);
+                return AppColors.brand.withOpacity(0.85);
               }),
               trackOutlineWidth: WidgetStateProperty.all(1.8),
               thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -865,13 +865,13 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                   return Colors.grey.shade400;
                 }
                 if (states.contains(WidgetState.selected)) {
-                  return AppColors.brandOrange;
+                  return AppColors.brand;
                 }
                 return Colors.white;
               }),
               trackColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return AppColors.brandOrange.withOpacity(0.22);
+                  return AppColors.brand.withOpacity(0.22);
                 }
                 return Colors.transparent;
               }),
@@ -932,7 +932,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         const SizedBox(height: 4),
         Text(
           'SKU: ${p.sku ?? p.id}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
           ),
@@ -944,7 +944,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               '${p.precio.toStringAsFixed(2)} USD lista',
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
-                color: AppColors.brandOrange,
+                color: AppColors.brand,
               ),
             ),
             const SizedBox(width: 12),
@@ -976,7 +976,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 height: 1.25,
-                color: Colors.teal.shade800,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -987,7 +987,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               p.category!,
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.blue.shade800,
+                color: AppColors.brandAccent,
               ),
             ),
           ),
@@ -998,13 +998,13 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
 
   Widget _buildProductTile(PartModel p, {required bool desktop}) {
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       borderRadius: AppDecorations.radius12,
       elevation: 0,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: AppDecorations.radius12,
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.borderSubtle),
           boxShadow: desktop ? AppDecorations.cardShadow : null,
         ),
         child: Padding(
@@ -1023,7 +1023,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     onChanged: (_) => _toggleRowSelected(p),
                     fillColor: WidgetStateProperty.resolveWith((s) {
                       if (s.contains(WidgetState.selected)) {
-                        return AppColors.brandOrange;
+                        return AppColors.brand;
                       }
                       return null;
                     }),
@@ -1145,16 +1145,17 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                             controller: _searchController,
                             decoration: InputDecoration(
                               hintText: 'Buscar en mi inventario…',
-                              prefixIcon: const Icon(Icons.search),
+                              hintStyle: AppColors.hintStyle,
+                              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: AppColors.fieldFill,
                               border: OutlineInputBorder(
                                 borderRadius: AppDecorations.radius12,
-                                borderSide: BorderSide(color: Colors.grey.shade300),
+                                borderSide: BorderSide(color: AppColors.borderSubtle),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: AppDecorations.radius12,
-                                borderSide: BorderSide(color: Colors.grey.shade300),
+                                borderSide: BorderSide(color: AppColors.borderSubtle),
                               ),
                             ),
                             onSubmitted: (_) => _reload(),
@@ -1179,7 +1180,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                           controller: _searchController,
                           decoration: InputDecoration(
                             hintText: 'Buscar en mi inventario…',
-                            prefixIcon: const Icon(Icons.search),
+                            hintStyle: AppColors.hintStyle,
+                            prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                             filled: true,
                             fillColor: AppColors.fieldFill,
                             border: OutlineInputBorder(
@@ -1204,7 +1206,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Categoría',
                     style: TextStyle(
                       fontSize: 11,
@@ -1244,7 +1246,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     },
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Filtros rápidos',
                     style: TextStyle(
                       fontSize: 11,
@@ -1266,18 +1268,18 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                           _reload();
                         },
                         selectedColor:
-                            AppColors.brandOrange.withOpacity(0.22),
-                        checkmarkColor: AppColors.brandOrange,
+                            AppColors.brand.withOpacity(0.22),
+                        checkmarkColor: AppColors.brand,
                         labelStyle: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: _filterLowStock
-                              ? AppColors.brandOrange
+                              ? AppColors.brand
                               : AppColors.textPrimary,
                         ),
                         side: BorderSide(
                           color: _filterLowStock
-                              ? AppColors.brandOrange
-                              : Colors.grey.shade300,
+                              ? AppColors.brand
+                              : AppColors.borderSubtle,
                         ),
                       ),
                       FilterChip(
@@ -1302,7 +1304,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                         side: BorderSide(
                           color: _filterActiveOnly
                               ? AppColors.successGreen
-                              : Colors.grey.shade300,
+                              : AppColors.borderSubtle,
                         ),
                       ),
                       FilterChip(
@@ -1315,18 +1317,18 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                           });
                           _reload();
                         },
-                        selectedColor: Colors.orange.shade100,
-                        checkmarkColor: Colors.orange.shade900,
+                        selectedColor: AppColors.brandBlueContainer,
+                        checkmarkColor: AppColors.brandBlue,
                         labelStyle: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: _filterHidden
-                              ? Colors.orange.shade900
+                              ? AppColors.brandBlue
                               : AppColors.textPrimary,
                         ),
                         side: BorderSide(
                           color: _filterHidden
-                              ? Colors.orange.shade700
-                              : Colors.grey.shade300,
+                              ? AppColors.brandAccent
+                              : AppColors.borderSubtle,
                         ),
                       ),
                     ],
@@ -1342,11 +1344,17 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 runSpacing: 0,
                 children: [
                   TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.brandAccent,
+                    ),
                     onPressed: () => _reload(),
                     icon: const Icon(Icons.refresh, size: 18),
                     label: const Text('Actualizar lista'),
                   ),
                   TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.brandAccent,
+                    ),
                     onPressed: () => _setSelectionMode(
                       _selectionMode == _InventorySelectionMode.visibility
                           ? _InventorySelectionMode.none
@@ -1467,7 +1475,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                         ? 'Prueba quitar filtros o actualizar la lista.'
                         : 'Sube el Excel de tu ERP o añade productos uno a uno.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                   if (!hasFilters) ...[
                     const SizedBox(height: 20),
@@ -1666,7 +1674,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                   : (isDesktop ? 24 : 16),
               child: FloatingActionButton.extended(
                 onPressed: _inSelectionMode ? null : () => _openEditor(null),
-                backgroundColor: AppColors.brandOrange,
+                backgroundColor: AppColors.brand,
                 icon: const Icon(Icons.add),
                 label: const Text('Añadir'),
               ),
@@ -1696,30 +1704,31 @@ class _MetricCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: AppDecorations.radius12,
         border: Border.all(
           color: highlight
-              ? AppColors.brandOrange.withOpacity(0.5)
-              : Colors.grey.shade200,
+              ? AppColors.brandAccent.withOpacity(0.55)
+              : AppColors.borderSubtle,
         ),
         boxShadow: AppDecorations.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: AppColors.brandBlue),
+          Icon(icon, size: 20, color: AppColors.brandAccent),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,

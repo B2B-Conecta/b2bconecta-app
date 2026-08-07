@@ -181,10 +181,27 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  'Promociones de proveedores (aliados) o vallas de terceros '
-                  '(ej. agencia de transporte) para aliados, importadores o ambos.',
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey.shade800),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.campaign_outlined,
+                      size: 18,
+                      color: AppColors.brandAccent,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        MediaQuery.sizeOf(context).width < 600
+                            ? 'Campañas · catálogo'
+                            : 'Campañas para aliados e importadores',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               FilledButton.icon(
@@ -204,7 +221,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                       SizedBox(height: 80),
                       Center(
                         child: Text(
-                          'No hay campañas. Cree una para probar en catálogo aliado.',
+                          'Sin campañas',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -562,7 +579,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: AppColors.borderSubtle,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

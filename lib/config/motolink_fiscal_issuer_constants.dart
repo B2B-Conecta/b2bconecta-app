@@ -1,6 +1,6 @@
-/// Datos del emisor en documentos PDF (ajustar a la razón social y fiscal real).
+/// Datos del emisor en documentos PDF (B2B Conecta C.A.).
 abstract final class MotolinkFiscalIssuerConstants {
-  static const businessName = 'MotoLink, C.A.';
+  static const businessName = 'B2B Conecta C.A.';
   static const rif = 'J-00000000-0';
   static const address =
       'Valencia, Edo. Carabobo — Av. Bolívar Norte, edif. Cámara de Comercio, locales 7-8';

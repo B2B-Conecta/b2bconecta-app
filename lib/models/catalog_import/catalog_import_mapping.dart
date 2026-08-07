@@ -30,7 +30,7 @@ extension CatalogImportTransformX on CatalogImportTransform {
   }
 }
 
-/// Mapeo de una columna del archivo ERP → campo MotoLink.
+/// Mapeo de una columna del archivo ERP → campo B2B Conecta.
 class CatalogImportColumnBinding {
   const CatalogImportColumnBinding({
     required this.source,

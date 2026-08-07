@@ -170,7 +170,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                   _rows.isEmpty
                       ? 'No hay usuarios B2B registrados.'
                       : 'Ningún usuario coincide con la búsqueda.',
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -313,7 +313,7 @@ class _MiniStat extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Row(
         children: [
@@ -325,7 +325,7 @@ class _MiniStat extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -366,7 +366,7 @@ class _UserActivityCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: AppColors.borderSubtle),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -383,12 +383,12 @@ class _UserActivityCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               '$roleLabel${row.rif != null && row.rif!.isNotEmpty ? ' · ${row.rif}' : ''}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             if (location.isNotEmpty)
               Text(
                 location,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
           ],
         ),
@@ -397,7 +397,7 @@ class _UserActivityCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Último ingreso: ${formatEsShortDateTime(row.lastLoginAt)}',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -473,7 +473,7 @@ class _UserActivityCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
                 Text(
                   value,

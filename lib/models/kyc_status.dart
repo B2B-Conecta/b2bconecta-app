@@ -10,7 +10,7 @@ abstract final class KycStatus {
       case pendiente:
         return 'Pendiente de envío';
       case enRevision:
-        return 'En revisión MotoLink';
+        return 'En revisión B2B Conecta';
       case aprobado:
         return 'Aprobado';
       case rechazado:

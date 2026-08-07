@@ -44,7 +44,7 @@ String orderCardProductosSubtitle(
   return '$partidas · $uds uds · ${formatRefAmount(totalRef)} REF';
 }
 
-/// Subtítulo de comisión MotoLink (importador).
+/// Subtítulo de comisión B2B Conecta (importador).
 String? orderCardCommissionSubtitle(List<TransactionRequestModel> lines) {
   final eligible = orderLinesEligibleForCommission(lines);
   if (eligible.isEmpty) return null;

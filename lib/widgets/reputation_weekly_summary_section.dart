@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../models/reputation_weekly_snapshot_model.dart';
 import '../services/supabase_service.dart';
@@ -68,7 +69,7 @@ class _ReputationWeeklySummarySectionState
       subtitle: _sectionSubtitle(),
       initiallyExpanded: _weeks.isNotEmpty,
       infoMessage:
-          'Promedio y volumen de valoraciones por semana. Los cierres se registran los lunes.',
+          'Promedio semanal · cierre los lunes',
       trailingActions: [
         IconButton(
           onPressed: _loading ? null : _load,
@@ -99,7 +100,7 @@ class _ReputationWeeklySummarySectionState
           else if (_weeks.isEmpty)
             Text(
               'Sin cierres semanales todavía.',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             )
           else
             ..._weeks.map(_weekRow),
@@ -124,7 +125,7 @@ class _ReputationWeeklySummarySectionState
               style: TextStyle(
                 fontSize: 9.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
@@ -158,7 +159,7 @@ class _ReputationWeeklySummarySectionState
             child: Text(
               '${w.ratingCount}',
               textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
             ),
           ),
         ],

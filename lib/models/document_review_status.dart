@@ -10,7 +10,7 @@ abstract final class DocumentReviewStatus {
       case pendiente:
         return 'Listo para enviar a revisión';
       case enRevision:
-        return 'En revisión MotoLink';
+        return 'En revisión B2B Conecta';
       case aprobado:
         return 'Aprobado';
       case rechazado:

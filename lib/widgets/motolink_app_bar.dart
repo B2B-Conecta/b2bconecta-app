@@ -7,6 +7,7 @@ import '../models/profile_role_labels.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'motolink_pro_logo.dart';
+import 'theme_mode_bubble.dart';
 
 /// Altura del logo en AppBar: importadores (compacto) vs aliados (más visible).
 abstract final class MotolinkAppBarLogoSizes {
@@ -15,7 +16,7 @@ abstract final class MotolinkAppBarLogoSizes {
 }
 
 /// Barra superior: a la izquierda marca del usuario (logo opcional, nombre, rol);
-/// a la derecha MotoLink + descripción; campana de notificaciones.
+/// a la derecha B2B Conecta + descripción; campana de notificaciones.
 class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   const MotolinkAppBar({
     super.key,
@@ -26,14 +27,14 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
     this.unreadNotifications = 0,
   });
 
-  /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra MotoLink a la derecha.
+  /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra B2B Conecta a la derecha.
   final ProfileModel? currentUserProfile;
 
   final VoidCallback? onNotificationTap;
   final List<Widget>? extraActions;
   final int unreadNotifications;
 
-  /// Alto del logo MotoLink a la derecha y referencia del logo de usuario.
+  /// Alto del logo B2B Conecta a la derecha y referencia del logo de usuario.
   final double logoHeight;
 
   @override
@@ -110,9 +111,9 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
                             height: lh,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
-                                MotoLinkProLogo(height: lh),
+                                BusinessLogoPlaceholder(size: lh),
                           )
-                        : MotoLinkProLogo(height: lh),
+                        : BusinessLogoPlaceholder(size: lh),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -126,7 +127,7 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
                               : 'Mi cuenta',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
                             color: AppColors.textPrimary,
@@ -140,7 +141,7 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             fontSize: 11,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                             height: 1.15,
                           ),
                         ),
@@ -153,34 +154,39 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
             const SizedBox(width: 8),
           ] else
             const Spacer(),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'MotoLink',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: AppColors.brandBlue,
-                  height: 1.1,
+          if (MediaQuery.sizeOf(context).width >= 600)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'B2B Conecta',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: AppColors.brandBlue,
+                    height: 1.1,
+                  ),
                 ),
-              ),
-              Text(
-                'Marketplace B2B',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                  height: 1.1,
+                Text(
+                  'Marketplace',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 11,
+                    color: AppColors.brandAccent,
+                    height: 1.1,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
       actions: [
         ...?widget.extraActions,
+        const Padding(
+          padding: EdgeInsets.only(right: 2),
+          child: ThemeModeBubble(compact: true),
+        ),
         Padding(
           padding: const EdgeInsets.only(right: 8),
           child: Stack(
@@ -228,7 +234,7 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
         child: Divider(
           height: 1,
           thickness: 1,
-          color: AppColors.brandBlue.withOpacity(0.12),
+          color: AppColors.divider,
         ),
       ),
     );

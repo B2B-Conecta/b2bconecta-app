@@ -46,7 +46,7 @@ class MotolinkCommissionDeliveryNotePdfService {
         CommissionSettlementFiscal.totalVentasInformativoUsd(lines);
     final serviceDesc =
         'Servicio de intermediación digital y uso de plataforma tecnológica '
-        'MotoLink, según corte de cuenta referencia $ref';
+        'B2B Conecta, según corte de cuenta referencia $ref';
 
     final tasaTxt =
         formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4);

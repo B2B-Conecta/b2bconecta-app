@@ -229,7 +229,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'MotoLink suspendió la creación de nuevos pedidos por morosidad. '
+                          'B2B Conecta suspendió la creación de nuevos pedidos por morosidad. '
                           'Regularice los pagos en pedidos entregados; cuando reactivemos su cuenta, '
                           'podrá volver a solicitar en el catálogo.',
                           style: TextStyle(
@@ -266,7 +266,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
                     Icon(
                       docOk ? Icons.check_circle : Icons.radio_button_off,
                       size: 15,
-                      color: docOk ? AppColors.successGreen : Colors.grey.shade600,
+                      color: docOk ? AppColors.successGreen : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -274,7 +274,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
                         d == null
                             ? AliadoDocType.labelEs(type)
                             : '${AliadoDocType.labelEs(type)} · ${DocumentReviewStatus.labelEs(st ?? DocumentReviewStatus.pendiente)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           height: 1.3,
                           color: AppColors.textSecondary,
@@ -306,13 +306,13 @@ class _CheckRow extends StatelessWidget {
         Icon(
           ok ? Icons.check_circle : Icons.warning_amber_rounded,
           size: 18,
-          color: ok ? AppColors.successGreen : Colors.orange.shade800,
+          color: ok ? AppColors.successGreen : AppColors.brandAccent,
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 1.35,
               color: AppColors.textSecondary,

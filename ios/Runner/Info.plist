@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>MotoLink</string>
+	<string>B2B Conecta</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,11 +46,11 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>MotoLink usa la cámara para fotografiar documentos de registro, logos y productos.</string>
+	<string>B2B Conecta usa la cámara para fotografiar documentos de registro, logos y productos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MotoLink permite elegir imágenes desde tu galería para documentos y fotos del perfil.</string>
+	<string>B2B Conecta permite elegir imágenes desde tu galería para documentos y fotos del perfil.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MotoLink usa tu ubicación para ordenar el catálogo de importadores por cercanía y estimar distancias de envío.</string>
+	<string>B2B Conecta usa tu ubicación para ordenar el catálogo de importadores por cercanía y estimar distancias de envío.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Permite que las herramientas de desarrollo se conecten a la app para depuración.</string>
 	<key>NSBonjourServices</key>

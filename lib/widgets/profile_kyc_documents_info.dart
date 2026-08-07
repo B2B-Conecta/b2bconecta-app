@@ -16,7 +16,7 @@ class ProfileKycDocumentsInfo extends StatelessWidget {
           color: AppColors.brandBlue.withOpacity(0.22),
         ),
       ),
-      child: const Padding(
+      child: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,13 +101,13 @@ class _KycBullet extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               height: 1.45,
-              color: Colors.grey.shade700,
+              color: AppColors.textSecondary,
             ),
           ),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 height: 1.45,
                 color: AppColors.textSecondary,

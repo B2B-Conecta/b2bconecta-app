@@ -102,7 +102,7 @@ class _AliadoSpecRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
               letterSpacing: 0.3,
             ),
           ),
@@ -112,7 +112,7 @@ class _AliadoSpecRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               height: 1.4,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
         ],
@@ -259,7 +259,7 @@ class _ProductCustomFieldsEditorState extends State<ProductCustomFieldsEditor> {
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Información de tu sistema interno. Usa el botón del ojo para decidir '
           'qué campos puede ver el aliado en la ficha del repuesto.',
           style: TextStyle(

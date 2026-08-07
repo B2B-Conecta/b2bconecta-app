@@ -5,7 +5,7 @@ import 'order_vocab.dart';
 abstract final class OrderStatusFlowCopy {
   static String labelEs(String status) => switch (status) {
         TransactionRequestStatus.pendiente => 'Nuevo · en revisión',
-        TransactionRequestStatus.aprobadoAdmin => 'Aprobado por MotoLink',
+        TransactionRequestStatus.aprobadoAdmin => 'Aprobado por B2B Conecta',
         TransactionRequestStatus.rechazado => 'Cancelado o rechazado',
         TransactionRequestStatus.enPreparacion => 'En preparación',
         TransactionRequestStatus.pedidoListo => 'Listo para recolección',
@@ -77,7 +77,7 @@ abstract final class OrderStatusFlowCopy {
           if (canceladoPorImportador) {
             return 'Pedido cancelado por el importador';
           }
-          if (anuladoPorMotolink) return 'Pedido anulado por MotoLink';
+          if (anuladoPorMotolink) return 'Pedido anulado por B2B Conecta';
           return 'Pedido rechazado';
         }(),
         _ => '—',

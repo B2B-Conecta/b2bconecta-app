@@ -1,4 +1,4 @@
-/// Cuenta aliado: MotoLink suspendió nuevos pedidos por morosidad.
+/// Cuenta aliado: B2B Conecta suspendió nuevos pedidos por morosidad.
 class PedidosSuspendidosMorosidadException implements Exception {
   PedidosSuspendidosMorosidadException(this.message);
 

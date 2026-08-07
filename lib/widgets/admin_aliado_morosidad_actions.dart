@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 import '../services/supabase_service.dart';
 
 /// Admin: suspender o reactivar nuevos pedidos de un aliado moroso.
@@ -85,10 +87,10 @@ class _AdminAliadoMorosidadActionsState extends State<AdminAliadoMorosidadAction
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: suspended ? Colors.red.shade50 : Colors.orange.shade50,
+        color: suspended ? Colors.red.shade50 : AppColors.brandBlueContainer,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: suspended ? Colors.red.shade200 : Colors.orange.shade200,
+          color: suspended ? Colors.red.shade200 : AppColors.brandAccent.withOpacity(0.35),
         ),
       ),
       child: Column(
@@ -99,7 +101,7 @@ class _AdminAliadoMorosidadActionsState extends State<AdminAliadoMorosidadAction
               Icon(
                 suspended ? Icons.block : Icons.warning_amber_rounded,
                 size: 20,
-                color: suspended ? Colors.red.shade800 : Colors.orange.shade900,
+                color: suspended ? Colors.red.shade800 : AppColors.brandBlue,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -110,7 +112,7 @@ class _AdminAliadoMorosidadActionsState extends State<AdminAliadoMorosidadAction
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: suspended ? Colors.red.shade900 : Colors.orange.shade900,
+                    color: suspended ? Colors.red.shade900 : AppColors.brandBlue,
                   ),
                 ),
               ),

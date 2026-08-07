@@ -29,10 +29,10 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      color: AppColors.brandOrange.withOpacity(0.06),
+      color: AppColors.brand.withOpacity(0.06),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.brandOrange.withOpacity(0.35)),
+        side: BorderSide(color: AppColors.brand.withOpacity(0.35)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
@@ -44,7 +44,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.local_offer_outlined,
-                  color: AppColors.brandOrange,
+                  color: AppColors.brand,
                   size: 22,
                 ),
                 const SizedBox(width: 10),
@@ -52,7 +52,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Condiciones para aliados',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
@@ -68,7 +68,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.35,
-                          color: Colors.grey.shade700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -86,14 +86,14 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
                 labelText: 'Precio oferta mayorista (USD)',
                 hintText: 'Opcional · menor que precio lista',
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: AppColors.fieldFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: AppColors.borderSubtle),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: AppColors.borderSubtle),
                 ),
                 isDense: true,
               ),
@@ -105,7 +105,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
             ),
             if (showUsdPaymentDiscount) ...[
               const SizedBox(height: 16),
-              Divider(color: Colors.grey.shade300, height: 1),
+              Divider(color: AppColors.borderSubtle, height: 1),
               const SizedBox(height: 12),
               ProductUsdPaymentDiscountField(
                 controller: usdPaymentDiscountController,

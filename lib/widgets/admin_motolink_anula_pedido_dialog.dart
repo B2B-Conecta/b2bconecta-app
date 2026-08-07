@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Admin MotoLink: anula un pedido ya aprobado / en curso. Devuelve motivo o null.
+/// Admin B2B Conecta: anula un pedido ya aprobado / en curso. Devuelve motivo o null.
 Future<String?> showAdminMotolinkAnulaPedidoDialog(
   BuildContext context, {
   required String productName,
@@ -10,7 +10,7 @@ Future<String?> showAdminMotolinkAnulaPedidoDialog(
     context: context,
     builder: (ctx) {
       return AlertDialog(
-        title: const Text('Anular pedido (MotoLink)'),
+        title: const Text('Anular pedido (B2B Conecta)'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

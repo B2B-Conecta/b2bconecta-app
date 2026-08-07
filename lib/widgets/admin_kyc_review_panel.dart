@@ -438,7 +438,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
-                                              color: Colors.blueGrey.shade800,
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                         ),
@@ -513,7 +513,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                               child: DecoratedBox(
                                                 decoration: BoxDecoration(
                                                   border: Border.all(
-                                                    color: Colors.grey.shade300,
+                                                    color: AppColors.borderSubtle,
                                                   ),
                                                   borderRadius:
                                                       BorderRadius.circular(8),

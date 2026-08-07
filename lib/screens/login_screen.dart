@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
 import '../widgets/login_forgot_password_dialog.dart';
 import '../widgets/motolink_pro_logo.dart';
+import '../widgets/theme_mode_bubble.dart';
 
 enum _AuthMode { login, register }
 
@@ -171,43 +172,33 @@ class _LoginScreenState extends State<LoginScreen> {
       fillColor: AppColors.fieldFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
     );
   }
 
   Widget _buildAuthHeader({required bool compact}) {
-    final logoHeight = compact ? 120.0 : MotoLinkProLogoHeights.login;
+    final logoHeight = compact ? 88.0 : MotoLinkProLogoHeights.login;
     return Column(
       children: [
+        // El PNG ya incluye «B2B CONECTA»; no repetir el nombre en texto.
         MotoLinkProLogo(height: logoHeight),
-        SizedBox(height: compact ? 16 : 20),
-        const Text(
-          'MotoLink',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: AppColors.brandBlue,
-            letterSpacing: -0.3,
-          ),
-        ),
-        const SizedBox(height: 8),
+        SizedBox(height: compact ? 18 : 22),
         Text(
           _mode == _AuthMode.login
               ? 'Ingrese a su cuenta'
               : 'Cree su cuenta B2B',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             color: AppColors.textSecondary,
             height: 1.35,
@@ -335,7 +326,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (_mode == _AuthMode.login) ...[
           TextButton(
             onPressed: _isLoading ? null : _showForgotPasswordDialog,
-            child: const Text(
+            child: Text(
               '¿Olvidó su contraseña?',
               style: TextStyle(
                 color: AppColors.textSecondary,
@@ -349,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     '¿No tiene cuenta? ',
                     style: TextStyle(
                       color: AppColors.textSecondary,
@@ -380,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     '¿Ya tiene cuenta? ',
                     style: TextStyle(
                       color: AppColors.textSecondary,
@@ -412,15 +403,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildAuthCard({required bool showHeader}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.white,
+      color: isDark ? AppColors.surfaceTinted : AppColors.white,
       elevation: 0,
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.borderSubtle),
           boxShadow: AppDecorations.cardShadow,
         ),
         child: Padding(
@@ -430,7 +422,18 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (showHeader) ...[
-                _buildAuthHeader(compact: true),
+                // Desktop: logo va en el panel izquierdo; aquí solo el subtítulo.
+                Text(
+                  _mode == _AuthMode.login
+                      ? 'Ingrese a su cuenta'
+                      : 'Cree su cuenta B2B',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 28),
               ],
               _buildFormFields(),
@@ -452,9 +455,9 @@ class _LoginScreenState extends State<LoginScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0D47A1),
+            AppColors.black,
             AppColors.brandBlue,
-            Color(0xFF1976D2),
+            AppColors.brandAccent,
           ],
         ),
       ),
@@ -465,12 +468,14 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const MotoLinkProLogo(height: 64, forceWhite: true),
+              const SizedBox(height: 28),
               const Text(
-                'Plataforma B2B\npara repuestos',
+                'Marketplace B2B\npara repuestos',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.white,
                   height: 1.15,
                   letterSpacing: -0.5,
                 ),
@@ -482,7 +487,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 15.5,
                   height: 1.5,
-                  color: Colors.white.withOpacity(0.88),
+                  color: AppColors.white.withOpacity(0.88),
                 ),
               ),
               const SizedBox(height: 32),
@@ -511,55 +516,71 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= AppBreakpoints.authDesktop;
+      body: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop =
+                  constraints.maxWidth >= AppBreakpoints.authDesktop;
 
-          if (isDesktop) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(flex: 5, child: _buildBrandingPanel()),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 32,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: AppBreakpoints.authFormMaxWidth,
+              if (isDesktop) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 5, child: _buildBrandingPanel()),
+                    Expanded(
+                      flex: 4,
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 32,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: AppBreakpoints.authFormMaxWidth,
+                            ),
+                            child: _buildAuthCard(showHeader: true),
+                          ),
                         ),
-                        child: _buildAuthCard(showHeader: true),
                       ),
+                    ),
+                  ],
+                );
+              }
+
+              return Center(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppBreakpoints.authFormMaxWidth,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildAuthHeader(compact: false),
+                        const SizedBox(height: 28),
+                        _buildAuthCard(showHeader: false),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            );
-          }
-
-          return Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppBreakpoints.authFormMaxWidth,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildAuthHeader(compact: false),
-                    const SizedBox(height: 28),
-                    _buildAuthCard(showHeader: false),
-                  ],
-                ),
+              );
+            },
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+                child: const ThemeModeBubble(compact: true),
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

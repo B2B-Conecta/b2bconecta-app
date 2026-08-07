@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
@@ -72,7 +73,7 @@ class AliadoTransitEtaBanner extends StatelessWidget {
                     registrado,
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -126,7 +127,7 @@ class AliadoTransitEtaBanner extends StatelessWidget {
                       registrado,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -137,7 +138,7 @@ class AliadoTransitEtaBanner extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 10.5,
                         fontStyle: FontStyle.italic,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],

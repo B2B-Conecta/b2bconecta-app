@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../models/transaction_request_model.dart';
 import '../utils/admin_order_panel_utils.dart';
@@ -36,7 +37,7 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             height: 1.35,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),

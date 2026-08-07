@@ -38,8 +38,8 @@ class PushNotificationService {
 
   static const _androidChannel = AndroidNotificationChannel(
     'motolink_alerts',
-    'MotoLink',
-    description: 'Pedidos, pagos y mensajes de MotoLink',
+    'B2B Conecta',
+    description: 'Pedidos, pagos y mensajes de B2B Conecta',
     importance: Importance.high,
   );
 
@@ -158,7 +158,7 @@ class PushNotificationService {
     final n = message.notification;
     final data = message.data;
     final rawTitle =
-        n?.title ?? data['title']?.toString() ?? 'MotoLink';
+        n?.title ?? data['title']?.toString() ?? 'B2B Conecta';
     final type = data['type']?.toString() ?? 'mensaje';
     final accessApproved = isAliadoAccessApprovedNotification(
       type: type,

@@ -19,7 +19,7 @@ abstract final class OrderActionsFlowCopy {
       'Indique el motivo; después podrá valorar el servicio.';
   static const importadorCancelarTitulo = 'Cancelar pedido (importador)';
   static String importadorCancelarIntro(String productName) =>
-      'El pedido de «$productName» se cerrará y se notificará al aliado y a MotoLink. '
+      'El pedido de «$productName» se cerrará y se notificará al aliado y a B2B Conecta. '
       'Indique el motivo; después podrá valorar al aliado.';
   static const cancelarMotivoLabel = 'Motivo de la cancelación';
   static const cancelarMotivoObligatorio = 'Motivo (obligatorio)';
@@ -69,7 +69,7 @@ abstract final class OrderActionsFlowCopy {
   static const pedidoCanceladoPorImportador = 'Pedido cancelado por el importador';
   static const pagoPendienteBanner =
       'Pedido entregado con pago pendiente. Complete el comprobante o espere '
-      'la aprobación de MotoLink.';
+      'la aprobación de B2B Conecta.';
   static const valorarImportadorTitulo = 'Valorar al importador';
   static const valorarAliadoTitulo = 'Valorar al aliado';
   static const valorarImportadorIntro =

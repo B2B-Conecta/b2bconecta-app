@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../utils/rating_scale_labels.dart';
 
@@ -36,7 +37,7 @@ class RatingDimensionSlider extends StatelessWidget {
             trackHeight: trackHeight,
             thumbShape: RoundSliderThumbShape(enabledThumbRadius: thumbRadius),
             overlayShape: RoundSliderOverlayShape(overlayRadius: compact ? 16 : 22),
-            inactiveTrackColor: Colors.grey.shade300,
+            inactiveTrackColor: AppColors.borderSubtle,
             activeTrackColor: Colors.transparent,
             thumbColor: color,
             overlayColor: color.withOpacity(0.18),
@@ -72,7 +73,7 @@ class RatingDimensionSlider extends StatelessWidget {
               'Muy mal',
               style: TextStyle(
                 fontSize: compact ? 9 : 10,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
               ),
             ),
             Text(
@@ -87,7 +88,7 @@ class RatingDimensionSlider extends StatelessWidget {
               'Excelente',
               style: TextStyle(
                 fontSize: compact ? 9 : 10,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
               ),
             ),
           ],
@@ -120,7 +121,7 @@ class RatingDimensionCard extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -140,9 +141,10 @@ class RatingDimensionCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 20,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -151,7 +153,7 @@ class RatingDimensionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.35,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -179,9 +181,14 @@ class RatingDimensionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.grey.shade50,
+      color: AppColors.card,
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -195,10 +202,10 @@ class RatingDimensionCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
-                          color: Colors.black87,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -207,7 +214,7 @@ class RatingDimensionCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.35,
-                          color: Colors.grey.shade700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -228,6 +235,7 @@ class RatingDimensionCard extends StatelessWidget {
               enabled: enabled,
             ),
           ],
+        ),
         ),
       ),
     );

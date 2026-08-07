@@ -23,7 +23,7 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
           children: [
             Icon(Icons.attach_money, size: 20, color: Colors.green.shade800),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Descuento en precio USD (catálogo aliado)',
                 style: TextStyle(
@@ -43,7 +43,7 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
           style: TextStyle(
             fontSize: 11.5,
             height: 1.35,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 10),
@@ -59,14 +59,14 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
             hintText: 'Ej. 2',
             suffixText: '%',
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.fieldFill,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
             ),
             isDense: true,
           ),

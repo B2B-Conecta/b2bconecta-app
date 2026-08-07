@@ -1,7 +1,7 @@
 import '../config/motolink_fiscal_issuer_constants.dart';
 import '../models/commission_settlement_model.dart';
 
-/// Cálculo fiscal unificado para cortes de comisión MotoLink (base + IVA 16%).
+/// Cálculo fiscal unificado para cortes de comisión B2B Conecta (base + IVA 16%).
 abstract final class CommissionSettlementFiscal {
   static double get ivaPct => MotolinkFiscalIssuerConstants.commissionIvaPct;
 

@@ -46,9 +46,9 @@ class ImporterPedidoPromoChip extends StatelessWidget {
         vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.brandOrange.withOpacity(0.12),
+        color: AppColors.brand.withOpacity(0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.brandOrange.withOpacity(0.45)),
+        border: Border.all(color: AppColors.brand.withOpacity(0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -56,7 +56,7 @@ class ImporterPedidoPromoChip extends StatelessWidget {
           Icon(
             Icons.campaign_outlined,
             size: compact ? 14 : 15,
-            color: AppColors.brandOrange,
+            color: AppColors.brand,
           ),
           const SizedBox(width: 5),
           Flexible(
@@ -65,7 +65,7 @@ class ImporterPedidoPromoChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: compact ? 10.5 : 11.5,
                 fontWeight: FontWeight.w700,
-                color: AppColors.brandOrange,
+                color: AppColors.brand,
                 height: 1.2,
               ),
               maxLines: 2,
@@ -154,7 +154,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Material(
-            color: AppColors.brandOrange.withOpacity(0.08),
+            color: AppColors.brand.withOpacity(0.08),
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
@@ -166,7 +166,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                   children: [
                     const Icon(
                       Icons.campaign_outlined,
-                      color: AppColors.brandOrange,
+                      color: AppColors.brand,
                       size: 22,
                     ),
                     const SizedBox(width: 10),
@@ -178,7 +178,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                             campaigns.length == 1
                                 ? 'Promoción activa en catálogo aliado'
                                 : '${campaigns.length} promociones activas en catálogo aliado',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 13.5,
                               color: AppColors.textPrimary,
@@ -191,7 +191,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.35,
-                              color: Colors.grey.shade800,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -199,7 +199,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                     ),
                     Icon(
                       Icons.chevron_right,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                     ),
                   ],
                 ),
@@ -245,7 +245,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -288,7 +288,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                                 '${_formatPromoRange(c.startsAt, c.endsAt)}',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade700,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],

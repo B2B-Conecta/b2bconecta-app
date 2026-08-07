@@ -222,14 +222,14 @@ abstract final class MotolinkCommissionSettlementPdfLayout {
       children: [
         pw.SizedBox(height: 14),
         pw.Text(
-          'Forma de pago: transferencia o medio acordado con MotoLink. '
+          'Forma de pago: transferencia o medio acordado con B2B Conecta. '
           'Registre el comprobante en la app (Perfil → Cortes de comisión).',
           style: const pw.TextStyle(fontSize: 8, lineSpacing: 1.2),
         ),
         pw.SizedBox(height: 12),
         pw.Center(
           child: pw.Text(
-            'MotoLink Marketplace B2B — documento generado electrónicamente.',
+            'B2B Conecta Marketplace — documento generado electrónicamente.',
             style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
           ),
         ),

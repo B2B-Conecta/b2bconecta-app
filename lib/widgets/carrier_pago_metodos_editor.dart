@@ -28,7 +28,7 @@ class CarrierPagoMetodosEditor extends StatelessWidget {
         Text(
           'Indique los datos de cada método activo. '
           'El aliado los verá al elegir transportista en el checkout.',
-          style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.4),
+          style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 10),
         ...PagoMetodo.valuesMotoconecta.map(
@@ -95,7 +95,7 @@ class _CarrierPagoMetodoTileState extends State<_CarrierPagoMetodoTile> {
             border: Border.all(
               color: widget.checked
                   ? AppColors.brandBlue.withOpacity(0.35)
-                  : Colors.grey.shade300,
+                  : AppColors.borderSubtle,
             ),
           ),
           child: Column(
@@ -139,7 +139,7 @@ class _CarrierPagoMetodoTileState extends State<_CarrierPagoMetodoTile> {
                     'Datos registrados · toque ⌄ para editar',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),

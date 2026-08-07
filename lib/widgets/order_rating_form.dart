@@ -114,7 +114,7 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
     if (_q.questions.isEmpty) {
       return Text(
         'El cuestionario de valoración no está disponible. Intente más tarde.',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
       );
     }
 
@@ -149,7 +149,7 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
                       fontSize: 12,
                       height: 1.35,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -169,7 +169,7 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
           widget.subtitle,
           style: TextStyle(
             fontSize: subtitleSize,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
             height: 1.35,
           ),
         ),
@@ -180,14 +180,14 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: AppColors.brandBlueContainer,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: AppColors.brandAccent.withOpacity(0.35)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, size: 18, color: Colors.orange.shade900),
+                Icon(Icons.info_outline, size: 18, color: AppColors.brandBlue),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -195,7 +195,7 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: Colors.orange.shade900,
+                      color: AppColors.brandBlue,
                     ),
                   ),
                 ),
@@ -317,9 +317,10 @@ class OrderRatingAnswersReadOnly extends StatelessWidget {
             children: [
               Text(
                 q.displayTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
+                  color: AppColors.textPrimary,
                 ),
               ),
               if (q.displaySubtitle.isNotEmpty) ...[
@@ -329,7 +330,7 @@ class OrderRatingAnswersReadOnly extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10.5,
                     height: 1.3,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -356,7 +357,7 @@ class OrderRatingAnswersReadOnly extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 4),
@@ -378,7 +379,7 @@ class OrderRatingAnswersReadOnly extends StatelessWidget {
             '${q.textEs ?? q.displayTitle} · $n/${questionnaire.scaleMax}',
             style: TextStyle(
               fontSize: 10.5,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
               height: 1.3,
             ),
           ),
@@ -394,7 +395,7 @@ class OrderRatingAnswersReadOnly extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 4),
@@ -429,9 +430,9 @@ class OrderRatingReceivedCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,15 +442,16 @@ class OrderRatingReceivedCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   authorLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
               Text(
                 submittedAtLabel,
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -462,7 +464,7 @@ class OrderRatingReceivedCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
-                color: Colors.grey.shade900,
+                color: AppColors.textPrimary,
               ),
             ),
           ],

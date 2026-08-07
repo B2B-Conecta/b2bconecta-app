@@ -64,7 +64,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
       padding: const EdgeInsets.only(top: 2),
       child: Text(
         line,
-        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
       ),
     );
   }
@@ -138,7 +138,7 @@ class AdminCompactImportadorCard extends StatelessWidget {
       padding: const EdgeInsets.only(top: 2),
       child: Text(
         line,
-        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
       ),
     );
   }

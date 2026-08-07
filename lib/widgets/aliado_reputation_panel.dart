@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 import '../models/aliado_received_rating_model.dart';
 import '../models/profile_model.dart';
@@ -100,12 +101,10 @@ class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ProfileCollapsibleSection(
-          title: 'Reputación como aliado',
+          title: 'Reputación',
           subtitle: _reputationSubtitle(cnt, avg, hasDimensions),
           initiallyExpanded: hasDimensions,
-          infoMessage:
-              'Valoraciones de importadores sobre su taller (Comunicación y Pagos). '
-              'Ventana de las últimas 100 valoraciones.',
+          infoMessage: 'Últimas 100 valoraciones de importadores.',
           child: _reputationBody(
             cnt: cnt,
             hasDimensions: hasDimensions,
@@ -115,11 +114,10 @@ class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
         ),
         const SizedBox(height: 12),
         ProfileCollapsibleSection(
-          title: 'Comentarios de importadores',
+          title: 'Comentarios',
           subtitle: _commentsSubtitle(),
           initiallyExpanded: false,
-          infoMessage:
-              'Los importadores se muestran de forma anónima (solo ciudad).',
+          infoMessage: 'Anónimos · solo ciudad',
           trailingActions: [
             IconButton(
               onPressed: _loading ? null : _load,
@@ -161,20 +159,20 @@ class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
     }
     if (cnt > 0) {
       return Text(
-        'Aún no hay desglose por categoría en las valoraciones registradas.',
+        'Sin desglose por categoría',
         style: TextStyle(
-          fontSize: 11,
-          height: 1.4,
-          color: Colors.grey.shade800,
+          fontSize: 12,
+          height: 1.35,
+          color: AppColors.textSecondary,
         ),
       );
     }
     return Text(
-      'Cuando los importadores valoren pedidos entregados, verá aquí su reputación.',
+      'Sin valoraciones aún',
       style: TextStyle(
-        fontSize: 11.5,
+        fontSize: 12,
         height: 1.35,
-        color: Colors.grey.shade800,
+        color: AppColors.textSecondary,
       ),
     );
   }
@@ -201,7 +199,7 @@ class _AliadoReputationPanelState extends State<AliadoReputationPanel> {
     if (_ratings.isEmpty) {
       return Text(
         'Sin comentarios todavía.',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
       );
     }
     return ReceivedRatingsCarousel(

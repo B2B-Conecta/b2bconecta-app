@@ -58,7 +58,7 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
             style: TextStyle(
               fontSize: 11.5,
               height: 1.35,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -74,7 +74,7 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                       b.importadorNombre!.trim().isNotEmpty) ...[
                     Text(
                       b.importadorNombre!.trim(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
                         color: AppColors.textPrimary,
@@ -114,7 +114,7 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         height: 1.35,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],

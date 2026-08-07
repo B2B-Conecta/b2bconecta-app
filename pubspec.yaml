@@ -83,6 +83,10 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
   assets:
+    - assets/logo-b2b-conecta-color.png
+    - assets/logo-b2b-conecta-white.png
+    - assets/isotipo-b2b-conecta-blue.png
+    - assets/isotipo-b2b-conecta-white.png
     - assets/logo-oficial-motolinkpro-nobg.png
     - assets/logo-oficial-motolinkpro.png
     - .env
@@ -113,13 +117,13 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Icono de la app (launcher) = LogoMotoLink-OutApp (PDF oficial, sin texto).
+# Icono de la app (launcher) = isotipo B B2B Conecta.
 flutter_launcher_icons:
   android: true
   ios: true
   web:
     generate: true
-  image_path: assets/app-icon-motolink-launcher.png
+  image_path: assets/app-icon-b2b-conecta-launcher.png
   remove_alpha_ios: true
-  adaptive_icon_background: '#034BBA'
-  adaptive_icon_foreground: assets/app-icon-motolink-foreground.png
+  adaptive_icon_background: '#000000'
+  adaptive_icon_foreground: assets/app-icon-b2b-conecta-foreground.png

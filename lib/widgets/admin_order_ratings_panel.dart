@@ -150,7 +150,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       return Center(
         child: Text(
           'No hay valoraciones registradas.',
-          style: TextStyle(color: Colors.grey.shade700),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
       );
     }
@@ -177,7 +177,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
               child: Center(
                 child: Text(
                   'Ninguna valoración coincide con el filtro.',
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
               ),
             )
@@ -247,7 +247,7 @@ class _AdminRatingsToolbar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -271,14 +271,18 @@ class _AdminRatingsToolbar extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               _filterChip(
-                label: 'Aliado → importador',
+                label: MediaQuery.sizeOf(context).width < 600
+                    ? 'Aliado → Imp.'
+                    : 'Aliado → importador',
                 selected: filter == _AdminRatingFilter.aliadoRatesImporter,
                 onTap: () =>
                     onFilterChanged(_AdminRatingFilter.aliadoRatesImporter),
               ),
               const SizedBox(width: 6),
               _filterChip(
-                label: 'Importador → aliado',
+                label: MediaQuery.sizeOf(context).width < 600
+                    ? 'Imp. → Aliado'
+                    : 'Importador → aliado',
                 selected: filter == _AdminRatingFilter.importerRatesAliado,
                 onTap: () =>
                     onFilterChanged(_AdminRatingFilter.importerRatesAliado),
@@ -296,14 +300,20 @@ class _AdminRatingsToolbar extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return FilterChip(
-      label: Text(label, style: const TextStyle(fontSize: 11)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+        ),
+      ),
       selected: selected,
       onSelected: (_) => onTap(),
       visualDensity: VisualDensity.compact,
       showCheckmark: false,
       selectedColor: AppColors.brandBlueContainer,
       side: BorderSide(
-        color: selected ? AppColors.brandBlue : Colors.grey.shade400,
+        color: selected ? AppColors.brandAccent : AppColors.borderSubtle,
       ),
     );
   }
@@ -334,18 +344,16 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
     final at = r.submittedAt;
     final hasDimensions = r.answers.isNotEmpty && q.questions.isNotEmpty;
     final accent = _isAliadoRater
-        ? Colors.deepPurple.shade700
-        : Colors.teal.shade800;
-    final accentBg = _isAliadoRater
-        ? Colors.deepPurple.shade50
-        : Colors.teal.shade50;
+        ? AppColors.brandAccent
+        : AppColors.successGreen;
+    final accentBg = accent.withOpacity(0.14);
 
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: AppColors.borderSubtle),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -361,9 +369,9 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.fieldFill,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: accent.withOpacity(0.35)),
+                    border: Border.all(color: accent.withOpacity(0.45)),
                   ),
                   child: Text(
                     r.raterLabelEs,
@@ -381,7 +389,7 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
               ],
@@ -400,9 +408,10 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                     Expanded(
                       child: Text(
                         _shortName(r.importadorName),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -413,7 +422,7 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                   child: Icon(
                     Icons.arrow_downward,
                     size: 12,
-                    color: Colors.grey.shade500,
+                    color: AppColors.textMuted,
                   ),
                 ),
                 Row(
@@ -427,7 +436,7 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade900,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -440,7 +449,7 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                     'Carrito ${_shortUuid(r.checkoutGroupId!)}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -473,7 +482,7 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.4,
-                      color: Colors.grey.shade900,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -496,17 +505,17 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                                 ? Icons.expand_less
                                 : Icons.expand_more,
                             size: 18,
-                            color: AppColors.brandBlue,
+                            color: AppColors.brandAccent,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _detailExpanded
                                 ? 'Ocultar detalle por categoría'
                                 : 'Ver detalle por categoría',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.brandBlue,
+                              color: AppColors.brandAccent,
                             ),
                           ),
                         ],

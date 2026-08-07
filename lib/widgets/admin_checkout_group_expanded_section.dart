@@ -54,7 +54,7 @@ class _AdminCheckoutGroupExpandedSectionState
         padding: const EdgeInsets.all(8),
         child: Text(
           'No se encontraron líneas del carrito.',
-          style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+          style: TextStyle(fontSize: 12, color: AppColors.brandAccent),
         ),
       );
     }
@@ -77,7 +77,7 @@ class _AdminCheckoutGroupExpandedSectionState
           chunks.length > 1
               ? 'Avance por proveedor'
               : 'Proveedor',
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 12,
             color: AppColors.textPrimary,
@@ -140,8 +140,8 @@ class _AdminImporterChipRow extends StatelessWidget {
             padding: EdgeInsets.only(right: i < chunks.length - 1 ? 8 : 0),
             child: Material(
               color: selected
-                  ? AppColors.brandBlue.withOpacity(0.12)
-                  : Colors.grey.shade100,
+                  ? AppColors.brandBlue.withOpacity(0.18)
+                  : AppColors.surfaceTinted,
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 onTap: () => onSelected(i),
@@ -152,7 +152,7 @@ class _AdminImporterChipRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: selected ? AppColors.brandBlue : Colors.grey.shade300,
+                      color: selected ? AppColors.brandBlue : AppColors.borderSubtle,
                       width: selected ? 1.5 : 1,
                     ),
                   ),
@@ -166,7 +166,7 @@ class _AdminImporterChipRow extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                           color: selected
                               ? AppColors.brandBlue
-                              : Colors.grey.shade700,
+                              : AppColors.textSecondary,
                         ),
                       ),
                       Text(
@@ -188,7 +188,7 @@ class _AdminImporterChipRow extends StatelessWidget {
                             status,
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey.shade700,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           if (moroso)
@@ -307,7 +307,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
         if (commissionSubtitle != null) ...[
           const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
-            title: 'Comisión MotoLink',
+            title: 'Comisión B2B Conecta',
             subtitle: commissionSubtitle,
             infoMessage:
                 'Comisión devengada o estimada según el estado del pedido.',
@@ -428,7 +428,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             ],
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con aliado, importador y MotoLink',
+          subtitle: 'Hilo con aliado, importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>(

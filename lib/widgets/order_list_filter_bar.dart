@@ -82,10 +82,13 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
             controller: widget.searchController,
             onChanged: widget.onSearchChanged,
             textInputAction: TextInputAction.search,
+            style: TextStyle(color: AppColors.textPrimary),
+            cursorColor: AppColors.brandAccent,
             decoration: InputDecoration(
               hintText: widget.hintText,
+              hintStyle: AppColors.hintStyle,
               prefixIcon:
-                  const Icon(Icons.search, color: AppColors.textSecondary),
+                  Icon(Icons.search, color: AppColors.textSecondary),
               suffixIcon: widget.searchController.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 20),
@@ -97,23 +100,23 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                     )
                   : null,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: AppColors.fieldFill,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 10,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderSide: BorderSide(color: AppColors.borderSubtle),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderSide: BorderSide(color: AppColors.borderSubtle),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: AppColors.brandBlue, width: 1.2),
+                    const BorderSide(color: AppColors.brandAccent, width: 1.2),
               ),
               isDense: true,
             ),
@@ -130,8 +133,11 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                       selected: widget.selectedStatus == null,
                       onSelected: (_) => widget.onStatusChanged!(null),
                       visualDensity: VisualDensity.compact,
-                      selectedColor: AppColors.brandBlue.withOpacity(0.2),
-                      checkmarkColor: AppColors.brandBlue,
+                      selectedColor: AppColors.brandBlueContainer,
+                      checkmarkColor: AppColors.brandAccent,
+                      labelStyle: TextStyle(color: AppColors.textPrimary),
+                      side: BorderSide(color: AppColors.borderSubtle),
+                      backgroundColor: AppColors.fieldFill,
                     ),
                     const SizedBox(width: 6),
                     ...widget.statusOptions!.map(
@@ -139,12 +145,17 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
                           label: Text(o.label,
-                              style: const TextStyle(fontSize: 12)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textPrimary,
+                              )),
                           selected: widget.selectedStatus == o.status,
                           onSelected: (_) => widget.onStatusChanged!(o.status),
                           visualDensity: VisualDensity.compact,
-                          selectedColor: AppColors.brandBlue.withOpacity(0.2),
-                          checkmarkColor: AppColors.brandBlue,
+                          selectedColor: AppColors.brandBlueContainer,
+                          checkmarkColor: AppColors.brandAccent,
+                          side: BorderSide(color: AppColors.borderSubtle),
+                          backgroundColor: AppColors.fieldFill,
                         ),
                       ),
                     ),
@@ -152,18 +163,23 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                   if (_hasMorosoFilter) ...[
                     if (_hasStatusFilter) const SizedBox(width: 6),
                     FilterChip(
-                      label: const Text('Morosos'),
+                      label: Text(
+                        'Morosos',
+                        style: TextStyle(color: AppColors.textPrimary),
+                      ),
                       selected: widget.morosoOnly,
                       onSelected: (v) => widget.onMorosoOnlyChanged!(v),
                       visualDensity: VisualDensity.compact,
-                      selectedColor: Colors.red.shade100,
-                      checkmarkColor: Colors.red.shade800,
+                      selectedColor: Colors.red.withOpacity(0.25),
+                      checkmarkColor: Colors.red.shade300,
+                      side: BorderSide(color: AppColors.borderSubtle),
+                      backgroundColor: AppColors.fieldFill,
                       avatar: Icon(
                         Icons.warning_amber_rounded,
                         size: 16,
                         color: widget.morosoOnly
-                            ? Colors.red.shade800
-                            : Colors.grey.shade600,
+                            ? Colors.red.shade300
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],

@@ -62,7 +62,7 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
                           importadorNombre!.trim(),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                     ],
@@ -108,7 +108,7 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   height: 1.35,
-                  color: Colors.orange.shade900,
+                  color: AppColors.brandBlue,
                   fontWeight: FontWeight.w600,
                 ),
               ),

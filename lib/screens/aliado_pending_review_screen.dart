@@ -36,7 +36,7 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
   RealtimeChannel? _profileChannel;
   bool _approvedBannerVisible = false;
   String _approvedMessage =
-      'Su acceso a MotoLink está habilitado. Ya puede operar en la plataforma.';
+      'Su acceso a B2B Conecta está habilitado. Ya puede operar en la plataforma.';
 
   bool get _isRejected =>
       widget.profile.accountAccessStatus?.trim() ==
@@ -121,35 +121,29 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Center(child: MotoLinkProLogo(height: 56)),
-                    const SizedBox(height: 24),
-                    Icon(
-                      _isRejected ? Icons.cancel_outlined : Icons.hourglass_top,
-                      size: 56,
-                      color:
-                          _isRejected ? Colors.red.shade700 : AppColors.brand,
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 28),
                     Text(
                       _isRejected
                           ? 'Solicitud no aprobada'
                           : 'Solicitud en revisión',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _isRejected
-                          ? 'MotoLink no pudo aprobar su registro inicial en este momento. '
+                          ? 'B2B Conecta no pudo aprobar su registro inicial en este momento. '
                               'Revise el motivo, corrija la documentación y vuelva a enviar.'
-                          : 'Recibimos su registro inicial. Un administrador de MotoLink '
+                          : 'Recibimos su registro inicial. Un administrador de B2B Conecta '
                               'revisará su documentación y habilitará el acceso a la plataforma.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,
-                        color: Colors.grey.shade700,
+                        color: AppColors.textSecondary,
                         height: 1.45,
                       ),
                     ),
@@ -192,7 +186,7 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     if (!_isRejected) ...[
@@ -202,7 +196,7 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                           height: 1.35,
                         ),
                       ),

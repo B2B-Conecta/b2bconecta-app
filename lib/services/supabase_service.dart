@@ -532,7 +532,7 @@ class SupabaseService {
       final code = error.code?.trim();
       final msg = error.message.toLowerCase();
       if (code == '23505' && msg.contains('rif')) {
-        return 'Ese RIF ya está registrado en MotoLink. Use el RIF fiscal real de su negocio.';
+        return 'Ese RIF ya está registrado en B2B Conecta. Use el RIF fiscal real de su negocio.';
       }
       if (code == '23502' && msg.contains('role')) {
         return 'No se pudo guardar el perfil. Vuelva a seleccionar Importador o Aliado e intente de nuevo.';
@@ -1639,7 +1639,7 @@ class SupabaseService {
     );
   }
 
-  /// Aliado o importador: envía expediente a revisión MotoLink.
+  /// Aliado o importador: envía expediente a revisión B2B Conecta.
   static Future<void> profileSubmitKycForReview() async {
     await _client.rpc('profile_submit_kyc_for_review');
   }
@@ -1859,8 +1859,8 @@ class SupabaseService {
     }
     if (profile.pedidosSuspendidosMorosidad) {
       throw PedidosSuspendidosMorosidadException(
-        'MotoLink suspendió temporalmente la creación de nuevos pedidos en su cuenta por morosidad. '
-        'Complete o regularice los pagos pendientes de pedidos ya entregados; cuando MotoLink confirme '
+        'B2B Conecta suspendió temporalmente la creación de nuevos pedidos en su cuenta por morosidad. '
+        'Complete o regularice los pagos pendientes de pedidos ya entregados; cuando B2B Conecta confirme '
         'y reactive su cuenta, podrá volver a solicitar repuestos.',
       );
     }
@@ -2121,7 +2121,7 @@ class SupabaseService {
         .createSignedUrl(storagePath, 3600);
   }
 
-  /// Aliado: sube foto del comprobante y envía a revisión MotoLink.
+  /// Aliado: sube foto del comprobante y envía a revisión B2B Conecta.
   static Future<void> aliadoSubmitComprobantePago({
     required String transactionRequestId,
     required String metodo,
@@ -2360,7 +2360,7 @@ class SupabaseService {
     );
   }
 
-  /// MotoLink: sube foto respaldo del cobro en efectivo y registra vía RPC.
+  /// B2B Conecta: sube foto respaldo del cobro en efectivo y registra vía RPC.
   static Future<void> registrarRespaldoCobroEfectivo({
     required String transactionRequestId,
     required Uint8List bytes,
@@ -2712,7 +2712,7 @@ class SupabaseService {
     );
   }
 
-  /// MotoLink: pasa el pedido a `en_transito`. [transitEtaDays]/[transitEtaHours] son opcionales
+  /// B2B Conecta: pasa el pedido a `en_transito`. [transitEtaDays]/[transitEtaHours] son opcionales
   /// (por defecto 0); el ETA en vivo se espera en el enlace de Google Maps del pedido.
   static Future<void> adminMarcaPedidoEnTransito({
     required String requestId,
@@ -2729,7 +2729,7 @@ class SupabaseService {
     );
   }
 
-  /// MotoLink: guarda o borra el enlace de Google Maps de la ruta unificada
+  /// B2B Conecta: guarda o borra el enlace de Google Maps de la ruta unificada
   /// (visible a aliado e importador en tránsito).
   static Future<void> adminSetTransactionRequestRutaMapsUrl({
     required String requestId,
@@ -2740,7 +2740,7 @@ class SupabaseService {
 
     final profile = await fetchMyProfile();
     if (profile?.role?.trim().toLowerCase() != 'administrador') {
-      throw StateError('Solo MotoLink puede publicar el enlace de ruta.');
+      throw StateError('Solo B2B Conecta puede publicar el enlace de ruta.');
     }
 
     final row = await _client
@@ -2936,7 +2936,7 @@ class SupabaseService {
     });
   }
 
-  /// Admin MotoLink: anula un pedido ya aprobado / en curso (no pendiente ni entregado), con motivo.
+  /// Admin B2B Conecta: anula un pedido ya aprobado / en curso (no pendiente ni entregado), con motivo.
   static Future<void> adminAnulaPedidoPorMotolink({
     required String transactionRequestId,
     required String motivo,
@@ -2954,7 +2954,7 @@ class SupabaseService {
     );
   }
 
-  /// Aliado: cancela pedido en `pendiente` (antes de aprobación MotoLink), con motivo.
+  /// Aliado: cancela pedido en `pendiente` (antes de aprobación B2B Conecta), con motivo.
   static Future<void> aliadoCancelaPedidoPendiente({
     required String transactionRequestId,
     required String motivo,
@@ -3998,7 +3998,7 @@ class SupabaseService {
     )
   ''';
 
-  /// Tasa global MotoLink (fracción; 0.05 = 5 %).
+  /// Tasa global B2B Conecta (fracción; 0.05 = 5 %).
   static Future<double> fetchDefaultCommissionRate() async {
     final row = await _client
         .from('platform_settings')
@@ -4188,8 +4188,8 @@ class SupabaseService {
         : settlement.id.substring(0, 8);
     final isNota = settlement.isDeliveryNote;
     final fileName = isNota
-        ? 'MotoLink_nota_entrega_$safeRef.pdf'
-        : 'MotoLink_comision_$safeRef.pdf';
+        ? 'B2B_Conecta_nota_entrega_$safeRef.pdf'
+        : 'B2B_Conecta_comision_$safeRef.pdf';
     final path = '${settlement.id}/$fileName';
 
     final oldPath = settlement.invoicePdfStoragePath?.trim();
@@ -4277,7 +4277,7 @@ class SupabaseService {
     return raw?.toString().trim() ?? '';
   }
 
-  /// Importador: sube comprobante y envía a revisión MotoLink.
+  /// Importador: sube comprobante y envía a revisión B2B Conecta.
   static Future<void> importadorSubmitCommissionSettlementPago({
     required String settlementId,
     required Uint8List bytes,

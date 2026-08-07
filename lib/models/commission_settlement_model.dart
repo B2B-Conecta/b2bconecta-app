@@ -1,7 +1,7 @@
 import 'commission_settlement_document_type.dart';
 import 'pago_revision_estado.dart';
 
-/// Corte de cuenta semanal de comisiones MotoLink por importador.
+/// Corte de cuenta semanal de comisiones B2B Conecta por importador.
 class CommissionSettlementModel {
   const CommissionSettlementModel({
     required this.id,

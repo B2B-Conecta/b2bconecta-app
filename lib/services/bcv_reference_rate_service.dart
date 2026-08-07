@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// Referencia de tasa BCV USD (VES por 1 USD ≈ VES por 1 REF en MotoLink).
+/// Referencia de tasa BCV USD (VES por 1 USD ≈ VES por 1 REF en B2B Conecta).
 class BcvReferenceQuote {
   const BcvReferenceQuote({
     required this.vesPerUsd,

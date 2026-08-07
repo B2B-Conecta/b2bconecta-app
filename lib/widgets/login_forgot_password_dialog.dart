@@ -134,7 +134,7 @@ class _LoginForgotPasswordDialogState extends State<_LoginForgotPasswordDialog> 
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.brandOrange),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
           onPressed: _busy ? null : _submit,
           child: _busy
               ? const SizedBox(

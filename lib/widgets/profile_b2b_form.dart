@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/document_pick_utils.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_controller.dart';
 import 'motolink_pro_logo.dart';
 import 'main_shell_tab.dart';
 import 'profile_kyc_documents_section.dart';
@@ -266,36 +267,50 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     }
   }
 
-  InputDecoration _fieldDecoration(String hint) {
+  InputDecoration _fieldDecoration(
+    String hint, {
+    String? label,
+    bool readOnly = false,
+  }) {
+    final radius = BorderRadius.circular(10);
+    final side = BorderSide(color: AppColors.borderSubtle);
     return InputDecoration(
-      hintText: hint,
+      labelText: label,
+      floatingLabelBehavior:
+          label == null ? FloatingLabelBehavior.never : FloatingLabelBehavior.auto,
+      hintText: hint.isEmpty ? null : hint,
+      hintStyle: AppColors.hintStyle.copyWith(fontSize: 14),
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textSecondary,
+      ),
+      floatingLabelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColors.brandAccent,
+      ),
       filled: true,
-      fillColor: AppColors.fieldFill,
-      border: OutlineInputBorder(
-        borderRadius: AppDecorations.radius12,
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.radius12,
-        borderSide: BorderSide.none,
-      ),
+      fillColor: readOnly
+          ? AppColors.surfaceTinted
+          : AppColors.fieldFill,
+      border: OutlineInputBorder(borderRadius: radius, borderSide: side),
+      enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: side),
+      disabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: side),
       focusedBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.radius12,
-        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+        borderRadius: radius,
+        borderSide: const BorderSide(color: AppColors.brandAccent, width: 1.6),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      errorBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: Colors.red.shade400),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: Colors.red.shade400, width: 1.6),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
-  }
-
-  String _fiscalMapsSectionTitle() {
-    switch (_role.trim().toLowerCase()) {
-      case 'importador':
-        return 'ENLACE GOOGLE MAPS · ALMACÉN / DOMICILIO FISCAL';
-      case 'aliado':
-        return 'ENLACE GOOGLE MAPS · TALLER / DOMICILIO FISCAL';
-      default:
-        return 'ENLACE GOOGLE MAPS (OPCIONAL)';
-    }
   }
 
   String? _ubicacionFiscalHelp() {
@@ -357,7 +372,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                     'Valoraciones recibidas, cierres semanales y comentarios están en la pestaña Reputación.',
                 title: 'Reputación',
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade600, size: 20),
+              Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
             ],
           ),
         ),
@@ -517,308 +532,354 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         ? '—'
         : _emailDisplayController.text.trim();
 
+    final businessName = _businessNameController.text.trim();
+    final width = MediaQuery.sizeOf(context).width;
+    final mobile = width < 600;
+    final wide = width >= 560;
+
     return Form(
       key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (widget.showCloseBar) ...[
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: widget.onClose,
-                  color: AppColors.textPrimary,
-                ),
-                const Expanded(
-                  child: Text(
-                    'Mi Perfil B2B',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 17,
-                    ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(mobile ? 0 : 4, mobile ? 0 : 4, mobile ? 0 : 4, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.showCloseBar) ...[
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: widget.onClose,
+                    color: AppColors.textPrimary,
                   ),
-                ),
-                const SizedBox(width: 48),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-          Center(
-            child: Column(
-              children: [
-                ClipRRect(
-                  borderRadius: AppDecorations.radius12,
-                  child: Container(
-                    width: 88,
-                    height: 88,
-                    color: AppColors.brand.withOpacity(0.08),
-                    child: _ProfileLogoBox(
-                      storagePath: widget.initial?.logoStoragePath,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                MediaPickActionChips(
-                  busy: _logoBusy,
-                  enabled: !_saving,
-                  fileLabel: 'Archivo',
-                  onCamera: () => _pickProfileLogo(
-                    channel: DocumentPickChannel.camera,
-                  ),
-                  onGallery: () => _pickProfileLogo(
-                    channel: DocumentPickChannel.gallery,
-                  ),
-                  onFile: () => _pickProfileLogo(
-                    channel: DocumentPickChannel.file,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const ProfileInfoIcon(
-                      message:
-                          'Si no sube logo, se muestra el de MotoLink en la barra superior.',
-                      title: 'Logo del negocio',
-                    ),
-                    if (widget.initial?.logoStoragePath != null &&
-                        widget.initial!.logoStoragePath!.trim().isNotEmpty) ...[
-                      const SizedBox(width: 4),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed:
-                            (_saving || _logoBusy) ? null : _clearProfileLogo,
-                        child: Text(
-                          'Quitar',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Mi Perfil B2B',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            email,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          if (widget.onEnterApp != null &&
-              (widget.initial?.isReadyForMainApp ?? false)) ...[
-            const SizedBox(height: 20),
-            _EnterAppBanner(onPressed: widget.onEnterApp!),
-          ],
-          const SizedBox(height: 24),
-          ProfileCollapsibleSection(
-            title: 'Datos del negocio',
-            subtitle: _businessNameController.text.trim().isEmpty
-                ? 'Nombre, RIF y contacto'
-                : _businessNameController.text.trim(),
-            initiallyExpanded: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const ProfileSectionHeader(label: 'TIPO DE CUENTA'),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _RoleChoiceTile(
-                        label: 'Importador',
-                        icon: Icons.local_shipping_outlined,
-                        selected: _role == 'importador',
-                        enabled: !_roleLocked,
-                        onTap: _saving || _roleLocked
-                            ? null
-                            : () => setState(() => _role = 'importador'),
+                  Expanded(
+                    child: Text(
+                      mobile ? 'Perfil' : 'Mi Perfil B2B',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _RoleChoiceTile(
-                        label: 'Aliado',
-                        icon: Icons.person_outline,
-                        selected: _role == 'aliado',
-                        enabled: !_roleLocked,
-                        onTap: _saving || _roleLocked
-                            ? null
-                            : () => setState(() => _role = 'aliado'),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_showAdministradorRoleOption) ...[
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: _RoleChoiceTile(
-                      label: 'Administrador (broker)',
-                      icon: Icons.admin_panel_settings_outlined,
-                      selected: _role == 'administrador',
-                      enabled: !_roleLocked,
-                      onTap: _saving || _roleLocked
-                          ? null
-                          : () => setState(() => _role = 'administrador'),
-                    ),
                   ),
+                  const SizedBox(width: 48),
                 ],
-                const SizedBox(height: 14),
-                const ProfileSectionHeader(label: 'NOMBRE DEL NEGOCIO'),
-                TextFormField(
-                  controller: _businessNameController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: _fieldDecoration('Ej: Repuestos La Victoria C.A.'),
-                  onChanged: (_) => setState(() {}),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Campo obligatorio';
-                    return null;
-                  },
+              ),
+              const SizedBox(height: 8),
+            ],
+            _ProfileIdentityCard(
+              compact: mobile,
+              businessName: businessName.isEmpty
+                  ? (mobile ? 'Tu negocio' : 'Mi Perfil B2B')
+                  : businessName,
+              email: email,
+              logo: _ProfileLogoBox(
+                storagePath: widget.initial?.logoStoragePath,
+                size: mobile ? 72 : 84,
+              ),
+              actions: MediaPickActionChips(
+                iconOnly: true,
+                busy: _logoBusy,
+                enabled: !_saving,
+                fileLabel: 'Archivo',
+                onCamera: () => _pickProfileLogo(
+                  channel: DocumentPickChannel.camera,
                 ),
-                const SizedBox(height: 12),
-                const ProfileSectionHeader(label: 'RIF'),
-                TextFormField(
-                  controller: _rifController,
-                  decoration: _fieldDecoration('J-12345678-9'),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Campo obligatorio';
-                    return null;
-                  },
+                onGallery: () => _pickProfileLogo(
+                  channel: DocumentPickChannel.gallery,
                 ),
-                const SizedBox(height: 12),
-                const ProfileSectionHeader(label: 'CORREO ELECTRÓNICO'),
-                TextFormField(
-                  controller: _emailDisplayController,
-                  readOnly: true,
-                  decoration: _fieldDecoration(''),
+                onFile: () => _pickProfileLogo(
+                  channel: DocumentPickChannel.file,
                 ),
-                const SizedBox(height: 12),
-                const ProfileSectionHeader(label: 'TELÉFONO'),
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: _fieldDecoration('+58 412 1234567'),
-                ),
-              ],
+                onDelete: (widget.initial?.logoStoragePath != null &&
+                        widget.initial!.logoStoragePath!.trim().isNotEmpty)
+                    ? _clearProfileLogo
+                    : null,
+              ),
             ),
-          ),
-          if (_requiereUbicacionFiscalCompleta) ...[
-            const SizedBox(height: 12),
+            if (widget.onEnterApp != null &&
+                (widget.initial?.isReadyForMainApp ?? false)) ...[
+              const SizedBox(height: 16),
+              _EnterAppBanner(onPressed: widget.onEnterApp!),
+            ],
+            SizedBox(height: mobile ? 12 : 16),
             ProfileCollapsibleSection(
-              title: 'Ubicación y domicilio fiscal',
-              subtitle: _ubicacionSectionSubtitle(),
-              initiallyExpanded: !(widget.initial?.isComplete ?? false),
-              infoMessage: _ubicacionFiscalHelp(),
+              title: mobile ? 'Negocio' : 'Datos del negocio',
+              subtitle: mobile
+                  ? null
+                  : (businessName.isEmpty
+                      ? 'Tipo de cuenta, RIF y contacto'
+                      : businessName),
+              initiallyExpanded: true,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const ProfileSectionHeader(label: 'UBICACIÓN (ESTADO / CIUDAD)'),
-                  TextFormField(
-                    controller: _estadoController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _fieldDecoration('Estado (ej: Miranda)'),
-                    onChanged: (_) => setState(() {}),
-                    validator: (v) {
-                      if (!_requiereUbicacionFiscalCompleta) return null;
-                      if (v == null || v.trim().isEmpty) return 'Indique el estado';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _ciudadController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _fieldDecoration('Ciudad (ej: Los Teques)'),
-                    onChanged: (_) => setState(() {}),
-                    validator: (v) {
-                      if (!_requiereUbicacionFiscalCompleta) return null;
-                      if (v == null || v.trim().isEmpty) return 'Indique la ciudad';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  const ProfileSectionHeader(label: 'DIRECCIÓN FISCAL'),
-                  TextFormField(
-                    controller: _fiscalAddressController,
-                    maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: _fieldDecoration(
-                      'Av. Principal, Local 12, Zona Industrial...',
+                  if (!mobile) ...[
+                    Text(
+                      'Tipo de cuenta',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                  ],
+                  _RoleChoiceGrid(
+                    compact: mobile,
+                    showAdministrador: _showAdministradorRoleOption,
+                    role: _role,
+                    locked: _roleLocked,
+                    saving: _saving,
+                    onChanged: (r) => setState(() => _role = r),
+                  ),
+                  SizedBox(height: mobile ? 14 : 18),
+                  TextFormField(
+                    controller: _businessNameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _fieldDecoration(
+                      mobile ? 'Nombre comercial' : 'Ej: Repuestos La Victoria C.A.',
+                      label: mobile ? 'Negocio' : 'Nombre del negocio',
+                    ),
+                    onChanged: (_) => setState(() {}),
                     validator: (v) {
-                      if (!_requiereUbicacionFiscalCompleta) return null;
                       if (v == null || v.trim().isEmpty) {
-                        return 'Indique la dirección fiscal (domicilio de la empresa)';
+                        return 'Campo obligatorio';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 12),
-                  ProfileSectionHeader(
-                    label: _fiscalMapsSectionTitle(),
-                    infoMessage: _fiscalMapsHelp(),
-                  ),
-                  TextFormField(
-                    controller: _fiscalMapsUrlController,
-                    keyboardType: TextInputType.url,
-                    decoration: _fieldDecoration(
-                      'https://maps.app.goo.gl/... o maps.google.com/...',
+                  if (wide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _rifController,
+                            decoration: _fieldDecoration(
+                              'J-12345678-9',
+                              label: 'RIF',
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Campo obligatorio';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: _fieldDecoration(
+                              '+58 412…',
+                              label: 'Teléfono',
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    TextFormField(
+                      controller: _rifController,
+                      decoration: _fieldDecoration(
+                        'J-12345678-9',
+                        label: 'RIF',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Campo obligatorio';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (!_requiereUbicacionFiscalCompleta) return null;
-                      final t = v?.trim() ?? '';
-                      if (t.isEmpty) {
-                        return 'Indique el enlace «Compartir» de Google Maps de su domicilio fiscal';
-                      }
-                      if (SupabaseService.normalizeHttpUrl(t) == null) {
-                        return 'Use una URL válida (p. ej. https://maps.app.goo.gl/...)';
-                      }
-                      return null;
-                    },
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _fieldDecoration(
+                        '+58 412…',
+                        label: 'Teléfono',
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _emailDisplayController,
+                    readOnly: true,
+                    decoration: _fieldDecoration(
+                      '',
+                      label: mobile ? 'Correo' : 'Correo electrónico',
+                      readOnly: true,
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-          if (!_requiereUbicacionFiscalCompleta) ...[
-            const SizedBox(height: 12),
-            ProfileCollapsibleSection(
-              title: 'Dirección fiscal',
-              subtitle: 'Opcional',
-              initiallyExpanded: false,
-              child: TextFormField(
-                controller: _fiscalAddressController,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: _fieldDecoration(
-                  'Av. Principal, Local 12, Zona Industrial...',
+            if (_requiereUbicacionFiscalCompleta) ...[
+              const SizedBox(height: 12),
+              ProfileCollapsibleSection(
+                title: mobile ? 'Ubicación' : 'Ubicación y domicilio fiscal',
+                subtitle: mobile ? null : _ubicacionSectionSubtitle(),
+                initiallyExpanded: !(widget.initial?.isComplete ?? false),
+                infoMessage: mobile ? null : _ubicacionFiscalHelp(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _estadoController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: _fieldDecoration(
+                                'Miranda',
+                                label: 'Estado',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              validator: (v) {
+                                if (!_requiereUbicacionFiscalCompleta) {
+                                  return null;
+                                }
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Indique el estado';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _ciudadController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: _fieldDecoration(
+                                'Los Teques',
+                                label: 'Ciudad',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              validator: (v) {
+                                if (!_requiereUbicacionFiscalCompleta) {
+                                  return null;
+                                }
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Indique la ciudad';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      TextFormField(
+                        controller: _estadoController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _fieldDecoration(
+                          'Miranda',
+                          label: 'Estado',
+                        ),
+                        onChanged: (_) => setState(() {}),
+                        validator: (v) {
+                          if (!_requiereUbicacionFiscalCompleta) return null;
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Indique el estado';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _ciudadController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _fieldDecoration(
+                          'Los Teques',
+                          label: 'Ciudad',
+                        ),
+                        onChanged: (_) => setState(() {}),
+                        validator: (v) {
+                          if (!_requiereUbicacionFiscalCompleta) return null;
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Indique la ciudad';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _fiscalAddressController,
+                      maxLines: mobile ? 2 : 3,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: _fieldDecoration(
+                        mobile ? 'Calle, local…' : 'Av. Principal, Local 12…',
+                        label: mobile ? 'Dirección' : 'Dirección fiscal',
+                      ),
+                      validator: (v) {
+                        if (!_requiereUbicacionFiscalCompleta) return null;
+                        if (v == null || v.trim().isEmpty) {
+                          return mobile
+                              ? 'Indique la dirección'
+                              : 'Indique la dirección fiscal (domicilio de la empresa)';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _fiscalMapsUrlController,
+                      keyboardType: TextInputType.url,
+                      decoration: _fieldDecoration(
+                        'maps.app.goo.gl/…',
+                        label: mobile ? 'Google Maps' : _fiscalMapsFieldLabel(),
+                      ).copyWith(
+                        suffixIcon: ProfileInfoIcon(
+                          message: _fiscalMapsHelp() ??
+                              'Pegue el enlace «Compartir» de Google Maps.',
+                          title: 'Google Maps',
+                        ),
+                      ),
+                      validator: (v) {
+                        if (!_requiereUbicacionFiscalCompleta) return null;
+                        final t = v?.trim() ?? '';
+                        if (t.isEmpty) {
+                          return mobile
+                              ? 'Falta el enlace de Maps'
+                              : 'Indique el enlace «Compartir» de Google Maps de su domicilio fiscal';
+                        }
+                        if (SupabaseService.normalizeHttpUrl(t) == null) {
+                          return 'URL de Maps no válida';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+            ],
+            if (!_requiereUbicacionFiscalCompleta) ...[
+              const SizedBox(height: 12),
+              ProfileCollapsibleSection(
+                title: mobile ? 'Dirección' : 'Dirección fiscal',
+                subtitle: mobile ? null : 'Opcional',
+                initiallyExpanded: false,
+                child: TextFormField(
+                  controller: _fiscalAddressController,
+                  maxLines: mobile ? 2 : 3,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: _fieldDecoration(
+                    mobile ? 'Calle, local…' : 'Av. Principal, Local 12…',
+                    label: mobile ? 'Dirección' : 'Dirección fiscal',
+                  ),
+                ),
+              ),
+            ],
           if (_roleLocked && _persistedAsImportador) ...[
             const SizedBox(height: 12),
             AuthorizationStatusSection(
@@ -845,11 +906,18 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ],
           if (_showAliadoKycSection) ...[
             const SizedBox(height: 14),
-            const ProfileSectionHeader(
-              label: 'VERIFICACIÓN',
-              infoTitle: 'Verificación',
-              infoMessage: AliadoKycSectionHelp.verificacion,
-            ),
+            if (!mobile)
+              const ProfileSectionHeader(
+                label: 'VERIFICACIÓN',
+                infoTitle: 'Verificación',
+                infoMessage: AliadoKycSectionHelp.verificacion,
+              )
+            else
+              ProfileSectionHeader(
+                label: 'KYC',
+                infoTitle: 'Verificación',
+                infoMessage: AliadoKycSectionHelp.verificacion,
+              ),
             KeyedSubtree(
               key: _kycDocumentationSectionKey,
               child: ProfileKycDocumentsSection(
@@ -869,12 +937,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
           ],
           if (_showTermsSection) ...[
             const SizedBox(height: 14),
-            const ProfileSectionHeader(
-              label: 'TÉRMINOS LEGALES',
+            ProfileSectionHeader(
+              label: mobile ? 'TÉRMINOS' : 'TÉRMINOS LEGALES',
               infoTitle: 'Términos y privacidad',
-              infoMessage:
-                  'Aliados e importadores deben aceptar los términos y la '
-                  'política de privacidad vigentes antes de usar MotoLink.',
+              infoMessage: mobile
+                  ? 'Debe aceptar términos y privacidad para usar B2B Conecta.'
+                  : 'Aliados e importadores deben aceptar los términos y la '
+                      'política de privacidad vigentes antes de usar B2B Conecta.',
             ),
             TermsAcceptanceSection(
               accepted: _termsAccepted,
@@ -885,7 +954,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
           ],
           if (_showGuardarPerfilButton) ...[
-            const SizedBox(height: 24),
+            SizedBox(height: mobile ? 18 : 24),
             ElevatedButton(
               onPressed: _saving ? null : _submit,
               child: _saving
@@ -897,7 +966,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('Guardar Perfil'),
+                  : Text(mobile ? 'Guardar' : 'Guardar Perfil'),
             ),
           ] else
             const SizedBox(height: 16),
@@ -905,65 +974,296 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 12),
             widget.beforeSignOut!,
           ],
-          const SizedBox(height: 12),
-          TextButton.icon(
-            onPressed: _saving ? null : _signOut,
-            icon: Icon(Icons.logout, color: Colors.grey.shade600, size: 20),
-            label: Text(
-              'Cerrar Sesión',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
+          const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _saving ? null : _signOut,
+              icon: Icon(Icons.logout, color: AppColors.textSecondary, size: 20),
+              label: Text(
+                mobile ? 'Salir' : 'Cerrar Sesión',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  String _fiscalMapsFieldLabel() {
+    switch (_role.trim().toLowerCase()) {
+      case 'importador':
+        return 'Google Maps · almacén / domicilio';
+      case 'aliado':
+        return 'Google Maps · taller / domicilio';
+      default:
+        return 'Google Maps (opcional)';
+    }
   }
 }
 
 class _ProfileLogoBox extends StatelessWidget {
-  const _ProfileLogoBox({this.storagePath});
+  const _ProfileLogoBox({this.storagePath, this.size = 84});
 
   final String? storagePath;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final p = storagePath?.trim();
     if (p == null || p.isEmpty) {
-      return const Center(
-        child: MotoLinkProLogo(height: 48),
+      return BusinessLogoPlaceholder(size: size);
+    }
+    final radius = BorderRadius.circular(size * 0.16);
+    return ClipRRect(
+      borderRadius: radius,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: FutureBuilder<String>(
+          future: SupabaseService.createSignedUrlForProfileLogo(p),
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return ColoredBox(
+                color: AppColors.brandBlueContainer,
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: ThemeController.instance.isDark
+                          ? AppColors.brandAccent
+                          : AppColors.brandBlue,
+                    ),
+                  ),
+                ),
+              );
+            }
+            final url = snap.data;
+            if (url == null || snap.hasError) {
+              return BusinessLogoPlaceholder(size: size);
+            }
+            return Image.network(
+              url,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => BusinessLogoPlaceholder(size: size),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileIdentityCard extends StatelessWidget {
+  const _ProfileIdentityCard({
+    required this.businessName,
+    required this.email,
+    required this.logo,
+    required this.actions,
+    this.compact = false,
+  });
+
+  final String businessName;
+  final String email;
+  final Widget logo;
+  final Widget actions;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return Material(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+            child: Column(
+              children: [
+                logo,
+                const SizedBox(height: 10),
+                actions,
+                const SizedBox(height: 12),
+                Text(
+                  businessName,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
-    return FutureBuilder<String>(
-      future: SupabaseService.createSignedUrlForProfileLogo(p),
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        }
-        final url = snap.data;
-        if (url == null || snap.hasError) {
-          return const Center(
-            child: Icon(Icons.business_outlined, size: 40, color: AppColors.brand),
-          );
-        }
-        return Image.network(
-          url,
-          width: 88,
-          height: 88,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Center(
-            child: MotoLinkProLogo(height: 48),
+
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  logo,
+                  const SizedBox(height: 10),
+                  actions,
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      businessName,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleChoiceGrid extends StatelessWidget {
+  const _RoleChoiceGrid({
+    required this.role,
+    required this.locked,
+    required this.saving,
+    required this.onChanged,
+    required this.showAdministrador,
+    this.compact = false,
+  });
+
+  final String role;
+  final bool locked;
+  final bool saving;
+  final ValueChanged<String> onChanged;
+  final bool showAdministrador;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tile({
+      required String value,
+      required String label,
+      required IconData icon,
+    }) {
+      return _RoleChoiceTile(
+        label: label,
+        icon: icon,
+        selected: role == value,
+        enabled: !locked,
+        compact: compact,
+        onTap: saving || locked ? null : () => onChanged(value),
+      );
+    }
+
+    final importador = tile(
+      value: 'importador',
+      label: 'Importador',
+      icon: Icons.local_shipping_outlined,
+    );
+    final aliado = tile(
+      value: 'aliado',
+      label: 'Aliado',
+      icon: Icons.person_outline,
+    );
+    final admin = tile(
+      value: 'administrador',
+      label: compact ? 'Admin' : 'Administrador (broker)',
+      icon: Icons.admin_panel_settings_outlined,
+    );
+
+    if (!showAdministrador) {
+      return Row(
+        children: [
+          Expanded(child: importador),
+          SizedBox(width: compact ? 8 : 10),
+          Expanded(child: aliado),
+        ],
+      );
+    }
+
+    if (compact) {
+      return Row(
+        children: [
+          Expanded(child: importador),
+          const SizedBox(width: 8),
+          Expanded(child: aliado),
+          const SizedBox(width: 8),
+          Expanded(child: admin),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: importador),
+            const SizedBox(width: 10),
+            Expanded(child: aliado),
+          ],
+        ),
+        const SizedBox(height: 10),
+        admin,
+      ],
     );
   }
 }
@@ -974,6 +1274,7 @@ class _RoleChoiceTile extends StatelessWidget {
     required this.icon,
     required this.selected,
     this.enabled = true,
+    this.compact = false,
     this.onTap,
   });
 
@@ -981,40 +1282,70 @@ class _RoleChoiceTile extends StatelessWidget {
   final IconData icon;
   final bool selected;
   final bool enabled;
+  final bool compact;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final accent = selected ? AppColors.brandAccent : AppColors.textSecondary;
     final content = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        vertical: compact ? 10 : 12,
+        horizontal: compact ? 6 : 10,
+      ),
       decoration: BoxDecoration(
-        color: selected ? AppColors.brand.withOpacity(0.08) : Colors.white,
-        borderRadius: AppDecorations.radius12,
+        color: selected ? AppColors.brandBlueContainer : AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(compact ? 12 : 10),
         border: Border.all(
-          color: selected ? AppColors.brand : Colors.grey.shade300,
-          width: selected ? 2.5 : 1,
+          color: selected ? AppColors.brandAccent : AppColors.borderSubtle,
+          width: selected ? 1.8 : 1,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 22,
-            color: selected ? AppColors.brand : AppColors.textSecondary,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: selected ? AppColors.brand : AppColors.textSecondary,
+      child: compact
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 22, color: accent),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11.5,
+                    color: selected
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 20, color: accent),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                      height: 1.2,
+                      color: selected
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
 
     return Opacity(
@@ -1023,7 +1354,7 @@ class _RoleChoiceTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: AppDecorations.radius12,
+          borderRadius: BorderRadius.circular(compact ? 12 : 10),
           child: content,
         ),
       ),
@@ -1057,7 +1388,7 @@ class _EnterAppBanner extends StatelessWidget {
                   'Su cuenta está habilitada',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: Colors.green.shade900,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -1065,11 +1396,11 @@ class _EnterAppBanner extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Ya puede acceder al panel de MotoLink con su catálogo, pedidos y operaciones.',
+            'Ya puede acceder al panel de B2B Conecta con su catálogo, pedidos y operaciones.',
             style: TextStyle(
               fontSize: 13,
               height: 1.35,
-              color: Colors.green.shade900.withOpacity(0.85),
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 12),
@@ -1081,7 +1412,7 @@ class _EnterAppBanner extends StatelessWidget {
             ),
             icon: const Icon(Icons.dashboard_outlined, size: 20),
             label: const Text(
-              'Entrar a MotoLink',
+              'Entrar a B2B Conecta',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),

@@ -163,11 +163,11 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
     );
@@ -328,7 +328,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.35),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
           ),
         ],
         const SizedBox(height: 10),
@@ -663,7 +663,7 @@ class CarrierPagoMetodoChips extends StatelessWidget {
     if (metodos.isEmpty) {
       return Text(
         'Sin métodos de pago',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
       );
     }
     final visible = metodos.take(maxVisible).toList();
@@ -687,7 +687,7 @@ class CarrierPagoMetodoChips extends StatelessWidget {
         if (extra > 0)
           Text(
             '+$extra',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
       ],
     );
@@ -721,7 +721,7 @@ class CarrierPagoInstruccionesPanel extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
@@ -750,7 +750,7 @@ class CarrierPagoInstruccionesPanel extends StatelessWidget {
                     item.value!,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade800,
+                      color: AppColors.textPrimary,
                       height: 1.35,
                     ),
                   ),

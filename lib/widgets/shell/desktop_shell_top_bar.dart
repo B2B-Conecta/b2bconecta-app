@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../theme_mode_bubble.dart';
 
 /// Barra superior en shells de escritorio: acciones contextuales y notificaciones.
 class DesktopShellTopBar extends StatelessWidget {
@@ -18,14 +19,14 @@ class DesktopShellTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surfaceTinted,
       elevation: 0,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+          border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: AppColors.black.withOpacity(0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -37,6 +38,9 @@ class DesktopShellTopBar extends StatelessWidget {
             children: [
               const Spacer(),
               ...trailingActions,
+              const SizedBox(width: 4),
+              const ThemeModeBubble(),
+              const SizedBox(width: 4),
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -45,7 +49,7 @@ class DesktopShellTopBar extends StatelessWidget {
                     onPressed: onNotificationTap,
                     icon: Icon(
                       Icons.notifications_outlined,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   if (unreadNotifications > 0)
@@ -58,7 +62,7 @@ class DesktopShellTopBar extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.brandOrange,
+                          color: AppColors.brand,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         constraints: const BoxConstraints(

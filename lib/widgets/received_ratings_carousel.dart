@@ -76,7 +76,7 @@ class _ReceivedRatingsCarouselState extends State<ReceivedRatingsCarousel> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                 ),
               ),
               IconButton(

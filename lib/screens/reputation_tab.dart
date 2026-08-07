@@ -55,7 +55,7 @@ class ReputationTab extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Reputación',
                         style: TextStyle(

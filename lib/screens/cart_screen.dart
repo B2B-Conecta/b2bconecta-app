@@ -134,7 +134,7 @@ class _CartScreenState extends State<CartScreen> {
           ? Center(
               child: Text(
                 'Agregue repuestos desde el catálogo.',
-                style: TextStyle(color: Colors.grey.shade700),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
             )
           : Column(
@@ -166,7 +166,7 @@ class _CartScreenState extends State<CartScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: AppColors.brandOrange
+                                    color: AppColors.brand
                                         .withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -175,7 +175,7 @@ class _CartScreenState extends State<CartScreen> {
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.brandOrange,
+                                      color: AppColors.brand,
                                     ),
                                   ),
                                 ),
@@ -233,7 +233,7 @@ class _CartScreenState extends State<CartScreen> {
                               '${formatVesAmount(totalBs)}',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.grey.shade800,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           const SizedBox(height: 10),
@@ -399,7 +399,7 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
                         ? 'El reparto usará su domicilio y el enlace Maps guardados en Mi perfil.'
                         : 'Debe completar el enlace de Google Maps en Mi perfil para usar esta opción.')
                     : 'Indique otra dirección y enlace Maps a continuación.',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               value: _usaPerfil,
               onChanged: (v) => setState(() => _usaPerfil = v),
@@ -415,7 +415,7 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Esta dirección sustituye a la fiscal para este pedido. '
                 'El enlace de Google Maps es obligatorio para ubicar el sitio con precisión.',
                 style: TextStyle(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/carrier_decision.dart';
@@ -42,7 +43,7 @@ class PickupLocationDisplaySection extends StatelessWidget {
                 PickupLocationMode.labelEs(request.pickupLocationMode),
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -56,7 +57,7 @@ class PickupLocationDisplaySection extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               _pickupAddressLines(request)!,
-              style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textPrimary),
             ),
           ],
           if (maps != null && maps.isNotEmpty) ...[

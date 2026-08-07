@@ -109,7 +109,7 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Contacto',
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -181,7 +181,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Datos del aliado',
                 style: TextStyle(
@@ -247,7 +247,7 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Datos del importador',
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -284,7 +284,7 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!hideSectionTitle) ...[
-          const Text(
+          Text(
             'Valoración del aliado (post-entrega)',
             style: TextStyle(
               fontWeight: FontWeight.w800,
@@ -301,7 +301,7 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
             color: at != null ? Colors.purple.shade50 : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: at != null ? Colors.purple.shade200 : Colors.grey.shade300,
+              color: at != null ? Colors.purple.shade200 : AppColors.borderSubtle,
             ),
           ),
           child: at == null
@@ -310,7 +310,7 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.35,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                 )
@@ -385,7 +385,7 @@ class TransactionRequestDocumentPreferenceAdminSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Preferencia de documento (A6)',
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -482,7 +482,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
               fiscalBloque,
               style: TextStyle(
                 fontSize: bodySize,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
                 height: 1.4,
               ),
             )
@@ -491,7 +491,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
               'Dirección fiscal del aliado aún no disponible en esta vista.',
               style: TextStyle(
                 fontSize: bodySize,
-                color: Colors.grey.shade700,
+                color: AppColors.textSecondary,
                 height: 1.35,
               ),
             ),
@@ -502,7 +502,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
                 : 'Otro destino (sin texto guardado)',
             style: TextStyle(
               fontSize: bodySize,
-              color: Colors.grey.shade800,
+              color: AppColors.textPrimary,
               height: 1.35,
             ),
           ),
@@ -512,7 +512,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
   }
 }
 
-/// Enlaces firmados a facturas y comprobantes (MotoLink / admin): referencia durante y después del ciclo.
+/// Enlaces firmados a facturas y comprobantes (B2B Conecta / admin): referencia durante y después del ciclo.
 class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
   const TransactionRequestEvidenceDocumentsSection({
     super.key,
@@ -632,7 +632,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surfaceTinted.withOpacity(0.4),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: AppColors.borderSubtle),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -646,15 +646,15 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     isDone: r.createdAt != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: r.anuladoPorMotolink
-                        ? 'Anulado por MotoLink (post-aprobación)'
+                        ? 'Anulado por B2B Conecta (post-aprobación)'
                         : (r.canceladoPorImportador
                             ? 'Cancelado por proveedor (importador)'
                             : (r.canceladoPorAliado
                                 ? 'Cancelado por el aliado'
-                                : 'Rechazado (MotoLink)')),
+                                : 'Rechazado (B2B Conecta)')),
                     value: formatEsShortDateTime(r.atRechazado),
                     isDone: r.atRechazado != null,
                     highlight: true,
@@ -664,11 +664,11 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                           false)) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Motivo (MotoLink): ${r.motolinkAnulacionMotivo!.trim()}',
+                      'Motivo (B2B Conecta): ${r.motolinkAnulacionMotivo!.trim()}',
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.35,
-                        color: Colors.blueGrey.shade900,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ] else if (r.canceladoPorImportador &&
@@ -680,7 +680,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.35,
-                        color: Colors.blueGrey.shade900,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ] else if (r.canceladoPorAliado &&
@@ -692,7 +692,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.35,
-                        color: Colors.blueGrey.shade900,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -703,23 +703,23 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     isDone: r.createdAt != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
-                    label: 'Aprobado por MotoLink',
+                    label: 'Aprobado por B2B Conecta',
                     value: formatEsShortDateTime(r.atAprobadoAdmin),
                     isDone: r.atAprobadoAdmin != null,
                     mutedIfEmpty:
                         r.status == TransactionRequestStatus.pendiente,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'En preparación (importador)',
                     value: _prepValue(r),
                     isDone: r.atEnPreparacion != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Pedido listo para recolección (importador)',
                     value: formatEsShortDateTime(r.atPedidoListo),
@@ -727,14 +727,14 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     highlight: r.status == TransactionRequestStatus.pedidoListo,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Factura importador al aliado',
                     value: _facturaImportadorTimeline(r),
                     isDone: r.hasProveedorFactura,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Respaldo cobro en efectivo',
                     value: _efectivoRespaldoTimeline(r),
@@ -742,14 +742,14 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     mutedIfEmpty: true,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
-                    label: 'En tránsito (MotoLink)',
+                    label: 'En tránsito (B2B Conecta)',
                     value: _transitoValue(r),
                     isDone: r.atEnTransito != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: Colors.grey.shade300),
+                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Entregado',
                     value: _entregadoTimeline(r),
@@ -804,7 +804,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
       final pagoAprobado =
           r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado;
       if (pagoAprobado || r.status == TransactionRequestStatus.enTransito) {
-        return 'Pendiente por registrar (MotoLink)';
+        return 'Pendiente por registrar (B2B Conecta)';
       }
       return '—';
     }
@@ -869,7 +869,7 @@ class _TimelineRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.35,
-                  color: empty ? Colors.grey.shade600 : Colors.grey.shade800,
+                  color: empty ? AppColors.textSecondary : AppColors.textPrimary,
                 ),
               ),
             ],
@@ -880,7 +880,7 @@ class _TimelineRow extends StatelessWidget {
   }
 }
 
-/// Comisión MotoLink (Minuta #7 C1). Delega en [OrderCommissionSummary].
+/// Comisión B2B Conecta (Minuta #7 C1). Delega en [OrderCommissionSummary].
 @Deprecated('Use OrderCommissionSummary directly')
 class TransactionRequestCommissionSection extends StatelessWidget {
   const TransactionRequestCommissionSection({

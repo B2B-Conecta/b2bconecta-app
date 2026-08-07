@@ -54,7 +54,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                           _selectionMode
                               ? '${_selectedIds.length} seleccionadas'
                               : 'Centro de notificaciones',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
@@ -169,7 +169,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                     ),
                   )
                 else if (visible.isEmpty)
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'No tienes notificaciones todavía.',
@@ -251,14 +251,14 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.grey.shade800,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ],
                               const SizedBox(height: 6),
                               Text(
                                 _whenText(n.createdAt),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   color: AppColors.textSecondary,
                                 ),
@@ -276,7 +276,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                                         height: 9,
                                         margin: const EdgeInsets.only(right: 10),
                                         decoration: const BoxDecoration(
-                                          color: AppColors.brandOrange,
+                                          color: AppColors.brand,
                                           shape: BoxShape.circle,
                                         ),
                                       ),
@@ -351,7 +351,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         break;
       case 'promocion':
         icon = Icons.campaign_outlined;
-        bg = AppColors.brandOrange;
+        bg = AppColors.brand;
         break;
       case 'soporte':
         icon = Icons.support_agent_outlined;
@@ -359,7 +359,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         break;
       default:
         icon = Icons.notifications_none_outlined;
-        bg = Colors.orange.shade700;
+        bg = AppColors.brandAccent;
     }
     return CircleAvatar(
       radius: 18,
@@ -459,18 +459,18 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon: const Icon(
           Icons.delete_forever_rounded,
           size: 36,
-          color: AppColors.brandOrange,
+          color: AppColors.brand,
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
           ),
         ),
         content: Text(
           message,
-          style: const TextStyle(
+          style: TextStyle(
             height: 1.35,
             color: AppColors.textSecondary,
           ),
@@ -501,7 +501,7 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                 const SizedBox(height: 14),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.brandOrange,
+                    backgroundColor: AppColors.brand,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     elevation: 0,

@@ -293,20 +293,20 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
           ),
           if (name != null && name.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(name, style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800)),
+            Text(name, style: TextStyle(fontSize: 11.5, color: AppColors.textPrimary)),
           ],
           if (r.fleteFacturaSubmittedAt != null) ...[
             const SizedBox(height: 2),
             Text(
               'Recibida: ${formatEsShortDateTime(r.fleteFacturaSubmittedAt)}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
           if (r.carrierFeeUsdSnapshot != null) ...[
             const SizedBox(height: 4),
             Text(
               'Flete estimado: USD ${r.carrierFeeUsdSnapshot!.toStringAsFixed(2)}',
-              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 11.5, color: AppColors.textPrimary),
             ),
           ],
           const SizedBox(height: 8),
@@ -360,14 +360,14 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
               const SizedBox(height: 4),
               Text(
                 'Método: ${PagoMetodo.labelEs(r.fletePagoMetodo!)}',
-                style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800),
+                style: TextStyle(fontSize: 11.5, color: AppColors.textPrimary),
               ),
             ],
             if (r.fleteComprobanteSubmittedAt != null) ...[
               const SizedBox(height: 2),
               Text(
                 'Enviado: ${formatEsShortDateTime(r.fleteComprobanteSubmittedAt)}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ],
             const SizedBox(height: 8),
@@ -419,7 +419,7 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
                   const SizedBox(height: 4),
                   Text(
                     'Método: ${PagoMetodo.labelEs(r.fletePagoMetodo!)}',
-                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade800),
+                    style: TextStyle(fontSize: 11.5, color: AppColors.textPrimary),
                   ),
                 ],
                 if (pe == PagoRevisionEstado.rechazado &&
@@ -465,7 +465,7 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
       return Text(
         'El transportista no tiene métodos de pago configurados. Acuerde el pago '
         'con el importador o el transportista.',
-        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, height: 1.35),
+        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
       );
     }
 
@@ -487,7 +487,7 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
         const SizedBox(height: 6),
         Text(
           'Pague al transportista según los datos indicados y adjunte el comprobante.',
-          style: TextStyle(fontSize: 11.5, height: 1.35, color: Colors.grey.shade700),
+          style: TextStyle(fontSize: 11.5, height: 1.35, color: AppColors.textSecondary),
         ),
         if (_loadingPago) ...[
           const SizedBox(height: 10),
@@ -568,7 +568,7 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
           const SizedBox(height: 4),
           Text(
             r.carrierDisplayCompanyName!,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
         ],
         const SizedBox(height: 10),

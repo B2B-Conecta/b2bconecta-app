@@ -120,7 +120,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
@@ -138,7 +138,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
         else
           Text(
             'Pendiente: el importador la adjunta en su pestaña Pedidos.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         const SizedBox(height: 14),
         Text(
@@ -146,7 +146,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
@@ -157,7 +157,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
               'Sin factura del importador el aliado aún no puede enviar comprobante.',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 height: 1.25,
               ),
             ),
@@ -187,7 +187,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
@@ -202,7 +202,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
             bloqueoTransito ?? 'Complete los pasos anteriores.',
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey.shade700,
+              color: AppColors.textSecondary,
               height: 1.25,
             ),
           ),

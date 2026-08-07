@@ -63,7 +63,7 @@ class _ImporterBulkUsdDiscountDialogState
     return AlertDialog(
       title: const Row(
         children: [
-          Icon(Icons.percent, color: AppColors.brandOrange),
+          Icon(Icons.percent, color: AppColors.brand),
           SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -85,13 +85,13 @@ class _ImporterBulkUsdDiscountDialogState
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 14),
             ProductUsdPaymentDiscountField(controller: _pctController),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Aplicar a',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
@@ -112,7 +112,7 @@ class _ImporterBulkUsdDiscountDialogState
               ),
               subtitle: Text(
                 'Actualiza el % en artículos que ya tenían descuento USD configurado.',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
             RadioListTile<ImporterBulkUsdDiscountScope>(
@@ -128,7 +128,7 @@ class _ImporterBulkUsdDiscountDialogState
               subtitle: Text(
                 'Aplica el % a todo el inventario, o 0 para quitar descuentos USD en todos '
                 '(conserva tramos por volumen si existen).',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../app_scaffold_messenger.dart';
 import '../screens/login_screen.dart';
 import '../screens/recover_password_screen.dart';
 import '../services/auth_service.dart';
@@ -286,6 +287,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
       _applyAuthState(data);
+      // Cerrar ajustes/perfil apilados para mostrar login de inmediato.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        popNavigationToRoot();
+      });
       return;
     }
 
@@ -407,7 +412,7 @@ class _AuthLoadingScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
       body: Center(
         child: CircularProgressIndicator(color: AppColors.brand),

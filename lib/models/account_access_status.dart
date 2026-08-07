@@ -10,7 +10,7 @@ abstract final class AccountAccessStatus {
       case draft:
         return 'Borrador — complete su registro';
       case pendingReview:
-        return 'Pendiente de aprobación MotoLink';
+        return 'Pendiente de aprobación B2B Conecta';
       case active:
         return 'Acceso habilitado';
       case rejected:

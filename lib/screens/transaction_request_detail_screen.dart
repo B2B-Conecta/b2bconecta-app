@@ -231,7 +231,7 @@ class _TransactionRequestDetailScreenState
                       )
                       .motolinkAnulacionMotivo!
                       .trim(),
-                  title: 'Pedido anulado por MotoLink',
+                  title: 'Pedido anulado por B2B Conecta',
                   tone: _NoteCardTone.danger,
                 ),
                 const SizedBox(height: 12),
@@ -342,7 +342,7 @@ class _TransactionRequestDetailScreenState
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Pedido entregado y pagado: MotoLink validó el pago.',
+                'Pedido entregado y pagado: B2B Conecta validó el pago.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -370,7 +370,7 @@ class _TransactionRequestDetailScreenState
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Han pasado 3 o más días hábiles sin completar el pago. MotoLink puede restringir la cuenta '
+                'Han pasado 3 o más días hábiles sin completar el pago. B2B Conecta puede restringir la cuenta '
                 'del aliado para pedidos futuros si no se regulariza.',
                 style: TextStyle(
                   fontSize: 13,
@@ -393,7 +393,7 @@ class _TransactionRequestDetailScreenState
         child: Text(
           t,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
       ),
     );
@@ -442,7 +442,7 @@ class _TransactionRequestDetailScreenState
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -464,7 +464,7 @@ class _TransactionRequestDetailScreenState
                   : 'Ref. pedido: ${r.id.substring(0, 8)}…',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade700,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -554,7 +554,7 @@ class _TransactionRequestDetailScreenState
         if (orderCardCommissionSubtitle(lines) != null) ...[
           const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
-            title: 'Comisión MotoLink',
+            title: 'Comisión B2B Conecta',
             subtitle: orderCardCommissionSubtitle(lines),
             infoMessage:
                 'Comisión devengada o estimada según el estado del pedido.',
@@ -618,11 +618,11 @@ class _TransactionRequestDetailScreenState
       if (hasNota) ...[
         const SizedBox(height: kOrderCardSectionGap),
         OrderCardCollapsibleSection(
-          title: 'Nota de MotoLink',
+          title: 'Nota de B2B Conecta',
           subtitle: 'Instrucción interna del pedido',
           child: _noteCard(
             r.notasAdmin!.trim(),
-            title: 'Nota de MotoLink',
+            title: 'Nota de B2B Conecta',
             tone: _NoteCardTone.info,
           ),
         ),
@@ -656,7 +656,7 @@ class _TransactionRequestDetailScreenState
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,
-                  color: Colors.grey.shade700,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ),
@@ -674,7 +674,7 @@ class _TransactionRequestDetailScreenState
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
-                color: Colors.grey.shade800,
+                color: AppColors.textPrimary,
               ),
             ),
             if (AliadoTransitEtaBanner.shouldShow(lines[i])) ...[
@@ -739,7 +739,7 @@ class _TransactionRequestDetailScreenState
               color: AppColors.brandBlue,
             ),
           ),
-          title: const Text(
+          title: Text(
             'Más información',
             style: TextStyle(
               fontWeight: FontWeight.w800,
@@ -751,7 +751,7 @@ class _TransactionRequestDetailScreenState
             'Referencias, entrega, historial y notas',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
             ),
           ),
           children: [
@@ -779,12 +779,12 @@ class _TransactionRequestDetailScreenState
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.35,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
             ] else if (isGroup) ...[
-              const Text(
+              Text(
                 'Seguimiento del envío',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
@@ -800,7 +800,7 @@ class _TransactionRequestDetailScreenState
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
-                    color: Colors.grey.shade800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 if (AliadoTransitEtaBanner.shouldShow(lines[i])) ...[
@@ -831,7 +831,7 @@ class _TransactionRequestDetailScreenState
               const SizedBox(height: 14),
               _noteCard(
                 r.notasAdmin!.trim(),
-                title: 'Nota de MotoLink',
+                title: 'Nota de B2B Conecta',
                 tone: _NoteCardTone.info,
               ),
             ],
@@ -880,7 +880,7 @@ class _TransactionRequestDetailScreenState
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -888,7 +888,7 @@ class _TransactionRequestDetailScreenState
           r.id,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
             height: 1.35,
           ),
         ),
@@ -896,7 +896,7 @@ class _TransactionRequestDetailScreenState
           const SizedBox(height: 6),
           Text(
             'SKU: ${r.productSku}',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
         const SizedBox(height: 8),
@@ -959,9 +959,9 @@ class _TransactionRequestDetailScreenState
     late Color titleColor;
     switch (tone) {
       case _NoteCardTone.info:
-        bg = Colors.orange.shade50;
-        border = Colors.orange.shade200;
-        titleColor = Colors.orange.shade900;
+        bg = AppColors.brandBlueContainer;
+        border = AppColors.brandAccent.withOpacity(0.35);
+        titleColor = AppColors.brandBlue;
       case _NoteCardTone.warning:
         bg = Colors.amber.shade50;
         border = Colors.amber.shade300;

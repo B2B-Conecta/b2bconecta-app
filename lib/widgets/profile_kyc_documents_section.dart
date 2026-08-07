@@ -18,7 +18,7 @@ import 'terms_acceptance_section.dart';
 /// Ayudas (icono ℹ️) en verificación KYC del aliado.
 abstract final class AliadoKycSectionHelp {
   static const verificacion =
-      'MotoLink revisa su documentación para habilitar el uso completo de la '
+      'B2B Conecta revisa su documentación para habilitar el uso completo de la '
       'plataforma. Complete los requisitos del perfil y suba los archivos iniciales.';
   static const requisitosPerfil =
       'Datos fiscales del formulario y documentos mínimos. Deben estar listos '
@@ -31,11 +31,11 @@ abstract final class AliadoKycSectionHelp {
       'Opcional. Referencias bancarias y comerciales para fortalecer su perfil; '
       'puede completarlas después de ingresar a la plataforma.';
   static const morosidad =
-      'MotoLink suspendió nuevos pedidos por morosidad. Regularice pagos en '
+      'B2B Conecta suspendió nuevos pedidos por morosidad. Regularice pagos en '
       'pedidos entregados.';
 }
 
-/// Subida de documentos KYC y envío a revisión MotoLink (solo aliados).
+/// Subida de documentos KYC y envío a revisión B2B Conecta (solo aliados).
 class ProfileKycDocumentsSection extends StatefulWidget {
   const ProfileKycDocumentsSection({
     super.key,
@@ -221,7 +221,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Solicitud enviada. MotoLink revisará su registro y le avisará en la app.',
+            'Solicitud enviada. B2B Conecta revisará su registro y le avisará en la app.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -333,7 +333,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
         if (!widget._isAliado)
           Text(
             'Documentación (${widget.role})',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
@@ -346,14 +346,14 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
             padding: const EdgeInsets.all(10),
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: AppColors.brandBlueContainer,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade200),
+              border: Border.all(color: AppColors.borderSubtle),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, size: 18, color: Colors.amber.shade900),
+                Icon(Icons.info_outline, size: 18, color: AppColors.brandAccent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -363,7 +363,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: Colors.amber.shade900,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -495,7 +495,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
                 : Text(
                     widget._isAliado
                         ? 'Enviar registro inicial a revisión'
-                        : 'Enviar a revisión MotoLink',
+                        : 'Enviar a revisión B2B Conecta',
                   ),
           ),
         ],

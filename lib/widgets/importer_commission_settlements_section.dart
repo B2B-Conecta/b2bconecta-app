@@ -20,7 +20,7 @@ enum _ImporterSettlementStatusFilter {
   pagado,
 }
 
-/// Importador: cortes de comisión MotoLink, filtros por semana y estado de pago.
+/// Importador: cortes de comisión B2B Conecta, filtros por semana y estado de pago.
 class ImporterCommissionSettlementsSection extends StatefulWidget {
   const ImporterCommissionSettlementsSection({super.key});
 
@@ -147,7 +147,7 @@ class _ImporterCommissionSettlementsSectionState
       case 'pagado':
         return Colors.green.shade700;
       case 'emitido':
-        return Colors.orange.shade800;
+        return AppColors.brandAccent;
       default:
         return AppColors.brandBlue;
     }
@@ -218,7 +218,7 @@ class _ImporterCommissionSettlementsSectionState
         onSelected: (_) => setState(() => _statusFilter = value),
         visualDensity: VisualDensity.compact,
         selectedColor: value == _ImporterSettlementStatusFilter.pendientePago
-            ? Colors.orange.shade100
+            ? AppColors.brandBlueContainer
             : AppColors.brandBlue.withOpacity(0.2),
       ),
     );
@@ -233,7 +233,7 @@ class _ImporterCommissionSettlementsSectionState
         initiallyExpanded: _sectionExpanded,
         onExpansionChanged: (v) => setState(() => _sectionExpanded = v),
         title: const Text(
-          'Cortes de comisión MotoLink',
+          'Cortes de comisión B2B Conecta',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
         ),
         subtitle: Text(
@@ -266,11 +266,11 @@ class _ImporterCommissionSettlementsSectionState
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Text(
-                  'Aún no hay cortes de cuenta. MotoLink consolidará las comisiones '
+                  'Aún no hay cortes de cuenta. B2B Conecta consolidará las comisiones '
                   'devengadas en cortes semanales y emitirá la factura correspondiente.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                     height: 1.35,
                   ),
                 ),
@@ -282,7 +282,7 @@ class _ImporterCommissionSettlementsSectionState
                   'Ningún corte coincide con los filtros seleccionados.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               )
@@ -294,7 +294,7 @@ class _ImporterCommissionSettlementsSectionState
                   child: Card(
                     margin: EdgeInsets.zero,
                     elevation: 0,
-                    color: Colors.grey.shade50,
+                    color: AppColors.card,
                     child: ExpansionTile(
                       key: ValueKey('cs-${s.id}'),
                       initiallyExpanded: expanded,
@@ -335,7 +335,7 @@ class _ImporterCommissionSettlementsSectionState
                                     'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade700,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           if (s.invoiceReference != null &&
@@ -349,7 +349,7 @@ class _ImporterCommissionSettlementsSectionState
                               s.pagoEstadoLabelEs,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade700,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           if (s.paidAt != null)

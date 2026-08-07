@@ -1,4 +1,5 @@
-/// Control de acceso a la app para aliados (`profiles.account_access_status`).
+/// Control de acceso a la app (`profiles.account_access_status`).
+/// Aplica a aliados y mayoristas (`importador`).
 abstract final class AccountAccessStatus {
   static const draft = 'draft';
   static const pendingReview = 'pending_review';
@@ -20,12 +21,14 @@ abstract final class AccountAccessStatus {
     }
   }
 
-  /// Importadores/admin omiten este gate; aliados sin fila explícita → borrador.
+  /// Admin siempre entra. Aliado e importador requieren `active`.
   static bool allowsAppAccess({
     required String? role,
     required String? accountAccessStatus,
   }) {
-    if (role?.trim().toLowerCase() != 'aliado') return true;
+    final r = role?.trim().toLowerCase();
+    if (r == 'administrador') return true;
+    if (r != 'aliado' && r != 'importador') return true;
     return accountAccessStatus?.trim() == active;
   }
 }

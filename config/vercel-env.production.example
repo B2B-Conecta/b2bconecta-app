@@ -6,4 +6,4 @@ NEXT_PUBLIC_SUPABASE_URL=https://fzugzjcwdzcwfxgviltw.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PRODUCTION_PUBLISHABLE_KEY
 
 # Dominio web estable (debe coincidir con Supabase Auth → Redirect URLs)
-SUPABASE_AUTH_REDIRECT_URL=https://YOUR_PRODUCTION_DOMAIN
+SUPABASE_AUTH_REDIRECT_URL=https://www.b2bconecta.com.ve

@@ -79,6 +79,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   int _authSectionTick = 0;
 
   bool _termsAccepted = false;
+  bool _submittingImportadorReview = false;
 
   /// Ancla scroll desde notificaciones KYC → sección documentación aliado.
   final GlobalKey _kycDocumentationSectionKey = GlobalKey();
@@ -119,6 +120,20 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   bool get _persistedAsImportador {
     return widget.initial?.role?.trim().toLowerCase() == 'importador';
+  }
+
+  bool get _isImportadorRole {
+    return _role.trim().toLowerCase() == 'importador' || _persistedAsImportador;
+  }
+
+  /// Mayorista aún no aprobado: puede completar perfil y enviar a revisión.
+  bool get _showImportadorSubmitSection {
+    if (!_isImportadorRole) return false;
+    final access = widget.initial?.accountAccessStatus?.trim();
+    return access == null ||
+        access.isEmpty ||
+        access == AccountAccessStatus.draft ||
+        access == AccountAccessStatus.rejected;
   }
 
   bool get _requiresTerms {
@@ -433,6 +448,51 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   Future<void> _signOut() async {
     await AuthService.signOut();
+  }
+
+  Future<void> _submitImportadorForReview() async {
+    if (_submittingImportadorReview || _saving) return;
+    final termsOk =
+        _hasAcceptedTerms || (widget.initial?.hasAcceptedCurrentTerms ?? false);
+    if (!termsOk) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Debe aceptar los términos y la política de privacidad antes de enviar.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submittingImportadorReview = true);
+    try {
+      final saved = await _persistProfileFromForm(validate: true);
+      if (!saved) return;
+      await SupabaseService.profileSubmitImportadorForReview();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Solicitud enviada. B2B Conecta revisará su registro de mayorista.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      widget.onSaved();
+      widget.onRelatedDataChanged?.call();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(SupabaseService.profileSaveErrorMessage(e)),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submittingImportadorReview = false);
+    }
   }
 
   Future<bool> _persistProfileFromForm({bool validate = true}) async {
@@ -887,7 +947,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               profile: widget.initial,
             ),
           ],
-          if (_persistedAsImportador && widget.initial != null) ...[
+          if (_persistedAsImportador &&
+              widget.initial != null &&
+              widget.initial!.hasActiveAccountAccess) ...[
             const SizedBox(height: 12),
             ImporterAcceptedPagoMetodosSection(
               profile: widget.initial!,
@@ -953,10 +1015,55 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               },
             ),
           ],
+          if (_showImportadorSubmitSection) ...[
+            SizedBox(height: mobile ? 18 : 24),
+            Text(
+              widget.initial?.accountAccessStatus?.trim() ==
+                      AccountAccessStatus.rejected
+                  ? 'Corrija su perfil y vuelva a enviar la solicitud de ingreso.'
+                  : 'Cuando complete su perfil y acepte los términos, envíe su '
+                      'solicitud. Un administrador habilitará su acceso.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: (_saving || _submittingImportadorReview)
+                  ? null
+                  : _submitImportadorForReview,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brand,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _submittingImportadorReview
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      widget.initial?.accountAccessStatus?.trim() ==
+                              AccountAccessStatus.rejected
+                          ? (mobile
+                              ? 'Reenviar solicitud'
+                              : 'Reenviar solicitud de ingreso')
+                          : (mobile
+                              ? 'Enviar solicitud'
+                              : 'Enviar solicitud de ingreso'),
+                    ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (_showGuardarPerfilButton) ...[
             SizedBox(height: mobile ? 18 : 24),
             ElevatedButton(
-              onPressed: _saving ? null : _submit,
+              onPressed: (_saving || _submittingImportadorReview) ? null : _submit,
               child: _saving
                   ? const SizedBox(
                       height: 22,

@@ -6,4 +6,4 @@ NEXT_PUBLIC_SUPABASE_URL=https://kdrccmqcrruixuworlmz.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_STAGING_PUBLISHABLE_KEY
 
 # Must match Supabase Auth Site URL + Redirect URLs (config/supabase-auth-redirects.example)
-SUPABASE_AUTH_REDIRECT_URL=https://motolink-app.vercel.app
+SUPABASE_AUTH_REDIRECT_URL=https://b2bconecta-app-git-dev-b2bconecta.vercel.app

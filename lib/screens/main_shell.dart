@@ -218,8 +218,8 @@ class _MainShellState extends State<MainShell> {
       icon: Icons.verified_user_outlined,
       selectedIcon: Icons.verified_user,
       label: 'KYC',
-      title: 'KYC',
-      subtitle: 'Documentos · aprobación',
+      title: 'Verificación',
+      subtitle: 'Aliados · mayoristas',
     ),
     AdminShellDestination(
       icon: Icons.support_agent_outlined,

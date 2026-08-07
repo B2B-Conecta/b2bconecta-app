@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/document_review_status.dart';
 import '../models/kyc_status.dart';
@@ -97,9 +98,17 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final complete = profile.isComplete;
-    final operacionLabelEs = complete
-        ? 'Perfil B2B completo: puede gestionar inventario y pedidos.'
+    final accessOk = profile.hasActiveAccountAccess;
+    final access = profile.accountAccessStatus?.trim();
+    final termsOk = !profile.requiresTermsAcceptance ||
+        profile.hasAcceptedCurrentTerms;
+
+    final perfilLabelEs = complete
+        ? 'Perfil B2B completo.'
         : 'Complete nombre, RIF, domicilio fiscal y enlace Google Maps.';
+    final accesoLabelEs = accessOk
+        ? 'Acceso habilitado: puede gestionar inventario y pedidos.'
+        : 'Acceso: ${AccountAccessStatus.labelEs(access)}.';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -115,16 +124,14 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  complete
-                      ? Icons.check_circle_outline
-                      : Icons.info_outline,
+                  accessOk ? Icons.check_circle_outline : Icons.info_outline,
                   size: 22,
                   color: AppColors.brandBlue,
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Estado para operar (importador)',
+                    'Estado para operar (mayorista)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -135,7 +142,11 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            _CheckRow(ok: complete, label: operacionLabelEs),
+            _CheckRow(ok: complete, label: perfilLabelEs),
+            const SizedBox(height: 6),
+            _CheckRow(ok: termsOk, label: 'Términos y privacidad aceptados.'),
+            const SizedBox(height: 6),
+            _CheckRow(ok: accessOk, label: accesoLabelEs),
           ],
         ),
       ),

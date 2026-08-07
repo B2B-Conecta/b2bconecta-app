@@ -1554,12 +1554,12 @@ class SupabaseService {
         .toList();
   }
 
-  /// Perfiles aliado para cola KYC admin.
+  /// Perfiles aliado e importador (mayorista) para cola de verificación admin.
   static Future<List<ProfileModel>> fetchB2BProfilesForAdminKycReview() async {
     final response = await _client
         .from('profiles')
         .select()
-        .eq('role', 'aliado')
+        .inFilter('role', ['aliado', 'importador'])
         .order('business_name', ascending: true);
 
     final list = response as List<dynamic>;
@@ -1577,6 +1577,22 @@ class SupabaseService {
   }) async {
     await _client.rpc(
       'admin_set_profile_kyc_status',
+      params: <String, dynamic>{
+        'p_profile_id': profileId,
+        'p_status': status,
+        'p_note': note?.trim().isNotEmpty == true ? note!.trim() : null,
+      },
+    );
+  }
+
+  /// Admin: aprueba o rechaza acceso de mayorista (`aprobado` | `rechazado`).
+  static Future<void> adminSetImportadorAccountAccess({
+    required String profileId,
+    required String status,
+    String? note,
+  }) async {
+    await _client.rpc(
+      'admin_set_importador_account_access',
       params: <String, dynamic>{
         'p_profile_id': profileId,
         'p_status': status,
@@ -1639,9 +1655,14 @@ class SupabaseService {
     );
   }
 
-  /// Aliado o importador: envía expediente a revisión B2B Conecta.
+  /// Aliado: envía expediente KYC a revisión B2B Conecta.
   static Future<void> profileSubmitKycForReview() async {
     await _client.rpc('profile_submit_kyc_for_review');
+  }
+
+  /// Mayorista (importador): envía solicitud de ingreso a revisión (sin KYC docs).
+  static Future<void> profileSubmitImportadorForReview() async {
+    await _client.rpc('profile_submit_importador_for_review');
   }
 
   static String get _pushPlatform {

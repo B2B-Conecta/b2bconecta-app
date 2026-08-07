@@ -1,6 +1,7 @@
 # Environment (secrets)
 .env
 config/push.env
+config/smtp.env
 config/env/*.env.local
 config/migrate-db.env
 

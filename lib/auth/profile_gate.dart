@@ -123,8 +123,9 @@ class _ProfileGateState extends State<ProfileGate> {
           );
         }
 
-        if (profile.isAliado && !profile.hasActiveAccountAccess) {
-          if (profile.needsAliadoPendingReviewScreen) {
+        if ((profile.isAliado || profile.isImportador) &&
+            !profile.hasActiveAccountAccess) {
+          if (profile.needsPendingReviewScreen) {
             return AliadoPendingReviewScreen(
               profile: profile,
               onRefresh: _reloadProfile,

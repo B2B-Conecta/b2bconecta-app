@@ -15,7 +15,7 @@ import '../widgets/aliado_access_approved_banner.dart';
 import '../widgets/motolink_pro_logo.dart';
 import 'profile_setup_screen.dart';
 
-/// Aliado con registro enviado o rechazado: sin acceso a MainShell hasta aprobación admin.
+/// Aliado o mayorista con registro enviado o rechazado: sin MainShell hasta aprobación.
 class AliadoPendingReviewScreen extends StatefulWidget {
   const AliadoPendingReviewScreen({
     super.key,
@@ -41,6 +41,8 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
   bool get _isRejected =>
       widget.profile.accountAccessStatus?.trim() ==
       AccountAccessStatus.rejected;
+
+  bool get _isImportador => widget.profile.isImportador;
 
   @override
   void initState() {
@@ -136,10 +138,16 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _isRejected
-                          ? 'B2B Conecta no pudo aprobar su registro inicial en este momento. '
-                              'Revise el motivo, corrija la documentación y vuelva a enviar.'
-                          : 'Recibimos su registro inicial. Un administrador de B2B Conecta '
-                              'revisará su documentación y habilitará el acceso a la plataforma.',
+                          ? (_isImportador
+                              ? 'B2B Conecta no pudo aprobar su registro de mayorista en este momento. '
+                                  'Revise el motivo, corrija su perfil y vuelva a enviar.'
+                              : 'B2B Conecta no pudo aprobar su registro inicial en este momento. '
+                                  'Revise el motivo, corrija la documentación y vuelva a enviar.')
+                          : (_isImportador
+                              ? 'Recibimos su registro de mayorista. Un administrador de B2B Conecta '
+                                  'revisará su perfil y habilitará el acceso a la plataforma.'
+                              : 'Recibimos su registro inicial. Un administrador de B2B Conecta '
+                                  'revisará su documentación y habilitará el acceso a la plataforma.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,

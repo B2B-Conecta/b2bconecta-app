@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/account_access_status.dart';
 import '../models/profile_model.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -55,9 +56,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _softRefreshProfile() async {
+    final previousAccess = _profile?.accountAccessStatus?.trim();
     final fetched = await SupabaseService.fetchMyProfile();
     if (!mounted) return;
     setState(() => _profile = fetched);
+    final nextAccess = fetched?.accountAccessStatus?.trim();
+    // Tras enviar a revisión (draft/rejected → pending_review), volver al gate.
+    if (!widget.isEditing &&
+        fetched != null &&
+        nextAccess == AccountAccessStatus.pendingReview &&
+        previousAccess != AccountAccessStatus.pendingReview) {
+      widget.onProfileComplete();
+      return;
+    }
     _maybeAdvanceToMainApp();
   }
 
@@ -72,8 +83,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _onProfileSaved() async {
     await _softRefreshProfile();
-    if (!mounted) return;
-    _maybeAdvanceToMainApp();
   }
 
   @override

@@ -48,6 +48,22 @@ bash scripts/use_env.sh staging
 ```
 
 Auth: Site URL + Redirect URLs en **cada** Dashboard (main y dev).
+Ver `config/supabase-auth-redirects.example`.
+
+### SMTP (confirmación de correo + recuperación de contraseña)
+
+Sender: `b2bconecta.ve@gmail.com` (Gmail App Password).
+
+1. Copiar `config/smtp.env.example` → `config/smtp.env` y pegar `SMTP_PASS`.
+2. Aplicar en remoto:
+   ```bash
+   bash scripts/configure_supabase_smtp.sh staging    # b2bconecta-db-dev
+   bash scripts/configure_supabase_smtp.sh production # b2bconecta-db
+   ```
+3. Local: por defecto Inbucket (`http://127.0.0.1:54324`). Para Gmail real, ver comentarios en `supabase/config.toml` → `[auth.email.smtp]`.
+4. Vercel: `SUPABASE_AUTH_REDIRECT_URL` debe coincidir con Site URL del proyecto:
+   - Production → `https://www.b2bconecta.com.ve`
+   - Preview `dev` → `https://b2bconecta-app-git-dev-b2bconecta.vercel.app`
 
 ## Mapeo CLI ↔ app
 

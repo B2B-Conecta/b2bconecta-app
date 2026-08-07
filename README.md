@@ -35,16 +35,16 @@ bash scripts/run_web_local.sh    # http://localhost:3000
 Variables: `config/vercel-env.staging.example`  
 Production web: `config/vercel-env.production.example`
 
-**Staging URL:** `https://motolink-app.vercel.app` (Vercel project `motolink-app`).
+**Dev / staging URL:** `https://b2bconecta-app-git-dev-b2bconecta.vercel.app` (Vercel project `b2bconecta-app`, branch `dev`).  
+**Production:** `https://www.b2bconecta.com.ve`
 
-Align before testing password recovery:
+Align before testing password recovery / email confirmation:
 
-1. **Vercel** → Environment Variables → `SUPABASE_AUTH_REDIRECT_URL=https://motolink-app.vercel.app`
-2. **Supabase staging** → Auth → Site URL = same; Redirect URLs include `https://motolink-app.vercel.app/**`
-3. **Redeploy** Vercel after changing env vars (Flutter web bakes `.env` at build time)
-4. **PKCE:** request reset and open the email link in the **same browser** on `motolink-app.vercel.app` (not incognito / not the phone mail app if you requested on desktop)
-
-See `config/supabase-auth-redirects.example` for the full redirect list.
+1. **SMTP** → `config/smtp.env` + `bash scripts/configure_supabase_smtp.sh staging|production` (sender `b2bconecta.ve@gmail.com`)
+2. **Vercel** → Environment Variables → `SUPABASE_AUTH_REDIRECT_URL` = Site URL del entorno
+3. **Supabase** → Auth → Site URL + Redirect URLs (ver `config/supabase-auth-redirects.example`)
+4. **Redeploy** Vercel after changing env vars (Flutter web bakes `.env` at build time)
+5. **PKCE:** request reset and open the email link in the **same browser** where you requested it
 
 ### Release mobile (staging QA)
 

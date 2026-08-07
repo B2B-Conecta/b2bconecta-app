@@ -179,18 +179,21 @@ class ProfileModel {
   bool get isReadyForMainApp {
     if (!hasValidAppRole || !isComplete) return false;
     if (requiresTermsAcceptance && !hasAcceptedCurrentTerms) return false;
-    if (isAliado && !hasActiveAccountAccess) return false;
+    if ((isAliado || isImportador) && !hasActiveAccountAccess) return false;
     return true;
   }
 
-  /// Aliado en revisión B2B Conecta (no borrador ni activo).
-  bool get needsAliadoPendingReviewScreen {
-    if (!isAliado || hasActiveAccountAccess) return false;
+  /// Aliado o mayorista en revisión / rechazado (no borrador ni activo).
+  bool get needsPendingReviewScreen {
+    if ((!isAliado && !isImportador) || hasActiveAccountAccess) return false;
     final access = accountAccessStatus?.trim();
     return access != null &&
         access.isNotEmpty &&
         access != AccountAccessStatus.draft;
   }
+
+  /// Alias legado.
+  bool get needsAliadoPendingReviewScreen => needsPendingReviewScreen;
 
   /// Aliados e importadores deben aceptar términos vigentes.
   bool get requiresTermsAcceptance => isAliado || isImportador;

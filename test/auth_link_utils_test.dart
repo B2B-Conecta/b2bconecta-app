@@ -13,7 +13,7 @@ void main() {
 
   test('detects PKCE auth callback with code query param', () {
     final uri = Uri.parse(
-      'https://motolink-app.vercel.app/?code=abc-123',
+      'https://b2bconecta-app-git-dev-b2bconecta.vercel.app/?code=abc-123',
     );
     expect(hasAuthCallbackInUri(uri), isTrue);
     expect(parseAuthUriFragment(uri).isPasswordRecovery, isFalse);
@@ -29,7 +29,7 @@ void main() {
 
   test('detects password recovery from query type param', () {
     final uri = Uri.parse(
-      'https://motolink-app.vercel.app/?code=abc&type=recovery',
+      'https://www.b2bconecta.com.ve/?code=abc&type=recovery',
     );
     final result = parseAuthUriFragment(uri);
     expect(result.isPasswordRecovery, isTrue);

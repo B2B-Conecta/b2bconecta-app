@@ -1,24 +1,30 @@
 # Supabase Dashboard → Authentication → URL Configuration
 #
-# === MAIN (b2bconecta-db / fzugzjcwdzcwfxgviltw) — plantilla + seed ===
+# === MAIN (b2bconecta-db / fzugzjcwdzcwfxgviltw) — production ===
 # Site URL:
-#   https://YOUR_PRODUCTION_DOMAIN
+#   https://www.b2bconecta.com.ve
 # Redirect URLs:
-#   https://YOUR_PRODUCTION_DOMAIN/**
+#   https://www.b2bconecta.com.ve/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
 #   com.carlosf12.motolinkProApp://auth-callback
 #
 # === DEV (b2bconecta-db-dev / kdrccmqcrruixuworlmz) — data de trabajo ===
-# Site URL (ej. preview):
-#   https://motolink-app.vercel.app
+# Site URL (Vercel branch `dev`):
+#   https://b2bconecta-app-git-dev-b2bconecta.vercel.app
 # Redirect URLs:
-#   https://motolink-app.vercel.app/**
+#   https://b2bconecta-app-git-dev-b2bconecta.vercel.app/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
 #   com.carlosf12.motolinkProApp://auth-callback
 #
-# Ver config/ENVIRONMENTS.md
+# === SMTP (confirmación + recovery) ===
+# Sender: b2bconecta.ve@gmail.com
+# Dashboard → Authentication → Emails → SMTP Settings
+#   o: bash scripts/configure_supabase_smtp.sh staging|production
+# Ver config/smtp.env.example
 #
 # Password recovery on web uses PKCE: open the email link in the SAME browser
 # where "Forgot password" was clicked.
+#
+# Ver config/ENVIRONMENTS.md

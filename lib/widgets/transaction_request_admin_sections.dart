@@ -10,6 +10,8 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 import '../utils/b2b_orders_panel_layout.dart';
+import '../utils/order_rating_eligibility.dart';
+import 'admin_order_rating_sheet.dart';
 import 'order_commission_summary.dart';
 import '../models/kyc_approved_aliado_model.dart';
 import '../models/kyc_status.dart';
@@ -263,15 +265,18 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
 }
 
 /// A6: valoración del aliado tras entrega (reportes gerenciales).
+/// Si falta y el pedido es elegible, el admin puede registrar en nombre del aliado.
 class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
   const TransactionRequestAliadoExperienceAdminSection({
     super.key,
     required this.request,
     this.hideSectionTitle = false,
+    this.onMutated,
   });
 
   final TransactionRequestModel request;
   final bool hideSectionTitle;
+  final VoidCallback? onMutated;
 
   @override
   Widget build(BuildContext context) {
@@ -279,6 +284,9 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
     final at = r.aliadoExperienceSubmittedAt;
     final stars = r.aliadoExperienceStars;
     final comment = r.aliadoExperienceComment?.trim();
+    final canAdminRate = at == null &&
+        onMutated != null &&
+        lineaElegibleValoracionAliado(r);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,21 +306,44 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           decoration: BoxDecoration(
-            color: at != null ? Colors.purple.shade50 : Colors.grey.shade100,
+            color: at != null
+                ? Colors.purple.shade50
+                : AppColors.brandBlueContainer,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: at != null ? Colors.purple.shade200 : AppColors.borderSubtle,
+              color: at != null
+                  ? Colors.purple.shade200
+                  : AppColors.borderSubtle,
             ),
           ),
           child: at == null
-              ? Text(
-                  'Sin valoración: el aliado aún no envió calificación ni comentario para este pedido.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Sin valoración: el aliado aún no envió calificación '
+                      'ni comentario para este pedido.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (canAdminRate) ...[
+                      const SizedBox(height: 10),
+                      FilledButton.icon(
+                        onPressed: () => showAdminOrderRatingSheet(
+                          context,
+                          request: r,
+                          raterRole: 'aliado',
+                          onSubmitted: () => onMutated?.call(),
+                        ),
+                        icon: const Icon(Icons.star_outline, size: 18),
+                        label: const Text('Valorar como administración'),
+                      ),
+                    ],
+                  ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,6 +391,169 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
                     ),
                   ],
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Valoración importador → aliado: pendiente o CTA admin si aún no calificó.
+class TransactionRequestImporterRatingAdminSection extends StatefulWidget {
+  const TransactionRequestImporterRatingAdminSection({
+    super.key,
+    required this.request,
+    this.onMutated,
+  });
+
+  final TransactionRequestModel request;
+  final VoidCallback? onMutated;
+
+  @override
+  State<TransactionRequestImporterRatingAdminSection> createState() =>
+      _TransactionRequestImporterRatingAdminSectionState();
+}
+
+class _TransactionRequestImporterRatingAdminSectionState
+    extends State<TransactionRequestImporterRatingAdminSection> {
+  bool _loading = true;
+  bool _hasRated = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant TransactionRequestImporterRatingAdminSection oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.request.id != widget.request.id ||
+        oldWidget.request.checkoutGroupId != widget.request.checkoutGroupId) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final r = widget.request;
+    final aliadoId = r.aliadoId.trim();
+    final importadorId = r.ownerId.trim();
+    if (aliadoId.isEmpty || importadorId.isEmpty) {
+      setState(() {
+        _loading = false;
+        _hasRated = false;
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final exists = await SupabaseService.orderRatingExistsForRater(
+        raterRole: 'importador',
+        importadorId: importadorId,
+        aliadoId: aliadoId,
+        checkoutGroupId: r.checkoutGroupId,
+        transactionRequestId: r.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _hasRated = exists;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.request;
+    final canAdminRate = !_hasRated &&
+        !_loading &&
+        widget.onMutated != null &&
+        lineaElegibleValoracionImportador(r);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Valoración del mayorista (al aliado)',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: _hasRated
+                ? AppColors.successGreen.withOpacity(0.12)
+                : AppColors.brandBlueContainer,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: _loading
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              : _error != null
+                  ? Text(
+                      'No se pudo verificar: $_error',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade800,
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _hasRated
+                              ? 'El mayorista ya registró su valoración al aliado.'
+                              : 'Sin valoración: el mayorista aún no calificó al aliado.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (canAdminRate) ...[
+                          const SizedBox(height: 10),
+                          FilledButton.icon(
+                            onPressed: () => showAdminOrderRatingSheet(
+                              context,
+                              request: r,
+                              raterRole: 'importador',
+                              onSubmitted: () {
+                                _load();
+                                widget.onMutated?.call();
+                              },
+                            ),
+                            icon: const Icon(Icons.star_outline, size: 18),
+                            label: const Text('Valorar como administración'),
+                          ),
+                        ],
+                      ],
+                    ),
         ),
       ],
     );

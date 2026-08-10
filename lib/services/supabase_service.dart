@@ -26,7 +26,9 @@ import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/admin_order_rating_row_model.dart';
+import '../auth/referral_invite_storage.dart';
 import '../models/admin_user_activity_row_model.dart';
+import '../models/admin_referral_row_model.dart';
 import '../models/aliado_received_rating_model.dart';
 import '../models/importador_received_rating_model.dart';
 import '../models/reputation_weekly_snapshot_model.dart';
@@ -461,6 +463,9 @@ class SupabaseService {
     String? ciudad,
     String? direccion,
     String? fiscalMapsUrl,
+    String? legalContactName,
+    String? legalContactEmail,
+    String? legalContactPhone,
   }) async {
     final uid = _currentUserId;
     if (uid == null) {
@@ -493,6 +498,15 @@ class SupabaseService {
     final dir = direccion?.trim();
     payload['direccion'] = (dir == null || dir.isEmpty) ? null : dir;
 
+    if (requestedRole == 'importador') {
+      final ln = legalContactName?.trim();
+      final le = legalContactEmail?.trim();
+      final lp = legalContactPhone?.trim();
+      payload['legal_contact_name'] = (ln == null || ln.isEmpty) ? null : ln;
+      payload['legal_contact_email'] = (le == null || le.isEmpty) ? null : le;
+      payload['legal_contact_phone'] = (lp == null || lp.isEmpty) ? null : lp;
+    }
+
     final fmu = normalizeHttpUrl(fiscalMapsUrl);
     if (fmu != null) {
       payload['fiscal_maps_url'] = fmu;
@@ -512,6 +526,14 @@ class SupabaseService {
         ...payload,
         'role': requestedRole,
       });
+      final pendingReferral = await ReferralInviteStorage.consumePendingCode();
+      if (pendingReferral != null && pendingReferral.isNotEmpty) {
+        try {
+          await applyReferralCode(pendingReferral);
+        } catch (_) {
+          // Código inválido o ya aplicado vía metadata de Auth: no bloquear el alta.
+        }
+      }
     } else {
       await _client.from('profiles').update(payload).eq('id', uid);
     }
@@ -3378,12 +3400,67 @@ class SupabaseService {
         .toList();
   }
 
+  /// Aplica código de referido una sola vez (RPC `profile_apply_referral_code`).
+  static Future<void> applyReferralCode(String code) async {
+    final c = code.trim().toUpperCase();
+    if (c.isEmpty) {
+      throw ArgumentError('Indique un código de referido.');
+    }
+    await _client.rpc(
+      'profile_apply_referral_code',
+      params: <String, dynamic>{'p_code': c},
+    );
+  }
+
+  /// Admin: ranking de referidos.
+  static Future<List<AdminReferralStatRowModel>> listAdminReferralStats({
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_referral_stats',
+      params: <String, dynamic>{
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AdminReferralStatRowModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  /// Admin: usuarios referidos por un perfil.
+  static Future<List<AdminReferredUserRowModel>> listAdminReferredUsers({
+    required String referrerId,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_referred_users',
+      params: <String, dynamic>{
+        'p_referrer_id': referrerId.trim(),
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AdminReferredUserRowModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
   /// C4: expediente admin — valoraciones con nombres reales (RPC `list_admin_order_ratings`).
   static Future<List<AdminOrderRatingRowModel>> listAdminOrderRatings({
     String? importadorId,
     String? aliadoId,
     int limit = 50,
     int offset = 0,
+    bool? commentHidden,
   }) async {
     final res = await _client.rpc(
       'list_admin_order_ratings',
@@ -3392,6 +3469,7 @@ class SupabaseService {
         'p_aliado_id': _nullableUuid(aliadoId),
         'p_limit': limit,
         'p_offset': offset,
+        'p_comment_hidden': commentHidden,
       },
     );
     if (res is! List) return const [];
@@ -3400,6 +3478,54 @@ class SupabaseService {
               Map<String, dynamic>.from(e as Map),
             ))
         .toList();
+  }
+
+  /// Moderación v1: ocultar o restaurar el comentario de texto de una valoración.
+  static Future<void> adminSetOrderRatingCommentHidden({
+    required String ratingId,
+    required bool hidden,
+    String? reason,
+  }) async {
+    final id = ratingId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('Valoración requerida');
+    }
+    await _client.rpc(
+      'admin_set_order_rating_comment_hidden',
+      params: <String, dynamic>{
+        'p_rating_id': id,
+        'p_hidden': hidden,
+        'p_reason': reason?.trim().isEmpty == true ? null : reason?.trim(),
+      },
+    );
+  }
+
+  /// Admin registra valoración en nombre del usuario (solo si aún no calificó).
+  static Future<void> adminSubmitOrderRating({
+    required String raterRole,
+    required String transactionRequestId,
+    required int stars,
+    required String comment,
+    Map<String, dynamic> answers = const {},
+  }) async {
+    final role = raterRole.trim().toLowerCase();
+    final id = transactionRequestId.trim();
+    if (role != 'aliado' && role != 'importador') {
+      throw ArgumentError('Rol de valoración inválido');
+    }
+    if (id.isEmpty) {
+      throw ArgumentError('Pedido requerido');
+    }
+    await _client.rpc(
+      'admin_submit_order_rating',
+      params: <String, dynamic>{
+        'p_rater_role': role,
+        'p_request_id': id,
+        'p_stars': stars,
+        'p_comment': comment.trim(),
+        'p_answers': answers,
+      },
+    );
   }
 
   static String? _nullableUuid(String? raw) {
@@ -3603,18 +3729,39 @@ class SupabaseService {
   }) async {
     final uid = _currentUserId;
     if (uid == null) return false;
+    return orderRatingExistsForRater(
+      raterRole: 'importador',
+      importadorId: uid,
+      aliadoId: aliadoId,
+      checkoutGroupId: checkoutGroupId,
+      transactionRequestId: transactionRequestId,
+    );
+  }
+
+  /// Comprueba si ya hay valoración de [raterRole] para el par en carrito/línea.
+  static Future<bool> orderRatingExistsForRater({
+    required String raterRole,
+    required String importadorId,
+    required String aliadoId,
+    String? checkoutGroupId,
+    String? transactionRequestId,
+  }) async {
+    final role = raterRole.trim().toLowerCase();
+    final imp = importadorId.trim();
+    final ali = aliadoId.trim();
+    if (imp.isEmpty || ali.isEmpty) return false;
     final cg = checkoutGroupId?.trim();
     dynamic q = _client
         .from('order_ratings')
         .select('id')
-        .eq('rater_role', 'importador')
-        .eq('importador_id', uid)
-        .eq('aliado_id', aliadoId.trim());
+        .eq('rater_role', role)
+        .eq('importador_id', imp)
+        .eq('aliado_id', ali);
     if (cg != null && cg.isNotEmpty) {
       q = q.eq('checkout_group_id', cg);
     } else if (transactionRequestId != null &&
-        transactionRequestId.isNotEmpty) {
-      q = q.eq('transaction_request_id', transactionRequestId);
+        transactionRequestId.trim().isNotEmpty) {
+      q = q.eq('transaction_request_id', transactionRequestId.trim());
     } else {
       return false;
     }

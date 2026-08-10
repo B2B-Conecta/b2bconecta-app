@@ -59,6 +59,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
       _onAuthStateChange,
+      onError: (Object error, StackTrace stack) {
+        // getSessionFromUrl / detectSessionInUri pueden emitir AuthException
+        // en el stream; no tumbar la app (Uncaught Error en web).
+        debugPrint('AuthGate onAuthStateChange error: $error');
+      },
     );
 
     if (!kIsWeb) {
@@ -111,6 +116,13 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _bootstrapWithoutCallback(expectAuthCallback: false);
     } else {
       _bootstrapWithoutCallback(expectAuthCallback: false);
+    }
+
+    // Sesión ya creada por detectSessionInUri + flag local (p. ej. remount web).
+    if (!_awaitingPasswordRecovery &&
+        Supabase.instance.client.auth.currentSession != null &&
+        await AuthRecoveryStorage.peekPendingPasswordRecovery()) {
+      _awaitingPasswordRecovery = true;
     }
 
     if (mounted) {
@@ -189,62 +201,88 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   Future<void> _resolveAuthCallback(Uri uri, AuthLinkParseResult link) async {
     try {
-      // Deja que Supabase.initialize termine detectSessionInUri si aplica.
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+      // Deja que supabase_flutter detectSessionInUri termine el primer canje PKCE.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
 
       var session = Supabase.instance.client.auth.currentSession;
       var redirectType = link.isPasswordRecovery ? 'recovery' : null;
+      final hadCode = uri.queryParameters.containsKey('code');
+      final pendingFlag =
+          await AuthRecoveryStorage.peekPendingPasswordRecovery();
 
-      if (uri.queryParameters.containsKey('code')) {
+      if (hadCode && session == null) {
+        // Solo canjear si initialize no estableció sesión (evita 2º exchange
+        // que borra el code_verifier y lanza "Code verifier could not be found").
         try {
           final response =
               await Supabase.instance.client.auth.getSessionFromUrl(uri);
           session = response.session;
           redirectType = response.redirectType ?? redirectType;
         } on AuthException catch (e) {
+          _initialLinkError = AuthService.mapAuthErrorMessage(e.message);
+          session = Supabase.instance.client.auth.currentSession;
           if (session == null) {
-            _initialLinkError = AuthService.mapAuthErrorMessage(e.message);
             await _signOutAfterLinkError();
-            return;
           }
-          redirectType ??=
-              (await AuthRecoveryStorage.peekPendingPasswordRecovery())
-                  ? 'recovery'
-                  : null;
+        } catch (e) {
+          debugPrint('getSessionFromUrl failed: $e');
+          _initialLinkError ??=
+              'No se pudo completar la autenticación desde el enlace.';
+          session = Supabase.instance.client.auth.currentSession;
+          if (session == null) {
+            await _signOutAfterLinkError();
+          }
         }
+      } else if (hadCode && session != null) {
+        // Ya canjeado por detectSessionInUri; el evento passwordRecovery pudo
+        // haberse emitido antes de suscribir AuthGate → confiar en el flag local.
+        redirectType ??= pendingFlag ? 'recovery' : null;
       } else if (session != null) {
-        redirectType ??=
-            (await AuthRecoveryStorage.peekPendingPasswordRecovery())
-                ? 'recovery'
-                : null;
+        redirectType ??= pendingFlag ? 'recovery' : null;
       }
 
+      // Siempre limpiar ?code= / errores de la barra de direcciones.
       clearAuthUriCallback();
 
       final pendingRecovery = redirectType == 'recovery' ||
+          redirectType == 'passwordRecovery' ||
           _awaitingPasswordRecovery ||
-          await AuthRecoveryStorage.peekPendingPasswordRecovery();
+          pendingFlag;
 
-      if (pendingRecovery && session != null) {
+      if (session == null) {
+        if (_initialLinkError == null && hadCode) {
+          _initialLinkError =
+              'No se pudo abrir el enlace. Solicita uno nuevo desde esta misma web.';
+        }
+        if (!mounted) return;
+        setState(() {
+          _authState = const AuthState(AuthChangeEvent.signedOut, null);
+        });
+        return;
+      }
+
+      if (pendingRecovery) {
         _awaitingPasswordRecovery = true;
-      } else if (session != null) {
+        await AuthRecoveryStorage.markPendingPasswordRecovery();
+      } else {
         await AuthRecoveryStorage.clearPendingPasswordRecovery();
+        _awaitingPasswordRecovery = false;
       }
 
       if (!mounted) return;
       setState(() {
         _authState = AuthState(
-          session != null
-              ? (pendingRecovery
-                  ? AuthChangeEvent.passwordRecovery
-                  : AuthChangeEvent.signedIn)
-              : AuthChangeEvent.signedOut,
+          pendingRecovery
+              ? AuthChangeEvent.passwordRecovery
+              : AuthChangeEvent.signedIn,
           session,
         );
       });
     } catch (e) {
+      debugPrint('_resolveAuthCallback error: $e');
       _initialLinkError ??=
           'No se pudo completar la autenticación desde el enlace.';
+      clearAuthUriCallback();
       await _signOutAfterLinkError();
     } finally {
       _clearAuthCallbackTimeout();
@@ -273,7 +311,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _awaitingPasswordRecovery = true;
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
-      unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
+      // No limpiar el flag aquí: debe sobrevivir remounts hasta updatePassword.
+      unawaited(AuthRecoveryStorage.markPendingPasswordRecovery());
       _applyAuthState(data);
       return;
     }
@@ -286,6 +325,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _awaitingPasswordRecovery = false;
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
+      unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
       _applyAuthState(data);
       // Cerrar ajustes/perfil apilados para mostrar login de inmediato.
       WidgetsBinding.instance.addPostFrameCallback((_) {

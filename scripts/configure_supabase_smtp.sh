@@ -43,12 +43,12 @@ case "$TARGET" in
   staging|dev)
     PROJECT_REF="${STAGING_PROJECT_REF:-kdrccmqcrruixuworlmz}"
     SITE_URL="${STAGING_SITE_URL:-https://b2bconecta-app-git-dev-b2bconecta.vercel.app}"
-    URI_ALLOW_LIST="${STAGING_URI_ALLOW_LIST:-https://b2bconecta-app-git-dev-b2bconecta.vercel.app/*,http://localhost:3000/*,http://127.0.0.1:3000/*,com.carlosf12.motolinkProApp://auth-callback}"
+    URI_ALLOW_LIST="${STAGING_URI_ALLOW_LIST:-https://b2bconecta-app-git-dev-b2bconecta.vercel.app/*,https://www.b2bconecta.com.ve/*,http://localhost:3000/*,http://127.0.0.1:3000/*,com.carlosf12.motolinkProApp://auth-callback}"
     ;;
   production|main)
     PROJECT_REF="${PRODUCTION_PROJECT_REF:-fzugzjcwdzcwfxgviltw}"
     SITE_URL="${PRODUCTION_SITE_URL:-https://www.b2bconecta.com.ve}"
-    URI_ALLOW_LIST="${PRODUCTION_URI_ALLOW_LIST:-https://www.b2bconecta.com.ve/*,http://localhost:3000/*,http://127.0.0.1:3000/*,com.carlosf12.motolinkProApp://auth-callback}"
+    URI_ALLOW_LIST="${PRODUCTION_URI_ALLOW_LIST:-https://www.b2bconecta.com.ve/*,https://b2bconecta-app-git-dev-b2bconecta.vercel.app/*,http://localhost:3000/*,http://127.0.0.1:3000/*,com.carlosf12.motolinkProApp://auth-callback}"
     ;;
   *)
     echo "Target desconocido: $TARGET (use staging|production)"

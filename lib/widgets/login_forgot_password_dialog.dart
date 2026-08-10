@@ -77,8 +77,8 @@ class _LoginForgotPasswordDialogState extends State<_LoginForgotPasswordDialog> 
         const ForgotPasswordDialogResult(
           message:
               'Si existe una cuenta con ese correo, recibirás un enlace para '
-              'restablecer la contraseña. Ábrelo en el mismo navegador donde '
-              'lo solicitaste.',
+              'restablecer la contraseña. Ábrelo en el mismo navegador y sitio '
+              'donde lo solicitaste (mismo origen).',
           isError: false,
         ),
       );

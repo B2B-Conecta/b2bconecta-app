@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 
 import '../models/transaction_request_model.dart';
 import '../utils/admin_order_panel_utils.dart';
+import '../utils/order_rating_eligibility.dart';
 import 'order_card_collapsible_layout.dart';
 import 'transaction_request_admin_sections.dart';
 import 'transaction_request_counterparty_profile_section.dart';
@@ -12,9 +13,11 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
   const AdminCheckoutGroupMasterHeader({
     super.key,
     required this.lines,
+    this.onMutated,
   });
 
   final List<TransactionRequestModel> lines;
+  final VoidCallback? onMutated;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +30,15 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
         break;
       }
     }
+    if (expLine == null) {
+      for (final x in lines) {
+        if (lineaElegibleValoracionAliado(x)) {
+          expLine = x;
+          break;
+        }
+      }
+    }
+    expLine ??= lines.first;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -73,16 +85,31 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
             hideSectionTitle: true,
           ),
         ),
-        if (expLine != null) ...[
+        if (expLine.aliadoExperienceSubmittedAt != null ||
+            lineaElegibleValoracionAliado(expLine)) ...[
           const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
             title: 'Valoración del aliado',
             subtitle: expLine.aliadoExperienceStars != null
                 ? '${expLine.aliadoExperienceStars}/5 post-entrega'
-                : 'Sin estrellas',
+                : (expLine.aliadoExperienceSubmittedAt != null
+                    ? 'Sin estrellas'
+                    : 'Pendiente — admin puede registrar'),
             child: TransactionRequestAliadoExperienceAdminSection(
               request: expLine,
               hideSectionTitle: true,
+              onMutated: onMutated,
+            ),
+          ),
+        ],
+        if (lineaElegibleValoracionImportador(expLine)) ...[
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Valoración del mayorista',
+            subtitle: 'Al aliado de este pedido',
+            child: TransactionRequestImporterRatingAdminSection(
+              request: expLine,
+              onMutated: onMutated,
             ),
           ),
         ],

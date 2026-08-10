@@ -27,6 +27,9 @@ class ProfileModel {
     this.estado,
     this.ciudad,
     this.direccion,
+    this.legalContactName,
+    this.legalContactEmail,
+    this.legalContactPhone,
     this.logoStoragePath,
     this.fiscalMapsUrl,
     this.latitude,
@@ -45,6 +48,9 @@ class ProfileModel {
     this.acceptedPagoMetodos,
     this.pagoMetodoInstrucciones = const {},
     this.pagoSoloDivisas = false,
+    this.referralCode,
+    this.referredByProfileId,
+    this.referredAt,
   });
 
   final String id;
@@ -91,6 +97,28 @@ class ProfileModel {
   /// Domicilio fiscal / dirección de la empresa (`profiles.direccion`).
   final String? direccion;
 
+  /// Importador: contacto legal — nombre (`profiles.legal_contact_name`).
+  final String? legalContactName;
+
+  /// Importador: contacto legal — correo (`profiles.legal_contact_email`).
+  final String? legalContactEmail;
+
+  /// Importador: contacto legal — teléfono (`profiles.legal_contact_phone`).
+  final String? legalContactPhone;
+
+  /// True si nombre, correo y teléfono legales están completos.
+  bool get hasLegalContact {
+    final n = legalContactName?.trim();
+    final e = legalContactEmail?.trim();
+    final p = legalContactPhone?.trim();
+    return n != null &&
+        n.isNotEmpty &&
+        e != null &&
+        e.isNotEmpty &&
+        p != null &&
+        p.isNotEmpty;
+  }
+
   /// Logo del negocio en Storage (`profile-logos/{uid}/...`); opcional.
   final String? logoStoragePath;
 
@@ -132,6 +160,14 @@ class ProfileModel {
 
   /// Importador: solo pagos en divisas/USD; sin descuento línea USD en productos.
   final bool pagoSoloDivisas;
+
+  /// Código único de invitación (`profiles.referral_code`).
+  final String? referralCode;
+
+  /// Quién refirió a este usuario (`profiles.referred_by_profile_id`).
+  final String? referredByProfileId;
+
+  final DateTime? referredAt;
 
   /// Métodos visibles para aliados según configuración del importador.
   List<String> get effectiveAcceptedPagoMetodos =>
@@ -226,7 +262,12 @@ class ProfileModel {
     if (r == 'administrador') return true;
     if (!hasRegisteredLocation) return false;
     if (r == 'importador' || r == 'aliado') {
-      return hasFiscalMapsShareLink;
+      if (!hasFiscalMapsShareLink) return false;
+    }
+    // Referencia legal: obligatoria en onboarding / envío a revisión (RPC).
+    // Cuentas ya activas no deben volver al registro inicial por campos nuevos.
+    if (r == 'importador' && !hasActiveAccountAccess) {
+      return hasLegalContact;
     }
     return true;
   }
@@ -296,6 +337,10 @@ class ProfileModel {
       estado: _text(json['estado']),
       ciudad: _text(json['ciudad']),
       direccion: _text(json['direccion']),
+      legalContactName: _text(json['legal_contact_name']) ??
+          _text(json['legal_reference']),
+      legalContactEmail: _text(json['legal_contact_email']),
+      legalContactPhone: _text(json['legal_contact_phone']),
       logoStoragePath: _text(json['logo_storage_path']),
       fiscalMapsUrl: _text(json['fiscal_maps_url']),
       latitude: _asDoubleNullable(json['latitude']),
@@ -327,6 +372,11 @@ class ProfileModel {
       pagoMetodoInstrucciones:
           PagoMetodoInstrucciones.parseMap(json['pago_metodo_instrucciones']),
       pagoSoloDivisas: _parseBool(json['pago_solo_divisas']),
+      referralCode: _text(json['referral_code']),
+      referredByProfileId: _text(json['referred_by_profile_id']),
+      referredAt: json['referred_at'] != null
+          ? DateTime.tryParse(json['referred_at'].toString())
+          : null,
     );
   }
 

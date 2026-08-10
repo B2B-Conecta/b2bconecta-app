@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build MotoLink iOS release (firmado para iPhone físico).
+# Build B2B Conecta iOS release (firmado para iPhone físico).
+# Default QA: mobile-staging (dev API). Store: MOTOLINK_BUILD_ENV=mobile-production
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

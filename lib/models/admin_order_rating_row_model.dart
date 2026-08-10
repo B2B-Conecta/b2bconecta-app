@@ -14,6 +14,9 @@ class AdminOrderRatingRowModel {
     required this.aliadoId,
     required this.aliadoName,
     this.checkoutGroupId,
+    this.commentHidden = false,
+    this.commentHiddenAt,
+    this.commentHiddenReason,
   });
 
   final String id;
@@ -30,8 +33,17 @@ class AdminOrderRatingRowModel {
   final String aliadoName;
   final String? checkoutGroupId;
 
+  /// Comentario de texto oculto por moderación (estrellas intactas).
+  final bool commentHidden;
+  final DateTime? commentHiddenAt;
+  final String? commentHiddenReason;
+
   factory AdminOrderRatingRowModel.fromJson(Map<String, dynamic> json) {
     final ans = json['answers'];
+    final hiddenRaw = json['comment_hidden'];
+    final hidden = hiddenRaw is bool
+        ? hiddenRaw
+        : hiddenRaw?.toString().toLowerCase() == 'true';
     return AdminOrderRatingRowModel(
       id: json['id']?.toString() ?? '',
       overallStars: _asInt(json['overall_stars']),
@@ -48,6 +60,11 @@ class AdminOrderRatingRowModel {
       aliadoId: json['aliado_id']?.toString() ?? '',
       aliadoName: json['aliado_name']?.toString() ?? '',
       checkoutGroupId: json['checkout_group_id']?.toString(),
+      commentHidden: hidden || json['comment_hidden_at'] != null,
+      commentHiddenAt: json['comment_hidden_at'] != null
+          ? DateTime.tryParse(json['comment_hidden_at'].toString())
+          : null,
+      commentHiddenReason: json['comment_hidden_reason']?.toString(),
     );
   }
 
@@ -61,4 +78,7 @@ class AdminOrderRatingRowModel {
       raterRole == 'aliado' ? 'Aliado → importador' : 'Importador → aliado';
 
   bool get isBucketV2 => questionnaireVersion == 'bucket_v2';
+
+  bool get hasVisibleComment =>
+      !commentHidden && comment.trim().isNotEmpty;
 }

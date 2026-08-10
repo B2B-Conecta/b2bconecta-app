@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/terms_config.dart';
 import '../models/account_access_status.dart';
 import '../models/kyc_status.dart';
 import '../models/profile_model.dart';
@@ -19,6 +20,7 @@ import 'authorization_status_section.dart';
 import 'media_pick_action_chips.dart';
 import 'profile_section_helpers.dart';
 import 'terms_acceptance_section.dart';
+import 'profile_referral_section.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -70,6 +72,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   late final TextEditingController _ciudadController;
   late final TextEditingController _fiscalAddressController;
   late final TextEditingController _fiscalMapsUrlController;
+  late final TextEditingController _legalContactNameController;
+  late final TextEditingController _legalContactEmailController;
+  late final TextEditingController _legalContactPhoneController;
   late final TextEditingController _emailDisplayController;
   String _role = 'importador';
   bool _saving = false;
@@ -143,11 +148,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   bool get _hasAcceptedTerms => _termsAccepted;
 
-  /// Solo durante el primer registro; oculto si ya aceptó términos vigentes.
-  bool get _showTermsSection =>
-      _requiresTerms &&
-      !_showAliadoKycSection &&
-      !(widget.initial?.hasAcceptedCurrentTerms ?? false);
+  /// Registro inicial: visible aunque ya aceptó (casilla bloqueada + textos).
+  bool get _showTermsSection {
+    if (!_requiresTerms || _showAliadoKycSection) return false;
+    if (_isOnboarding || _showImportadorSubmitSection) return true;
+    return !(widget.initial?.hasAcceptedCurrentTerms ?? false);
+  }
 
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
@@ -172,6 +178,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _fiscalAddressController = TextEditingController(text: i?.direccion ?? '');
     _fiscalMapsUrlController =
         TextEditingController(text: i?.fiscalMapsUrl ?? '');
+    _legalContactNameController =
+        TextEditingController(text: i?.legalContactName ?? '');
+    _legalContactEmailController =
+        TextEditingController(text: i?.legalContactEmail ?? '');
+    _legalContactPhoneController =
+        TextEditingController(text: i?.legalContactPhone ?? '');
     _emailDisplayController = TextEditingController(
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
@@ -217,6 +229,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _ciudadController.dispose();
     _fiscalAddressController.dispose();
     _fiscalMapsUrlController.dispose();
+    _legalContactNameController.dispose();
+    _legalContactEmailController.dispose();
+    _legalContactPhoneController.dispose();
     _emailDisplayController.dispose();
     super.dispose();
   }
@@ -395,6 +410,17 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     );
   }
 
+  bool get _termsPersisted =>
+      widget.initial?.hasAcceptedCurrentTerms ?? false;
+
+  /// Persiste términos solo después de que exista/actualice el perfil en BD.
+  Future<void> _persistAcceptedTermsIfNeeded() async {
+    if (!_requiresTerms) return;
+    if (!_hasAcceptedTerms && !_termsPersisted) return;
+    if (_termsPersisted) return;
+    await SupabaseService.acceptTerms(version: TermsConfig.currentVersion);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_requiresTerms &&
@@ -428,7 +454,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         ciudad: _ciudadController.text,
         direccion: _fiscalAddressController.text,
         fiscalMapsUrl: mapsUrl ?? _fiscalMapsUrlController.text,
+        legalContactName:
+            _isImportadorRole ? _legalContactNameController.text : null,
+        legalContactEmail:
+            _isImportadorRole ? _legalContactEmailController.text : null,
+        legalContactPhone:
+            _isImportadorRole ? _legalContactPhoneController.text : null,
       );
+      await _persistAcceptedTermsIfNeeded();
       await _tryGeocodeAndSaveCoordinates();
       if (!mounted) return;
       widget.onSaved();
@@ -523,7 +556,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         ciudad: _ciudadController.text,
         direccion: _fiscalAddressController.text,
         fiscalMapsUrl: mapsUrl ?? _fiscalMapsUrlController.text,
+        legalContactName:
+            _isImportadorRole ? _legalContactNameController.text : null,
+        legalContactEmail:
+            _isImportadorRole ? _legalContactEmailController.text : null,
+        legalContactPhone:
+            _isImportadorRole ? _legalContactPhoneController.text : null,
       );
+      await _persistAcceptedTermsIfNeeded();
       await _tryGeocodeAndSaveCoordinates();
       if (!mounted) return false;
       widget.onRelatedDataChanged?.call();
@@ -923,6 +963,80 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
               ),
             ],
+            if (_isImportadorRole) ...[
+              const SizedBox(height: 12),
+              ProfileCollapsibleSection(
+                title: 'Referencia legal',
+                subtitle: mobile
+                    ? 'Nombre, correo y teléfono'
+                    : 'Contacto legal de la compañía (obligatorio)',
+                initiallyExpanded: true,
+                infoMessage: mobile
+                    ? null
+                    : 'Datos del responsable o contacto legal. El administrador '
+                        'los revisará al validar su ingreso.',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _legalContactNameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: _fieldDecoration(
+                        'Ej: Dra. Ana Pérez',
+                        label: 'Nombre',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) {
+                        if (!_isImportadorRole) return null;
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Indique el nombre del contacto legal';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _legalContactEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: _fieldDecoration(
+                        'legal@empresa.com',
+                        label: 'Correo',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) {
+                        if (!_isImportadorRole) return null;
+                        final t = v?.trim() ?? '';
+                        if (t.isEmpty) {
+                          return 'Indique el correo del contacto legal';
+                        }
+                        if (!RegExp(r'^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$')
+                            .hasMatch(t)) {
+                          return 'Correo no válido';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _legalContactPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _fieldDecoration(
+                        '+58 412…',
+                        label: 'Teléfono',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) {
+                        if (!_isImportadorRole) return null;
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Indique el teléfono del contacto legal';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (!_requiereUbicacionFiscalCompleta) ...[
               const SizedBox(height: 12),
               ProfileCollapsibleSection(
@@ -945,6 +1059,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             AuthorizationStatusSection(
               key: ValueKey<int>(_authSectionTick),
               profile: widget.initial,
+              termsAcceptedLocally: _hasAcceptedTerms || _termsPersisted,
             ),
           ],
           if (_persistedAsImportador &&
@@ -1008,10 +1123,14 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                       'política de privacidad vigentes antes de usar B2B Conecta.',
             ),
             TermsAcceptanceSection(
-              accepted: _termsAccepted,
+              accepted: _termsAccepted || _termsPersisted,
+              locked: _termsPersisted,
               onAcceptedChanged: (v) {
-                setState(() => _termsAccepted = v);
-                if (v) widget.onTermsAccepted?.call();
+                if (!v) return;
+                setState(() {
+                  _termsAccepted = true;
+                  _authSectionTick++;
+                });
               },
             ),
           ],
@@ -1077,6 +1196,18 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
           ] else
             const SizedBox(height: 16),
+          if (widget.initial != null &&
+              (widget.initial!.isAliado ||
+                  widget.initial!.isImportador ||
+                  widget.initial!.role?.trim().toLowerCase() ==
+                      'administrador')) ...[
+            const SizedBox(height: 8),
+            ProfileReferralSection(
+              profile: widget.initial!,
+              onChanged: widget.onRelatedDataChanged ?? widget.onSaved,
+            ),
+            const SizedBox(height: 8),
+          ],
           if (widget.beforeSignOut != null) ...[
             const SizedBox(height: 12),
             widget.beforeSignOut!,

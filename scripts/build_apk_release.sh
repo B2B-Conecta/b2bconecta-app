@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build MotoLink release APK avoiding broken local proxy (Cursor/VPN leftovers).
+# Build B2B Conecta release APK (proxy disabled for Java/Gradle).
+# Default QA: mobile-staging (dev API). Store: MOTOLINK_BUILD_ENV=mobile-production
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -7,6 +7,7 @@ import '../models/pago_revision_estado.dart';
 import '../models/transaction_request_model.dart';
 import '../models/transaction_request_status.dart';
 import 'admin_promo_campaigns_panel.dart';
+import 'admin_referrals_panel.dart';
 import 'admin_user_monitoring_panel.dart';
 import '../services/encomiendas_report_excel_service.dart';
 import '../utils/excel_file_export.dart';
@@ -1036,6 +1037,11 @@ class _AdminEncomiendasReportPanelState
           label: Text('Usuarios'),
           icon: Icon(Icons.people_outline, size: 18),
         ),
+        const ButtonSegment(
+          value: 3,
+          label: Text('Referidos'),
+          icon: Icon(Icons.share_outlined, size: 18),
+        ),
       ],
       selected: {_sectionIndex},
       onSelectionChanged: (s) => setState(() => _sectionIndex = s.first),
@@ -1066,6 +1072,19 @@ class _AdminEncomiendasReportPanelState
             child: _sectionSwitcher(),
           ),
           const Expanded(child: AdminUserMonitoringPanel()),
+        ],
+      );
+    }
+
+    if (_sectionIndex == 3) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _sectionSwitcher(),
+          ),
+          const Expanded(child: AdminReferralsPanel()),
         ],
       );
     }

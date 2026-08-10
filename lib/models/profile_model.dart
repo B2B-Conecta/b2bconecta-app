@@ -48,6 +48,9 @@ class ProfileModel {
     this.acceptedPagoMetodos,
     this.pagoMetodoInstrucciones = const {},
     this.pagoSoloDivisas = false,
+    this.referralCode,
+    this.referredByProfileId,
+    this.referredAt,
   });
 
   final String id;
@@ -157,6 +160,14 @@ class ProfileModel {
 
   /// Importador: solo pagos en divisas/USD; sin descuento línea USD en productos.
   final bool pagoSoloDivisas;
+
+  /// Código único de invitación (`profiles.referral_code`).
+  final String? referralCode;
+
+  /// Quién refirió a este usuario (`profiles.referred_by_profile_id`).
+  final String? referredByProfileId;
+
+  final DateTime? referredAt;
 
   /// Métodos visibles para aliados según configuración del importador.
   List<String> get effectiveAcceptedPagoMetodos =>
@@ -361,6 +372,11 @@ class ProfileModel {
       pagoMetodoInstrucciones:
           PagoMetodoInstrucciones.parseMap(json['pago_metodo_instrucciones']),
       pagoSoloDivisas: _parseBool(json['pago_solo_divisas']),
+      referralCode: _text(json['referral_code']),
+      referredByProfileId: _text(json['referred_by_profile_id']),
+      referredAt: json['referred_at'] != null
+          ? DateTime.tryParse(json['referred_at'].toString())
+          : null,
     );
   }
 

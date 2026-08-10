@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_scaffold_messenger.dart';
+import '../auth/referral_invite_storage.dart';
+import '../config/referral_invite_config.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
@@ -25,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _referralController = TextEditingController();
   _AuthMode _mode = _AuthMode.login;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -39,6 +42,20 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) _showSnackBar(msg, isError: true);
       });
     }
+    _bootstrapReferralFromUrl();
+  }
+
+  Future<void> _bootstrapReferralFromUrl() async {
+    final fromUrl = ReferralInviteConfig.codeFromUri(Uri.base);
+    final pending = await ReferralInviteStorage.peekPendingCode();
+    final code = fromUrl ?? pending;
+    if (code == null || code.isEmpty) return;
+    await ReferralInviteStorage.savePendingCode(code);
+    if (!mounted) return;
+    setState(() {
+      _referralController.text = code;
+      if (fromUrl != null) _mode = _AuthMode.register;
+    });
   }
 
   @override
@@ -46,6 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
 
@@ -126,9 +144,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final referral =
+          ReferralInviteConfig.normalizeCode(_referralController.text);
+      if (referral.isNotEmpty) {
+        await ReferralInviteStorage.savePendingCode(referral);
+      }
       final res = await AuthService.signUpWithPassword(
         email: email,
         password: password,
+        referralCode: referral.isEmpty ? null : referral,
       );
       if (!mounted) return;
       if (res.session != null) {
@@ -256,8 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: _confirmPasswordController,
               obscureText: _obscureConfirm,
               autofillHints: const [AutofillHints.newPassword],
-              textInputAction: TextInputAction.done,
-              onSubmitted: !_isLoading ? (_) => _register() : null,
+              textInputAction: TextInputAction.next,
               decoration: _inputDecoration(
                 hint: 'Confirmar contraseña',
                 prefixIcon: Icons.lock_outlined,
@@ -272,6 +295,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     setState(() => _obscureConfirm = !_obscureConfirm);
                   },
                 ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _referralController,
+              textCapitalization: TextCapitalization.characters,
+              textInputAction: TextInputAction.done,
+              onSubmitted: !_isLoading ? (_) => _register() : null,
+              decoration: _inputDecoration(
+                hint: 'Código de referido (opcional)',
+                prefixIcon: Icons.card_giftcard_outlined,
               ),
             ),
           ],

@@ -20,6 +20,7 @@ import 'authorization_status_section.dart';
 import 'media_pick_action_chips.dart';
 import 'profile_section_helpers.dart';
 import 'terms_acceptance_section.dart';
+import 'profile_referral_section.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -1195,6 +1196,18 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
           ] else
             const SizedBox(height: 16),
+          if (widget.initial != null &&
+              (widget.initial!.isAliado ||
+                  widget.initial!.isImportador ||
+                  widget.initial!.role?.trim().toLowerCase() ==
+                      'administrador')) ...[
+            const SizedBox(height: 8),
+            ProfileReferralSection(
+              profile: widget.initial!,
+              onChanged: widget.onRelatedDataChanged ?? widget.onSaved,
+            ),
+            const SizedBox(height: 8),
+          ],
           if (widget.beforeSignOut != null) ...[
             const SizedBox(height: 12),
             widget.beforeSignOut!,

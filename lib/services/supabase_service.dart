@@ -26,7 +26,9 @@ import '../models/aliado_pago_frecuente_model.dart';
 import '../models/pedidos_suspendidos_morosidad_exception.dart';
 import '../models/profile_document_model.dart';
 import '../models/admin_order_rating_row_model.dart';
+import '../auth/referral_invite_storage.dart';
 import '../models/admin_user_activity_row_model.dart';
+import '../models/admin_referral_row_model.dart';
 import '../models/aliado_received_rating_model.dart';
 import '../models/importador_received_rating_model.dart';
 import '../models/reputation_weekly_snapshot_model.dart';
@@ -524,6 +526,14 @@ class SupabaseService {
         ...payload,
         'role': requestedRole,
       });
+      final pendingReferral = await ReferralInviteStorage.consumePendingCode();
+      if (pendingReferral != null && pendingReferral.isNotEmpty) {
+        try {
+          await applyReferralCode(pendingReferral);
+        } catch (_) {
+          // Código inválido o ya aplicado vía metadata de Auth: no bloquear el alta.
+        }
+      }
     } else {
       await _client.from('profiles').update(payload).eq('id', uid);
     }
@@ -3390,6 +3400,60 @@ class SupabaseService {
         .toList();
   }
 
+  /// Aplica código de referido una sola vez (RPC `profile_apply_referral_code`).
+  static Future<void> applyReferralCode(String code) async {
+    final c = code.trim().toUpperCase();
+    if (c.isEmpty) {
+      throw ArgumentError('Indique un código de referido.');
+    }
+    await _client.rpc(
+      'profile_apply_referral_code',
+      params: <String, dynamic>{'p_code': c},
+    );
+  }
+
+  /// Admin: ranking de referidos.
+  static Future<List<AdminReferralStatRowModel>> listAdminReferralStats({
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_referral_stats',
+      params: <String, dynamic>{
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AdminReferralStatRowModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  /// Admin: usuarios referidos por un perfil.
+  static Future<List<AdminReferredUserRowModel>> listAdminReferredUsers({
+    required String referrerId,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_referred_users',
+      params: <String, dynamic>{
+        'p_referrer_id': referrerId.trim(),
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => AdminReferredUserRowModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
   /// C4: expediente admin — valoraciones con nombres reales (RPC `list_admin_order_ratings`).
   static Future<List<AdminOrderRatingRowModel>> listAdminOrderRatings({
     String? importadorId,
@@ -3432,6 +3496,34 @@ class SupabaseService {
         'p_rating_id': id,
         'p_hidden': hidden,
         'p_reason': reason?.trim().isEmpty == true ? null : reason?.trim(),
+      },
+    );
+  }
+
+  /// Admin registra valoración en nombre del usuario (solo si aún no calificó).
+  static Future<void> adminSubmitOrderRating({
+    required String raterRole,
+    required String transactionRequestId,
+    required int stars,
+    required String comment,
+    Map<String, dynamic> answers = const {},
+  }) async {
+    final role = raterRole.trim().toLowerCase();
+    final id = transactionRequestId.trim();
+    if (role != 'aliado' && role != 'importador') {
+      throw ArgumentError('Rol de valoración inválido');
+    }
+    if (id.isEmpty) {
+      throw ArgumentError('Pedido requerido');
+    }
+    await _client.rpc(
+      'admin_submit_order_rating',
+      params: <String, dynamic>{
+        'p_rater_role': role,
+        'p_request_id': id,
+        'p_stars': stars,
+        'p_comment': comment.trim(),
+        'p_answers': answers,
       },
     );
   }
@@ -3637,18 +3729,39 @@ class SupabaseService {
   }) async {
     final uid = _currentUserId;
     if (uid == null) return false;
+    return orderRatingExistsForRater(
+      raterRole: 'importador',
+      importadorId: uid,
+      aliadoId: aliadoId,
+      checkoutGroupId: checkoutGroupId,
+      transactionRequestId: transactionRequestId,
+    );
+  }
+
+  /// Comprueba si ya hay valoración de [raterRole] para el par en carrito/línea.
+  static Future<bool> orderRatingExistsForRater({
+    required String raterRole,
+    required String importadorId,
+    required String aliadoId,
+    String? checkoutGroupId,
+    String? transactionRequestId,
+  }) async {
+    final role = raterRole.trim().toLowerCase();
+    final imp = importadorId.trim();
+    final ali = aliadoId.trim();
+    if (imp.isEmpty || ali.isEmpty) return false;
     final cg = checkoutGroupId?.trim();
     dynamic q = _client
         .from('order_ratings')
         .select('id')
-        .eq('rater_role', 'importador')
-        .eq('importador_id', uid)
-        .eq('aliado_id', aliadoId.trim());
+        .eq('rater_role', role)
+        .eq('importador_id', imp)
+        .eq('aliado_id', ali);
     if (cg != null && cg.isNotEmpty) {
       q = q.eq('checkout_group_id', cg);
     } else if (transactionRequestId != null &&
-        transactionRequestId.isNotEmpty) {
-      q = q.eq('transaction_request_id', transactionRequestId);
+        transactionRequestId.trim().isNotEmpty) {
+      q = q.eq('transaction_request_id', transactionRequestId.trim());
     } else {
       return false;
     }

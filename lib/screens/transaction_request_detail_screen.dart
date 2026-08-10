@@ -15,6 +15,7 @@ import '../utils/aliado_order_grouping.dart';
 import '../utils/order_flow_copy/order_actions_flow_copy.dart';
 import '../utils/order_flow_copy/order_vocab.dart';
 import '../utils/order_pickup_flow_copy.dart';
+import '../utils/order_rating_eligibility.dart';
 import '../widgets/order_card_collapsible_layout.dart';
 import '../widgets/order_commission_summary.dart';
 import '../widgets/transaction_request_admin_sections.dart';
@@ -491,6 +492,15 @@ class _TransactionRequestDetailScreenState
         break;
       }
     }
+    if (expLine == null && isAdmin) {
+      for (final x in lines) {
+        if (lineaElegibleValoracionAliado(x) ||
+            lineaElegibleValoracionImportador(x)) {
+          expLine = x;
+          break;
+        }
+      }
+    }
 
     final out = <Widget>[
       if (isAliado) ...[
@@ -570,12 +580,30 @@ class _TransactionRequestDetailScreenState
             title: 'Valoración del aliado',
             subtitle: expLine.aliadoExperienceStars != null
                 ? '${expLine.aliadoExperienceStars}/5 post-entrega'
-                : 'Comentario registrado',
+                : (expLine.aliadoExperienceSubmittedAt != null
+                    ? 'Comentario registrado'
+                    : 'Pendiente — admin puede registrar'),
             child: TransactionRequestAliadoExperienceAdminSection(
               request: expLine,
               hideSectionTitle: true,
+              onMutated: () => setState(() {
+                _future = _loadDetail();
+              }),
             ),
           ),
+          if (lineaElegibleValoracionImportador(expLine)) ...[
+            const SizedBox(height: kOrderCardSectionGap),
+            OrderCardCollapsibleSection(
+              title: 'Valoración del mayorista',
+              subtitle: 'Al aliado de este pedido',
+              child: TransactionRequestImporterRatingAdminSection(
+                request: expLine,
+                onMutated: () => setState(() {
+                  _future = _loadDetail();
+                }),
+              ),
+            ),
+          ],
         ],
       ],
       if (_showPickupSection(refLine)) ...[

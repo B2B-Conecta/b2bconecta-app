@@ -6,6 +6,7 @@ import '../models/transaction_request_status.dart';
 import '../theme/app_theme.dart';
 import '../utils/admin_order_panel_utils.dart';
 import '../utils/importer_order_date.dart';
+import '../utils/order_rating_eligibility.dart';
 import 'importer_order_date_badge.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'courier_timeline_widget.dart';
@@ -226,7 +227,10 @@ class AdminExpandableOrderCard extends StatelessWidget {
                     ),
                   ),
                   if (isCheckoutGroup)
-                    AdminCheckoutGroupMasterHeader(lines: lines)
+                    AdminCheckoutGroupMasterHeader(
+                      lines: lines,
+                      onMutated: onRequestMutated,
+                    )
                   else ...[
                     OrderCardCollapsibleSection(
                       title: 'Partes del pedido',
@@ -279,16 +283,32 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (r.aliadoExperienceSubmittedAt != null) ...[
+                    if (r.aliadoExperienceSubmittedAt != null ||
+                        lineaElegibleValoracionAliado(r)) ...[
                       const SizedBox(height: kOrderCardSectionGap),
                       OrderCardCollapsibleSection(
                         title: 'Valoración del aliado',
                         subtitle: r.aliadoExperienceStars != null
                             ? '${r.aliadoExperienceStars}/5 post-entrega'
-                            : 'Comentario registrado',
+                            : (r.aliadoExperienceSubmittedAt != null
+                                ? 'Comentario registrado'
+                                : 'Pendiente — admin puede registrar'),
                         child: TransactionRequestAliadoExperienceAdminSection(
                           request: r,
                           hideSectionTitle: true,
+                          onMutated: onRequestMutated,
+                        ),
+                      ),
+                    ],
+                    if (lineaElegibleValoracionImportador(r) ||
+                        r.aliadoExperienceSubmittedAt != null) ...[
+                      const SizedBox(height: kOrderCardSectionGap),
+                      OrderCardCollapsibleSection(
+                        title: 'Valoración del mayorista',
+                        subtitle: 'Al aliado de este pedido',
+                        child: TransactionRequestImporterRatingAdminSection(
+                          request: r,
+                          onMutated: onRequestMutated,
                         ),
                       ),
                     ],

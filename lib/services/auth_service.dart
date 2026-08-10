@@ -50,11 +50,16 @@ class AuthService {
   static Future<AuthResponse> signUpWithPassword({
     required String email,
     required String password,
+    String? referralCode,
   }) {
+    final code = referralCode?.trim().toUpperCase();
     return _auth.signUp(
       email: email.trim(),
       password: password,
       emailRedirectTo: authRedirectUrl,
+      data: (code != null && code.isNotEmpty)
+          ? <String, dynamic>{'referral_code': code}
+          : null,
     );
   }
 

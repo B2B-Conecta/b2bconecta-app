@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/terms_config.dart';
 import '../models/account_access_status.dart';
 import '../models/aliado_doc_type.dart';
 import '../models/profile_model.dart';
@@ -216,6 +217,14 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     }
     setState(() => _submittingReview = true);
     try {
+      // Términos: solo locales en la casilla; persistir tras guardar perfil.
+      if (_termsAccepted &&
+          !(widget.profile?.hasAcceptedCurrentTerms ?? false)) {
+        await SupabaseService.acceptTerms(
+          version: TermsConfig.currentVersion,
+        );
+        widget.onTermsAccepted?.call();
+      }
       await SupabaseService.profileSubmitKycForReview();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -460,20 +469,26 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
           ...requiredTypes.map(_buildDocTile),
         ],
         if (widget._isAliado &&
-            !(widget.profile?.hasAcceptedCurrentTerms ?? false)) ...[
+            (widget.profile?.accountAccessStatus?.trim() !=
+                    AccountAccessStatus.active ||
+                !(widget.profile?.hasAcceptedCurrentTerms ?? false) ||
+                !_termsAccepted)) ...[
           const SizedBox(height: 12),
           const ProfileSectionHeader(
             label: 'TÉRMINOS LEGALES',
             infoTitle: 'Términos y privacidad',
             infoMessage:
                 'Debe aceptar los términos y la política de privacidad vigentes '
-                'antes de enviar el registro inicial a revisión.',
+                'antes de enviar el registro inicial a revisión. Se registran '
+                'al guardar el perfil o al enviar la solicitud.',
           ),
           TermsAcceptanceSection(
-            accepted: _termsAccepted,
+            accepted: _termsAccepted ||
+                (widget.profile?.hasAcceptedCurrentTerms ?? false),
+            locked: widget.profile?.hasAcceptedCurrentTerms ?? false,
             onAcceptedChanged: (v) {
-              setState(() => _termsAccepted = v);
-              if (v) widget.onTermsAccepted?.call();
+              if (!v) return;
+              setState(() => _termsAccepted = true);
             },
           ),
         ],

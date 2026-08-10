@@ -14,9 +14,13 @@ class AuthorizationStatusSection extends StatefulWidget {
   const AuthorizationStatusSection({
     super.key,
     required this.profile,
+    this.termsAcceptedLocally = false,
   });
 
   final ProfileModel? profile;
+
+  /// Casilla marcada en el formulario aún no reflejada en [profile].
+  final bool termsAcceptedLocally;
 
   @override
   State<AuthorizationStatusSection> createState() =>
@@ -61,7 +65,10 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
 
     final role = p.role?.trim().toLowerCase();
     if (role == 'importador') {
-      return _ImportadorAuthorizationCard(profile: p);
+      return _ImportadorAuthorizationCard(
+        profile: p,
+        termsAcceptedLocally: widget.termsAcceptedLocally,
+      );
     }
     if (role == 'aliado') {
       return FutureBuilder<List<ProfileDocumentModel>>(
@@ -91,9 +98,13 @@ class _AuthorizationStatusSectionState extends State<AuthorizationStatusSection>
 }
 
 class _ImportadorAuthorizationCard extends StatelessWidget {
-  const _ImportadorAuthorizationCard({required this.profile});
+  const _ImportadorAuthorizationCard({
+    required this.profile,
+    this.termsAcceptedLocally = false,
+  });
 
   final ProfileModel profile;
+  final bool termsAcceptedLocally;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +112,8 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
     final accessOk = profile.hasActiveAccountAccess;
     final access = profile.accountAccessStatus?.trim();
     final termsOk = !profile.requiresTermsAcceptance ||
-        profile.hasAcceptedCurrentTerms;
+        profile.hasAcceptedCurrentTerms ||
+        termsAcceptedLocally;
 
     final perfilLabelEs = complete
         ? 'Perfil B2B completo.'

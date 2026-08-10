@@ -72,8 +72,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
     try {
       await AuthService.updatePassword(_newPasswordController.text);
       if (!mounted) return;
-      await AuthRecoveryStorage.clearPendingPasswordRecovery();
-      if (!mounted) return;
+      // No limpiar el flag de recovery aquí: si AuthGate remounta (web) con
+      // sesión aún activa, el usuario caería en ProfileGate / registro.
+      // signOut() limpia el flag y la sesión juntos.
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -121,6 +122,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
   }
 
   Future<void> _cancelRecovery() async {
+    await AuthRecoveryStorage.clearPendingPasswordRecovery();
     await AuthService.signOut();
   }
 

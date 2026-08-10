@@ -113,6 +113,13 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _bootstrapWithoutCallback(expectAuthCallback: false);
     }
 
+    // Sesión ya creada por detectSessionInUri + flag local (p. ej. remount web).
+    if (!_awaitingPasswordRecovery &&
+        Supabase.instance.client.auth.currentSession != null &&
+        await AuthRecoveryStorage.peekPendingPasswordRecovery()) {
+      _awaitingPasswordRecovery = true;
+    }
+
     if (mounted) {
       setState(() => _bootstrapping = false);
     }
@@ -226,9 +233,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           await AuthRecoveryStorage.peekPendingPasswordRecovery();
 
       if (pendingRecovery && session != null) {
+        // Persistir hasta que el usuario guarde la nueva contraseña (o cancele).
+        // En web, limpiar la URL puede remountar AuthGate; el flag local evita
+        // que entre al panel con la sesión de recuperación.
         _awaitingPasswordRecovery = true;
+        await AuthRecoveryStorage.markPendingPasswordRecovery();
       } else if (session != null) {
         await AuthRecoveryStorage.clearPendingPasswordRecovery();
+        _awaitingPasswordRecovery = false;
       }
 
       if (!mounted) return;
@@ -273,7 +285,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _awaitingPasswordRecovery = true;
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
-      unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
+      // No limpiar el flag aquí: debe sobrevivir remounts hasta updatePassword.
+      unawaited(AuthRecoveryStorage.markPendingPasswordRecovery());
       _applyAuthState(data);
       return;
     }
@@ -286,6 +299,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _awaitingPasswordRecovery = false;
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
+      unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
       _applyAuthState(data);
       // Cerrar ajustes/perfil apilados para mostrar login de inmediato.
       WidgetsBinding.instance.addPostFrameCallback((_) {

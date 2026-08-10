@@ -368,6 +368,12 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       if (p.direccion?.trim().isNotEmpty == true) p.direccion!.trim(),
     ].where((s) => s.trim().isNotEmpty).toList();
 
+    final legalName = p.legalContactName?.trim();
+    final legalEmail = p.legalContactEmail?.trim();
+    final legalPhone = p.legalContactPhone?.trim();
+    final hasLegal = p.hasLegalContact;
+    final termsOk = p.hasAcceptedCurrentTerms;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -406,6 +412,74 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
             ),
           ),
         ],
+        const SizedBox(height: 12),
+        Text(
+          'Referencia legal',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.borderSubtle),
+            borderRadius: BorderRadius.circular(8),
+            color: AppColors.brandBlueContainer,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: hasLegal
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        legalName!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        legalEmail!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        legalPhone!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    'Sin referencia legal completa.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          termsOk
+              ? 'Términos y privacidad: aceptados'
+              : 'Términos y privacidad: pendientes',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: termsOk ? AppColors.successGreen : AppColors.textSecondary,
+          ),
+        ),
         if (p.accountReviewNote?.trim().isNotEmpty == true) ...[
           const SizedBox(height: 8),
           Text(

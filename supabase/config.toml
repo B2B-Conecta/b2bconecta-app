@@ -220,20 +220,20 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# SMTP B2B Conecta (Gmail). Por defecto OFF en local → correos en Inbucket
-# (http://127.0.0.1:54324). Para enviar de verdad en local:
-#   1) Copiar config/smtp.env.example → config/smtp.env (App Password)
-#   2) Descomentar este bloque
-#   3) set -a && source config/smtp.env && set +a && supabase stop && supabase start
+# SMTP B2B Conecta (Gmail). Con este bloque ON, Auth local envía correo real.
+# Requiere variables de config/smtp.env al arrancar:
+#   set -a && source config/smtp.env && set +a && supabase stop && supabase start
+#   (o: bash scripts/restart_supabase_local_smtp.sh)
+# Para volver a Mailpit/Inbucket (http://127.0.0.1:54324): comentar este bloque y reiniciar.
 # Remoto (dev/main): bash scripts/configure_supabase_smtp.sh staging|production
-# [auth.email.smtp]
-# enabled = true
-# host = "env(SMTP_HOST)"
-# port = 587
-# user = "env(SMTP_USER)"
-# pass = "env(SMTP_PASS)"
-# admin_email = "env(SMTP_ADMIN_EMAIL)"
-# sender_name = "env(SMTP_SENDER_NAME)"
+[auth.email.smtp]
+enabled = true
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_ADMIN_EMAIL)"
+sender_name = "env(SMTP_SENDER_NAME)"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

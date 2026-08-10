@@ -2,28 +2,31 @@ import 'package:flutter/material.dart';
 
 import '../config/privacy_policy_config.dart';
 import '../config/terms_config.dart';
-import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 
 /// Aceptación de términos y política de privacidad en registro inicial (aliado / importador).
-class LegalAcceptanceSection extends StatefulWidget {
+///
+/// La casilla solo marca intención local. La persistencia (`profile_accept_terms`)
+/// ocurre al guardar el perfil. Se bloquea únicamente cuando [locked] es true
+/// (aceptación ya guardada en BD).
+class LegalAcceptanceSection extends StatelessWidget {
   const LegalAcceptanceSection({
     super.key,
     required this.accepted,
     required this.onAcceptedChanged,
+    this.locked = false,
   });
 
+  /// Marcada en UI (local y/o persistida).
   final bool accepted;
+
+  /// True cuando la aceptación ya está en `profiles` (versión vigente).
+  final bool locked;
+
   final ValueChanged<bool> onAcceptedChanged;
 
-  @override
-  State<LegalAcceptanceSection> createState() => _LegalAcceptanceSectionState();
-}
-
-class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
-  bool _busy = false;
-
-  Future<void> _showLegalSheet({
+  Future<void> _showLegalSheet(
+    BuildContext context, {
     required String title,
     required String body,
   }) async {
@@ -76,35 +79,19 @@ class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
     );
   }
 
-  Future<void> _onToggle(bool? value) async {
-    if (_busy || value == null || value == widget.accepted) return;
-
-    if (!value) {
-      widget.onAcceptedChanged(false);
-      return;
-    }
-
-    setState(() => _busy = true);
-    try {
-      await SupabaseService.acceptTerms(version: TermsConfig.currentVersion);
-      if (!mounted) return;
-      widget.onAcceptedChanged(true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo registrar la aceptación: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  void _onToggle(bool? value) {
+    if (locked || value == null) return;
+    // Solo se puede aceptar (no retirar desde aquí una vez persistido).
+    if (!value) return;
+    if (accepted) return;
+    onAcceptedChanged(true);
   }
 
   TextStyle _baseStyle() => TextStyle(
         fontSize: 13,
         height: 1.35,
-        color:
-            widget.accepted ? AppColors.successGreen : AppColors.textPrimary,
-        fontWeight: widget.accepted ? FontWeight.w600 : FontWeight.w400,
+        color: accepted ? AppColors.successGreen : AppColors.textPrimary,
+        fontWeight: accepted ? FontWeight.w600 : FontWeight.w400,
       );
 
   static const _linkStyle = TextStyle(
@@ -115,7 +102,7 @@ class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
     decoration: TextDecoration.underline,
   );
 
-  Widget _link(String label, VoidCallback onTap) {
+  Widget _link(BuildContext context, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -127,53 +114,73 @@ class _LegalAcceptanceSectionState extends State<LegalAcceptanceSection> {
 
   @override
   Widget build(BuildContext context) {
-    final accepted = widget.accepted;
-
     return Align(
       alignment: Alignment.centerLeft,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _busy
-              ? const Padding(
-                  padding: EdgeInsets.only(left: 4, top: 6),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : Checkbox(
-                  value: accepted,
-                  onChanged: _busy ? null : _onToggle,
-                  activeColor: AppColors.brand,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                ),
+          Checkbox(
+            value: accepted,
+            onChanged: locked ? null : _onToggle,
+            activeColor: AppColors.brand,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),
-              child: Wrap(
-                alignment: WrapAlignment.start,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _plain('Acepto los '),
-                  _link(
-                    'términos y condiciones',
-                    () => _showLegalSheet(
-                      title: TermsConfig.title,
-                      body: TermsConfig.body,
-                    ),
+                  Wrap(
+                    alignment: WrapAlignment.start,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _plain('Acepto los '),
+                      _link(
+                        context,
+                        'términos y condiciones',
+                        () => _showLegalSheet(
+                          context,
+                          title: TermsConfig.title,
+                          body: TermsConfig.body,
+                        ),
+                      ),
+                      _plain(' y la '),
+                      _link(
+                        context,
+                        'política de privacidad',
+                        () => _showLegalSheet(
+                          context,
+                          title: PrivacyPolicyConfig.title,
+                          body: PrivacyPolicyConfig.body,
+                        ),
+                      ),
+                      _plain(' de B2B Conecta.'),
+                    ],
                   ),
-                  _plain(' y la '),
-                  _link(
-                    'política de privacidad',
-                    () => _showLegalSheet(
-                      title: PrivacyPolicyConfig.title,
-                      body: PrivacyPolicyConfig.body,
+                  if (locked) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Aceptación registrada. Puede consultar los textos; '
+                      'no es posible retirar el consentimiento desde aquí.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.3,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  _plain(' de B2B Conecta.'),
+                  ] else if (accepted) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Marcado. Se registrará al guardar el perfil.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.3,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

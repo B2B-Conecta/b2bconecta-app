@@ -461,6 +461,9 @@ class SupabaseService {
     String? ciudad,
     String? direccion,
     String? fiscalMapsUrl,
+    String? legalContactName,
+    String? legalContactEmail,
+    String? legalContactPhone,
   }) async {
     final uid = _currentUserId;
     if (uid == null) {
@@ -492,6 +495,15 @@ class SupabaseService {
     payload['ciudad'] = (ci == null || ci.isEmpty) ? null : ci;
     final dir = direccion?.trim();
     payload['direccion'] = (dir == null || dir.isEmpty) ? null : dir;
+
+    if (requestedRole == 'importador') {
+      final ln = legalContactName?.trim();
+      final le = legalContactEmail?.trim();
+      final lp = legalContactPhone?.trim();
+      payload['legal_contact_name'] = (ln == null || ln.isEmpty) ? null : ln;
+      payload['legal_contact_email'] = (le == null || le.isEmpty) ? null : le;
+      payload['legal_contact_phone'] = (lp == null || lp.isEmpty) ? null : lp;
+    }
 
     final fmu = normalizeHttpUrl(fiscalMapsUrl);
     if (fmu != null) {

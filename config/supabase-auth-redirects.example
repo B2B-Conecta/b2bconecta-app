@@ -1,10 +1,14 @@
 # Supabase Dashboard → Authentication → URL Configuration
 #
+# Keep ALL of these Redirect URLs enabled on each project so web recovery
+# can use the current browser origin (Uri.base.origin) for PKCE.
+#
 # === MAIN (b2bconecta-db / fzugzjcwdzcwfxgviltw) — production ===
 # Site URL:
 #   https://www.b2bconecta.com.ve
-# Redirect URLs:
+# Redirect URLs (keep enabled):
 #   https://www.b2bconecta.com.ve/**
+#   https://b2bconecta-app-git-dev-b2bconecta.vercel.app/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
 #   com.carlosf12.motolinkProApp://auth-callback
@@ -12,8 +16,9 @@
 # === DEV (b2bconecta-db-dev / kdrccmqcrruixuworlmz) — data de trabajo ===
 # Site URL (Vercel branch `dev`):
 #   https://b2bconecta-app-git-dev-b2bconecta.vercel.app
-# Redirect URLs:
+# Redirect URLs (keep enabled):
 #   https://b2bconecta-app-git-dev-b2bconecta.vercel.app/**
+#   https://www.b2bconecta.com.ve/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
 #   com.carlosf12.motolinkProApp://auth-callback
@@ -25,6 +30,6 @@
 # Ver config/smtp.env.example
 #
 # Password recovery on web uses PKCE: open the email link in the SAME browser
-# where "Forgot password" was clicked.
+# (and same origin) where "Forgot password" was clicked.
 #
 # Ver config/ENVIRONMENTS.md

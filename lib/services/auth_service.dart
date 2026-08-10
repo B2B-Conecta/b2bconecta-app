@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/auth_recovery_storage.dart';
+import '../config/auth_redirect_config.dart';
 import 'push_notification_service.dart';
 
 /// Operaciones de Supabase Auth (login, registro, recuperación, actualización).
@@ -10,11 +12,30 @@ class AuthService {
 
   static GoTrueClient get _auth => Supabase.instance.client.auth;
 
-  /// URL post-auth (recovery, confirmación de registro). Ver `.env` → `SUPABASE_AUTH_REDIRECT_URL`.
+  /// Redirect post-auth (recovery / confirmación).
+  ///
+  /// En **web** usa el origen actual ([Uri.base.origin]) para que el correo
+  /// vuelva a la misma app donde se pidió el enlace (localhost, Vercel o prod).
+  /// Ese origen debe estar en Supabase Auth → Redirect URLs
+  /// (`config/supabase-auth-redirects.example`).
+  ///
+  /// En **móvil** usa `.env` → `SUPABASE_AUTH_REDIRECT_URL` (deep link).
   static String? get authRedirectUrl {
+    if (kIsWeb) {
+      final origin = Uri.base.origin.trim();
+      if (origin.isNotEmpty && origin != 'null') return origin;
+    }
     final redirect = dotenv.env['SUPABASE_AUTH_REDIRECT_URL']?.trim();
     return redirect != null && redirect.isNotEmpty ? redirect : null;
   }
+
+  /// Orígenes web conocidos (dev / prod / local) — referencia; allow-list en Dashboard.
+  static List<String> get knownWebRedirectOrigins => [
+        AuthRedirectConfig.stagingWebRedirectUrl,
+        AuthRedirectConfig.productionWebRedirectUrl,
+        AuthRedirectConfig.localWebRedirectUrl,
+        'http://127.0.0.1:3000',
+      ];
 
   static Future<AuthResponse> signInWithPassword({
     required String email,
@@ -37,7 +58,7 @@ class AuthService {
     );
   }
 
-  /// [redirectTo] opcional vía `.env` → `SUPABASE_AUTH_REDIRECT_URL` (URL de tu app web o deep link).
+  /// Recovery: [redirectTo] = origen web actual o deep link móvil.
   static Future<void> resetPasswordForEmail(String email) async {
     await AuthRecoveryStorage.markPendingPasswordRecovery();
     await _auth.resetPasswordForEmail(

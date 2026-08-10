@@ -9,7 +9,12 @@ import '../utils/rating_scale_labels.dart';
 import 'aliado_order_experience_display.dart';
 import 'order_rating_form.dart';
 
-enum _AdminRatingFilter { all, aliadoRatesImporter, importerRatesAliado }
+enum _AdminRatingFilter {
+  all,
+  aliadoRatesImporter,
+  importerRatesAliado,
+  commentHidden,
+}
 
 /// C4: expediente admin — listado de valoraciones con nombres reales.
 class AdminOrderRatingsPanel extends StatefulWidget {
@@ -50,7 +55,112 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         return _rows.where((r) => r.raterRole == 'aliado').toList();
       case _AdminRatingFilter.importerRatesAliado:
         return _rows.where((r) => r.raterRole == 'importador').toList();
+      case _AdminRatingFilter.commentHidden:
+        return _rows.where((r) => r.commentHidden).toList();
     }
+  }
+
+  Future<void> _setCommentHidden(
+    AdminOrderRatingRowModel row, {
+    required bool hidden,
+  }) async {
+    String? reason;
+    if (hidden) {
+      reason = await _promptHideReason();
+      if (reason == null) return;
+    } else {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Restaurar comentario'),
+          content: const Text(
+            'El texto volverá a mostrarse en reputación pública. '
+            'Las estrellas no se modifican.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Restaurar'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+
+    try {
+      await SupabaseService.adminSetOrderRatingCommentHidden(
+        ratingId: row.id,
+        hidden: hidden,
+        reason: reason,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hidden
+                ? 'Comentario ocultado. Las estrellas se mantienen.'
+                : 'Comentario restaurado.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo moderar: $e'),
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<String?> _promptHideReason() async {
+    final controller = TextEditingController();
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ocultar comentario'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'El texto dejará de verse en reputación. '
+              'Las estrellas y el promedio no cambian.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Motivo (opcional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Ocultar'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return res;
   }
 
   Future<void> _load() async {
@@ -188,6 +298,13 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
                 child: _AdminOrderRatingCard(
                   row: r,
                   questionnaire: _questionnaireFor(r),
+                  onHideComment: (!r.commentHidden &&
+                          r.comment.trim().isNotEmpty)
+                      ? () => _setCommentHidden(r, hidden: true)
+                      : null,
+                  onRestoreComment: r.commentHidden
+                      ? () => _setCommentHidden(r, hidden: false)
+                      : null,
                 ),
               ),
             ),
@@ -287,6 +404,13 @@ class _AdminRatingsToolbar extends StatelessWidget {
                 onTap: () =>
                     onFilterChanged(_AdminRatingFilter.importerRatesAliado),
               ),
+              const SizedBox(width: 6),
+              _filterChip(
+                label: 'Ocultos',
+                selected: filter == _AdminRatingFilter.commentHidden,
+                onTap: () =>
+                    onFilterChanged(_AdminRatingFilter.commentHidden),
+              ),
             ],
           ),
         ),
@@ -323,10 +447,14 @@ class _AdminOrderRatingCard extends StatefulWidget {
   const _AdminOrderRatingCard({
     required this.row,
     required this.questionnaire,
+    this.onHideComment,
+    this.onRestoreComment,
   });
 
   final AdminOrderRatingRowModel row;
   final RatingQuestionnaireModel questionnaire;
+  final VoidCallback? onHideComment;
+  final VoidCallback? onRestoreComment;
 
   @override
   State<_AdminOrderRatingCard> createState() => _AdminOrderRatingCardState();
@@ -347,13 +475,19 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
         ? AppColors.brandAccent
         : AppColors.successGreen;
     final accentBg = accent.withOpacity(0.14);
+    final canModerate =
+        widget.onHideComment != null || widget.onRestoreComment != null;
 
     return Material(
       color: AppColors.card,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderSubtle),
+        side: BorderSide(
+          color: r.commentHidden
+              ? Colors.orange.shade300
+              : AppColors.borderSubtle,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -382,6 +516,26 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                     ),
                   ),
                 ),
+                if (r.commentHidden) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Text(
+                      'Comentario oculto',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 if (at != null)
                   Text(
@@ -482,8 +636,46 @@ class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.4,
-                      color: AppColors.textPrimary,
+                      color: r.commentHidden
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                      fontStyle: r.commentHidden
+                          ? FontStyle.italic
+                          : FontStyle.normal,
                     ),
+                  ),
+                  if (r.commentHidden &&
+                      (r.commentHiddenReason?.trim().isNotEmpty ?? false)) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Motivo: ${r.commentHiddenReason!.trim()}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ],
+                ],
+                if (canModerate) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: r.commentHidden
+                        ? TextButton.icon(
+                            onPressed: widget.onRestoreComment,
+                            icon: const Icon(Icons.visibility_outlined,
+                                size: 18),
+                            label: const Text('Restaurar comentario'),
+                          )
+                        : TextButton.icon(
+                            onPressed: widget.onHideComment,
+                            icon: const Icon(Icons.visibility_off_outlined,
+                                size: 18),
+                            label: const Text('Ocultar comentario'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.orange.shade900,
+                            ),
+                          ),
                   ),
                 ],
                 if (hasDimensions) ...[

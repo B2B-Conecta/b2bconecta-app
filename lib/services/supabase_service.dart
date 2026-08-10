@@ -3396,6 +3396,7 @@ class SupabaseService {
     String? aliadoId,
     int limit = 50,
     int offset = 0,
+    bool? commentHidden,
   }) async {
     final res = await _client.rpc(
       'list_admin_order_ratings',
@@ -3404,6 +3405,7 @@ class SupabaseService {
         'p_aliado_id': _nullableUuid(aliadoId),
         'p_limit': limit,
         'p_offset': offset,
+        'p_comment_hidden': commentHidden,
       },
     );
     if (res is! List) return const [];
@@ -3412,6 +3414,26 @@ class SupabaseService {
               Map<String, dynamic>.from(e as Map),
             ))
         .toList();
+  }
+
+  /// Moderación v1: ocultar o restaurar el comentario de texto de una valoración.
+  static Future<void> adminSetOrderRatingCommentHidden({
+    required String ratingId,
+    required bool hidden,
+    String? reason,
+  }) async {
+    final id = ratingId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError('Valoración requerida');
+    }
+    await _client.rpc(
+      'admin_set_order_rating_comment_hidden',
+      params: <String, dynamic>{
+        'p_rating_id': id,
+        'p_hidden': hidden,
+        'p_reason': reason?.trim().isEmpty == true ? null : reason?.trim(),
+      },
+    );
   }
 
   static String? _nullableUuid(String? raw) {

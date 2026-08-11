@@ -3,10 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_scaffold_messenger.dart';
 import '../auth/referral_invite_storage.dart';
+import '../config/public_legal_route.dart';
 import '../config/referral_invite_config.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_breakpoints.dart';
+import '../utils/open_public_legal.dart';
 import '../widgets/login_forgot_password_dialog.dart';
 import '../widgets/motolink_pro_logo.dart';
 import '../widgets/theme_mode_bubble.dart';
@@ -432,6 +434,51 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+        const SizedBox(height: 8),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 4,
+          children: [
+            TextButton(
+              onPressed: () => openPublicLegal(context, PublicLegalKind.terms),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Términos',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Text(
+              '·',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+            TextButton(
+              onPressed: () =>
+                  openPublicLegal(context, PublicLegalKind.privacy),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Privacidad',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

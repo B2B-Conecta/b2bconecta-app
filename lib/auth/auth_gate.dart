@@ -7,10 +7,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_scaffold_messenger.dart';
 import '../screens/login_screen.dart';
+import '../screens/public_legal_document_screen.dart';
 import '../screens/recover_password_screen.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../config/public_legal_route.dart';
 import 'auth_incoming_uri.dart';
 import 'auth_link_utils.dart';
 import 'auth_recovery_storage.dart';
@@ -418,6 +420,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Documentos legales públicos (Play Console / enlaces externos) — sin sesión.
+    final legalKind = PublicLegalRoute.kindFromUri(Uri.base);
+    if (legalKind != null) {
+      return PublicLegalDocumentScreen(
+        key: ValueKey('legal_${legalKind.name}'),
+        kind: legalKind,
+      );
+    }
+
     if (_bootstrapping ||
         _authState == null ||
         _resolvingAuthCallback ||

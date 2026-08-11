@@ -6,17 +6,12 @@ import pathlib
 root = pathlib.Path(__file__).resolve().parent.parent
 color_png = root / "assets" / "logo-b2b-conecta-color.png"
 white_png = root / "assets" / "logo-b2b-conecta-white.png"
-# Compat PDF / rutas legacy
-legacy = root / "assets" / "logo-oficial-motolinkpro-nobg.png"
 out = root / "lib" / "gen" / "motolink_pro_logo_bytes.dart"
 
 if not color_png.is_file():
     raise SystemExit(f"Missing {color_png}")
 if not white_png.is_file():
     raise SystemExit(f"Missing {white_png}")
-
-# Mantener alias legacy apuntando al logo color (fondos claros / PDFs).
-legacy.write_bytes(color_png.read_bytes())
 
 color_b64 = base64.b64encode(color_png.read_bytes()).decode("ascii")
 white_b64 = base64.b64encode(white_png.read_bytes()).decode("ascii")

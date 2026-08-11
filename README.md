@@ -1,4 +1,4 @@
-# MotoLink Pro App
+# B2B Conecta App
 
 Flutter B2B marketplace (aliados, importadores, administrador). Backend: Supabase.
 

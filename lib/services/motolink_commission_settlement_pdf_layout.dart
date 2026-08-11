@@ -12,7 +12,7 @@ abstract final class MotolinkCommissionSettlementPdfLayout {
   static Future<Uint8List?> loadLogo() async {
     try {
       final data =
-          await rootBundle.load('assets/logo-oficial-motolinkpro-nobg.png');
+          await rootBundle.load('assets/logo-b2b-conecta-color.png');
       return data.buffer.asUint8List();
     } catch (_) {
       return null;

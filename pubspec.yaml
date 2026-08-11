@@ -117,13 +117,15 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Icono de la app (launcher) = isotipo B B2B Conecta.
+# Icono de la app (launcher) = isotipo B blanco sobre azul marca.
 flutter_launcher_icons:
   android: true
   ios: true
   web:
     generate: true
+    background_color: '#0039A0'
+    theme_color: '#0039A0'
   image_path: assets/app-icon-b2b-conecta-launcher.png
   remove_alpha_ios: true
-  adaptive_icon_background: '#000000'
+  adaptive_icon_background: '#0039A0'
   adaptive_icon_foreground: assets/app-icon-b2b-conecta-foreground.png

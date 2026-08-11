@@ -87,8 +87,8 @@ flutter:
     - assets/logo-b2b-conecta-white.png
     - assets/isotipo-b2b-conecta-blue.png
     - assets/isotipo-b2b-conecta-white.png
-    - assets/logo-oficial-motolinkpro-nobg.png
-    - assets/logo-oficial-motolinkpro.png
+    - assets/app-icon-b2b-conecta-launcher.png
+    - assets/app-icon-b2b-conecta-foreground.png
     - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see

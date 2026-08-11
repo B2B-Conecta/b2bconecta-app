@@ -67,10 +67,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.carlosf12.motolinkProApp.auth</string>
+			<string>ve.com.b2bconecta.app.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.carlosf12.motolinkProApp</string>
+				<string>ve.com.b2bconecta.app</string>
 			</array>
 		</dict>
 	</array>

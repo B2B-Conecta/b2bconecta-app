@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.carlosf12.motolinkProApp</string>
+	<string>ve.com.b2bconecta.app</string>
 	<key>PROJECT_ID</key>
 	<string>moto-link-pro-app</string>
 	<key>STORAGE_BUCKET</key>

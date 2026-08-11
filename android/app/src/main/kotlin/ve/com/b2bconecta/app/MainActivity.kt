@@ -1,4 +1,4 @@
-package com.carlosf12.motolink_pro_app
+package ve.com.b2bconecta.app
 
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity

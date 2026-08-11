@@ -36,6 +36,6 @@ abstract final class DefaultFirebaseOptions {
     messagingSenderId: '1032441463656',
     projectId: 'moto-link-pro-app',
     storageBucket: 'moto-link-pro-app.firebasestorage.app',
-    iosBundleId: 'com.carlosf12.motolinkProApp',
+    iosBundleId: 've.com.b2bconecta.app',
   );
 }

@@ -21,7 +21,7 @@ void main() {
 
   test('detects Android custom scheme PKCE callback', () {
     final uri = Uri.parse(
-      'com.carlosf12.motolinkProApp://auth-callback?code=abc-123',
+      've.com.b2bconecta.app://auth-callback?code=abc-123',
     );
     expect(hasAuthCallbackInUri(uri), isTrue);
     expect(uri.host, 'auth-callback');

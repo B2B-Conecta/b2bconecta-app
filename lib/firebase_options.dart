@@ -24,7 +24,7 @@ abstract final class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAT12-GE4vPt0n9rzCzhrpSNdT7y5kchaA',
-    appId: '1:1032441463656:android:63e049a05b18f847040cdd',
+    appId: '1:1032441463656:android:41de74deeb7542ee040cdd',
     messagingSenderId: '1032441463656',
     projectId: 'moto-link-pro-app',
     storageBucket: 'moto-link-pro-app.firebasestorage.app',

@@ -15,7 +15,7 @@ abstract final class AuthRedirectConfig {
   /// Local Flutter web (`scripts/run_web_local.sh`) — activar con use_env local.
   static const localWebRedirectUrl = 'http://localhost:3000';
 
-  static const mobileScheme = 'com.carlosf12.motolinkProApp';
+  static const mobileScheme = 've.com.b2bconecta.app';
   static const mobileHost = 'auth-callback';
   static const mobileDeepLink = '$mobileScheme://$mobileHost';
 }

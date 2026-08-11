@@ -11,7 +11,7 @@
 #   https://b2bconecta-app-git-dev-b2bconecta.vercel.app/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
-#   com.carlosf12.motolinkProApp://auth-callback
+#   ve.com.b2bconecta.app://auth-callback
 #
 # === DEV (b2bconecta-db-dev / kdrccmqcrruixuworlmz) — data de trabajo ===
 # Site URL (Vercel branch `dev`):
@@ -21,7 +21,7 @@
 #   https://www.b2bconecta.com.ve/**
 #   http://localhost:3000/**
 #   http://127.0.0.1:3000/**
-#   com.carlosf12.motolinkProApp://auth-callback
+#   ve.com.b2bconecta.app://auth-callback
 #
 # === SMTP (confirmación + recovery) ===
 # Sender: b2bconecta.ve@gmail.com

@@ -8,7 +8,7 @@
 PRODUCT_NAME = motolink_pro_app
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.carlosf12.motolinkProApp
+PRODUCT_BUNDLE_IDENTIFIER = ve.com.b2bconecta.app
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.carlosf12. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 B2B Conecta C.A. All rights reserved.

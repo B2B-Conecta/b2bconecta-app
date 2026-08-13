@@ -50,6 +50,11 @@ class ProfileModel {
     this.pagoSoloDivisas = false,
     this.referralCode,
     this.referredByProfileId,
+    this.referredByExternalId,
+    this.referredByExternalName,
+    this.referredByExternalCode,
+    this.referredByExternalPhone,
+    this.referredByExternalEmail,
     this.referredAt,
   });
 
@@ -161,13 +166,26 @@ class ProfileModel {
   /// Importador: solo pagos en divisas/USD; sin descuento línea USD en productos.
   final bool pagoSoloDivisas;
 
-  /// Código único de invitación (`profiles.referral_code`).
+  /// Legado: códigos en perfiles ya no se generan (solo vendedores externos).
   final String? referralCode;
 
-  /// Quién refirió a este usuario (`profiles.referred_by_profile_id`).
+  /// Legado usuario→usuario (`profiles.referred_by_profile_id`).
   final String? referredByProfileId;
 
+  /// Vendedor externo que refirió (`profiles.referred_by_external_id`).
+  final String? referredByExternalId;
+
+  /// Datos del vendedor (join admin / opcional).
+  final String? referredByExternalName;
+  final String? referredByExternalCode;
+  final String? referredByExternalPhone;
+  final String? referredByExternalEmail;
+
   final DateTime? referredAt;
+
+  bool get hasReferralAttribution =>
+      (referredByExternalId != null && referredByExternalId!.isNotEmpty) ||
+      (referredByProfileId != null && referredByProfileId!.isNotEmpty);
 
   /// Métodos visibles para aliados según configuración del importador.
   List<String> get effectiveAcceptedPagoMetodos =>
@@ -374,10 +392,31 @@ class ProfileModel {
       pagoSoloDivisas: _parseBool(json['pago_solo_divisas']),
       referralCode: _text(json['referral_code']),
       referredByProfileId: _text(json['referred_by_profile_id']),
+      referredByExternalId: _text(json['referred_by_external_id']),
+      referredByExternalName: _text(
+        _nestedExternal(json)?['full_name'] ?? json['referred_by_external_name'],
+      ),
+      referredByExternalCode: _text(
+        _nestedExternal(json)?['code'] ?? json['referred_by_external_code'],
+      ),
+      referredByExternalPhone: _text(
+        _nestedExternal(json)?['phone'] ?? json['referred_by_external_phone'],
+      ),
+      referredByExternalEmail: _text(
+        _nestedExternal(json)?['email'] ?? json['referred_by_external_email'],
+      ),
       referredAt: json['referred_at'] != null
           ? DateTime.tryParse(json['referred_at'].toString())
           : null,
     );
+  }
+
+  static Map<String, dynamic>? _nestedExternal(Map<String, dynamic> json) {
+    final raw = json['external_referrers'] ?? json['referred_external'];
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return null;
   }
 
   static bool _parseBool(dynamic raw) {

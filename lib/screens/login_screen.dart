@@ -11,6 +11,7 @@ import '../utils/app_breakpoints.dart';
 import '../utils/open_public_legal.dart';
 import '../widgets/login_forgot_password_dialog.dart';
 import '../widgets/motolink_pro_logo.dart';
+import '../widgets/referral_qr_scan_sheet.dart';
 import '../widgets/theme_mode_bubble.dart';
 
 enum _AuthMode { login, register }
@@ -306,8 +307,21 @@ class _LoginScreenState extends State<LoginScreen> {
               textInputAction: TextInputAction.done,
               onSubmitted: !_isLoading ? (_) => _register() : null,
               decoration: _inputDecoration(
-                hint: 'Código de referido (opcional)',
-                prefixIcon: Icons.card_giftcard_outlined,
+                hint: 'Código de vendedor / referido (opcional)',
+                prefixIcon: Icons.qr_code_2_outlined,
+                suffixIcon: IconButton(
+                  tooltip: 'Escanear QR',
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          final code = await ReferralQrScanSheet.scan(context);
+                          if (!mounted || code == null) return;
+                          setState(() {
+                            _referralController.text = code;
+                          });
+                        },
+                  icon: const Icon(Icons.photo_camera_outlined),
+                ),
               ),
             ),
           ],

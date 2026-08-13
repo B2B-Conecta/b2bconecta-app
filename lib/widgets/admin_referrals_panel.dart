@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
-import '../models/admin_referral_row_model.dart';
+import '../config/referral_invite_config.dart';
+import '../models/external_referrer_model.dart';
 import '../models/profile_role_labels.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_date_format.dart';
 
-/// Admin: métricas de referidos (quién invitó a quién).
+/// Admin: vendedores externos (código + QR) y usuarios referidos.
 class AdminReferralsPanel extends StatefulWidget {
   const AdminReferralsPanel({super.key});
 
@@ -15,7 +18,7 @@ class AdminReferralsPanel extends StatefulWidget {
 }
 
 class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
-  List<AdminReferralStatRowModel> _rows = const [];
+  List<ExternalReferrerModel> _rows = const [];
   bool _loading = true;
   String? _error;
   final _searchCtrl = TextEditingController();
@@ -39,7 +42,7 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
       _error = null;
     });
     try {
-      final rows = await SupabaseService.listAdminReferralStats();
+      final rows = await SupabaseService.listAdminExternalReferrers();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -54,21 +57,181 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
     }
   }
 
-  List<AdminReferralStatRowModel> get _filtered {
+  List<ExternalReferrerModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
     if (q.isEmpty) return _rows;
     return _rows.where((r) {
-      return (r.businessName ?? '').toLowerCase().contains(q) ||
-          (r.rif ?? '').toLowerCase().contains(q) ||
-          (r.referralCode ?? '').toLowerCase().contains(q) ||
-          (r.role ?? '').toLowerCase().contains(q);
+      return r.fullName.toLowerCase().contains(q) ||
+          r.phone.toLowerCase().contains(q) ||
+          r.email.toLowerCase().contains(q) ||
+          r.code.toLowerCase().contains(q);
     }).toList();
   }
 
-  Future<void> _openReferred(AdminReferralStatRowModel row) async {
+  Future<void> _copy(String text, String ok) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok)));
+  }
+
+  Future<void> _openCreate() async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => const _ExternalReferrerFormSheet(),
+    );
+    if (created == true) await _load();
+  }
+
+  Future<void> _openDetail(ExternalReferrerModel row) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.paddingOf(ctx).bottom + 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    row.fullName,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${row.phone} · ${row.email}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    row.active ? 'Activo' : 'Inactivo',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: row.active
+                          ? AppColors.brandBlue
+                          : AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: QrImageView(
+                      data: ReferralInviteConfig.inviteUrlForCode(row.code),
+                      version: QrVersions.auto,
+                      size: 200,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    row.code,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    ReferralInviteConfig.inviteUrlForCode(row.code),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _copy(row.code, 'Código copiado'),
+                        icon: const Icon(Icons.copy_outlined, size: 18),
+                        label: const Text('Copiar código'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _copy(
+                          ReferralInviteConfig.inviteUrlForCode(row.code),
+                          'Enlace copiado',
+                        ),
+                        icon: const Icon(Icons.link, size: 18),
+                        label: const Text('Copiar enlace'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${row.referredCount} registro(s) con este código',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            await _openReferred(row);
+                          },
+                          child: const Text('Ver referidos'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            final ok = await showModalBottomSheet<bool>(
+                              context: context,
+                              isScrollControlled: true,
+                              showDragHandle: true,
+                              builder: (_) =>
+                                  _ExternalReferrerFormSheet(existing: row),
+                            );
+                            if (ok == true) await _load();
+                          },
+                          child: const Text('Editar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openReferred(ExternalReferrerModel row) async {
     try {
       final users = await SupabaseService.listAdminReferredUsers(
-        referrerId: row.referrerId,
+        referrerId: row.id,
       );
       if (!mounted) return;
       await showModalBottomSheet<void>(
@@ -85,7 +248,7 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Referidos de ${row.businessName ?? 'usuario'}',
+                      'Referidos de ${row.fullName}',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
@@ -94,52 +257,50 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Código ${row.referralCode ?? '—'} · ${row.referredCount} registro(s)',
+                      'Código ${row.code} · ${row.referredCount} registro(s)',
                       style: TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    if (users.isEmpty)
-                      const Expanded(
-                        child: Center(child: Text('Sin referidos.')),
-                      )
-                    else
-                      Expanded(
-                        child: ListView.separated(
-                          itemCount: users.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            final u = users[i];
-                            final role = ProfileRoleLabels.labelEs(u.role);
-                            final when = u.referredAt ?? u.createdAt;
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                u.businessName ?? 'Sin nombre',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              subtitle: Text(
-                                [
-                                  role,
-                                  if (u.rif != null) u.rif!,
-                                  if (u.accountAccessStatus != null)
-                                    u.accountAccessStatus!,
-                                  if (when != null)
-                                    formatEsShortDateTime(when),
-                                ].join(' · '),
+                    Expanded(
+                      child: users.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Aún no hay registros con este código.',
                                 style: TextStyle(
-                                  fontSize: 12,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                            )
+                          : ListView.separated(
+                              itemCount: users.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final u = users[i];
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    u.businessName ?? 'Sin nombre',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    [
+                                      if (u.role != null)
+                                        ProfileRoleLabels.labelEs(u.role),
+                                      if (u.rif != null) u.rif!,
+                                      if (u.referredAt != null)
+                                        formatEsShortDateTime(u.referredAt),
+                                    ].whereType<String>().join(' · '),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
                   ],
                 ),
               ),
@@ -150,7 +311,7 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text('$e'), backgroundColor: Colors.red.shade800),
       );
     }
   }
@@ -177,36 +338,51 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
     }
 
     final rows = _filtered;
-    final totalReferred =
-        _rows.fold<int>(0, (sum, r) => sum + r.referredCount);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Text(
-            '${_rows.length} invitador(es) · $totalReferred registro(s) referidos',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar nombre, teléfono, correo o código',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: AppColors.fieldFill,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: _openCreate,
+                icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+                label: const Text('Nuevo'),
+              ),
+              IconButton(
+                tooltip: 'Actualizar',
+                onPressed: _load,
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-          child: TextField(
-            controller: _searchCtrl,
-            decoration: InputDecoration(
-              hintText: 'Buscar por negocio, RIF o código',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              filled: true,
-              fillColor: AppColors.fieldFill,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              isDense: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'Registre vendedores externos. Ellos no usan la app: reciben un '
+            'código y QR para compartir con nuevos aliados/mayoristas.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: AppColors.textSecondary,
             ),
           ),
         ),
@@ -215,100 +391,233 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
               ? Center(
                   child: Text(
                     _rows.isEmpty
-                        ? 'Aún no hay registros con código de referido aplicado.'
-                        : 'Sin coincidencias.',
-                    textAlign: TextAlign.center,
+                        ? 'No hay vendedores externos. Cree el primero.'
+                        : 'Ningún resultado para la búsqueda.',
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: rows.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) {
-                      final r = rows[i];
-                      final role = ProfileRoleLabels.labelEs(r.role);
-                      return Material(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(10),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () => _openReferred(r),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.borderSubtle),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        r.businessName ?? 'Sin nombre',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                        ),
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  itemCount: rows.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final r = rows[i];
+                    return Material(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _openDetail(r),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r.fullName,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        color: AppColors.textPrimary,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        [
-                                          role,
-                                          if (r.rif != null) r.rif!,
-                                          if (r.referralCode != null)
-                                            r.referralCode!,
-                                        ].join(' · '),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      if (r.lastReferralAt != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Último: ${formatEsShortDateTime(r.lastReferralAt)}',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.brandBlueContainer,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    '${r.referredCount}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.brand,
                                     ),
-                                  ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${r.code} · ${r.referredCount} referido(s)'
+                                      '${r.active ? '' : ' · inactivo'}',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${r.phone} · ${r.email}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              Icon(
+                                Icons.qr_code_2,
+                                color: AppColors.brandBlue,
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _ExternalReferrerFormSheet extends StatefulWidget {
+  const _ExternalReferrerFormSheet({this.existing});
+
+  final ExternalReferrerModel? existing;
+
+  @override
+  State<_ExternalReferrerFormSheet> createState() =>
+      _ExternalReferrerFormSheetState();
+}
+
+class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> {
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+  late final TextEditingController _email;
+  late final TextEditingController _notes;
+  late bool _active;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _name = TextEditingController(text: e?.fullName ?? '');
+    _phone = TextEditingController(text: e?.phone ?? '');
+    _email = TextEditingController(text: e?.email ?? '');
+    _notes = TextEditingController(text: e?.notes ?? '');
+    _active = e?.active ?? true;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _email.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    try {
+      if (widget.existing == null) {
+        await SupabaseService.adminCreateExternalReferrer(
+          fullName: _name.text,
+          phone: _phone.text,
+          email: _email.text,
+          notes: _notes.text,
+        );
+      } else {
+        await SupabaseService.adminUpdateExternalReferrer(
+          id: widget.existing!.id,
+          fullName: _name.text,
+          phone: _phone.text,
+          email: _email.text,
+          active: _active,
+          notes: _notes.text,
+        );
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
+          ),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final editing = widget.existing != null;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottom + 16),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              editing ? 'Editar vendedor externo' : 'Nuevo vendedor externo',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _name,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nombre *',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Número / teléfono *',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Correo *',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notes,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Notas (opcional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (editing) ...[
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Activo'),
+                subtitle: const Text(
+                  'Si está inactivo, el código deja de aceptar registros nuevos.',
+                ),
+                value: _active,
+                onChanged: _busy ? null : (v) => setState(() => _active = v),
+              ),
+            ],
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: _busy ? null : _save,
+              child: _busy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(editing ? 'Guardar cambios' : 'Crear y generar código'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

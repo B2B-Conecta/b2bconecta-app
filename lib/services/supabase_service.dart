@@ -29,6 +29,7 @@ import '../models/admin_order_rating_row_model.dart';
 import '../auth/referral_invite_storage.dart';
 import '../models/admin_user_activity_row_model.dart';
 import '../models/admin_referral_row_model.dart';
+import '../models/external_referrer_model.dart';
 import '../models/aliado_received_rating_model.dart';
 import '../models/importador_received_rating_model.dart';
 import '../models/reputation_weekly_snapshot_model.dart';
@@ -1577,10 +1578,15 @@ class SupabaseService {
   }
 
   /// Perfiles aliado e importador (mayorista) para cola de verificación admin.
+  /// Incluye datos del vendedor externo si el usuario llegó referido.
   static Future<List<ProfileModel>> fetchB2BProfilesForAdminKycReview() async {
     final response = await _client
         .from('profiles')
-        .select()
+        .select(
+          '*, external_referrers:referred_by_external_id('
+          'full_name, code, phone, email'
+          ')',
+        )
         .inFilter('role', ['aliado', 'importador'])
         .order('business_name', ascending: true);
 
@@ -3400,7 +3406,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Aplica código de referido una sola vez (RPC `profile_apply_referral_code`).
+  /// Aplica código de vendedor externo una sola vez.
   static Future<void> applyReferralCode(String code) async {
     final c = code.trim().toUpperCase();
     if (c.isEmpty) {
@@ -3412,7 +3418,73 @@ class SupabaseService {
     );
   }
 
-  /// Admin: ranking de referidos.
+  /// Admin: listado de vendedores externos + conteo de referidos.
+  static Future<List<ExternalReferrerModel>> listAdminExternalReferrers({
+    int limit = 100,
+    int offset = 0,
+    bool activeOnly = false,
+  }) async {
+    final res = await _client.rpc(
+      'list_admin_external_referrers',
+      params: <String, dynamic>{
+        'p_limit': limit,
+        'p_offset': offset,
+        'p_active_only': activeOnly,
+      },
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => ExternalReferrerModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
+  }
+
+  static Future<ExternalReferrerModel> adminCreateExternalReferrer({
+    required String fullName,
+    required String phone,
+    required String email,
+    String? notes,
+  }) async {
+    final res = await _client.rpc(
+      'admin_create_external_referrer',
+      params: <String, dynamic>{
+        'p_full_name': fullName.trim(),
+        'p_phone': phone.trim(),
+        'p_email': email.trim(),
+        'p_notes': notes?.trim(),
+      },
+    );
+    return ExternalReferrerModel.fromJson(
+      Map<String, dynamic>.from(res as Map),
+    );
+  }
+
+  static Future<ExternalReferrerModel> adminUpdateExternalReferrer({
+    required String id,
+    String? fullName,
+    String? phone,
+    String? email,
+    bool? active,
+    String? notes,
+  }) async {
+    final res = await _client.rpc(
+      'admin_update_external_referrer',
+      params: <String, dynamic>{
+        'p_id': id.trim(),
+        'p_full_name': fullName?.trim(),
+        'p_phone': phone?.trim(),
+        'p_email': email?.trim(),
+        'p_active': active,
+        'p_notes': notes,
+      },
+    );
+    return ExternalReferrerModel.fromJson(
+      Map<String, dynamic>.from(res as Map),
+    );
+  }
+
+  /// Admin: métricas (vendedores externos con al menos un referido).
   static Future<List<AdminReferralStatRowModel>> listAdminReferralStats({
     int limit = 100,
     int offset = 0,
@@ -3432,7 +3504,7 @@ class SupabaseService {
         .toList();
   }
 
-  /// Admin: usuarios referidos por un perfil.
+  /// Admin: usuarios referidos por un vendedor externo.
   static Future<List<AdminReferredUserRowModel>> listAdminReferredUsers({
     required String referrerId,
     int limit = 100,

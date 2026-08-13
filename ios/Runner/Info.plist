@@ -46,7 +46,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>B2B Conecta usa la cámara para fotografiar documentos de registro, logos y productos.</string>
+	<string>B2B Conecta usa la cámara para fotografiar documentos, logos, productos y escanear códigos QR de referido.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>B2B Conecta permite elegir imágenes desde tu galería para documentos y fotos del perfil.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

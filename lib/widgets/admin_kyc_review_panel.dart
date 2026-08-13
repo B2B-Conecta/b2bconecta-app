@@ -357,6 +357,74 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     if (next != null && _isAliado(p)) _ensureDocsLoaded(next);
   }
 
+  Widget _referralAttributionBox(ProfileModel p) {
+    if (!p.hasReferralAttribution) {
+      return const SizedBox.shrink();
+    }
+    final name = p.referredByExternalName?.trim();
+    final code = p.referredByExternalCode?.trim();
+    final phone = p.referredByExternalPhone?.trim();
+    final email = p.referredByExternalEmail?.trim();
+    final detailLines = <String>[
+      if (name != null && name.isNotEmpty) 'Vendedor: $name',
+      if (code != null && code.isNotEmpty) 'Código: $code',
+      if (phone != null && phone.isNotEmpty) 'Tel: $phone',
+      if (email != null && email.isNotEmpty) 'Email: $email',
+      if (p.referredAt != null)
+        'Registrado: ${p.referredAt!.toLocal().toString().split('.').first}',
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.borderSubtle),
+          borderRadius: BorderRadius.circular(8),
+          color: AppColors.brandBlueContainer,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Llegó por referido',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (detailLines.isEmpty)
+                Text(
+                  'Cuenta atribuida a un vendedor externo.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              else
+                for (final line in detailLines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      line,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _importadorProfileSummary(ProfileModel p) {
     final lines = <String>[
       if (p.rif?.trim().isNotEmpty == true) 'RIF: ${p.rif!.trim()}',
@@ -377,6 +445,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _referralAttributionBox(p),
         Text(
           'Perfil del mayorista',
           style: TextStyle(
@@ -652,11 +721,23 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                     ),
                                     subtitle: Text(
                                       '${ProfileRoleLabels.labelEs(role)}'
-                                      '${p.rif != null && p.rif!.trim().isNotEmpty ? ' · ${p.rif}' : ''}',
+                                      '${p.rif != null && p.rif!.trim().isNotEmpty ? ' · ${p.rif}' : ''}'
+                                      '${p.hasReferralAttribution ? ' · Referido' : ''}',
                                     ),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        if (p.hasReferralAttribution)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 6,
+                                            ),
+                                            child: Icon(
+                                              Icons.handshake_outlined,
+                                              size: 18,
+                                              color: AppColors.brand,
+                                            ),
+                                          ),
                                         Padding(
                                           padding: const EdgeInsets.only(
                                             right: 4,
@@ -751,6 +832,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.stretch,
                                               children: [
+                                                _referralAttributionBox(p),
                                                 Wrap(
                                                   spacing: 8,
                                                   runSpacing: 8,

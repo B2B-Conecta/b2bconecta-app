@@ -11,6 +11,10 @@ config/migrate-db.env
 **/*-credentials.json
 **/service-account*.json
 
+# Local Python venv for tool/embed_logo.py and tool/build_launcher_icon.py.
+# Recreate with: python3 -m venv .venv-logo && .venv-logo/bin/pip install pymupdf pillow
+.venv-logo/
+
 # Miscellaneous
 *.class
 *.log

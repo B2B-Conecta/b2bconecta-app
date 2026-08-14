@@ -1,6 +1,7 @@
 -- =============================================================================
 -- MotoConecta — migración baseline única (reemplaza el historial MotoLink).
--- Mantener sincronizado con `supabase/motoconecta/schema.sql` al editar el DDL.
+-- Snapshot histórico (no es la fuente de verdad): `docs/archive/motoconecta/schema.sql`.
+-- Schema vigente = esta baseline + migraciones posteriores en esta carpeta.
 -- =============================================================================
 -- MotoConecta — esquema (greenfield, alineado a la app Flutter)
 -- =============================================================================

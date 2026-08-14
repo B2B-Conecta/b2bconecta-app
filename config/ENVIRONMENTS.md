@@ -1,5 +1,7 @@
 # Entornos Supabase — B2B Conecta
 
+Clone y primer run: [`docs/GETTING_STARTED.md`](../docs/GETTING_STARTED.md). Mapa del repo: [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
+
 Dos proyectos en la org **B2B Conecta C.A.**:
 
 | Rol | Proyecto Supabase | Uso de datos | Env en este repo |

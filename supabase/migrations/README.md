@@ -1,38 +1,52 @@
-# Migraciones Supabase (rama MotoConecta)
+# Migraciones Supabase
 
-**Local:** ejecuta `supabase start` (Docker) y luego `supabase db reset --yes`. Sin `start`, el CLI responde «supabase start is not running».
+**Fuente de verdad del schema:** los archivos en esta carpeta. Hoy hay **114** migraciones: la baseline MotoConecta y todo lo posterior (pedidos, KYC, comisiones, logística, referidos, etc.).
 
-En esta rama **no se aplican** las migraciones históricas del broker MotoLink. Fueron movidas a:
+Snapshot histórico del greenfield (no aplicar): [`docs/archive/motoconecta/`](../../docs/archive/motoconecta/).
 
-`supabase/motolink/migrations_archive/`
+## Local
 
-El único archivo aquí es **`20260106000000_motoconecta_baseline.sql`**, que define el esquema MotoConecta (`profiles`, `products`, `transaction_requests`, `transaction_request_messages`, `notifications`, RLS y triggers mínimos).
+```bash
+supabase start
+supabase db reset --yes    # reaplica todas las migraciones + supabase/seed.sql
+```
 
-- **`supabase db reset`** (local): aplica esta migración y luego `supabase/seed.sql` según `config.toml`.
-- **Proyecto remoto**: enlaza el CLI y usa `db push` / reset según tu flujo, o pega el SQL desde `motoconecta/schema.sql` en el SQL Editor (mismo contenido que la migración baseline).
+Sin `start`, el CLI responde `supabase start is not running`.
 
-Para recuperar el historial MotoLink en otra rama, restaura los `.sql` desde `motolink/migrations_archive/` a `supabase/migrations/`.
+## Remoto (DEV vs MAIN)
 
----
+Ver [`config/ENVIRONMENTS.md`](../../config/ENVIRONMENTS.md) y [`docs/GETTING_STARTED.md`](../../docs/GETTING_STARTED.md).
+
+| Entorno | Project ref | Cuándo `db push` |
+|---------|-------------|------------------|
+| Local Docker | — | `db reset` (no push) |
+| DEV | `kdrccmqcrruixuworlmz` | Cuando el SQL de la rama esté estable |
+| MAIN | `fzugzjcwdzcwfxgviltw` | Solo tras merge a `main`, no desde una feature branch |
+
+```bash
+# Ejemplo DEV (después de supabase login)
+supabase link --project-ref kdrccmqcrruixuworlmz
+supabase migration list
+supabase db push
+```
+
+## Cómo añadir una migración
+
+1. Archivo nuevo: `supabase/migrations/YYYYMMDDHHMMSS_descripcion_corta.sql`.
+2. Probar en local con `db reset` (o `db push` contra una DB Docker ya levantada).
+3. No editar el DDL de migraciones **ya aplicadas** en DEV/MAIN. Si hay que corregir, una migración posterior.
+4. Comentarios de documentación en un SQL viejo sí se pueden actualizar; el orden y el hash de versiones los gestiona el CLI.
 
 ## Error: `Remote migration versions not found in local migrations directory`
 
-Al ejecutar **`supabase db push`**, el remoto tiene filas en `supabase_migrations.schema_migrations` (versiones de migraciones ya aplicadas) que **no tienen** archivo correspondiente en tu `supabase/migrations/` local. En esta rama solo existe la baseline MotoConecta; el remoto suele seguir con el historial MotoLink.
+`db push` exige que **todas** las versiones registradas en `supabase_migrations.schema_migrations` del remoto existan como archivos locales.
 
-`db push` exige alinear ese historial con los archivos del repo.
+Eso ocurría cuando el remoto tenía historial **MotoLink** y el repo solo tenía la baseline MotoConecta. Los proyectos actuales B2B Conecta (`b2bconecta-db` / `b2bconecta-db-dev`) se alinean con **esta** carpeta `migrations/`.
 
-### Qué hacer (elige una)
+Si aparece el error:
 
-1. **Proyecto Supabase nuevo** dedicado a MotoConecta: `supabase link` y luego **`supabase db push`** — sin historial viejo, aplica solo `20260106000000_motoconecta_baseline.sql`.
+1. `supabase migration list` — compara local vs remoto.
+2. No uses `migration repair` en producción sin saber qué versiones faltan.
+3. Proyecto nuevo: `link` + `db push` aplica desde la baseline hacia adelante.
 
-2. **Mismo proyecto remoto, sin `db push`**: pega **`supabase/motoconecta/schema.sql`** en **Dashboard → SQL Editor** (y `seed.sql` si quieres datos de prueba). La app solo necesita URL + clave publishable; no hace falta que el CLI marque las migraciones.
-
-3. **`supabase migration repair` / `db pull`** (lo que sugiere el CLI): sirve para **reparar metadatos** de migraciones cuando sabes lo que haces; **no** sustituye borrar/reemplazar el esquema MotoLink en Postgres. No lo uses como “parche mágico” sobre un remoto productivo sin plan.
-
-### Resumen
-
-| Entorno | Comando típico |
-|--------|----------------|
-| Local Docker | `supabase start` → `supabase db reset --yes` |
-| Nube, repo solo baseline | **SQL Editor** o **proyecto nuevo** + `db push` |
-| Nube con historial MotoLink + carpeta local sin esos `.sql` | `db push` **fallará** hasta alinear historial o usar otra estrategia arriba |
+El historial SQL del broker MotoLink **no** está en este repo (`supabase/motolink/migrations_archive/` se mencionó en docs viejas y no existe aquí).

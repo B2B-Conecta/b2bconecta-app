@@ -2,6 +2,26 @@
 
 Flutter B2B marketplace (aliados, importadores, administrador). Backend: Supabase.
 
+| Documento | Contenido |
+|-----------|-----------|
+| [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | Clone, entornos, local, ramas |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Mapa del código, flujo de pedido, convenciones |
+| [`config/ENVIRONMENTS.md`](config/ENVIRONMENTS.md) | Proyectos Supabase MAIN vs DEV |
+| [`config/SECURITY.md`](config/SECURITY.md) | Qué puede ir en el cliente vs secretos |
+
+## Dónde está cada cosa (resumen)
+
+| Área | Path |
+|------|------|
+| App Flutter | `lib/` — entrada `lib/main.dart` → `AuthGate` → `MainShell` |
+| Llamadas a Supabase | `lib/services/supabase_service.dart` |
+| Schema vigente | `supabase/migrations/` (no `docs/archive/`) |
+| Seed local | `supabase/seed.sql` |
+| Env / keys | `bash scripts/use_env.sh local\|staging\|production` |
+| Scripts de build | `scripts/build_*.sh`, `scripts/run_web_local.sh` |
+
+Detalle por pantalla y rol: tabla **Dónde está cada cosa** en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ## Environments
 
 Detalle B2B Conecta (main limpio+seed vs dev con data): **`config/ENVIRONMENTS.md`**.

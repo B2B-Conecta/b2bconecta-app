@@ -1,5 +1,5 @@
 -- Ensures RPC exists on projects that applied an older schema without it (PostgREST PGRST202).
--- Same definition as supabase/motoconecta/upgrade_aliado_effective_open_exposure.sql
+-- Same definition as docs/archive/motoconecta/upgrade_aliado_effective_open_exposure.sql (historical snapshot).
 
 create or replace function public.aliado_effective_open_exposure (p_aliado_id uuid)
 returns numeric

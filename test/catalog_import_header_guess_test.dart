@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/models/catalog_import/catalog_import_field.dart';
-import 'package:motolink_pro_app/utils/catalog_import_header_guess.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_field.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import_header_guess.dart';
 
 void main() {
   test('suggestAll mapea columnas ERP típicas', () {

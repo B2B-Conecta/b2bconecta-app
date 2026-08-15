@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/config/public_legal_route.dart';
+import 'package:motolink_pro_app/app/config/public_legal_route.dart';
 
 void main() {
   test('parses privacy and terms from query', () {

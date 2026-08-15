@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/services/excel_catalog_service.dart';
+import 'package:motolink_pro_app/features/inventory/excel_catalog_service.dart';
 
 void main() {
   group('parseGarantiaCell', () {

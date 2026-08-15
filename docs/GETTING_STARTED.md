@@ -110,4 +110,4 @@ La web no registra tokens FCM.
 - **Schema vigente:** `supabase/migrations/`, no `docs/archive/motoconecta/`.
 - **Keys:** `config/env/*.env.local` y `.env` (gitignored), no el código Dart.
 - **Lógica de negocio crítica:** RPCs SQL + RLS, no solo widgets.
-- **Llamadas al backend desde Flutter:** casi todas pasan por `lib/services/supabase_service.dart`.
+- **Llamadas al backend desde Flutter:** casi todas pasan por `lib/core/data/supabase_service.dart`.

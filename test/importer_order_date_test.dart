@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/models/transaction_request_model.dart';
-import 'package:motolink_pro_app/models/transaction_request_status.dart';
-import 'package:motolink_pro_app/utils/importer_order_date.dart';
+import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
+import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
+import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 
 TransactionRequestModel _row({
   required String status,

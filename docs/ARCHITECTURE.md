@@ -20,10 +20,10 @@ Backend: **solo Supabase** (Auth PKCE, Postgres + RLS + RPCs, Storage, Realtime,
 
 ```
 lib/main.dart
-  → AuthGate          (sesión, deep links, recovery)
-    → ProfileGate     (carga profiles)
+  → core/auth/AuthGate          (sesión, deep links, recovery)
+    → features/onboarding/ProfileGate
       → ProfileSetupScreen / AliadoPendingReviewScreen
-      → MainShell     (tabs por rol)
+      → app/MainShell           (tabs por rol)
 ```
 
 Nadie entra al dashboard sin rol válido, perfil completo, términos aceptados y `account_access` activo (aliado/importador pasan por revisión admin).
@@ -39,46 +39,53 @@ pendiente → en_preparacion → pedido_listo → en_transito → entregado
             (avanza el importador)           (el aliado confirma recepción)
 ```
 
-Estados y copy: `lib/models/transaction_request_status.dart` y `lib/utils/order_flow_copy/`.
+Estados y copy: `lib/features/orders/shared/transaction_request_status.dart` y `lib/features/orders/shared/order_flow_copy/`.
 
 Alrededor: factura, pago, flete/transportistas, chat, SLA 12 h, morosidad, valoraciones, comisión B2B Conecta.
 
-## Dónde está cada cosa (layout actual)
+## Dónde está cada cosa
 
-`lib/` está organizado **por tipo de archivo**, no por feature. Los prefijos `admin_`, `aliado_`, `importer_` son el mapa dentro de `widgets/`.
+`lib/` está organizado **por dominio** (`app/`, `core/`, `features/<nombre>/`). Los nombres de archivo (`admin_*`, `aliado_*`, `importer_*`) se conservaron.
 
 | Si quieres tocar… | Empieza aquí |
 |-------------------|--------------|
-| Login, recovery, deep links | `lib/auth/` (`auth_gate.dart`) |
-| Onboarding / KYC de acceso | `lib/auth/profile_gate.dart`, `lib/screens/profile_setup_screen.dart`, `lib/screens/aliado_pending_review_screen.dart` |
-| Tabs y shells por rol | `lib/screens/main_shell.dart` |
-| Catálogo aliado | `lib/screens/home_screen.dart`, `lib/screens/product_detail_screen.dart`, `lib/widgets/aliado_catalog_*` |
-| Inventario importador | `lib/widgets/importer_inventory_dashboard.dart`, `lib/widgets/importer_flexible_import_screen.dart` |
-| Carrito / checkout | `lib/screens/cart_screen.dart`, `lib/services/cart_service.dart` → RPC `aliado_checkout_multi_importador` |
-| Pedidos aliado | `lib/widgets/aliado_pedidos_panel.dart` |
-| Pedidos importador | `lib/widgets/importer_active_orders_panel.dart` |
-| Pedidos admin | `lib/widgets/admin_orders_panel.dart` |
-| Detalle de un pedido | `lib/screens/transaction_request_detail_screen.dart` |
-| Transportistas / flete / pickup | `lib/screens/importer_carriers_screen.dart`, `lib/widgets/importer_pickup_*`, `lib/widgets/aliado_pedido_carrier_*` |
-| Comisiones | `lib/widgets/admin_commission_settlements_panel.dart`, `lib/widgets/importer_commission_*`, `lib/services/motolink_commission_*` |
-| Reputación / ratings | `lib/screens/reputation_tab.dart`, `lib/widgets/aliado_reputation_panel.dart`, `lib/widgets/importer_reputation_panel.dart` |
-| KYC documentos | `lib/widgets/profile_kyc_*`, `lib/widgets/admin_kyc_review_panel.dart` |
-| Soporte | `lib/screens/support_tickets_screen.dart`, `lib/widgets/admin_support_tickets_panel.dart` |
-| Referidos | `lib/widgets/admin_referrals_panel.dart`, `lib/widgets/profile_referral_section.dart`, `lib/config/referral_invite_config.dart` |
-| Tema / marca | `lib/theme/`, `lib/widgets/motolink_pro_logo.dart` |
-| Términos / privacidad (web pública) | `lib/config/terms_config.dart`, `lib/screens/public_legal_document_screen.dart` |
-| **Cualquier llamada a Supabase** | `lib/services/supabase_service.dart` (~5 400 líneas, ~100 métodos). Punto único hoy; no añadir features nuevas ahí si se puede extraer un servicio. |
+| Login, recovery, deep links | `lib/core/auth/` |
+| Onboarding / acceso | `lib/features/onboarding/` |
+| Tabs y shells por rol | `lib/app/main_shell.dart`, `lib/core/layout/` |
+| Catálogo aliado | `lib/features/catalog/` |
+| Inventario importador | `lib/features/inventory/` |
+| Carrito / checkout | `lib/features/cart/` → RPC `aliado_checkout_multi_importador` |
+| Pedidos | `lib/features/orders/shared/`, `aliado/`, `importador/`, `admin/` |
+| Transportistas / flete / pickup | `lib/features/logistics/` |
+| Pagos y comprobantes | `lib/features/payments/` |
+| Comisiones | `lib/features/commissions/` |
+| Reputación / ratings | `lib/features/reputation/` |
+| KYC documentos | `lib/features/kyc/` |
+| Soporte | `lib/features/support/` |
+| Referidos | `lib/features/referrals/` |
+| Perfil / cuenta | `lib/features/profile/` |
+| Reportes, promos, monitoreo admin | `lib/features/admin/` |
+| Tema / marca | `lib/app/theme/`, `lib/core/widgets/` |
+| Términos / privacidad | `lib/app/config/`, `lib/features/onboarding/public_legal_document_screen.dart` |
+| **Cualquier llamada a Supabase** | `lib/core/data/supabase_service.dart` (~5 400 líneas). No añadir features nuevas ahí si se puede extraer un servicio. |
 
-Otras carpetas en `lib/`:
-
-| Carpeta | Rol |
-|---------|-----|
-| `lib/models/` | DTOs alineados a Postgres |
-| `lib/utils/` | Copy, pricing, filtros, layout |
-| `lib/config/` | Constantes (legal, fiscal, redirects) |
-| `lib/services/` | Cart, push, Excel, PDF, geolocalización, **supabase_service** |
-| `lib/widgets/shell/` | Rail desktop compartido |
-| `lib/gen/` | Logos embebidos (`python3 tool/embed_logo.py`) |
+```
+lib/
+  main.dart
+  app/                 # bootstrap, MainShell, tema, constantes
+  core/
+    auth/              # sesión, login, recovery
+    data/              # supabase_service
+    notifications/     # in-app + push
+    layout/            # rail desktop, breakpoints
+    widgets/           # logo, app bar
+    utils/             # fechas, geo, export Excel genérico
+  features/
+    onboarding/ catalog/ inventory/ cart/
+    orders/{shared,aliado,importador,admin}/
+    logistics/ payments/ reputation/ commissions/
+    kyc/ support/ referrals/ profile/ admin/
+```
 
 ## Backend (`supabase/`)
 
@@ -106,7 +113,7 @@ Tablas núcleo (baseline): `profiles`, `products`, `transaction_requests`, `tran
 | `scripts/build_apk_release.sh` / `build_ios_release.sh` / `build_aab_release.sh` / `build_web_vercel.sh` | Releases |
 | `scripts/configure_supabase_smtp.sh` | SMTP Gmail en el proyecto linkeado |
 | `scripts/configure_supabase_push_secrets.sh` | Vault + deploy push |
-| `tool/` | `embed_logo.py`, `build_launcher_icon.py` (venv local `.venv-logo`, no se commitea) |
+| `tool/` | `embed_logo.py` escribe `lib/core/widgets/motolink_pro_logo_bytes.dart`; `build_launcher_icon.py` (venv local `.venv-logo`, no se commitea) |
 | `test/` | Tests unitarios puntuales (no cubren el flujo completo) |
 | `vercel.json` | Build Flutter web |
 
@@ -122,12 +129,10 @@ Nunca `supabase db push` a MAIN desde una rama de trabajo. Nunca keys de la org 
 
 ## Convención al añadir código
 
-1. UI de un rol en un dominio → widget/screen con prefijo `aliado_` / `importer_` / `admin_` (hasta que `lib/` pase a carpetas por feature).
-2. Regla de negocio / RPC → migración nueva + método en un servicio de dominio; evita inflar `supabase_service.dart`.
-3. Compartido (tema, auth, shell) → `lib/auth/`, `lib/theme/`, `lib/widgets/shell/`.
+1. UI de un dominio → `lib/features/<dominio>/` (pedidos: `orders/shared|aliado|importador|admin`).
+2. Regla de negocio / RPC → migración nueva + método en un servicio de dominio; evita inflar `lib/core/data/supabase_service.dart`.
+3. Compartido (tema, auth, shell) → `lib/app/`, `lib/core/`.
 4. Secretos → `config/env/*.env.local`, nunca `lib/` ni git.
 5. Nombres `motolink_*` / `motoconecta_*` en código son legado; la marca en UI es B2B Conecta. No renombrar el package en el mismo PR que un feature.
 
-## Siguiente paso de scaffolding
-
-Este documento describe el layout **actual**. El siguiente PR (`feat/lib-feature-modules`) moverá `lib/` a `app/` + `core/` + `features/<dominio>/` sin cambiar lógica. Hasta entonces, usa la tabla “Dónde está cada cosa”.
+El siguiente paso de scaffolding es extraer servicios de dominio desde `supabase_service.dart` (fachada + un archivo por feature), sin mover de nuevo las carpetas.

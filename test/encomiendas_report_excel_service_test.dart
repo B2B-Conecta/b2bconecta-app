@@ -1,9 +1,9 @@
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/models/document_type_preference.dart';
-import 'package:motolink_pro_app/models/transaction_request_model.dart';
-import 'package:motolink_pro_app/models/transaction_request_status.dart';
-import 'package:motolink_pro_app/services/encomiendas_report_excel_service.dart';
+import 'package:motolink_pro_app/features/payments/document_type_preference.dart';
+import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
+import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
+import 'package:motolink_pro_app/features/admin/encomiendas_report_excel_service.dart';
 
 TransactionRequestModel _sampleRow() {
   return TransactionRequestModel(

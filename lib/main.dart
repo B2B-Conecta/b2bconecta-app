@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'app_scaffold_messenger.dart';
-import 'auth/auth_gate.dart';
-import 'services/push_notification_service.dart';
-import 'theme/app_theme.dart';
-import 'theme/theme_controller.dart';
+import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
+import 'package:motolink_pro_app/core/auth/auth_gate.dart';
+import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
+import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/models/importador_received_rating_model.dart';
-import 'package:motolink_pro_app/models/rating_questionnaire_model.dart';
-import 'package:motolink_pro_app/utils/rating_dimension_summary.dart';
-import 'package:motolink_pro_app/utils/rating_scale_labels.dart';
+import 'package:motolink_pro_app/features/reputation/importador_received_rating_model.dart';
+import 'package:motolink_pro_app/features/reputation/rating_questionnaire_model.dart';
+import 'package:motolink_pro_app/features/reputation/rating_dimension_summary.dart';
+import 'package:motolink_pro_app/features/reputation/rating_scale_labels.dart';
 
 void main() {
   test('overallStarsFromDimensionAnswers uses rounded mean', () {

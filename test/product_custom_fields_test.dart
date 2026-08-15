@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/utils/product_custom_fields.dart';
+import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 
 void main() {
   test('formatProductCustomFieldLabel humaniza claves', () {

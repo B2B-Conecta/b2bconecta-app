@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Regenera lib/gen/motolink_pro_logo_bytes.dart desde logos B2B Conecta."""
+"""Regenera lib/core/widgets/motolink_pro_logo_bytes.dart desde logos B2B Conecta."""
 import base64
 import pathlib
 
 root = pathlib.Path(__file__).resolve().parent.parent
 color_png = root / "assets" / "logo-b2b-conecta-color.png"
 white_png = root / "assets" / "logo-b2b-conecta-white.png"
-out = root / "lib" / "gen" / "motolink_pro_logo_bytes.dart"
+out = root / "lib" / "core" / "widgets" / "motolink_pro_logo_bytes.dart"
 
 if not color_png.is_file():
     raise SystemExit(f"Missing {color_png}")

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/auth/auth_link_utils.dart';
+import 'package:motolink_pro_app/core/auth/auth_link_utils.dart';
 
 void main() {
   test('detects password recovery fragment', () {

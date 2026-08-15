@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/models/catalog_import/catalog_import_field.dart';
-import 'package:motolink_pro_app/models/catalog_import/catalog_import_mapping.dart';
-import 'package:motolink_pro_app/services/catalog_import_validator.dart';
-import 'package:motolink_pro_app/services/flexible_catalog_import_service.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_field.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_mapping.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dart';
+import 'package:motolink_pro_app/features/inventory/flexible_catalog_import_service.dart';
 
 void main() {
   group('FlexibleCatalogImportService', () {

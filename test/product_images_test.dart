@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/utils/product_images.dart';
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
 
 void main() {
   test('parseProductImageFilename slots', () {

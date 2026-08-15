@@ -13,8 +13,8 @@ Flutter B2B marketplace (aliados, importadores, administrador). Backend: Supabas
 
 | Área | Path |
 |------|------|
-| App Flutter | `lib/` — entrada `lib/main.dart` → `AuthGate` → `MainShell` |
-| Llamadas a Supabase | `lib/services/supabase_service.dart` |
+| App Flutter | `lib/` — `main.dart` → `core/auth` → `app/main_shell.dart` |
+| Llamadas a Supabase | `lib/core/data/supabase_service.dart` |
 | Schema vigente | `supabase/migrations/` (no `docs/archive/`) |
 | Seed local | `supabase/seed.sql` |
 | Env / keys | `bash scripts/use_env.sh local\|staging\|production` |

@@ -16,8 +16,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "ve.com.b2bconecta.app"
-    compileSdk = 35
-    ndkVersion = "25.1.8937393"
+    compileSdk = 36
+    ndkVersion = "26.1.10909125"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -31,7 +31,8 @@ android {
 
     defaultConfig {
         applicationId = "ve.com.b2bconecta.app"
-        minSdk = flutter.minSdkVersion
+        // androidx.camera 1.5 (via mobile_scanner) requires minSdk 23+
+        minSdk = 23
         // Play requires API 35+ for new production apps (flutter.targetSdkVersion can lag).
         targetSdk = 35
         versionCode = flutter.versionCode

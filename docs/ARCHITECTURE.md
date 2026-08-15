@@ -67,7 +67,7 @@ Alrededor: factura, pago, flete/transportistas, chat, SLA 12 h, morosidad, valor
 | Reportes, promos, monitoreo admin | `lib/features/admin/` |
 | Tema / marca | `lib/app/theme/`, `lib/core/widgets/` |
 | Términos / privacidad | `lib/app/config/`, `lib/features/onboarding/public_legal_document_screen.dart` |
-| **Cualquier llamada a Supabase** | `lib/core/data/supabase_service.dart` (~5 400 líneas). No añadir features nuevas ahí si se puede extraer un servicio. |
+| **Cualquier llamada a Supabase** | Servicio de dominio (`OrdersService`, `CatalogService`, …). `SupabaseService` es solo fachada de compatibilidad. |
 
 ```
 lib/
@@ -75,8 +75,8 @@ lib/
   app/                 # bootstrap, MainShell, tema, constantes
   core/
     auth/              # sesión, login, recovery
-    data/              # supabase_service
-    notifications/     # in-app + push
+    data/              # supabase_access + fachada SupabaseService
+    notifications/     # in-app + push + NotificationsService
     layout/            # rail desktop, breakpoints
     widgets/           # logo, app bar
     utils/             # fechas, geo, export Excel genérico
@@ -86,6 +86,24 @@ lib/
     logistics/ payments/ reputation/ commissions/
     kyc/ support/ referrals/ profile/ admin/
 ```
+
+Cliente y helpers compartidos: `lib/core/data/supabase_access.dart`. La fachada `SupabaseService` delega; el código nuevo debe llamar al servicio del dominio:
+
+| Dominio | Servicio |
+|---------|----------|
+| Pedidos | `OrdersService` |
+| Catálogo / promos | `CatalogService` |
+| Inventario | `InventoryService` |
+| Perfil | `ProfileService` |
+| Pagos | `PaymentsService` |
+| KYC | `KycService` |
+| Comisiones | `CommissionsService` |
+| Reputación | `ReputationService` |
+| Admin (login / monitoreo) | `AdminService` |
+| Referidos | `ReferralsService` |
+| Soporte | `SupportService` |
+| Flete / transportistas | `LogisticsService` |
+| Notificaciones | `NotificationsService` |
 
 ## Backend (`supabase/`)
 
@@ -130,9 +148,7 @@ Nunca `supabase db push` a MAIN desde una rama de trabajo. Nunca keys de la org 
 ## Convención al añadir código
 
 1. UI de un dominio → `lib/features/<dominio>/` (pedidos: `orders/shared|aliado|importador|admin`).
-2. Regla de negocio / RPC → migración nueva + método en un servicio de dominio; evita inflar `lib/core/data/supabase_service.dart`.
-3. Compartido (tema, auth, shell) → `lib/app/`, `lib/core/`.
+2. Regla de negocio / RPC → migración nueva + método en el servicio de dominio (`lib/features/<dominio>/*_service.dart`). No añadas métodos nuevos a `SupabaseService`.
+3. Compartido (tema, auth, shell, cliente Supabase) → `lib/app/`, `lib/core/` (`SupabaseAccess` para client/buckets/helpers).
 4. Secretos → `config/env/*.env.local`, nunca `lib/` ni git.
 5. Nombres `motolink_*` / `motoconecta_*` en código son legado; la marca en UI es B2B Conecta. No renombrar el package en el mismo PR que un feature.
-
-El siguiente paso de scaffolding es extraer servicios de dominio desde `supabase_service.dart` (fachada + un archivo por feature), sin mover de nuevo las carpetas.

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:image_picker_android/image_picker_android.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
@@ -10,6 +12,7 @@ import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _enableAndroidPhotoPicker();
   await dotenv.load(fileName: '.env');
   await PushNotificationService.instance.initialize();
   ThemeController.instance.attach();
@@ -37,6 +40,14 @@ void main() async {
     ),
   );
   runApp(const MyApp());
+}
+
+/// Play policy: gallery picks must use the system Photo Picker (no READ_MEDIA_*).
+void _enableAndroidPhotoPicker() {
+  final impl = ImagePickerPlatform.instance;
+  if (impl is ImagePickerAndroid) {
+    impl.useAndroidPhotoPicker = true;
+  }
 }
 
 class MyApp extends StatelessWidget {

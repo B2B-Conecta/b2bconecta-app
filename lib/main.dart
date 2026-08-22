@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,11 +14,13 @@ import 'package:motolink_pro_app/core/auth/auth_gate.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
+import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Antes de cualquier await: en web, /registro o ?registro=1.
   final launchUri = Uri.base;
+  unawaited(AdAttributionStorage.captureFromUri(launchUri));
   if (kIsWeb) {
     usePathUrlStrategy();
   }

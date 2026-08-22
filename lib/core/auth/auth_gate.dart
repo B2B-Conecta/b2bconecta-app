@@ -20,6 +20,7 @@ import 'auth_recovery_storage.dart';
 import 'auth_uri_callback_clear_stub.dart'
     if (dart.library.html) 'auth_uri_callback_clear_web.dart';
 import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
+import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
 class AuthGate extends StatefulWidget {
@@ -74,6 +75,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           launchUri: widget.launchUri ?? Uri.base,
         ) ||
         PublicAuthRoute.isRegister(Uri.base);
+    unawaited(
+      AdAttributionStorage.captureFromUri(widget.launchUri ?? Uri.base),
+    );
     WidgetsBinding.instance.addObserver(this);
 
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(

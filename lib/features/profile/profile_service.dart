@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/referrals/referrals_service.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_storage.dart';
+import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 class ProfileService {
@@ -192,11 +193,15 @@ class ProfileService {
     // PostgREST upsert sin `role` en el cuerpo puede dejar `role` en null (23502).
     // Insert incluye rol; update omite rol para no permitir cambiarlo desde el cliente.
     if (existing == null) {
+      final attribution = await AdAttributionStorage.peek();
       await SupabaseAccess.client.from('profiles').insert({
         'id': uid,
         ...payload,
         'role': requestedRole,
+        if (attribution != null && !attribution.isEmpty)
+          ...attribution.toProfileColumns(),
       });
+      await AdAttributionStorage.clear();
       final pendingReferral = await ReferralInviteStorage.consumePendingCode();
       if (pendingReferral != null && pendingReferral.isNotEmpty) {
         try {

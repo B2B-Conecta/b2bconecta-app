@@ -1,7 +1,11 @@
 // ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import 'dart:js' as js;
 
+import 'marketing_consent.dart';
+import 'marketing_consent_storage.dart';
 import 'meta_pixel_config.dart';
+import 'meta_pixel_events.dart';
 
 bool _scriptReady = false;
 bool _pageViewSent = false;
@@ -11,6 +15,44 @@ void syncMetaPixel({required bool marketingAllowed}) {
   if (!marketingAllowed) return;
   _ensureScript();
   _trackPageViewOnce();
+}
+
+void trackCompleteRegistration({String? email}) {
+  _trackOnce(
+    MetaPixelEvents.completeRegistration,
+    email,
+  );
+}
+
+void trackSubmitApplication({String? userId}) {
+  _trackOnce(
+    MetaPixelEvents.submitApplication,
+    userId,
+  );
+}
+
+void _trackOnce(String event, String? identity) {
+  if (readMarketingConsent() != MarketingConsent.accepted) return;
+  _ensureScript();
+  if (!js.context.hasProperty('fbq')) return;
+  final key = MetaPixelEvents.dedupeKey(event, identity);
+  if (_wasSent(key)) return;
+  js.context.callMethod('fbq', ['track', event]);
+  _markSent(key);
+}
+
+bool _wasSent(String key) {
+  try {
+    return html.window.localStorage[key] == '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+void _markSent(String key) {
+  try {
+    html.window.localStorage[key] = '1';
+  } catch (_) {}
 }
 
 void _ensureScript() {

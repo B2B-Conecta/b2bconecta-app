@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/app/config/public_legal_route.dart';
 import 'package:motolink_pro_app/core/auth/browser_location.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_config.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
@@ -200,6 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
         referralCode: referral.isEmpty ? null : referral,
       );
+      trackCompleteRegistration(email: email);
       if (!mounted) return;
       if (res.session != null) {
         _showSnackBar('Cuenta creada. Bienvenido.');

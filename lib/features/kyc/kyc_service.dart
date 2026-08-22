@@ -7,6 +7,7 @@ import 'package:motolink_pro_app/features/kyc/kyc_approved_aliado_model.dart';
 import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_flag.dart';
 import 'package:motolink_pro_app/features/kyc/profile_document_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 
 class KycService {
   KycService._();
@@ -119,11 +120,13 @@ class KycService {
   /// Aliado: envía expediente KYC a revisión B2B Conecta.
   static Future<void> profileSubmitKycForReview() async {
     await SupabaseAccess.client.rpc('profile_submit_kyc_for_review');
+    trackSubmitApplication(userId: SupabaseAccess.currentUserId);
   }
 
   /// Mayorista (importador): envía solicitud de ingreso a revisión (sin KYC docs).
   static Future<void> profileSubmitImportadorForReview() async {
     await SupabaseAccess.client.rpc('profile_submit_importador_for_review');
+    trackSubmitApplication(userId: SupabaseAccess.currentUserId);
   }
 
   static const _profileDocumentsSelect = 'id, profile_id, doc_type, '

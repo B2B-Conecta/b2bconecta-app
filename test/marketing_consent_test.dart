@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/ads/marketing_consent.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel_config.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel_events.dart';
 
 void main() {
   test('parses consent cookie values', () {
@@ -31,6 +32,19 @@ void main() {
         'b2bconecta-app-git-dev-b2bconecta.vercel.app',
       ),
       isNull,
+    );
+  });
+
+  test('pixel event dedupe keys are stable per identity', () {
+    expect(
+      MetaPixelEvents.dedupeKey(MetaPixelEvents.completeRegistration, 'A@B.com'),
+      MetaPixelEvents.dedupeKey(MetaPixelEvents.completeRegistration, 'a@b.com'),
+    );
+    expect(
+      MetaPixelEvents.dedupeKey(MetaPixelEvents.submitApplication, 'uid-1'),
+      isNot(
+        MetaPixelEvents.dedupeKey(MetaPixelEvents.completeRegistration, 'uid-1'),
+      ),
     );
   });
 }

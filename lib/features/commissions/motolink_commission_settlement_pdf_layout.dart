@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/app/config/motolink_fiscal_issuer_constants.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 
@@ -35,7 +36,7 @@ abstract final class MotolinkCommissionSettlementPdfLayout {
           pw.Image(pw.MemoryImage(logoBytes), width: 72, height: 72),
         pw.SizedBox(height: 6),
         pw.Text(
-          MotolinkFiscalIssuerConstants.businessName,
+          BrandCopy.display(MotolinkFiscalIssuerConstants.businessName),
           style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
         ),
         pw.Text(
@@ -43,7 +44,7 @@ abstract final class MotolinkCommissionSettlementPdfLayout {
           style: const pw.TextStyle(fontSize: 9),
         ),
         pw.Text(
-          MotolinkFiscalIssuerConstants.address,
+          BrandCopy.display(MotolinkFiscalIssuerConstants.address),
           style: const pw.TextStyle(fontSize: 8),
         ),
         pw.Text(
@@ -222,14 +223,14 @@ abstract final class MotolinkCommissionSettlementPdfLayout {
       children: [
         pw.SizedBox(height: 14),
         pw.Text(
-          'Forma de pago: transferencia o medio acordado con B2B Conecta. '
+          'Forma de pago: transferencia o medio acordado con ${BrandCopy.name}. '
           'Registre el comprobante en la app (Perfil → Cortes de comisión).',
           style: const pw.TextStyle(fontSize: 8, lineSpacing: 1.2),
         ),
         pw.SizedBox(height: 12),
         pw.Center(
           child: pw.Text(
-            'B2B Conecta Marketplace — documento generado electrónicamente.',
+            '${BrandCopy.name} Marketplace — documento generado electrónicamente.',
             style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
           ),
         ),
@@ -246,7 +247,7 @@ abstract final class MotolinkCommissionSettlementPdfLayout {
           pw.Container(height: 0.5, color: PdfColors.grey500),
           pw.SizedBox(height: 6),
           pw.Text(
-            legalNote,
+            BrandCopy.display(legalNote),
             style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
           ),
         ],

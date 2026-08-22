@@ -5,7 +5,7 @@ abstract final class MotolinkFiscalIssuerConstants {
   static const address =
       'Valencia, Edo. Carabobo — Av. Bolívar Norte, edif. Cámara de Comercio, locales 7-8';
   static const phone = '(0414) 422-5083';
-  static const email = 'motolinkc.a@gmail.com';
+  static const email = 'b2bconecta.ve@gmail.com';
   static const codigoOperacion = '000110';
   static const codigoOrigen = '000001324';
 

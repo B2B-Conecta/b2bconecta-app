@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
@@ -132,9 +133,10 @@ class _MainShellState extends State<MainShell> {
     );
     final n = pending.isEmpty ? null : pending.first;
     final show = n != null;
-    final message = n != null && n.body.trim().isNotEmpty
+    final raw = n != null && n.body.trim().isNotEmpty
         ? n.body.trim()
         : _aliadoAccessApprovedMessage;
+    final message = BrandCopy.display(raw);
     if (show == _showAliadoAccessApprovedBanner &&
         message == _aliadoAccessApprovedMessage) {
       return;

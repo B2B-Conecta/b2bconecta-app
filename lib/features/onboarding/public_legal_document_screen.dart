@@ -52,7 +52,14 @@ class PublicLegalDocumentScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: navigateToAppHome,
+            onPressed: () {
+              final nav = Navigator.maybeOf(context);
+              if (nav != null && nav.canPop()) {
+                nav.pop();
+                return;
+              }
+              navigateToAppHome();
+            },
             child: Text(
               'Ir al inicio',
               style: TextStyle(

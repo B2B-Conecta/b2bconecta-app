@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/app/firebase_options.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'kyc_notification_match.dart';
@@ -138,8 +139,8 @@ class PushNotificationService {
     );
     await _local.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      title,
-      body,
+      BrandCopy.display(title),
+      BrandCopy.display(body),
       NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,
@@ -157,8 +158,9 @@ class PushNotificationService {
   void _onForegroundMessage(RemoteMessage message) {
     final n = message.notification;
     final data = message.data;
-    final rawTitle =
-        n?.title ?? data['title']?.toString() ?? 'B2B Conecta';
+    final rawTitle = BrandCopy.display(
+      n?.title ?? data['title']?.toString() ?? BrandCopy.name,
+    );
     final type = data['type']?.toString() ?? 'mensaje';
     final accessApproved = isAliadoAccessApprovedNotification(
       type: type,
@@ -166,7 +168,7 @@ class PushNotificationService {
     );
     showLocalBanner(
       title: accessApproved ? 'Acceso validado' : rawTitle,
-      body: n?.body ?? data['body']?.toString() ?? '',
+      body: BrandCopy.display(n?.body ?? data['body']?.toString() ?? ''),
       type: type,
       relatedId: data['related_id']?.toString(),
       notificationId: data['notification_id']?.toString(),

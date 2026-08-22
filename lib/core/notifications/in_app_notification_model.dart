@@ -1,3 +1,5 @@
+import 'package:motolink_pro_app/app/config/brand_copy.dart';
+
 class InAppNotificationModel {
   const InAppNotificationModel({
     required this.id,
@@ -28,8 +30,8 @@ class InAppNotificationModel {
     return InAppNotificationModel(
       id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
-      title: json['title']?.toString().trim() ?? '',
-      body: json['body']?.toString().trim() ?? '',
+      title: BrandCopy.display(json['title']?.toString().trim() ?? ''),
+      body: BrandCopy.display(json['body']?.toString().trim() ?? ''),
       type: json['type']?.toString().trim() ?? 'mensaje',
       isRead: json['is_read'] == true,
       createdAt: DateTime.tryParse(createdRaw ?? '') ?? DateTime.now(),

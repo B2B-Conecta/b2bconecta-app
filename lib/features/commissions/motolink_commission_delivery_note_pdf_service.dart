@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:motolink_pro_app/app/config/brand_copy.dart';
+
 import 'commission_settlement_model.dart';
 import 'commission_settlement_fiscal.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -46,7 +48,7 @@ class MotolinkCommissionDeliveryNotePdfService {
         CommissionSettlementFiscal.totalVentasInformativoUsd(lines);
     final serviceDesc =
         'Servicio de intermediación digital y uso de plataforma tecnológica '
-        'B2B Conecta, según corte de cuenta referencia $ref';
+        '${BrandCopy.name}, según corte de cuenta referencia $ref';
 
     final tasaTxt =
         formatTasaBcvDisplay(tasaBcvEmision, fractionDigits: 4);

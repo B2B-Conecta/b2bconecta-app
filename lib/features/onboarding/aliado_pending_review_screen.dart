@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/core/notifications/in_app_notification_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -78,9 +79,11 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
       return;
     }
 
-    final body = notification.body.trim().isNotEmpty
-        ? notification.body.trim()
-        : _approvedMessage;
+    final body = BrandCopy.display(
+      notification.body.trim().isNotEmpty
+          ? notification.body.trim()
+          : _approvedMessage,
+    );
 
     await PushNotificationService.instance.showLocalBanner(
       title: notification.title.trim().isNotEmpty

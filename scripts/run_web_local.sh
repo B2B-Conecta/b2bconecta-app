@@ -15,6 +15,11 @@ fi
 
 echo "Starting Flutter web on http://localhost:$PORT (ensure .env is local)..."
 echo ""
+echo "Registro (local):"
+echo "  http://localhost:$PORT/registro"
+echo "  http://localhost:$PORT/?registro=1"
+echo "Hot reload no basta: hay que reiniciar este script si cambió web/registro."
+echo ""
 echo "Push (local, opcional): en otra terminal ejecute"
 echo "  bash scripts/serve_functions_local.sh"
 echo "y configure config/push.env (FCM_SERVER_KEY desde Firebase Console)."

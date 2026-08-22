@@ -24,4 +24,8 @@ flutter pub get
 echo "==> Building Flutter web (release)"
 flutter build web --release
 
+# El stub web/registro/ es solo para `flutter run` (sin fallback SPA).
+# En Vercel el rewrite debe servir index.html y dejar la URL en /registro.
+rm -rf build/web/registro
+
 echo "==> Build output: build/web"

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B2B Conecta</title>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      params.set('registro', '1');
+      var q = params.toString();
+      window.location.replace('/' + (q ? '?' + q : '?registro=1'));
+    })();
+  </script>
+</head>
+<body></body>
+</html>

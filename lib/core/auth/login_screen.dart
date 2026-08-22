@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_storage.dart';
+import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
+import 'package:motolink_pro_app/core/auth/browser_location.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_config.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -17,10 +19,17 @@ import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
 enum _AuthMode { login, register }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.initialErrorMessage});
+  const LoginScreen({
+    super.key,
+    this.initialErrorMessage,
+    this.startInRegister = false,
+  });
 
   /// Mensaje de error tras abrir un enlace Auth inválido o expirado.
   final String? initialErrorMessage;
+
+  /// `/registro` y anuncios: abrir el formulario de cuenta, no el login.
+  final bool startInRegister;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -31,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _referralController = TextEditingController();
-  _AuthMode _mode = _AuthMode.login;
+  late _AuthMode _mode;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -39,13 +48,47 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _mode = widget.startInRegister ? _AuthMode.register : _AuthMode.login;
     final msg = widget.initialErrorMessage?.trim();
     if (msg != null && msg.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showSnackBar(msg, isError: true);
       });
     }
+    if (widget.startInRegister) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncBrowserPath(_AuthMode.register);
+      });
+    }
     _bootstrapReferralFromUrl();
+  }
+
+  void _syncBrowserPath(_AuthMode mode) {
+    final params = Map<String, String>.from(Uri.base.queryParameters)
+      ..remove('registro');
+    final query = params.isEmpty ? '' : Uri(queryParameters: params).query;
+    if (mode == _AuthMode.register) {
+      replaceBrowserPath(PublicAuthRoute.path, query: query);
+    } else {
+      replaceBrowserPath('/', query: query);
+    }
+  }
+
+  /// Flutter web pisa `history` con el nombre de la ruta del Navigator.
+  /// Cambiar solo el formulario deja la barra en `/`.
+  void _goToMode(_AuthMode mode) {
+    final routeName = ModalRoute.of(context)?.settings.name;
+    final onRegister = PublicAuthRoute.shouldOpenRegister(routeName: routeName);
+    if (mode == _AuthMode.register && !onRegister) {
+      Navigator.of(context).pushReplacementNamed(PublicAuthRoute.path);
+      return;
+    }
+    if (mode == _AuthMode.login && onRegister) {
+      Navigator.of(context).pushReplacementNamed('/');
+      return;
+    }
+    _syncBrowserPath(mode);
+    setState(() => _mode = mode);
   }
 
   Future<void> _bootstrapReferralFromUrl() async {
@@ -55,10 +98,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (code == null || code.isEmpty) return;
     await ReferralInviteStorage.savePendingCode(code);
     if (!mounted) return;
-    setState(() {
-      _referralController.text = code;
-      if (fromUrl != null) _mode = _AuthMode.register;
-    });
+    setState(() => _referralController.text = code);
+    if (fromUrl != null) _goToMode(_AuthMode.register);
   }
 
   @override
@@ -400,7 +441,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: _isLoading
                         ? null
-                        : () => setState(() => _mode = _AuthMode.register),
+                        : () => _goToMode(_AuthMode.register),
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: Size.zero,
@@ -431,7 +472,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: _isLoading
                         ? null
-                        : () => setState(() => _mode = _AuthMode.login),
+                        : () => _goToMode(_AuthMode.login),
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: Size.zero,

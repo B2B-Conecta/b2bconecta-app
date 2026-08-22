@@ -56,7 +56,7 @@ fi
 if [[ "$ENV_NAME" == "local" ]]; then
   PUBLISHABLE="$(supabase status -o json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('PUBLISHABLE_KEY',''))" 2>/dev/null || true)"
   if [[ -z "$PUBLISHABLE" ]]; then
-    PUBLISHABLE="$(supabase status 2>/dev/null | awk '/Publishable/{print $3}')"
+    PUBLISHABLE="$(supabase status 2>/dev/null | awk '/Publishable/{print $3}' || true)"
   fi
   cp "$TEMPLATE" "$TARGET"
   merge_env_local "local"

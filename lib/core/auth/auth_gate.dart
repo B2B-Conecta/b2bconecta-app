@@ -12,6 +12,7 @@ import 'recover_password_screen.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
 import 'auth_incoming_uri.dart';
 import 'auth_link_utils.dart';
@@ -22,7 +23,17 @@ import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({
+    super.key,
+    this.launchUri,
+    this.startInRegister = false,
+  });
+
+  /// URI al arrancar (web: `/registro` se pierde si el Navigator vuelve a `/`).
+  final Uri? launchUri;
+
+  /// Ruta nombrada `/registro` o `?registro=1`.
+  final bool startInRegister;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -31,6 +42,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   static const _authCallbackTimeout = Duration(seconds: 10);
 
+  late final bool _startInRegister;
   late final StreamSubscription<AuthState> _authSub;
   StreamSubscription<Uri>? _deepLinkSub;
   AuthState? _authState;
@@ -57,6 +69,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _startInRegister = widget.startInRegister ||
+        PublicAuthRoute.shouldOpenRegister(
+          launchUri: widget.launchUri ?? Uri.base,
+        ) ||
+        PublicAuthRoute.isRegister(Uri.base);
     WidgetsBinding.instance.addObserver(this);
 
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
@@ -452,8 +469,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
 
     return LoginScreen(
-      key: const ValueKey('login'),
+      key: ValueKey(_startInRegister ? 'register' : 'login'),
       initialErrorMessage: _initialLinkError,
+      startInRegister: _startInRegister,
     );
   }
 }

@@ -4,5 +4,19 @@
   "framework": null,
   "installCommand": "echo \"Flutter web: deps installed in buildCommand\"",
   "buildCommand": "bash scripts/build_web_vercel.sh",
-  "outputDirectory": "build/web"
+  "outputDirectory": "build/web",
+  "rewrites": [
+    {
+      "source": "/registro",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/registro/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!assets/|icons/|canvaskit/|flutter_service_worker\\.js).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

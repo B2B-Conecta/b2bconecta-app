@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/core/notifications/push_notification_service.da
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
+import 'package:motolink_pro_app/features/ads/marketing_consent_host.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,16 +90,19 @@ class MyApp extends StatelessWidget {
             // Key fuerza reconstrucción completa de la UI al cambiar tono.
             return KeyedSubtree(
               key: ValueKey<String>('theme-${mode.name}'),
-              child: child ?? const SizedBox.shrink(),
+              child: MarketingConsentHost(
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
           // La URL del navegador sigue el *nombre* de la ruta del Navigator.
           // Si el stack arranca en "/", Flutter deja localhost:3000/ aunque
           // el formulario sea de registro.
           onGenerateInitialRoutes: (initialRoute) {
+            final pathOnly = initialRoute.split('?').first;
             final register = PublicAuthRoute.shouldOpenRegister(
               launchUri: launchUri,
-              routeName: initialRoute,
+              routeName: pathOnly,
             );
             final name = register ? PublicAuthRoute.path : '/';
             return [

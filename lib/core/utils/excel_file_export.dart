@@ -15,10 +15,33 @@ enum ExcelExportResult {
 Future<ExcelExportResult> saveExcelForExport({
   required String name,
   required Uint8List bytes,
-}) async {
-  const ext = 'xlsx';
-  const mimeType = MimeType.microsoftExcel;
+}) {
+  return saveBytesForExport(
+    name: name,
+    bytes: bytes,
+    ext: 'xlsx',
+    mimeType: MimeType.microsoftExcel,
+  );
+}
 
+Future<ExcelExportResult> saveCsvForExport({
+  required String name,
+  required Uint8List bytes,
+}) {
+  return saveBytesForExport(
+    name: name,
+    bytes: bytes,
+    ext: 'csv',
+    mimeType: MimeType.csv,
+  );
+}
+
+Future<ExcelExportResult> saveBytesForExport({
+  required String name,
+  required Uint8List bytes,
+  required String ext,
+  required MimeType mimeType,
+}) async {
   if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) {
     final path = await FileSaver.instance.saveAs(
       name: name,

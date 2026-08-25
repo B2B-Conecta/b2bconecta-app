@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -91,6 +92,19 @@ class ExcelCatalogService {
     'garantia (opcional)',
   ];
 
+  static const templateExampleRow = [
+    'EJEMPLO-001',
+    'Repuesto de muestra (puede borrar esta fila)',
+    'Descripción opcional',
+    '12.50',
+    '10.99',
+    '2',
+    '10',
+    'Motor',
+    'CG150 CG125',
+    'si',
+  ];
+
   /// Bytes de un .xlsx con cabeceras (columnas alineadas al formulario y a BD).
   static Uint8List buildTemplateBytes() {
     final excel = Excel.createExcel();
@@ -100,24 +114,27 @@ class ExcelCatalogService {
     );
     // Fila ignorada al importar (SKU que empieza por "EJEMPLO").
     sheet.appendRow(
-      [
-        TextCellValue('EJEMPLO-001'),
-        TextCellValue('Repuesto de muestra (puede borrar esta fila)'),
-        TextCellValue('Descripción opcional'),
-        TextCellValue('12.50'),
-        TextCellValue('10.99'),
-        TextCellValue('2'),
-        TextCellValue('10'),
-        TextCellValue('Motor'),
-        TextCellValue('CG150, CG125'),
-        TextCellValue('si'),
-      ],
+      templateExampleRow.map((h) => TextCellValue(h)).toList(),
     );
     final bytes = excel.encode();
     if (bytes == null) {
       throw StateError('No se pudo generar el archivo Excel.');
     }
     return Uint8List.fromList(bytes);
+  }
+
+  /// CSV con coma (estándar B2B Conecta) y la misma fila de ejemplo.
+  static Uint8List buildCsvTemplateBytes() {
+    String csvCell(String raw) {
+      if (raw.contains(',') || raw.contains('"') || raw.contains('\n')) {
+        return '"${raw.replaceAll('"', '""')}"';
+      }
+      return raw;
+    }
+
+    final header = templateHeaders.map(csvCell).join(',');
+    final example = templateExampleRow.map(csvCell).join(',');
+    return Uint8List.fromList(utf8.encode('$header\n$example\n'));
   }
 
   /// Exporta filas reales del inventario del importador con el mismo layout

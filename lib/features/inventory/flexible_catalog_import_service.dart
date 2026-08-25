@@ -217,7 +217,10 @@ class FlexibleCatalogImportService {
       return const _TabularData(headers: [], rows: []);
     }
 
-    final delimiter = meta.csvDelimiter;
+    final delimiter = detectCsvDelimiter(
+      text,
+      fallback: meta.csvDelimiter,
+    );
     final parsed = lines.map((l) => _parseCsvLine(l, delimiter)).toList();
 
     final headerIdx = meta.headerRow - 1;
@@ -226,7 +229,11 @@ class FlexibleCatalogImportService {
     }
 
     final headers = parsed[headerIdx]
-        .map((h) => h.trim().isEmpty ? 'column' : h.trim())
+        .map((h) {
+          var t = h.trim();
+          if (t.startsWith('\uFEFF')) t = t.substring(1).trim();
+          return t.isEmpty ? 'column' : t;
+        })
         .toList();
 
     return _TabularData(headers: headers, rows: parsed);
@@ -267,6 +274,48 @@ class FlexibleCatalogImportService {
     final v = cell.value;
     if (v == null) return '';
     return v.toString();
+  }
+
+  /// Elige `,` `;` o tabulador según la primera línea con datos.
+  static String detectCsvDelimiter(String text, {String fallback = ','}) {
+    final lines = const LineSplitter().convert(text);
+    String sample = '';
+    for (final line in lines) {
+      final t = line.trim();
+      if (t.isEmpty) continue;
+      sample = t.startsWith('\uFEFF') ? t.substring(1) : t;
+      break;
+    }
+    if (sample.isEmpty) return fallback.isEmpty ? ',' : fallback;
+
+    final counts = <String, int>{
+      ';': _countUnquoted(sample, ';'),
+      ',': _countUnquoted(sample, ','),
+      '\t': _countUnquoted(sample, '\t'),
+    };
+    var best = fallback.isEmpty ? ',' : fallback;
+    var bestCount = counts[best] ?? 0;
+    for (final e in counts.entries) {
+      if (e.value > bestCount) {
+        best = e.key;
+        bestCount = e.value;
+      }
+    }
+    return bestCount > 0 ? best : (fallback.isEmpty ? ',' : fallback);
+  }
+
+  static int _countUnquoted(String line, String delimiter) {
+    var n = 0;
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+      final ch = line[i];
+      if (ch == '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (!inQuotes && ch == delimiter) n++;
+    }
+    return n;
   }
 
   /// Parser CSV mínimo con soporte de comillas dobles (RFC4180 básico).

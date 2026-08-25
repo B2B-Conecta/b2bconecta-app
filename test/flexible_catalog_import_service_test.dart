@@ -110,9 +110,113 @@ XYZ-002,Bujía,3.00,25,NKG
       expect(roundTrip.options.upsertMode, CatalogImportUpsertMode.priceStockOnly);
       expect(roundTrip.columnMap['sku']?.source, 'Cod_Art');
     });
+
+    test('detectCsvDelimiter reconoce punto y coma, coma y tabulador', () {
+      expect(
+        FlexibleCatalogImportService.detectCsvDelimiter(
+          'CODIGO;DESCRIPCION;MARCA;PRECIO',
+        ),
+        ';',
+      );
+      expect(
+        FlexibleCatalogImportService.detectCsvDelimiter(
+          'sku,name,price,stock',
+        ),
+        ',',
+      );
+      expect(
+        FlexibleCatalogImportService.detectCsvDelimiter(
+          'sku\tname\tprice',
+        ),
+        '\t',
+      );
+    });
+
+    test('CSV con punto y coma (Profit/Excel VE) parte columnas y acepta precio 0', () async {
+      final csv = '''
+CODIGO;DESCRIPCION;MARCA;PRECIO
+HV72016;BUJIAS D8TC HONGJU;HONGJU;52
+KIT-00015;KIT DE CILINDRO BERA 150 B-12 RS MOTO;RS MOTO MARKET;0
+F079;CINTA PARA RIN GS ROJO&AZUL LIDER;LIDER;4
+''';
+      final bytes = Uint8List.fromList(utf8.encode(csv));
+      final preview = FlexibleCatalogImportService.previewFile(
+        bytes: bytes,
+        meta: const CatalogImportFileMeta(
+          format: CatalogImportFileFormat.csv,
+          headerRow: 1,
+          dataStartsAtRow: 2,
+        ),
+      );
+      expect(preview.headers, ['CODIGO', 'DESCRIPCION', 'MARCA', 'PRECIO']);
+      expect(preview.sampleRows.first['PRECIO'], '52');
+
+      final mapping = CatalogImportMapping(
+        file: const CatalogImportFileMeta(
+          format: CatalogImportFileFormat.csv,
+          headerRow: 1,
+          dataStartsAtRow: 2,
+        ),
+        options: const CatalogImportOptions(batchSize: 50),
+        columnMap: {
+          CatalogImportField.sku.key: const CatalogImportColumnBinding(
+            source: 'CODIGO',
+            required: true,
+          ),
+          CatalogImportField.name.key: const CatalogImportColumnBinding(
+            source: 'DESCRIPCION',
+            required: true,
+          ),
+          CatalogImportField.priceUsd.key: const CatalogImportColumnBinding(
+            source: 'PRECIO',
+            required: true,
+          ),
+        },
+      );
+
+      final batches = await FlexibleCatalogImportService.parseInBatches(
+        bytes: bytes,
+        mapping: mapping,
+      ).toList();
+      expect(batches, hasLength(1));
+      final batch = batches.first;
+      expect(batch.errors, isEmpty);
+      expect(batch.validRows, hasLength(3));
+      final bySku = {for (final r in batch.validRows) r.sku: r};
+      expect(bySku['HV72016']!.priceUsd, 52);
+      expect(bySku['KIT-00015']!.priceUsd, 0);
+      expect(bySku['KIT-00015']!.stock, 0);
+      expect(bySku['F079']!.priceUsd, 4);
+    });
+  });
+
+  group('CatalogImportValidator.parseImportNumber', () {
+    test('normaliza moneda, coma decimal y miles', () {
+      expect(CatalogImportValidator.parseImportNumber('0'), 0);
+      expect(CatalogImportValidator.parseImportNumber('52'), 52);
+      expect(CatalogImportValidator.parseImportNumber('12,50'), 12.5);
+      expect(CatalogImportValidator.parseImportNumber('1.234,56'), 1234.56);
+      expect(CatalogImportValidator.parseImportNumber('1,234.56'), 1234.56);
+      expect(CatalogImportValidator.parseImportNumber('\$10.50'), 10.5);
+      expect(CatalogImportValidator.parseImportNumber('USD 8'), 8);
+      expect(CatalogImportValidator.parseImportNumber('  16  '), 16);
+    });
   });
 
   group('CatalogImportValidator', () {
+    test('validateBatch acepta precio 0', () {
+      const row = CatalogImportNormalizedRow(
+        rowIndex: 2,
+        sku: 'A1',
+        name: 'Producto',
+        priceUsd: 0,
+        stock: 0,
+      );
+      final result = CatalogImportValidator.validateBatch([row]);
+      expect(result.errors, isEmpty);
+      expect(result.validRows, hasLength(1));
+    });
+
     test('validateBatch rechaza precio negativo', () {
       const row = CatalogImportNormalizedRow(
         rowIndex: 2,

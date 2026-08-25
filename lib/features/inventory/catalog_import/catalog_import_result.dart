@@ -5,12 +5,16 @@ class CatalogImportRowError {
     required this.code,
     required this.message,
     this.sku,
+    this.column,
+    this.rawValue,
   });
 
   final int rowIndex;
   final String? sku;
   final String code;
   final String message;
+  final String? column;
+  final String? rawValue;
 
   factory CatalogImportRowError.fromJson(Map<String, dynamic> json) {
     return CatalogImportRowError(
@@ -20,6 +24,8 @@ class CatalogImportRowError {
       sku: json['sku']?.toString(),
       code: json['code']?.toString() ?? 'UNKNOWN',
       message: json['message']?.toString() ?? 'Error desconocido',
+      column: json['column']?.toString(),
+      rawValue: json['raw_value']?.toString(),
     );
   }
 
@@ -28,6 +34,8 @@ class CatalogImportRowError {
         if (sku != null) 'sku': sku,
         'code': code,
         'message': message,
+        if (column != null) 'column': column,
+        if (rawValue != null) 'raw_value': rawValue,
       };
 }
 

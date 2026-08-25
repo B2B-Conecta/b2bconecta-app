@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'product_images.dart';
 
 /// Slot de imagen en edición: URL existente o bytes pendientes de subir.
@@ -38,15 +38,13 @@ class ProductImageGalleryEditor extends StatelessWidget {
   Future<void> _pickImage(BuildContext context, int index) async {
     if (index != slots.length) return;
     try {
-      final x = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 82,
-        maxWidth: 1600,
-      );
-      if (x == null) return;
-      final bytes = await x.readAsBytes();
-      var ext = x.name.contains('.') ? x.name.split('.').last.toLowerCase() : 'jpeg';
+      final picked = await pickKycDocument(channel: DocumentPickChannel.gallery);
+      if (picked == null) return;
+      var ext = picked.fileName.contains('.')
+          ? picked.fileName.split('.').last.toLowerCase()
+          : 'jpeg';
       if (ext == 'jpg') ext = 'jpeg';
+      final bytes = picked.bytes;
 
       final next = List<ProductImageEditSlot>.from(slots);
       next.add(ProductImageEditSlot.pending(bytes, ext));

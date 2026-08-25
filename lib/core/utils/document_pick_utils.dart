@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'web_native_file_pick.dart';
+
 /// Archivo elegido por cámara, galería o selector de documentos.
 class PickedDocumentBytes {
   const PickedDocumentBytes({
@@ -51,20 +53,22 @@ Future<PickedDocumentBytes?> pickKycDocumentBytes(BuildContext context) async {
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
             ),
           ),
-          if (!kIsWeb)
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Tomar foto'),
-              subtitle: const Text('Usar la cámara del dispositivo'),
-              onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.camera),
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Tomar foto'),
+            subtitle: const Text(
+              kIsWeb
+                  ? 'En iPhone: elija Cámara o Fototeca en el menú'
+                  : 'Usar la cámara del dispositivo',
             ),
-          if (!kIsWeb)
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Elegir de galería'),
-              subtitle: const Text('Imagen JPG o PNG'),
-              onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.gallery),
-            ),
+            onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Elegir de galería'),
+            subtitle: const Text('Imagen JPG o PNG'),
+            onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.gallery),
+          ),
           ListTile(
             leading: const Icon(Icons.upload_file_outlined),
             title: const Text('Subir archivo'),
@@ -105,18 +109,16 @@ Future<PickedDocumentBytes?> pickProfileImageBytes(BuildContext context) async {
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
             ),
           ),
-          if (!kIsWeb)
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Tomar foto'),
-              onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.camera),
-            ),
-          if (!kIsWeb)
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Elegir de galería'),
-              onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.gallery),
-            ),
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Tomar foto'),
+            onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Elegir de galería'),
+            onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.gallery),
+          ),
           ListTile(
             leading: const Icon(Icons.upload_file_outlined),
             title: const Text('Subir archivo'),
@@ -140,7 +142,24 @@ Future<PickedDocumentBytes?> pickProfileImageBytes(BuildContext context) async {
   }
 }
 
+/// Excel / CSV para carga masiva. En web usa MIME nativos (Safari iOS).
+Future<PickedDocumentBytes?> pickSpreadsheetFile() async {
+  if (kIsWeb) {
+    return _fromWeb(await pickWebNativeFile(accept: kWebAcceptSpreadsheet));
+  }
+  final res = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: const ['xlsx', 'csv'],
+    withData: true,
+  );
+  return _fromPlatformFile(res, fallbackName: 'catalogo.xlsx');
+}
+
 Future<PickedDocumentBytes?> _pickFromCamera() async {
+  if (kIsWeb) {
+    // No `capture`: Safari muestra Cámara / Fototeca / Archivos.
+    return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesOnly));
+  }
   try {
     final x = await ImagePicker().pickImage(
       source: ImageSource.camera,
@@ -154,6 +173,9 @@ Future<PickedDocumentBytes?> _pickFromCamera() async {
 }
 
 Future<PickedDocumentBytes?> _pickFromGallery() async {
+  if (kIsWeb) {
+    return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesOnly));
+  }
   try {
     final x = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -167,30 +189,43 @@ Future<PickedDocumentBytes?> _pickFromGallery() async {
 }
 
 Future<PickedDocumentBytes?> _pickFromFiles() async {
+  if (kIsWeb) {
+    return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesAndPdf));
+  }
   final res = await FilePicker.platform.pickFiles(
     type: FileType.custom,
     allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
     withData: true,
   );
-  if (res == null || res.files.isEmpty) return null;
-  final f = res.files.first;
-  final bytes = f.bytes;
-  if (bytes == null || bytes.isEmpty) return null;
-  final name = f.name.trim().isEmpty ? 'documento.pdf' : f.name;
-  return PickedDocumentBytes(bytes: bytes, fileName: name);
+  return _fromPlatformFile(res, fallbackName: 'documento.pdf');
 }
 
 Future<PickedDocumentBytes?> _pickImageFromFiles() async {
+  if (kIsWeb) {
+    return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesOnly));
+  }
   final res = await FilePicker.platform.pickFiles(
     type: FileType.custom,
     allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
     withData: true,
   );
+  return _fromPlatformFile(res, fallbackName: 'imagen.png');
+}
+
+PickedDocumentBytes? _fromWeb(WebPickedFile? file) {
+  if (file == null || file.bytes.isEmpty) return null;
+  return PickedDocumentBytes(bytes: file.bytes, fileName: file.fileName);
+}
+
+PickedDocumentBytes? _fromPlatformFile(
+  FilePickerResult? res, {
+  required String fallbackName,
+}) {
   if (res == null || res.files.isEmpty) return null;
   final f = res.files.first;
   final bytes = f.bytes;
   if (bytes == null || bytes.isEmpty) return null;
-  final name = f.name.trim().isEmpty ? 'imagen.png' : f.name;
+  final name = f.name.trim().isEmpty ? fallbackName : f.name;
   return PickedDocumentBytes(bytes: bytes, fileName: name);
 }
 

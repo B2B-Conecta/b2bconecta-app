@@ -78,6 +78,7 @@ class _ImporterFlexibleImportScreenState
   static const _maxContentWidth = 1180.0;
 
   static const _optionalFields = [
+    CatalogImportField.stock,
     CatalogImportField.description,
     CatalogImportField.salePriceUsd,
     CatalogImportField.category,
@@ -100,7 +101,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.salePriceUsd:
         'Precio promocional en USD, si aplica. Debe ser menor al precio de lista.',
     CatalogImportField.stock:
-        'Unidades disponibles en tu almacén o sucursal.',
+        'Unidades en almacén. Si no mapeas esta columna, queda en 0.',
     CatalogImportField.category:
         'Familia o línea (Motor, Frenos, Eléctrico, etc.).',
     CatalogImportField.compatibility:
@@ -335,6 +336,19 @@ class _ImporterFlexibleImportScreenState
     }
   }
 
+  String _formatImportError(CatalogImportRowError e) {
+    final sku = e.sku?.trim();
+    final skuBit = (sku == null || sku.isEmpty)
+        ? ''
+        : ' · ${_clipImportSku(sku)}';
+    return 'Fila ${e.rowIndex}$skuBit: ${e.message}';
+  }
+
+  String _clipImportSku(String sku) {
+    if (sku.length <= 36) return sku;
+    return '${sku.substring(0, 36)}…';
+  }
+
   Future<void> _showResultDialog(CatalogImportResult result) async {
     final errors = result.allErrors.take(20).toList();
     await showDialog<void>(
@@ -381,8 +395,7 @@ class _ImporterFlexibleImportScreenState
                   (e) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
-                      'Fila ${e.rowIndex}${e.sku != null ? ' · ${e.sku}' : ''}: '
-                      '${e.message}',
+                      _formatImportError(e),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -590,7 +603,7 @@ class _ImporterFlexibleImportScreenState
           '${estimate ?? '?'} repuestos aprox.',
       child: const Text(
         'Exporta tu listado tal como sale del ERP. B2B Conecta reconoce '
-        'automáticamente SKU, nombre, precio y stock.',
+        'automáticamente SKU, nombre y precio.',
         style: TextStyle(fontSize: 12.5, height: 1.45),
       ),
     );
@@ -603,9 +616,9 @@ class _ImporterFlexibleImportScreenState
 
     final autoExtras = _captureUnmapped ? _unmappedHeaders().length : 0;
     final detail = autoExtras > 0
-        ? ' Detectamos los 4 campos obligatorios. '
+        ? ' Detectamos SKU, nombre y precio. '
             '$autoExtras columna(s) extra se guardarán como datos internos.'
-        : ' Detectamos SKU, nombre, precio y stock. Revisa y toca Importar.';
+        : ' Detectamos SKU, nombre y precio. Revisa y toca Importar.';
 
     return Container(
       width: double.infinity,
@@ -752,7 +765,7 @@ class _ImporterFlexibleImportScreenState
         step(
           1,
           'Columnas clave',
-          '$_mappedRequiredCount/4 listas',
+          '$_mappedRequiredCount/${catalogImportRequiredFields.length} listas',
           step1Done,
         ),
         const SizedBox(width: 8),
@@ -809,7 +822,7 @@ class _ImporterFlexibleImportScreenState
       icon: Icons.storefront_outlined,
       title: 'Asocia tus columnas',
       subtitle:
-          'SKU, nombre, precio y stock son obligatorios. El resto es opcional.',
+          'SKU, nombre y precio son obligatorios. Stock vacío se importa como 0.',
       child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

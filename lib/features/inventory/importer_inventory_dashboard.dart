@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'catalog_import/catalog_import_mapping.dart';
@@ -14,6 +13,7 @@ import 'product_custom_fields_section.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'importer_inventory_layout.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'product_volume_tiers.dart';
@@ -307,6 +307,15 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 icon: const Icon(Icons.folder_open_outlined, size: 18),
                 label: const Text('Elegir Excel / CSV'),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _downloadImportTemplate,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                ),
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Descargar plantilla'),
+              ),
             ],
           ),
         ),
@@ -438,11 +447,11 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             children: [
               _helpStep(
                 n: '1',
-                title: 'Exporta desde tu ERP',
+                title: 'Usa tu Excel/CSV o la plantilla',
                 body:
-                    'Genera un listado en Excel (.xlsx) o CSV desde Profit, Saint, '
-                    'AdministraNET o tu hoja de cálculo. No necesitas adaptar el '
-                    'archivo a una plantilla B2B Conecta.',
+                    'Puedes subir el listado de tu ERP tal cual (Profit, Saint, '
+                    'hoja de cálculo). Si prefieres un formato fijo, toca '
+                    '«Descargar plantilla» (.xlsx o .csv con coma).',
               ),
               _helpStep(
                 n: '2',
@@ -552,16 +561,82 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     );
   }
 
-  Future<void> _startBulkImport() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['xlsx', 'csv'],
-      withData: true,
+  Future<void> _downloadImportTemplate() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(
+                'Plantilla de ejemplo',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Excel (.xlsx)'),
+              subtitle: const Text('Cabeceras sku, nombre, precio, stock'),
+              onTap: () => Navigator.pop(ctx, 'xlsx'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('CSV (.csv)'),
+              subtitle: const Text('Separado por coma (estándar B2B Conecta)'),
+              onTap: () => Navigator.pop(ctx, 'csv'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) {
+    if (choice == null || !mounted) return;
+    try {
+      if (choice == 'csv') {
+        final result = await saveCsvForExport(
+          name: 'b2bconecta_plantilla_inventario',
+          bytes: ExcelCatalogService.buildCsvTemplateBytes(),
+        );
+        if (!mounted) return;
+        if (result == ExcelExportResult.cancelled) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              excelExportSavedMessage('Plantilla CSV descargada.'),
+            ),
+          ),
+        );
+        return;
+      }
+      final result = await saveExcelForExport(
+        name: 'b2bconecta_plantilla_inventario',
+        bytes: ExcelCatalogService.buildTemplateBytes(),
+      );
+      if (!mounted) return;
+      if (result == ExcelExportResult.cancelled) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            excelExportSavedMessage('Plantilla Excel descargada.'),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo descargar la plantilla: $e')),
+      );
+    }
+  }
+
+  Future<void> _startBulkImport() async {
+    final picked = await pickSpreadsheetFile();
+    if (picked == null) return;
+    final bytes = picked.bytes;
+    if (bytes.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -573,7 +648,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       return;
     }
 
-    final name = file.name;
+    final name = picked.fileName;
     final isCsv = name.toLowerCase().endsWith('.csv');
     final fileMeta = CatalogImportFileMeta(
       name: name,

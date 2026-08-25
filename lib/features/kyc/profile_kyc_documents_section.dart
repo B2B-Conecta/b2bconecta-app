@@ -150,23 +150,23 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
 
   bool get _hasPersistedProfile => widget.profile?.id.isNotEmpty == true;
 
-  Future<void> _guardUpload(Future<void> Function() action) async {
+  /// Persist profile *after* the file sheet opens. Awaiting network first
+  /// drops the iOS Safari user gesture and the camera/gallery never appears.
+  Future<bool> _ensureProfileAfterPick() async {
     if (widget.beforeUpload != null) {
-      final ok = await widget.beforeUpload!();
-      if (!ok) return;
-    } else if (!_hasPersistedProfile) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Guarde el perfil antes de subir documentos.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
+      return widget.beforeUpload!();
     }
-    await action();
+    if (_hasPersistedProfile) return true;
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Guarde el perfil antes de subir documentos.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return false;
   }
 
   Future<void> _pickAndUpload(
@@ -175,6 +175,9 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   }) async {
     final picked = await pickKycDocument(channel: channel);
     if (picked == null || !mounted) return;
+
+    final ok = await _ensureProfileAfterPick();
+    if (!ok || !mounted) return;
 
     setState(() => _busyDocType = docType);
     try {
@@ -282,15 +285,12 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
         busy: busy,
         reviewedHint: reviewedHint,
         reviewNote: note,
-        onPickCamera: () => _guardUpload(
-          () => _pickAndUpload(type, channel: DocumentPickChannel.camera),
-        ),
-        onPickGallery: () => _guardUpload(
-          () => _pickAndUpload(type, channel: DocumentPickChannel.gallery),
-        ),
-        onPickFile: () => _guardUpload(
-          () => _pickAndUpload(type, channel: DocumentPickChannel.file),
-        ),
+        onPickCamera: () =>
+            _pickAndUpload(type, channel: DocumentPickChannel.camera),
+        onPickGallery: () =>
+            _pickAndUpload(type, channel: DocumentPickChannel.gallery),
+        onPickFile: () =>
+            _pickAndUpload(type, channel: DocumentPickChannel.file),
         actionsEnabled: widget.beforeUpload != null || _hasPersistedProfile,
       ),
     );

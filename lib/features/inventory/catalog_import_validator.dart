@@ -21,6 +21,8 @@ class CatalogImportNormalizedRow {
     this.hasWarranty = false,
     this.discountRules,
     this.customFields = const {},
+    this.priceColumn,
+    this.priceRaw,
   });
 
   final int rowIndex;
@@ -36,6 +38,10 @@ class CatalogImportNormalizedRow {
   final bool hasWarranty;
   final Map<String, dynamic>? discountRules;
   final Map<String, dynamic> customFields;
+
+  /// Columna de origen del precio (para mensajes de error).
+  final String? priceColumn;
+  final String? priceRaw;
 
   Map<String, dynamic> toRpcJson() {
     final payload = <String, dynamic>{
@@ -123,7 +129,9 @@ class CatalogImportValidator {
           rowIndex: row.rowIndex,
           sku: sku,
           code: 'INVALID_PRICE',
-          message: 'Precio inválido',
+          column: row.priceColumn,
+          rawValue: row.priceRaw,
+          message: _invalidPriceMessage(row),
         ));
         continue;
       }
@@ -177,6 +185,12 @@ class CatalogImportValidator {
       return _applyTransform(raw, binding.transform);
     }
 
+    String? readUntransformed(String targetKey) {
+      final binding = mapping.columnMap[targetKey];
+      if (binding == null) return null;
+      return rawByHeader[binding.source];
+    }
+
     final sku = readField(CatalogImportField.sku.key)?.trim() ?? '';
     if (sku.isEmpty) return null;
     if (mapping.options.skipExampleRows &&
@@ -185,22 +199,24 @@ class CatalogImportValidator {
     }
 
     final name = readField(CatalogImportField.name.key)?.trim() ?? '';
-    final priceRaw = readField(CatalogImportField.priceUsd.key);
-    final stockRaw = readField(CatalogImportField.stock.key);
+    final priceBinding = mapping.columnMap[CatalogImportField.priceUsd.key];
+    final priceRaw = readUntransformed(CatalogImportField.priceUsd.key);
+    final stockRaw = readUntransformed(CatalogImportField.stock.key);
 
-    final price = _parseDouble(priceRaw);
-    final stock = _parseInt(stockRaw);
+    final price = parseImportNumber(priceRaw);
+    final stock = _parseStock(stockRaw);
 
-    final saleRaw = readField(CatalogImportField.salePriceUsd.key);
+    final saleRaw = readUntransformed(CatalogImportField.salePriceUsd.key);
     final sale = saleRaw == null || saleRaw.trim().isEmpty
         ? null
-        : _parseDouble(saleRaw);
+        : parseImportNumber(saleRaw);
 
-    final usdPctRaw = readField(CatalogImportField.usdPaymentDiscountPct.key);
+    final usdPctRaw =
+        readUntransformed(CatalogImportField.usdPaymentDiscountPct.key);
     final tiersRaw = readField(CatalogImportField.volumeTiersJson.key);
     double? usdPct;
     if (usdPctRaw != null && usdPctRaw.trim().isNotEmpty) {
-      usdPct = _parseDouble(usdPctRaw);
+      usdPct = parseImportNumber(usdPctRaw);
       if (usdPct == 0) usdPct = null;
     }
 
@@ -256,7 +272,7 @@ class CatalogImportValidator {
       sku: sku,
       name: name,
       priceUsd: price ?? double.nan,
-      stock: stock ?? -1,
+      stock: stock,
       description: _nullable(readField(CatalogImportField.description.key)),
       category: _nullable(readField(CatalogImportField.category.key)),
       compatibility: _nullable(readField(CatalogImportField.compatibility.key)),
@@ -265,6 +281,8 @@ class CatalogImportValidator {
       hasWarranty: hasWarranty,
       discountRules: discountRules,
       customFields: customFieldsPayload,
+      priceColumn: priceBinding?.source,
+      priceRaw: priceRaw,
     );
   }
 
@@ -301,18 +319,69 @@ class CatalogImportValidator {
     }
   }
 
-  static double? _parseDouble(String? raw) {
+  /// Acepta enteros, decimales con `.` o `,`, miles, `$` / `USD` y precio 0.
+  static double? parseImportNumber(String? raw) {
     if (raw == null) return null;
-    final t = raw.trim();
+    var t = raw.trim().replaceAll('\u00A0', ' ');
     if (t.isEmpty) return null;
-    return double.tryParse(t.replaceAll(',', '.'));
+    t = t.replaceAll(RegExp(r'(usd|us\$)', caseSensitive: false), '');
+    t = t.replaceAll('\$', '');
+    t = t.replaceAll(RegExp(r'\s+'), '');
+    if (t.isEmpty) return null;
+
+    final lastComma = t.lastIndexOf(',');
+    final lastDot = t.lastIndexOf('.');
+    if (lastComma >= 0 && lastDot >= 0) {
+      if (lastComma > lastDot) {
+        t = t.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        t = t.replaceAll(',', '');
+      }
+    } else if (lastComma >= 0) {
+      final decimals = t.length - lastComma - 1;
+      if (decimals > 0 && decimals <= 2) {
+        t = t.replaceAll(',', '.');
+      } else {
+        t = t.replaceAll(',', '');
+      }
+    }
+
+    return double.tryParse(t);
   }
 
-  static int? _parseInt(String? raw) {
-    if (raw == null) return null;
-    final t = raw.trim();
-    if (t.isEmpty) return null;
-    return int.tryParse(t);
+  static int _parseStock(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 0;
+    final n = parseImportNumber(raw);
+    if (n == null || n.isNaN) return -1;
+    return n.round();
+  }
+
+  static String _invalidPriceMessage(CatalogImportNormalizedRow row) {
+    final col = row.priceColumn?.trim();
+    final raw = row.priceRaw?.trim() ?? '';
+    final clipped = _clip(raw, 80);
+    if (col == null || col.isEmpty) {
+      if (raw.contains(';')) {
+        return 'Precio inválido: no se partieron las columnas (¿CSV con '
+            'punto y coma?). Valor: "$clipped"';
+      }
+      return raw.isEmpty
+          ? 'Precio inválido: columna de precio vacía o no mapeada'
+          : 'Precio inválido: "$clipped"';
+    }
+    if (raw.isEmpty) {
+      return 'Precio inválido (columna "$col" vacía)';
+    }
+    if (raw.contains(';') && !raw.contains(',')) {
+      return 'Precio inválido (columna "$col": "$clipped"). El archivo parece '
+          'CSV con punto y coma; vuelva a subirlo para autodetectar el separador.';
+    }
+    return 'Precio inválido (columna "$col": "$clipped")';
+  }
+
+  static String _clip(String value, int max) {
+    if (value.length <= max) return value;
+    return '${value.substring(0, max)}…';
   }
 
   static String _slugHeader(String header) {

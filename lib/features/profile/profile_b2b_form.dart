@@ -239,19 +239,26 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   Future<void> _pickProfileLogo({
     DocumentPickChannel? channel,
   }) async {
+    // Open the picker before any setState/await so iOS Safari keeps the tap
+    // as a user gesture (required to show Cámara / Fototeca).
+    final Future<PickedDocumentBytes?> pick = channel == null
+        ? pickProfileImageBytes(context)
+        : pickKycDocument(channel: channel);
+    final picked = await pick;
+    if (!mounted) return;
+    if (picked == null) return;
+    final n = picked.fileName.toLowerCase();
+    if (n.endsWith('.pdf')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El logo debe ser una imagen (JPG, PNG, WEBP).'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     setState(() => _logoBusy = true);
     try {
-      final picked = channel == null
-          ? await pickProfileImageBytes(context)
-          : await pickKycDocument(channel: channel).then((doc) {
-              if (doc == null) return null;
-              final n = doc.fileName.toLowerCase();
-              if (n.endsWith('.pdf')) {
-                throw ArgumentError('El logo debe ser una imagen (JPG, PNG, WEBP).');
-              }
-              return doc;
-            });
-      if (picked == null) return;
       final name = picked.fileName.toLowerCase();
       String ext = 'png';
       if (name.endsWith('.jpg') || name.endsWith('.jpeg')) ext = 'jpg';

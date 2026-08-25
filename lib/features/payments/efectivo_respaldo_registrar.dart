@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
 /// Foto de respaldo del cobro en efectivo (B2B Conecta).
@@ -29,16 +29,12 @@ class _EfectivoRespaldoRegistrarState extends State<EfectivoRespaldoRegistrar> {
     final r = widget.request;
     if (!r.puedeRegistrarRespaldoEfectivo) return;
 
-    final picker = ImagePicker();
-    final xfile = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 82,
-      maxWidth: 2200,
-    );
-    if (xfile == null) return;
-    final bytes = await xfile.readAsBytes();
+    final picked = await pickKycDocument(channel: DocumentPickChannel.camera);
+    if (picked == null) return;
+    final bytes = picked.bytes;
     if (bytes.isEmpty) return;
-    final name = xfile.name.trim().isEmpty ? 'efectivo_respaldo.jpg' : xfile.name;
+    final name =
+        picked.fileName.trim().isEmpty ? 'efectivo_respaldo.jpg' : picked.fileName;
 
     setState(() => _busy = true);
     try {

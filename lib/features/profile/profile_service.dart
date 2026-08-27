@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/referrals/referrals_service.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_storage.dart';
@@ -43,14 +44,16 @@ class ProfileService {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return null;
 
-    final data = await SupabaseAccess.client
-        .from('profiles')
-        .select()
-        .eq('id', uid)
-        .maybeSingle();
+    return retryOnJwtIssuedAtFuture(() async {
+      final data = await SupabaseAccess.client
+          .from('profiles')
+          .select()
+          .eq('id', uid)
+          .maybeSingle();
 
-    if (data == null) return null;
-    return ProfileModel.fromJson(Map<String, dynamic>.from(data));
+      if (data == null) return null;
+      return ProfileModel.fromJson(Map<String, dynamic>.from(data));
+    });
   }
 
   /// Nombre de negocio para mostrar en etiquetas de pedido.

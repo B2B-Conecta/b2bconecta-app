@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'aliado_pending_review_screen.dart';
 import 'package:motolink_pro_app/app/main_shell.dart';
 import 'profile_setup_screen.dart';
+import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
@@ -90,7 +91,7 @@ class _ProfileGateState extends State<ProfileGate> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${snapshot.error}',
+                      _profileLoadHint(snapshot.error),
                       textAlign: TextAlign.center,
                       style:
                           TextStyle(color: AppColors.textSecondary, fontSize: 13),
@@ -147,5 +148,12 @@ class _ProfileGateState extends State<ProfileGate> {
         );
       },
     );
+  }
+
+  static String _profileLoadHint(Object? error) {
+    if (error != null && isJwtIssuedAtFutureError(error)) {
+      return 'La sesión tardó un momento en validarse. Toque Reintentar.';
+    }
+    return 'Toque Reintentar. Si el aviso continúa, inicie sesión de nuevo.';
   }
 }

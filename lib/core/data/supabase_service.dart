@@ -960,6 +960,32 @@ class SupabaseService {
           AdminService.listAdminUserActivityMonitoring(
               role: role, period: period);
 
+  static Future<List<ProfileModel>> ownerListProfiles() =>
+      AdminService.ownerListProfiles();
+
+  static Future<void> ownerSetProfileRole({
+    required String profileId,
+    required String role,
+  }) =>
+      AdminService.ownerSetProfileRole(profileId: profileId, role: role);
+
+  static Future<void> ownerSetAccountAccess({
+    required String profileId,
+    required String status,
+    String? note,
+  }) =>
+      AdminService.ownerSetAccountAccess(
+        profileId: profileId,
+        status: status,
+        note: note,
+      );
+
+  static Future<void> ownerDeactivateProfile({
+    required String profileId,
+    required String note,
+  }) =>
+      AdminService.ownerDeactivateProfile(profileId: profileId, note: note);
+
   static Future<void> applyReferralCode(String code) =>
       ReferralsService.applyReferralCode(code);
 

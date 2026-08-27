@@ -1,6 +1,6 @@
 # Migraciones Supabase
 
-**Fuente de verdad del schema:** los archivos en esta carpeta. Hoy hay **114** migraciones: la baseline MotoConecta y todo lo posterior (pedidos, KYC, comisiones, logística, referidos, etc.).
+**Fuente de verdad del schema:** los archivos en esta carpeta. Hoy hay **116** migraciones: la baseline MotoConecta y todo lo posterior (pedidos, KYC, comisiones, logística, referidos, etc.).
 
 Snapshot histórico del greenfield (no aplicar): [`docs/archive/motoconecta/`](../../docs/archive/motoconecta/).
 

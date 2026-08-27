@@ -32,7 +32,7 @@ bash scripts/use_env.sh local          # o staging | mobile-staging | production
 ```bash
 supabase start
 bash scripts/use_env.sh local
-supabase db reset --yes                 # aplica las 114 migraciones + seed.sql
+supabase db reset --yes                 # aplica las 116 migraciones + seed.sql
 bash scripts/run_web_local.sh           # http://localhost:3000
 ```
 

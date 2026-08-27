@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'aliado_pending_review_screen.dart';
 import 'package:motolink_pro_app/app/main_shell.dart';
 import 'profile_setup_screen.dart';
+import 'account_locked_screen.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -136,6 +137,10 @@ class _ProfileGateState extends State<ProfileGate> {
             initial: profile,
             onProfileComplete: _reloadProfile,
           );
+        }
+
+        if (!profile.hasActiveAccountAccess) {
+          return const AccountLockedScreen();
         }
 
         if (profile.isReadyForMainApp) {

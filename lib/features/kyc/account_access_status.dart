@@ -21,13 +21,18 @@ abstract final class AccountAccessStatus {
     }
   }
 
-  /// Admin siempre entra. Aliado e importador requieren `active`.
+  /// Admin activo entra. Aliado e importador requieren `active`.
+  /// Baja lógica (`deactivatedAt`) bloquea cualquier rol.
   static bool allowsAppAccess({
     required String? role,
     required String? accountAccessStatus,
+    DateTime? deactivatedAt,
   }) {
+    if (deactivatedAt != null) return false;
     final r = role?.trim().toLowerCase();
-    if (r == 'administrador') return true;
+    if (r == 'administrador') {
+      return accountAccessStatus?.trim() != rejected;
+    }
     if (r != 'aliado' && r != 'importador') return true;
     return accountAccessStatus?.trim() == active;
   }

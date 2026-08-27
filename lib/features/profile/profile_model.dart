@@ -56,6 +56,9 @@ class ProfileModel {
     this.referredByExternalPhone,
     this.referredByExternalEmail,
     this.referredAt,
+    this.email,
+    this.isOwner = false,
+    this.deactivatedAt,
   });
 
   final String id;
@@ -183,6 +186,15 @@ class ProfileModel {
 
   final DateTime? referredAt;
 
+  /// Correo de Auth; solo llega en listados owner (`owner_list_profiles`).
+  final String? email;
+
+  /// Propietario de la plataforma. No se muestra como rol en la UI.
+  final bool isOwner;
+
+  /// Baja lógica (`profiles.deactivated_at`). No borra `auth.users`.
+  final DateTime? deactivatedAt;
+
   bool get hasReferralAttribution =>
       (referredByExternalId != null && referredByExternalId!.isNotEmpty) ||
       (referredByProfileId != null && referredByProfileId!.isNotEmpty);
@@ -224,6 +236,10 @@ class ProfileModel {
 
   bool get isImportador => role?.trim().toLowerCase() == 'importador';
 
+  bool get isAdministrador => role?.trim().toLowerCase() == 'administrador';
+
+  bool get isDeactivated => deactivatedAt != null;
+
   bool get hasValidAppRole {
     final r = role?.trim().toLowerCase();
     return r == 'importador' || r == 'aliado' || r == 'administrador';
@@ -233,7 +249,7 @@ class ProfileModel {
   bool get isReadyForMainApp {
     if (!hasValidAppRole || !isComplete) return false;
     if (requiresTermsAcceptance && !hasAcceptedCurrentTerms) return false;
-    if ((isAliado || isImportador) && !hasActiveAccountAccess) return false;
+    if (!hasActiveAccountAccess) return false;
     return true;
   }
 
@@ -255,6 +271,7 @@ class ProfileModel {
   bool get hasActiveAccountAccess => AccountAccessStatus.allowsAppAccess(
         role: role,
         accountAccessStatus: accountAccessStatus,
+        deactivatedAt: deactivatedAt,
       );
 
   bool get hasAcceptedCurrentTerms {
@@ -407,6 +424,11 @@ class ProfileModel {
       ),
       referredAt: json['referred_at'] != null
           ? DateTime.tryParse(json['referred_at'].toString())
+          : null,
+      email: _text(json['email']),
+      isOwner: _parseBool(json['is_owner']),
+      deactivatedAt: json['deactivated_at'] != null
+          ? DateTime.tryParse(json['deactivated_at'].toString())
           : null,
     );
   }

@@ -16,6 +16,7 @@ import 'package:motolink_pro_app/core/layout/admin_desktop_shell.dart';
 import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
 import 'package:motolink_pro_app/features/admin/admin_encomiendas_report_panel.dart';
 import 'package:motolink_pro_app/features/kyc/admin_kyc_review_panel.dart';
+import 'package:motolink_pro_app/features/admin/admin_account_management_panel.dart';
 import 'package:motolink_pro_app/features/reputation/admin_order_ratings_panel.dart';
 import 'package:motolink_pro_app/features/orders/admin/admin_orders_panel.dart';
 import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.dart';
@@ -82,6 +83,11 @@ class _MainShellState extends State<MainShell> {
     if (widget.homeRole == AppHomeRole.importador ||
         widget.homeRole == AppHomeRole.aliado) {
       MainShellTabController.registerB2BProfileTabIndex(3);
+    }
+    if (widget.homeRole == AppHomeRole.administrador) {
+      MainShellTabController.registerAdminProfileTabIndex(
+        widget.profile.isOwner ? 7 : 6,
+      );
     }
     unawaited(_ensureDailyTasaBcvNotification());
   }
@@ -177,6 +183,11 @@ class _MainShellState extends State<MainShell> {
     final p = await SupabaseService.fetchMyProfile();
     if (!mounted || p == null) return;
     setState(() => _profile = p);
+    if (widget.homeRole == AppHomeRole.administrador) {
+      MainShellTabController.registerAdminProfileTabIndex(
+        p.isOwner ? 7 : 6,
+      );
+    }
   }
 
   void _openAccountSettings() {
@@ -187,7 +198,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  static const _adminDestinations = <AdminShellDestination>[
+  static const _adminPanelDestinations = <AdminShellDestination>[
     AdminShellDestination(
       icon: Icons.local_shipping_outlined,
       selectedIcon: Icons.local_shipping,
@@ -230,14 +241,31 @@ class _MainShellState extends State<MainShell> {
       title: 'Soporte',
       subtitle: 'Reclamos · respuesta',
     ),
-    AdminShellDestination(
-      icon: Icons.person_outline,
-      selectedIcon: Icons.person,
-      label: 'Perfil',
-      title: 'Perfil',
-      subtitle: 'Cuenta broker',
-    ),
   ];
+
+  static const _adminCuentasDestination = AdminShellDestination(
+    icon: Icons.manage_accounts_outlined,
+    selectedIcon: Icons.manage_accounts,
+    label: 'Cuentas',
+    title: 'Cuentas',
+    subtitle: 'Roles · acceso',
+  );
+
+  static const _adminProfileDestination = AdminShellDestination(
+    icon: Icons.person_outline,
+    selectedIcon: Icons.person,
+    label: 'Perfil',
+    title: 'Perfil',
+    subtitle: 'Cuenta broker',
+  );
+
+  List<AdminShellDestination> get _adminDestinations {
+    return [
+      ..._adminPanelDestinations,
+      if (_profile.isOwner) _adminCuentasDestination,
+      _adminProfileDestination,
+    ];
+  }
 
   static const _aliadoDestinations = <ShellDestination>[
     ShellDestination(
@@ -302,13 +330,14 @@ class _MainShellState extends State<MainShell> {
   ];
 
   List<Widget> _adminPanelWidgets() {
-    return const [
-      AdminOrdersPanel(),
-      AdminEncomiendasReportPanel(),
-      AdminOrderRatingsPanel(),
-      AdminCommissionSettlementsPanel(),
-      AdminKycReviewPanel(),
-      AdminSupportTicketsPanel(),
+    return [
+      const AdminOrdersPanel(),
+      const AdminEncomiendasReportPanel(),
+      const AdminOrderRatingsPanel(),
+      const AdminCommissionSettlementsPanel(),
+      const AdminKycReviewPanel(),
+      const AdminSupportTicketsPanel(),
+      if (_profile.isOwner) AdminAccountManagementPanel(viewer: _profile),
     ];
   }
 
@@ -333,7 +362,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Pestañas admin: Pedidos, Reportes, Valoraciones, Comisiones, KYC, Perfil (sin catálogo).
+  /// Pestañas admin: Pedidos … Soporte, Cuentas (solo owner) y Perfil.
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,
@@ -379,11 +408,13 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildAdminDesktopShell() {
+    final dest = _adminDestinations;
+    final index = _tabIndex.clamp(0, dest.length - 1);
     final panels = _adminPanelWidgets();
     return AdminDesktopShell(
-      selectedIndex: _tabIndex,
+      selectedIndex: index,
       onDestinationSelected: (i) => setState(() => _tabIndex = i),
-      destinations: _adminDestinations,
+      destinations: dest,
       profile: _profile,
       unreadNotifications: _notifications.unreadCount,
       onNotificationTap: _openNotificationCenter,
@@ -396,14 +427,16 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildAdminMobileShell() {
+    final dest = _adminDestinations;
+    final index = _tabIndex.clamp(0, dest.length - 1);
     final panels = _adminPanelWidgets();
     return Scaffold(
       body: IndexedStack(
-        index: _tabIndex,
+        index: index,
         children: [
           for (var i = 0; i < panels.length; i++)
             _adminOrdersScaffold(
-              title: _adminDestinations[i].title,
+              title: dest[i].title,
               child: panels[i],
             ),
           _ProfileTab(
@@ -427,11 +460,11 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: _tabIndex,
+          currentIndex: index,
           type: BottomNavigationBarType.fixed,
           onTap: (i) => setState(() => _tabIndex = i),
           items: [
-            for (final d in _adminDestinations)
+            for (final d in dest)
               BottomNavigationBarItem(
                 icon: Icon(d.icon),
                 activeIcon: Icon(d.selectedIcon),

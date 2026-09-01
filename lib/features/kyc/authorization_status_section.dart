@@ -108,14 +108,16 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final complete = profile.isComplete;
+    final perfilOk = profile.hasRegisteredLocation &&
+        profile.hasFiscalMapsShareLink &&
+        (profile.rif?.trim().isNotEmpty ?? false);
     final accessOk = profile.hasActiveAccountAccess;
     final access = profile.accountAccessStatus?.trim();
     final termsOk = !profile.requiresTermsAcceptance ||
         profile.hasAcceptedCurrentTerms ||
         termsAcceptedLocally;
 
-    final perfilLabelEs = complete
+    final perfilLabelEs = perfilOk
         ? 'Perfil B2B completo.'
         : 'Complete nombre, RIF, domicilio fiscal y enlace Google Maps.';
     final accesoLabelEs = accessOk
@@ -154,7 +156,7 @@ class _ImportadorAuthorizationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            _CheckRow(ok: complete, label: perfilLabelEs),
+            _CheckRow(ok: perfilOk, label: perfilLabelEs),
             const SizedBox(height: 6),
             _CheckRow(ok: termsOk, label: 'Términos y privacidad aceptados.'),
             const SizedBox(height: 6),
@@ -186,6 +188,9 @@ class _AliadoAuthorizationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final kycGlobal = profile.kycStatus?.trim();
     final kycOk = kycGlobal == KycStatus.aprobado;
+    final perfilDatosOk = profile.hasRegisteredLocation &&
+        profile.hasFiscalMapsShareLink &&
+        (profile.rif?.trim().isNotEmpty ?? false);
 
     final kycLabelEs = kycOk
         ? 'Verificación documental aprobada.'
@@ -219,7 +224,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  kycRowOk && operacionRowOk && profile.isComplete
+                  kycRowOk && operacionRowOk && perfilDatosOk
                       ? Icons.check_circle_outline
                       : Icons.info_outline,
                   size: 20,
@@ -270,8 +275,8 @@ class _AliadoAuthorizationCard extends StatelessWidget {
               const SizedBox(height: 10),
             ],
             _CheckRow(
-              ok: profile.isComplete,
-              label: profile.isComplete
+              ok: perfilDatosOk,
+              label: perfilDatosOk
                   ? 'RIF, dirección fiscal y Maps completos.'
                   : 'Complete RIF, dirección fiscal y enlace Google Maps.',
             ),

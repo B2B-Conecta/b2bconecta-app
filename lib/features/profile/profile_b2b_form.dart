@@ -110,8 +110,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   bool get _showAliadoKycSection =>
       _role.trim().toLowerCase() == 'aliado' || _persistedAsAliado;
 
-  /// Aliados usan «Enviar registro inicial»; no muestran «Guardar Perfil».
-  bool get _showGuardarPerfilButton => !_showAliadoKycSection;
+  /// Igual que mayorista: pueden guardar el perfil (Maps, domicilio) en cualquier
+  /// momento. El envío a revisión es un botón aparte.
+  bool get _showGuardarPerfilButton => true;
 
   bool get _aliadoRegistrationLocked {
     if (!_showAliadoKycSection) return false;

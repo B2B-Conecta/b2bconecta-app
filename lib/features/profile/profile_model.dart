@@ -246,8 +246,10 @@ class ProfileModel {
   }
 
   /// Perfil listo para entrar al panel principal (post login).
+  /// El acceso `active` manda el admin: no se vuelve al registro inicial
+  /// si falta Maps u otro campo añadido después.
   bool get isReadyForMainApp {
-    if (!hasValidAppRole || !isComplete) return false;
+    if (!hasValidAppRole) return false;
     if (requiresTermsAcceptance && !hasAcceptedCurrentTerms) return false;
     if (!hasActiveAccountAccess) return false;
     return true;
@@ -296,13 +298,13 @@ class ProfileModel {
     if (!base) return false;
     if (r == 'administrador') return true;
     if (!hasRegisteredLocation) return false;
-    if (r == 'importador' || r == 'aliado') {
-      if (!hasFiscalMapsShareLink) return false;
-    }
-    // Referencia legal: obligatoria en onboarding / envío a revisión (RPC).
-    // Cuentas ya activas no deben volver al registro inicial por campos nuevos.
-    if (r == 'importador' && !hasActiveAccountAccess) {
-      return hasLegalContact;
+    // Maps y contacto legal: obligatorios para enviar el registro inicial.
+    // Cuentas ya activas no vuelven al onboarding por esos campos.
+    if (!hasActiveAccountAccess) {
+      if (r == 'importador' || r == 'aliado') {
+        if (!hasFiscalMapsShareLink) return false;
+      }
+      if (r == 'importador' && !hasLegalContact) return false;
     }
     return true;
   }

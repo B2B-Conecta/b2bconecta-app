@@ -782,22 +782,27 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                                   runSpacing: 8,
                                                   children: [
                                                     FilledButton.tonalIcon(
-                                                      onPressed:
-                                                          _busyProfileId == p.id
-                                                              ? null
-                                                              : () =>
-                                                                  _setImportadorAccess(
-                                                                    p,
-                                                                    KycStatus
-                                                                        .aprobado,
-                                                                  ),
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .check_circle_outline,
+                                                      onPressed: p.hasActiveAccountAccess ||
+                                                              _busyProfileId ==
+                                                                  p.id
+                                                          ? null
+                                                          : () =>
+                                                              _setImportadorAccess(
+                                                                p,
+                                                                KycStatus
+                                                                    .aprobado,
+                                                              ),
+                                                      icon: Icon(
+                                                        p.hasActiveAccountAccess
+                                                            ? Icons.verified
+                                                            : Icons
+                                                                .check_circle_outline,
                                                         size: 18,
                                                       ),
-                                                      label: const Text(
-                                                        'Aprobar mayorista',
+                                                      label: Text(
+                                                        p.hasActiveAccountAccess
+                                                            ? 'Acceso habilitado'
+                                                            : 'Aprobar mayorista',
                                                       ),
                                                     ),
                                                     OutlinedButton.icon(
@@ -855,22 +860,27 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                                       ),
                                                     ),
                                                     FilledButton.tonalIcon(
-                                                      onPressed:
-                                                          _busyProfileId == p.id
-                                                              ? null
-                                                              : () =>
-                                                                  _setGlobalKyc(
-                                                                    p,
-                                                                    KycStatus
-                                                                        .aprobado,
-                                                                  ),
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .check_circle_outline,
+                                                      onPressed: p.hasActiveAccountAccess ||
+                                                              _busyProfileId ==
+                                                                  p.id
+                                                          ? null
+                                                          : () =>
+                                                              _setGlobalKyc(
+                                                                p,
+                                                                KycStatus
+                                                                    .aprobado,
+                                                              ),
+                                                      icon: Icon(
+                                                        p.hasActiveAccountAccess
+                                                            ? Icons.verified
+                                                            : Icons
+                                                                .check_circle_outline,
                                                         size: 18,
                                                       ),
-                                                      label: const Text(
-                                                        'Habilitar acceso',
+                                                      label: Text(
+                                                        p.hasActiveAccountAccess
+                                                            ? 'Acceso habilitado'
+                                                            : 'Habilitar acceso',
                                                       ),
                                                     ),
                                                   ],

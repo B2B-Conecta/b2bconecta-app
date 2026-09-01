@@ -111,7 +111,7 @@ class _ProfileGateState extends State<ProfileGate> {
 
         final profile = snapshot.data;
 
-        if (profile == null || !profile.hasValidAppRole || !profile.isComplete) {
+        if (profile == null || !profile.hasValidAppRole) {
           return ProfileSetupScreen(
             initial: profile,
             onProfileComplete: _reloadProfile,

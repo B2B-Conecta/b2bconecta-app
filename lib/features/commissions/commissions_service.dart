@@ -19,12 +19,12 @@ class CommissionsService {
     return rec?.tasa;
   }
 
-  static Future<({double tasa, DateTime updatedAt})?>
+  static Future<({double tasa, DateTime updatedAt, String? effectiveDate})?>
       fetchGlobalTasaBcvRecord() async {
     try {
       final row = await SupabaseAccess.client
           .from('app_global_config')
-          .select('value_numeric, updated_at')
+          .select('value_numeric, value_text, updated_at')
           .eq('key', 'tasa_bcv')
           .maybeSingle();
       if (row == null) return null;
@@ -39,8 +39,13 @@ class CommissionsService {
       if (tasa == null || tasa <= 0) return null;
       final rawAt = m['updated_at']?.toString();
       final updatedAt = rawAt != null ? DateTime.tryParse(rawAt) : null;
-      if (updatedAt == null) return (tasa: tasa, updatedAt: DateTime.now());
-      return (tasa: tasa, updatedAt: updatedAt);
+      final effective = m['value_text']?.toString().trim();
+      return (
+        tasa: tasa,
+        updatedAt: updatedAt ?? DateTime.now(),
+        effectiveDate:
+            (effective != null && effective.isNotEmpty) ? effective : null,
+      );
     } catch (_) {
       return null;
     }
@@ -48,11 +53,11 @@ class CommissionsService {
 
   static bool globalTasaBcvNeedsDailySync(DateTime? updatedAt) {
     if (updatedAt == null) return true;
-    final now = DateTime.now();
-    final local = updatedAt.toLocal();
-    return local.year != now.year ||
-        local.month != now.month ||
-        local.day != now.day;
+    final now = BcvReferenceRateService.caracasWallClock();
+    final then = BcvReferenceRateService.caracasWallClock(updatedAt.toUtc());
+    return then.year != now.year ||
+        then.month != now.month ||
+        then.day != now.day;
   }
 
   static Future<void> adminSetTasaBcv(double tasa) async {
@@ -71,11 +76,20 @@ class CommissionsService {
     }
   }
 
-  /// Sincroniza la tasa BCV global desde referencia pública (bcv.today). Devuelve la tasa guardada.
+  /// Sincroniza la tasa BCV global desde el boletín publicado más reciente.
   static Future<double?> syncGlobalTasaBcvFromReference() async {
     final quote = await BcvReferenceRateService.fetchPublicBcvUsdRate();
     if (quote == null) return null;
     await adminSetTasaBcv(quote.vesPerUsd);
+    final fecha = quote.effectiveDate?.trim();
+    if (fecha != null && fecha.isNotEmpty) {
+      try {
+        await SupabaseAccess.client
+            .from('app_global_config')
+            .update({'value_text': fecha})
+            .eq('key', 'tasa_bcv');
+      } catch (_) {}
+    }
     return quote.vesPerUsd;
   }
 

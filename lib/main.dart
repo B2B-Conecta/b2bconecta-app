@@ -44,6 +44,15 @@ void main() async {
     );
   }
 
+  // Flutter embebe `.env` en el binario. Un AAB/APK de tienda con URL local
+  // hace signup contra 127.0.0.1 en el teléfono (connection refused).
+  if (kReleaseMode && !kIsWeb && _isLocalSupabaseUrl(url)) {
+    throw StateError(
+      'Release build apunta a Supabase local ($url). '
+      'Rebuild with: bash scripts/build_aab_release.sh',
+    );
+  }
+
   await Supabase.initialize(
     url: url,
     anonKey: anonKey,
@@ -53,6 +62,11 @@ void main() async {
     ),
   );
   runApp(MyApp(launchUri: launchUri));
+}
+
+bool _isLocalSupabaseUrl(String url) {
+  final u = url.toLowerCase();
+  return u.contains('127.0.0.1') || u.contains('localhost');
 }
 
 /// Play policy: gallery picks must use the system Photo Picker (no READ_MEDIA_*).

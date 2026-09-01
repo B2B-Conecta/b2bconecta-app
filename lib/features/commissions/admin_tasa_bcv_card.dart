@@ -24,6 +24,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
   String? _error;
   double? _rate;
   DateTime? _updatedAt;
+  String? _effectiveDate;
 
   @override
   void initState() {
@@ -44,9 +45,14 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
     });
     try {
       var rec = await SupabaseService.fetchGlobalTasaBcvRecord();
-      if (rec == null ||
-          rec.tasa <= 1.01 ||
-          SupabaseService.globalTasaBcvNeedsDailySync(rec.updatedAt)) {
+      final quote = await BcvReferenceRateService.fetchPublicBcvUsdRate();
+      final missing = rec == null || rec.tasa <= 1.01;
+      final staleDay =
+          SupabaseService.globalTasaBcvNeedsDailySync(rec?.updatedAt);
+      final publishedDiffers = quote != null &&
+          rec != null &&
+          BcvReferenceRateService.ratesDiffer(quote.vesPerUsd, rec.tasa);
+      if (missing || staleDay || publishedDiffers) {
         await SupabaseService.syncGlobalTasaBcvFromReference();
         rec = await SupabaseService.fetchGlobalTasaBcvRecord();
       }
@@ -54,6 +60,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
       setState(() {
         _rate = rec?.tasa;
         _updatedAt = rec?.updatedAt;
+        _effectiveDate = rec?.effectiveDate ?? quote?.effectiveDate;
         _ctrl.text =
             rec != null ? formatVesAmount(rec.tasa, fractionDigits: 4) : '';
         _loading = false;
@@ -87,6 +94,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
       setState(() {
         _rate = synced;
         _updatedAt = rec?.updatedAt ?? DateTime.now();
+        _effectiveDate = rec?.effectiveDate;
         _ctrl.text = formatVesAmount(synced, fractionDigits: 4);
         _editing = false;
       });
@@ -115,6 +123,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
       setState(() {
         _rate = parsed;
         _updatedAt = DateTime.now();
+        _effectiveDate = null;
         _editing = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -202,10 +211,18 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                                 height: 1.1,
                               ),
                             ),
-                            if (_updatedAt != null)
+                            if (_updatedAt != null || _effectiveDate != null)
                               Text(
-                                'Actualizada ${formatEsShortDateTime(_updatedAt)} · '
-                                'notificación diaria a usuarios',
+                                [
+                                  if (BcvReferenceRateService.formatFechaValorEs(
+                                        _effectiveDate,
+                                      ) !=
+                                      null)
+                                    'Fecha valor ${BcvReferenceRateService.formatFechaValorEs(_effectiveDate)}',
+                                  if (_updatedAt != null)
+                                    'actualizada ${formatEsShortDateTime(_updatedAt)}',
+                                  'notificación diaria a usuarios',
+                                ].join(' · '),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   color: AppColors.textSecondary,

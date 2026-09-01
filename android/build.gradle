@@ -11,7 +11,7 @@ gradle.beforeProject { project ->
         project.ext.flutter = [
             compileSdkVersion: 36,
             minSdkVersion: 23,
-            targetSdkVersion: 35,
+            targetSdkVersion: 36,
             ndkVersion: "26.1.10909125",
         ]
     }

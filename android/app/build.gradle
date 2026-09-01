@@ -33,8 +33,9 @@ android {
         applicationId = "ve.com.b2bconecta.app"
         // androidx.camera 1.5 (via mobile_scanner) requires minSdk 23+
         minSdk = 23
-        // Play requires API 35+ for new production apps (flutter.targetSdkVersion can lag).
-        targetSdk = 35
+        // Play requires API 36+ for app updates from 31 Aug 2026
+        // (flutter.targetSdkVersion can lag behind Play policy).
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

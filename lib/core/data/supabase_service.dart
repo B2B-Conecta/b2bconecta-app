@@ -586,7 +586,7 @@ class SupabaseService {
   static Future<double?> fetchGlobalTasaBcv() =>
       CommissionsService.fetchGlobalTasaBcv();
 
-  static Future<({double tasa, DateTime updatedAt})?>
+  static Future<({double tasa, DateTime updatedAt, String? effectiveDate})?>
       fetchGlobalTasaBcvRecord() =>
           CommissionsService.fetchGlobalTasaBcvRecord();
 

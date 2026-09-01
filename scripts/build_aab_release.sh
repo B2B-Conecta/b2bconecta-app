@@ -34,6 +34,12 @@ if grep -qE 'YOUR_.*_PUBLISHABLE_KEY|REPLACE_ME' "$ROOT_DIR/.env"; then
   exit 1
 fi
 
+if grep -qE '127\.0\.0\.1|localhost:54321' "$ROOT_DIR/.env"; then
+  echo "ERROR: .env apunta a Supabase local (127.0.0.1). Un AAB de Play no puede embeber Docker."
+  echo "       Use: bash scripts/use_env.sh mobile-production"
+  exit 1
+fi
+
 echo "Building release AAB..."
 flutter build appbundle --release "$@"
 

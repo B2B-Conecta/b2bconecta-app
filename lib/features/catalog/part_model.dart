@@ -2,6 +2,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/payments/broker_pricing.dart';
 import 'product_catalog_pricing.dart';
+import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 import 'package:motolink_pro_app/features/inventory/product_volume_tiers.dart';
 
 /// Modelo de repuesto. Los datos provienen de la tabla Supabase `products`
@@ -19,6 +20,7 @@ class PartModel {
     this.compatibilidad,
     required this.precio,
     required this.stock,
+    this.minOrderQty = ProductMinOrderQty.platformFloor,
     this.imagenUrl,
     this.imageUrls = const [],
     this.sku,
@@ -59,6 +61,10 @@ class PartModel {
   /// Precio mayorista USD cargado por el importador (`products.price_usd`).
   final double precio;
   final int stock;
+
+  /// Unidades mínimas para crear un pedido (`products.min_order_qty`, piso 5).
+  final int minOrderQty;
+
   final String? imagenUrl;
 
   /// Hasta [kMaxProductImages] URLs (`products.image_urls`). Portada = índice 0.
@@ -112,6 +118,15 @@ class PartModel {
 
   List<ProductVolumeTier> get volumeTiers =>
       parseProductVolumeTiers(discountRules);
+
+  int get minOrderQtyEffective => ProductMinOrderQty.resolve(minOrderQty);
+
+  bool get stockCoversMinOrder => ProductMinOrderQty.stockCovers(
+        stock: stock,
+        minOrderQty: minOrderQty,
+      );
+
+  String get minOrderQtyLabelEs => 'Mín. $minOrderQtyEffective uds';
 
   /// Precio unitario para aliado sin markup broker (legacy; preferir [precioUnitarioParaAliado]).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
@@ -177,6 +192,7 @@ class PartModel {
       salePriceUsd: _asNullableDouble(saleRaw),
       discountRules: _discountRulesFromJson(json['discount_rules']),
       stock: _asInt(json['stock']),
+      minOrderQty: ProductMinOrderQty.resolve(_asInt(json['min_order_qty'])),
       imagenUrl: productCoverImageUrl(
         imageUrls,
         legacy: _nullableUrl(imagenRaw),
@@ -203,6 +219,7 @@ class PartModel {
     String? compatibilidad,
     double? precio,
     int? stock,
+    int? minOrderQty,
     String? imagenUrl,
     List<String>? imageUrls,
     String? sku,
@@ -233,6 +250,7 @@ class PartModel {
       compatibilidad: compatibilidad ?? this.compatibilidad,
       precio: precio ?? this.precio,
       stock: stock ?? this.stock,
+      minOrderQty: minOrderQty ?? this.minOrderQty,
       imagenUrl: imagenUrl ?? this.imagenUrl,
       imageUrls: imageUrls ?? this.imageUrls,
       sku: sku ?? this.sku,

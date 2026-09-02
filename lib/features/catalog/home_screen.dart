@@ -1261,7 +1261,7 @@ class _ProductGridCard extends StatelessWidget {
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
-                            '${part.stock} en stock',
+                            '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

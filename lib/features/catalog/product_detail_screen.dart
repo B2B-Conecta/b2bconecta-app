@@ -82,7 +82,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   bool get _cartActionsDisabled =>
-      part.stock < 1 || _pedidosSuspendidosMorosidad;
+      !part.stockCoversMinOrder || _pedidosSuspendidosMorosidad;
 
   String? _cartBlockReason() {
     final ownerId = part.ownerId?.trim();
@@ -93,6 +93,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return 'B2B Conecta suspendió nuevos pedidos en su cuenta por morosidad.';
     }
     if (part.stock < 1) return 'Sin stock disponible.';
+    if (!part.stockCoversMinOrder) {
+      return 'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).';
+    }
     return null;
   }
 
@@ -113,11 +116,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final maxQty = part.stock;
-    var q = 1;
+    final minQty = part.minOrderQtyEffective;
+    var q = minQty;
 
-    final qtyCtrl = TextEditingController(text: '1');
+    final qtyCtrl = TextEditingController(text: '$minQty');
     bool? ok;
-    var qtyRaw = '1';
+    var qtyRaw = '$minQty';
     try {
       ok = await showDialog<bool>(
         context: context,
@@ -130,7 +134,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Indique cuántas unidades desea añadir (disponibles: $maxQty).',
+                    'Cantidad mínima: $minQty. Disponibles: $maxQty.',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.35,
@@ -144,7 +148,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     autofocus: true,
                     decoration: InputDecoration(
                       labelText: 'Cantidad',
-                      hintText: '1',
+                      hintText: '$minQty',
                       filled: true,
                       fillColor: AppColors.fieldFill,
                       border: OutlineInputBorder(
@@ -176,8 +180,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (ok != true || !mounted) return;
 
-    var requested = int.tryParse(qtyRaw) ?? 1;
-    if (requested < 1) requested = 1;
+    var requested = int.tryParse(qtyRaw) ?? minQty;
+    if (requested < minQty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'La cantidad mínima de este producto es $minQty unidades.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     q = requested;
     if (requested > maxQty) {
@@ -237,13 +252,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
-    _putInCart(quantity: 1);
+    final minQty = part.minOrderQtyEffective;
+    _putInCart(quantity: minQty);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
     messenger.showSnackBar(
-      const SnackBar(
-        content: Text('1 unidad añadida al carrito.'),
+      SnackBar(
+        content: Text(
+          minQty == 1
+              ? '1 unidad añadida al carrito.'
+              : '$minQty unidades añadidas al carrito (mínimo de pedido).',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -629,7 +649,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildStockBadge({bool desktop = false}) {
-    final inStock = part.stock > 0;
+    final inStock = part.stockCoversMinOrder;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: desktop ? 14 : 0,
@@ -656,7 +676,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           const SizedBox(width: 8),
           Text(
-            inStock ? 'Stock: ${part.stock} uds' : 'Sin stock disponible',
+            inStock
+                ? 'Stock: ${part.stock} uds · ${part.minOrderQtyLabelEs}'
+                : part.stock < 1
+                    ? 'Sin stock disponible'
+                    : 'Stock ${part.stock} uds · ${part.minOrderQtyLabelEs}',
             style: TextStyle(
               fontSize: desktop ? 15 : 14,
               fontWeight: FontWeight.w700,
@@ -675,6 +699,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         if (part.stock < 1)
           _AlertBanner(
             text: 'Sin stock disponible',
+            color: AppColors.brandBlue,
+            background: AppColors.brandBlueContainer,
+            border: AppColors.brandAccent.withOpacity(0.35),
+          )
+        else if (!part.stockCoversMinOrder)
+          _AlertBanner(
+            text:
+                'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).',
             color: AppColors.brandBlue,
             background: AppColors.brandBlueContainer,
             border: AppColors.brandAccent.withOpacity(0.35),
@@ -759,7 +791,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildActionAlerts(),
-          if (part.stock < 1 || _pedidosSuspendidosMorosidad)
+          if (!part.stockCoversMinOrder || _pedidosSuspendidosMorosidad)
             const SizedBox(height: 8),
           _buildActionButtons(horizontal: horizontal),
         ],

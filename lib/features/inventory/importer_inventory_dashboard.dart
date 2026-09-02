@@ -724,6 +724,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   String? _commercialTermsLine(PartModel p) {
     final parts = <String>[];
     if (p.tieneOfertaDirecta) parts.add('Oferta');
+    parts.add(p.minOrderQtyLabelEs);
     final vol = ProductCatalogPricing.volumeIncentiveChipEs(p.discountRules);
     if (vol != null) parts.add(vol);
     if (_pagoSoloDivisas) {
@@ -991,7 +992,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   }
 
   Widget _buildProductInfoColumn(PartModel p) {
-    final lowStock = p.stock < 5;
+    final lowStock = !p.stockCoversMinOrder;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1336,7 +1337,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     runSpacing: 8,
                     children: [
                       FilterChip(
-                        label: const Text('Stock bajo (<5 u.)'),
+                        label: const Text('Ocultos (stock < mínimo)'),
                         selected: _filterLowStock,
                         onSelected: (v) {
                           setState(() => _filterLowStock = v);

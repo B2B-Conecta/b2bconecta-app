@@ -137,6 +137,9 @@ class FlexibleCatalogImportService {
           source: 'precio_oferta_usd (opcional)',
         ),
         CatalogImportField.stock.key: bind('stock'),
+        CatalogImportField.minOrderQty.key: CatalogImportColumnBinding(
+          source: 'cantidad_minima',
+        ),
         CatalogImportField.category.key: CatalogImportColumnBinding(
           source: 'categoria (opcional)',
         ),

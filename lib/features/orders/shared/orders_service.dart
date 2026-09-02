@@ -487,20 +487,31 @@ class OrdersService {
 
     final prodRes = await SupabaseAccess.client
         .from('products')
-        .select('stock')
+        .select('stock, min_order_qty')
         .eq('id', productId)
         .eq('owner_id', ownerId)
         .maybeSingle();
     if (prodRes == null) {
       throw StateError('No se encontró el producto para este importador.');
     }
-    final stockRaw = Map<String, dynamic>.from(prodRes)['stock'];
+    final prodMap = Map<String, dynamic>.from(prodRes);
+    final stockRaw = prodMap['stock'];
     final stock =
         stockRaw is int ? stockRaw : int.tryParse(stockRaw.toString()) ?? 0;
     if (cantidad > stock) {
       throw StockInsufficientException(
         'Stock insuficiente: hay $stock unidad(es) disponible(s). '
         'Reduzca la cantidad o intente más tarde cuando el importador reponga inventario.',
+      );
+    }
+    final minRaw = prodMap['min_order_qty'];
+    final minQty = minRaw is int
+        ? minRaw
+        : int.tryParse(minRaw?.toString() ?? '') ?? 5;
+    final minEffective = minQty < 5 ? 5 : minQty;
+    if (cantidad < minEffective) {
+      throw StockInsufficientException(
+        'Cantidad mínima de pedido: $minEffective unidad(es).',
       );
     }
 

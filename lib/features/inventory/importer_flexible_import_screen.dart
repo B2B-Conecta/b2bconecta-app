@@ -79,6 +79,7 @@ class _ImporterFlexibleImportScreenState
 
   static const _optionalFields = [
     CatalogImportField.stock,
+    CatalogImportField.minOrderQty,
     CatalogImportField.description,
     CatalogImportField.salePriceUsd,
     CatalogImportField.category,
@@ -102,6 +103,8 @@ class _ImporterFlexibleImportScreenState
         'Precio promocional en USD, si aplica. Debe ser menor al precio de lista.',
     CatalogImportField.stock:
         'Unidades en almacén. Si no mapeas esta columna, queda en 0.',
+    CatalogImportField.minOrderQty:
+        'Unidades mínimas por pedido (piso 5). Si no mapeas la columna, los productos nuevos quedan en 5.',
     CatalogImportField.category:
         'Familia o línea (Motor, Frenos, Eléctrico, etc.).',
     CatalogImportField.compatibility:
@@ -123,6 +126,7 @@ class _ImporterFlexibleImportScreenState
         CatalogImportField.priceUsd => 'Precio mayorista (USD)',
         CatalogImportField.salePriceUsd => 'Precio oferta (USD)',
         CatalogImportField.stock => 'Existencia / stock',
+        CatalogImportField.minOrderQty => 'Cantidad mínima de pedido',
         CatalogImportField.category => 'Categoría',
         CatalogImportField.compatibility => 'Compatibilidad',
         CatalogImportField.imageUrl => 'URL de imagen',

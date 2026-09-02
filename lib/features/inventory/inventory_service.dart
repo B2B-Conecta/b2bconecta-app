@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_impor
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
+import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 
 class InventoryService {
   InventoryService._();
@@ -151,7 +152,7 @@ class InventoryService {
     }
 
     if (onlyLowStock) {
-      query = query.lt('stock', 5);
+      query = query.eq('stock_covers_min_order', false);
     }
 
     if (onlyInactive) {
@@ -298,6 +299,7 @@ class InventoryService {
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     required int stock,
+    int minOrderQty = ProductMinOrderQty.platformFloor,
     String? category,
     String? compatibility,
     String? imageUrl,
@@ -315,6 +317,7 @@ class InventoryService {
       'name': name.trim(),
       'price_usd': priceUsd,
       'stock': stock,
+      'min_order_qty': ProductMinOrderQty.resolve(minOrderQty),
       'is_active': isActive,
       'has_warranty': hasWarranty,
     };
@@ -363,6 +366,7 @@ class InventoryService {
     Map<String, dynamic>? discountRules,
     bool clearDiscountRules = false,
     required int stock,
+    int minOrderQty = ProductMinOrderQty.platformFloor,
     String? category,
     String? compatibility,
     String? imageUrl,
@@ -377,6 +381,7 @@ class InventoryService {
       'name': name.trim(),
       'price_usd': priceUsd,
       'stock': stock,
+      'min_order_qty': ProductMinOrderQty.resolve(minOrderQty),
       'is_active': isActive,
       'has_warranty': hasWarranty,
     };

@@ -565,8 +565,8 @@ class CatalogService {
         'sale_price_usd.not.is.null,discount_rules->volume_tiers.neq.[],discount_rules->usd_payment_discount_pct.gt.0',
       );
     }
-    // Catálogo B2B (aliados): no listar productos sin inventario.
-    q = q.gt('stock', 0);
+    // Catálogo B2B (aliados): ocultar sin inventario o por debajo del mínimo de pedido.
+    q = q.eq('stock_covers_min_order', true);
     return q;
   }
 }

@@ -57,6 +57,14 @@ class CatalogImportHeaderGuess {
       'inventario',
       'disponible',
     ],
+    CatalogImportField.minOrderQty: [
+      'cantidad_minima',
+      'min_order_qty',
+      'min_order',
+      'pedido_minimo',
+      'moq',
+      'minimo_pedido',
+    ],
     CatalogImportField.category: [
       'categoria',
       'category',
@@ -124,12 +132,23 @@ class CatalogImportHeaderGuess {
 
     for (final pattern in patterns) {
       for (final entry in normalized) {
+        if (field == CatalogImportField.stock && _looksLikeMinOrderQty(entry.key)) {
+          continue;
+        }
         if (entry.key == pattern || entry.key.contains(pattern)) {
           return entry.header;
         }
       }
     }
     return null;
+  }
+
+  static bool _looksLikeMinOrderQty(String normalizedHeader) {
+    return normalizedHeader.contains('minima') ||
+        normalizedHeader.contains('minimo') ||
+        normalizedHeader.contains('min_order') ||
+        normalizedHeader.contains('moq') ||
+        normalizedHeader.contains('pedido_min');
   }
 
   static String _normalize(String raw) {

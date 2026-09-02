@@ -3,6 +3,7 @@ import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
 import 'excel_catalog_service.dart';
 import 'product_custom_fields.dart';
+import 'product_min_order_qty.dart';
 import 'product_volume_tiers.dart';
 
 /// Fila normalizada lista para enviar al RPC `importador_bulk_upsert_products`.
@@ -13,6 +14,7 @@ class CatalogImportNormalizedRow {
     required this.name,
     required this.priceUsd,
     required this.stock,
+    this.minOrderQty,
     this.description,
     this.category,
     this.compatibility,
@@ -30,6 +32,7 @@ class CatalogImportNormalizedRow {
   final String name;
   final double priceUsd;
   final int stock;
+  final int? minOrderQty;
   final String? description;
   final String? category;
   final String? compatibility;
@@ -52,6 +55,7 @@ class CatalogImportNormalizedRow {
       'stock': stock,
       'has_warranty': hasWarranty,
     };
+    if (minOrderQty != null) payload['min_order_qty'] = minOrderQty;
     if (description != null) payload['description'] = description;
     if (category != null) payload['category'] = category;
     if (compatibility != null) payload['compatibility'] = compatibility;
@@ -146,6 +150,18 @@ class CatalogImportValidator {
         continue;
       }
 
+      if (row.minOrderQty != null &&
+          row.minOrderQty! < ProductMinOrderQty.platformFloor) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'INVALID_MIN_ORDER_QTY',
+          message:
+              'La cantidad mínima de pedido debe ser ${ProductMinOrderQty.platformFloor} o más',
+        ));
+        continue;
+      }
+
       final sale = row.salePriceUsd;
       if (sale != null && (sale <= 0 || sale >= row.priceUsd)) {
         errors.add(CatalogImportRowError(
@@ -202,9 +218,11 @@ class CatalogImportValidator {
     final priceBinding = mapping.columnMap[CatalogImportField.priceUsd.key];
     final priceRaw = readUntransformed(CatalogImportField.priceUsd.key);
     final stockRaw = readUntransformed(CatalogImportField.stock.key);
+    final minQtyRaw = readUntransformed(CatalogImportField.minOrderQty.key);
 
     final price = parseImportNumber(priceRaw);
     final stock = _parseStock(stockRaw);
+    final minOrderQty = _parseMinOrderQty(minQtyRaw);
 
     final saleRaw = readUntransformed(CatalogImportField.salePriceUsd.key);
     final sale = saleRaw == null || saleRaw.trim().isEmpty
@@ -273,6 +291,7 @@ class CatalogImportValidator {
       name: name,
       priceUsd: price ?? double.nan,
       stock: stock,
+      minOrderQty: minOrderQty,
       description: _nullable(readField(CatalogImportField.description.key)),
       category: _nullable(readField(CatalogImportField.category.key)),
       compatibility: _nullable(readField(CatalogImportField.compatibility.key)),
@@ -353,6 +372,13 @@ class CatalogImportValidator {
     if (raw == null || raw.trim().isEmpty) return 0;
     final n = parseImportNumber(raw);
     if (n == null || n.isNaN) return -1;
+    return n.round();
+  }
+
+  static int? _parseMinOrderQty(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final n = parseImportNumber(raw);
+    if (n == null || n.isNaN) return 0;
     return n.round();
   }
 

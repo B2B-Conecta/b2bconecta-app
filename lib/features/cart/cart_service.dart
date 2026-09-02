@@ -116,16 +116,17 @@ class CartService extends ChangeNotifier {
     int delta = 1,
   }) {
     final maxStock = part.stock;
+    final minQty = part.minOrderQtyEffective;
+    if (maxStock < minQty) return;
     final idx = _lines.indexWhere((l) => l.part.id == part.id);
     if (idx >= 0) {
       final existing = _lines[idx];
       final next = existing.quantity + delta;
       existing.quantity = next > maxStock ? maxStock : next;
-      if (existing.quantity < 1) existing.quantity = 1;
+      if (existing.quantity < minQty) existing.quantity = minQty;
     } else {
-      var q = delta < 1 ? 1 : delta;
+      var q = delta < minQty ? minQty : delta;
       if (q > maxStock) q = maxStock;
-      if (maxStock < 1) return;
       _lines.add(
         CartLine(
           part: part,
@@ -147,12 +148,14 @@ class CartService extends ChangeNotifier {
     if (idx < 0) return;
     final line = _lines[idx];
     final maxStock = line.part.stock;
+    final minQty = line.part.minOrderQtyEffective;
     if (qty < 1) {
       _lines.removeAt(idx);
       notifyListeners();
       return;
     }
-    line.quantity = qty > maxStock ? maxStock : qty;
+    var next = qty < minQty ? minQty : qty;
+    line.quantity = next > maxStock ? maxStock : next;
     notifyListeners();
   }
 

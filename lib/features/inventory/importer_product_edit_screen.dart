@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'product_min_order_qty.dart';
 import 'product_volume_tiers.dart';
 import 'importer_product_commercial_terms_section.dart';
 import 'product_custom_fields_section.dart';
@@ -32,6 +33,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   late final TextEditingController _salePriceController;
   late final TextEditingController _usdPaymentDiscountController;
   late final TextEditingController _stockController;
+  late final TextEditingController _minOrderQtyController;
   List<ProductVolumeTier> _volumeTiers = [];
   late final TextEditingController _categoryController;
   late final TextEditingController _compatController;
@@ -65,6 +67,9 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _stockController = TextEditingController(
       text: p != null ? '${p.stock}' : '',
     );
+    _minOrderQtyController = TextEditingController(
+      text: '${p?.minOrderQtyEffective ?? ProductMinOrderQty.platformFloor}',
+    );
     _categoryController = TextEditingController(text: p?.category ?? '');
     _compatController = TextEditingController(text: p?.compatibilidad ?? '');
     _imageSlots = (p?.imageUrls ?? const [])
@@ -96,6 +101,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _salePriceController.dispose();
     _usdPaymentDiscountController.dispose();
     _stockController.dispose();
+    _minOrderQtyController.dispose();
     _categoryController.dispose();
     _compatController.dispose();
     super.dispose();
@@ -116,6 +122,17 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     if (stock == null || stock < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Stock inválido.')),
+      );
+      return;
+    }
+    final minOrderQty = int.tryParse(_minOrderQtyController.text.trim());
+    if (minOrderQty == null || minOrderQty < ProductMinOrderQty.platformFloor) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La cantidad mínima de pedido es obligatoria y no puede ser menor a 5.',
+          ),
+        ),
       );
       return;
     }
@@ -186,6 +203,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           discountRules: discountRules,
           clearDiscountRules: discountRules == null,
           stock: stock,
+          minOrderQty: minOrderQty,
           category: _categoryController.text.trim(),
           compatibility: _compatController.text.trim(),
           imageUrls: imageUrls,
@@ -202,6 +220,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           salePriceUsd: salePrice,
           discountRules: discountRules,
           stock: stock,
+          minOrderQty: minOrderQty,
           category: _categoryController.text.trim(),
           compatibility: _compatController.text.trim(),
           imageUrls: imageUrls,
@@ -389,6 +408,23 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           decoration: _dec('Stock'),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _minOrderQtyController,
+          decoration: _dec(
+            'Cantidad mínima de pedido',
+            hint: 'Mínimo 5 unidades',
+          ),
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          validator: (v) {
+            final n = int.tryParse(v?.trim() ?? '');
+            if (n == null || n < ProductMinOrderQty.platformFloor) {
+              return 'Obligatorio · mínimo ${ProductMinOrderQty.platformFloor}';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 12),
         TextFormField(

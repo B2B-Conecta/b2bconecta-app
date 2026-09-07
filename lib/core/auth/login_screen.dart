@@ -622,7 +622,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Conecte importadores y aliados en un solo lugar: '
+                'Conecte importadores y minoristas en un solo lugar: '
                 'catálogo, pedidos, reputación y operaciones.',
                 style: TextStyle(
                   fontSize: 15.5,

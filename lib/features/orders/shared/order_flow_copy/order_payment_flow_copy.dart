@@ -31,7 +31,7 @@ abstract final class OrderPaymentFlowCopy {
 
   // —— Comprobante (aliado declara, importador verifica) ——
 
-  static const importadorVerificarPagoTitulo = 'Comprobante del aliado';
+  static const importadorVerificarPagoTitulo = 'Comprobante del minorista';
   static const importadorRechazarComprobanteTitulo = 'Rechazar comprobante';
   static const importadorRechazarComprobanteMotivo = 'Motivo (opcional)';
 
@@ -99,14 +99,14 @@ abstract final class OrderPaymentFlowCopy {
     final fletePend = r.pagoFletePendienteTrasEntrega;
 
     if (impPend && fletePend) {
-      return 'Entregado con pagos pendientes: comprobante del aliado y pago del flete.';
+      return 'Entregado con pagos pendientes: comprobante del minorista y pago del flete.';
     }
     if (fletePend) {
       return 'Entregado con pago del flete pendiente de su confirmación.';
     }
     if (!r.hasProveedorFactura) {
-      return 'Entregado sin pago aprobado. Falta factura o comprobante del aliado.';
+      return 'Entregado sin pago aprobado. Falta factura o comprobante del minorista.';
     }
-    return 'Revise el comprobante del aliado en la sección de pago.';
+    return 'Revise el comprobante del minorista en la sección de pago.';
   }
 }

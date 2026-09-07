@@ -16,7 +16,7 @@ void main() {
     expect(out, ['Stock']);
   });
 
-  test('buildCustomFieldsPayload guarda visibilidad aliado', () {
+  test('buildCustomFieldsPayload guarda visibilidad minorista', () {
     final payload = buildCustomFieldsPayload(
       values: {'marca': 'Yamaha', 'ubicacion': 'A-12'},
       aliadoVisibleKeys: {'marca'},
@@ -26,7 +26,7 @@ void main() {
     expect(payload[kAliadoVisibleCustomFieldKeys], ['marca']);
   });
 
-  test('productCustomFieldsDisplayEntries filtra vista aliado', () {
+  test('productCustomFieldsDisplayEntries filtra vista minorista', () {
     final fields = buildCustomFieldsPayload(
       values: {'marca': 'Yamaha', 'costo': '10'},
       aliadoVisibleKeys: {'marca'},

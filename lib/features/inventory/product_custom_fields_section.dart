@@ -261,7 +261,7 @@ class _ProductCustomFieldsEditorState extends State<ProductCustomFieldsEditor> {
         const SizedBox(height: 4),
         Text(
           'Información de tu sistema interno. Usa el botón del ojo para decidir '
-          'qué campos puede ver el aliado en la ficha del repuesto.',
+          'qué campos puede ver el minorista en la ficha del repuesto.',
           style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
@@ -278,13 +278,13 @@ class _ProductCustomFieldsEditorState extends State<ProductCustomFieldsEditor> {
                 onPressed:
                     widget.enabled ? () => _setAllAliadoVisibility(false) : null,
                 icon: const Icon(Icons.lock_outline, size: 16),
-                label: const Text('Ocultar todos para aliados'),
+                label: const Text('Ocultar todos para minoristas'),
               ),
               OutlinedButton.icon(
                 onPressed:
                     widget.enabled ? () => _setAllAliadoVisibility(true) : null,
                 icon: const Icon(Icons.visibility_outlined, size: 16),
-                label: const Text('Mostrar todos a aliados'),
+                label: const Text('Mostrar todos a minoristas'),
               ),
             ],
           ),
@@ -299,8 +299,8 @@ class _ProductCustomFieldsEditorState extends State<ProductCustomFieldsEditor> {
               children: [
                 IconButton(
                   tooltip: row.visibleToAliado
-                      ? 'Visible para aliados (tocar para ocultar)'
-                      : 'Solo interno (tocar para mostrar a aliados)',
+                      ? 'Visible para minoristas (tocar para ocultar)'
+                      : 'Solo interno (tocar para mostrar a minoristas)',
                   onPressed: widget.enabled
                       ? () {
                           setState(() {

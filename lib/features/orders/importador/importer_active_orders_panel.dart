@@ -437,7 +437,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       return 'En carritos multi-partida use el chat para acordar unidades; '
           'la propuesta formal aplica cuando alguna partida tiene más de 1 unidad.';
     }
-    return 'Solo aplica si el aliado pidió más de 1 unidad.';
+    return 'Solo aplica si el minorista pidió más de 1 unidad.';
   }
 
   int _requestedQtyForGroup(List<TransactionRequestModel> g) =>
@@ -497,8 +497,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         SnackBar(
           content: Text(
             g.length > 1
-                ? 'Carrito cancelado. Complete la valoración del aliado.'
-                : 'Pedido cancelado. Complete la valoración del aliado.',
+                ? 'Carrito cancelado. Complete la valoración del minorista.'
+                : 'Pedido cancelado. Complete la valoración del minorista.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -536,7 +536,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Propuesta enviada: el aliado debe aceptar o rechazar antes de avanzar el pedido.',
+              'Propuesta enviada: el minorista debe aceptar o rechazar antes de avanzar el pedido.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -573,7 +573,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ajuste notificado al aliado por chat.'),
+          content: Text('Ajuste notificado al minorista por chat.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -646,7 +646,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               OrderListFilterBar(
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),
-                hintText: 'Buscar por producto, SKU o aliado',
+                hintText: 'Buscar por producto, SKU o minorista',
               ),
               _quickFilterBar(),
               Expanded(

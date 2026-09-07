@@ -68,7 +68,7 @@ class ReputationTab extends StatelessWidget {
                     ProfileInfoIcon(
                       title: 'Reputación',
                       message: isImportador
-                          ? 'Cierres semanales y valoraciones de aliados. '
+                          ? 'Cierres semanales y valoraciones de minoristas. '
                               'Es independiente del detalle de cada pedido.'
                           : 'Su reputación ante importadores: pagos, comunicación '
                               'y resumen semanal.',

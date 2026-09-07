@@ -428,7 +428,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             ],
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con aliado, importador y B2B Conecta',
+          subtitle: 'Hilo con minorista, importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>(

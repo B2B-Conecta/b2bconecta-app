@@ -29,7 +29,7 @@ Future<ImporterQuantityAdjustmentDraft?>
           children: [
             Text(
               'Cantidad solicitada: $requestedQty uds.\n'
-              'Indique una cantidad menor disponible; el aliado deberá aceptar o rechazar en su ficha '
+              'Indique una cantidad menor disponible; el minorista deberá aceptar o rechazar en su ficha '
               '(y puede coordinar por el chat desde el estado pendiente).',
               style: const TextStyle(fontSize: 13, height: 1.35),
             ),
@@ -49,7 +49,7 @@ Future<ImporterQuantityAdjustmentDraft?>
               maxLines: 3,
               maxLength: 500,
               decoration: const InputDecoration(
-                labelText: 'Comentario para el aliado',
+                labelText: 'Comentario para el minorista',
                 alignLabelWithHint: true,
                 border: OutlineInputBorder(),
               ),

@@ -329,7 +329,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         title: Text(
           _isActive
               ? 'Visible en catálogo (Modo pausa off)'
-              : 'Producto en pausa (oculto para aliados)',
+              : 'Producto en pausa (oculto para minoristas)',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: _isActive ? AppColors.successGreen : AppColors.brandAccent,
@@ -337,7 +337,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         ),
         subtitle: Text(
           _isActive
-              ? 'Los aliados pueden ver este producto.'
+              ? 'Los minoristas pueden ver este producto.'
               : 'Actívelo cuando quiera volver a publicarlo.',
           style: const TextStyle(fontSize: 12),
         ),
@@ -550,7 +550,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
                                   style: TextStyle(fontWeight: FontWeight.w700),
                                 ),
                                 subtitle: const Text(
-                                  'El aliado verá el sello de garantía en el catálogo.',
+                                  'El minorista verá el sello de garantía en el catálogo.',
                                   style: TextStyle(fontSize: 12),
                                 ),
                                 value: _hasWarranty,
@@ -601,7 +601,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             subtitle: const Text(
-              'Si está activo, el aliado verá el sello de garantía en el catálogo.',
+              'Si está activo, el minorista verá el sello de garantía en el catálogo.',
               style: TextStyle(fontSize: 12),
             ),
             value: _hasWarranty,

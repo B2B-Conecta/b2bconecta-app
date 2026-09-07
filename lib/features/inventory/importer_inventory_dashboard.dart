@@ -467,7 +467,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 title: 'Importa',
                 body:
                     'Elige si los productos nuevos entran en pausa o visibles '
-                    'para aliados, y confirma. Los códigos existentes se '
+                    'para minoristas, y confirma. Los códigos existentes se '
                     'actualizan según la regla que elijas (todo el producto o '
                     'solo precio y stock).',
               ),
@@ -764,7 +764,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         content: Text(
           input.pct == 0
               ? 'Se quitará el descuento USD de $scopeLabel. '
-                  'Los aliados ya no verán precio USD rebajado en esos productos.\n\n¿Continuar?'
+                  'Los minoristas ya no verán precio USD rebajado en esos productos.\n\n¿Continuar?'
               : 'Se aplicará $pctLabel % de descuento USD a $scopeLabel.\n\n¿Continuar?',
         ),
         actions: [
@@ -911,7 +911,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     final busy = _togglingProductIds.contains(p.id);
     return Tooltip(
       message: p.isActive
-          ? 'Visible para aliados. Desactiva para pausar.'
+          ? 'Visible para minoristas. Desactiva para pausar.'
           : 'En pausa (oculto). Activa para publicar.',
       child: Column(
         mainAxisSize: MainAxisSize.min,

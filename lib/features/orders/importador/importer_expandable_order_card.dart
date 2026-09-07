@@ -361,8 +361,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           _InfoBanner(
                             color: Colors.amber,
                             text: isCheckoutGroup
-                                ? 'Cantidad pendiente de respuesta del aliado.'
-                                : 'Cantidad pendiente: el aliado debe responder antes de «En preparación».',
+                                ? 'Cantidad pendiente de respuesta del minorista.'
+                                : 'Cantidad pendiente: el minorista debe responder antes de «En preparación».',
                           ),
                         ],
                         if (anyPagoPendienteTrasEntrega) ...[
@@ -386,7 +386,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         ],
                         const SizedBox(height: 12),
                         OrderCardCollapsibleSection(
-                          title: 'Aliado y entrega',
+                          title: 'Minorista y entrega',
                           subtitle: '$aliadoTxt · $destinoTxt',
                           initiallyExpanded: true,
                           trailingActions: [
@@ -468,7 +468,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         const SizedBox(height: kOrderCardSectionGap),
                         OrderCardCollapsibleSection(
                           title: 'Mensajes',
-                          subtitle: 'Chat con el aliado',
+                          subtitle: 'Chat con el minorista',
                           child: OrderMotolinkThreadSection(
                             key: ValueKey<String>(
                               isCheckoutGroup

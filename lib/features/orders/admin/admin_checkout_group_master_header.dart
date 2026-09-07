@@ -55,7 +55,7 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
         ),
         const SizedBox(height: kOrderCardSectionGap),
         OrderCardCollapsibleSection(
-          title: 'Aliado',
+          title: 'Minorista',
           subtitle: orderCardPartySubtitle(
             businessName: r.aliadoBusinessName,
             ciudad: r.aliadoCiudad,
@@ -64,7 +64,7 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
           infoMessage: 'Taller solicitante del carrito y estado KYC.',
           child: TransactionRequestCounterpartyProfileSection(
             profileId: r.aliadoId,
-            partyLabel: 'Aliado',
+            partyLabel: 'Minorista',
             businessName: r.aliadoBusinessName,
             rif: r.aliadoRif,
             phone: r.aliadoPhone,
@@ -89,7 +89,7 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
             lineaElegibleValoracionAliado(expLine)) ...[
           const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
-            title: 'Valoración del aliado',
+            title: 'Valoración del minorista',
             subtitle: expLine.aliadoExperienceStars != null
                 ? '${expLine.aliadoExperienceStars}/5 post-entrega'
                 : (expLine.aliadoExperienceSubmittedAt != null
@@ -106,7 +106,7 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
           const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
             title: 'Valoración del mayorista',
-            subtitle: 'Al aliado de este pedido',
+            subtitle: 'Al minorista de este pedido',
             child: TransactionRequestImporterRatingAdminSection(
               request: expLine,
               onMutated: onMutated,

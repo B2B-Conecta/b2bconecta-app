@@ -176,8 +176,8 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                         children: [
                           Text(
                             campaigns.length == 1
-                                ? 'Promoción activa en catálogo aliado'
-                                : '${campaigns.length} promociones activas en catálogo aliado',
+                                ? 'Promoción activa en catálogo minorista'
+                                : '${campaigns.length} promociones activas en catálogo minorista',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 13.5,
@@ -186,7 +186,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Los aliados pueden ver su campaña «${campaigns.first.promoLabel}». '
+                            'Los minoristas pueden ver su campaña «${campaigns.first.promoLabel}». '
                             'Los pedidos solicitados desde la promoción aparecerán marcados.',
                             style: TextStyle(
                               fontSize: 12,
@@ -239,7 +239,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Mientras estén vigentes, los pedidos que un aliado solicite '
+                  'Mientras estén vigentes, los pedidos que un minorista solicite '
                   'tras usar «Ver proveedor» en su campaña se marcarán como '
                   '«Pedido bajo promoción».',
                   style: TextStyle(

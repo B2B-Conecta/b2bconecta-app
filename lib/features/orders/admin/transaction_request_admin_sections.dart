@@ -70,7 +70,7 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
     final r = request;
     final aliadoProfile = TransactionRequestCounterpartyProfileSection(
           profileId: r.aliadoId,
-          partyLabel: 'Aliado',
+          partyLabel: 'Minorista',
           businessName: r.aliadoBusinessName,
           rif: r.aliadoRif,
           phone: r.aliadoPhone,
@@ -161,7 +161,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
     final r = request;
     final profile = TransactionRequestCounterpartyProfileSection(
       profileId: r.aliadoId,
-      partyLabel: 'Aliado',
+      partyLabel: 'Minorista',
       businessName: r.aliadoBusinessName,
       rif: r.aliadoRif,
       phone: r.aliadoPhone,
@@ -185,7 +185,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Datos del aliado',
+                'Datos del minorista',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
@@ -293,7 +293,7 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
       children: [
         if (!hideSectionTitle) ...[
           Text(
-            'Valoración del aliado (post-entrega)',
+            'Valoración del minorista (post-entrega)',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
@@ -321,7 +321,7 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Sin valoración: el aliado aún no envió calificación '
+                      'Sin valoración: el minorista aún no envió calificación '
                       'ni comentario para este pedido.',
                       style: TextStyle(
                         fontSize: 12,
@@ -485,7 +485,7 @@ class _TransactionRequestImporterRatingAdminSectionState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Valoración del mayorista (al aliado)',
+          'Valoración del mayorista (al minorista)',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
@@ -527,8 +527,8 @@ class _TransactionRequestImporterRatingAdminSectionState
                       children: [
                         Text(
                           _hasRated
-                              ? 'El mayorista ya registró su valoración al aliado.'
-                              : 'Sin valoración: el mayorista aún no calificó al aliado.',
+                              ? 'El mayorista ya registró su valoración al minorista.'
+                              : 'Sin valoración: el mayorista aún no calificó al minorista.',
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.35,
@@ -574,7 +574,7 @@ class TransactionRequestDocumentPreferenceAdminSection extends StatelessWidget {
     final p = request.documentTypePreference?.trim();
     final String label = p != null && p.isNotEmpty
         ? (DocumentTypePreference.labelEs(p) ?? p)
-        : 'Pendiente: el aliado aún no indicó nota de entrega o factura fiscal.';
+        : 'Pendiente: el minorista aún no indicó nota de entrega o factura fiscal.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,7 +682,7 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
             )
           else
             Text(
-              'Dirección fiscal del aliado aún no disponible en esta vista.',
+              'Dirección fiscal del minorista aún no disponible en esta vista.',
               style: TextStyle(
                 fontSize: bodySize,
                 color: AppColors.textSecondary,
@@ -847,7 +847,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                         : (r.canceladoPorImportador
                             ? 'Cancelado por proveedor (importador)'
                             : (r.canceladoPorAliado
-                                ? 'Cancelado por el aliado'
+                                ? 'Cancelado por el minorista'
                                 : 'Rechazado (B2B Conecta)')),
                     value: formatEsShortDateTime(r.atRechazado),
                     isDone: r.atRechazado != null,
@@ -923,7 +923,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                   Divider(
                       height: 16, thickness: 0.5, color: AppColors.borderSubtle),
                   _TimelineRow(
-                    label: 'Factura importador al aliado',
+                    label: 'Factura importador al minorista',
                     value: _facturaImportadorTimeline(r),
                     isDone: r.hasProveedorFactura,
                   ),
@@ -962,7 +962,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
   static String _entregadoTimeline(TransactionRequestModel r) {
     final d = formatEsShortDateTime(r.atEntregado);
     if (r.atEntregado == null) return '—';
-    return '$d\nRecepción confirmada por el aliado en su taller';
+    return '$d\nRecepción confirmada por el minorista en su taller';
   }
 
   static String _prepValue(TransactionRequestModel r) {
@@ -981,7 +981,7 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
     final d = formatEsShortDateTime(r.atEnTransito);
     final eta = r.transitEtaResumenEs;
     if (eta == null) return d;
-    return '$d\nEntrega estimada al aliado: $eta';
+    return '$d\nEntrega estimada al minorista: $eta';
   }
 
   static String _facturaImportadorTimeline(TransactionRequestModel r) {

@@ -21,6 +21,7 @@ import 'package:motolink_pro_app/core/widgets/media_pick_action_chips.dart';
 import 'profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/onboarding/terms_acceptance_section.dart';
 import 'package:motolink_pro_app/features/referrals/profile_referral_section.dart';
+import 'profile_role_labels.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -1127,7 +1128,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               infoTitle: 'Términos y privacidad',
               infoMessage: mobile
                   ? 'Debe aceptar términos y privacidad para usar B2B Conecta.'
-                  : 'Aliados e importadores deben aceptar los términos y la '
+                  : 'Minoristas e importadores deben aceptar los términos y la '
                       'política de privacidad vigentes antes de usar B2B Conecta.',
             ),
             TermsAcceptanceSection(
@@ -1467,7 +1468,7 @@ class _RoleChoiceGrid extends StatelessWidget {
     );
     final aliado = tile(
       value: 'aliado',
-      label: 'Aliado',
+      label: ProfileRoleLabels.aliadoEs,
       icon: Icons.person_outline,
     );
     final admin = tile(

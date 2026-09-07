@@ -1,3 +1,5 @@
+import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
+
 /// Resumen de aliado con KYC aprobado (`list_kyc_approved_aliados_for_importador`).
 class KycApprovedAliadoModel {
   const KycApprovedAliadoModel({
@@ -33,7 +35,7 @@ class KycApprovedAliadoModel {
   String get displayName {
     final n = businessName?.trim();
     if (n != null && n.isNotEmpty) return n;
-    return 'Aliado';
+    return ProfileRoleLabels.aliadoEs;
   }
 
   String get locationLine {

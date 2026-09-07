@@ -18,10 +18,10 @@ extension ImporterNewProductsVisibilityX on ImporterNewProductsVisibility {
 
   String get subtitle => switch (this) {
         ImporterNewProductsVisibility.paused =>
-          'Los códigos nuevos quedan ocultos para aliados. Revísalos y actívalos '
+          'Los códigos nuevos quedan ocultos para minoristas. Revísalos y actívalos '
           'cuando quieras publicarlos.',
         ImporterNewProductsVisibility.active =>
-          'Los códigos nuevos se publican de inmediato para aliados. '
+          'Los códigos nuevos se publican de inmediato para minoristas. '
           'Úsalo si ya validaste el archivo.',
       };
 

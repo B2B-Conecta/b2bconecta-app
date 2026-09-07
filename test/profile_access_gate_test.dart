@@ -13,9 +13,9 @@ ProfileModel _aliado({
   String? termsVersion,
 }) {
   return ProfileModel(
-    id: 'aliado-1',
+    id: 'minorista-1',
     role: 'aliado',
-    businessName: 'Pedro Aliado',
+    businessName: 'Pedro Minorista',
     rif: 'J-12345678-9',
     accountAccessStatus: access,
     fiscalMapsUrl: fiscalMapsUrl,
@@ -28,7 +28,7 @@ ProfileModel _aliado({
 }
 
 void main() {
-  group('aliado con acceso activo', () {
+  group('minorista con acceso activo', () {
     test('entra a la app aunque falte Google Maps', () {
       final p = _aliado(
         access: AccountAccessStatus.active,
@@ -53,7 +53,7 @@ void main() {
     });
   });
 
-  group('aliado en registro inicial', () {
+  group('minorista en registro inicial', () {
     test('sin Maps no está completo y no entra a la app', () {
       final p = _aliado(
         access: AccountAccessStatus.draft,

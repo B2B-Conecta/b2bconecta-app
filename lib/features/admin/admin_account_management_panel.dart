@@ -482,7 +482,7 @@ class _AdminAccountManagementPanelState
   static String _roleFilterLabel(_AccountRoleFilter f) {
     return switch (f) {
       _AccountRoleFilter.todos => 'Todos',
-      _AccountRoleFilter.aliados => 'Aliados',
+      _AccountRoleFilter.aliados => 'Minoristas',
       _AccountRoleFilter.importadores => 'Importadores',
       _AccountRoleFilter.administracion => 'Administración',
     };

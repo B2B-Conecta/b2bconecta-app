@@ -193,7 +193,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                       child: Text(
                         MediaQuery.sizeOf(context).width < 600
                             ? 'Campañas · catálogo'
-                            : 'Campañas para aliados e importadores',
+                            : 'Campañas para minoristas e importadores',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -629,7 +629,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               items: [
                 DropdownMenuItem(
                   value: PromoCampaignModel.sponsorImportador,
-                  child: _promoDropdownLabel('Proveedor (catálogo aliado)'),
+                  child: _promoDropdownLabel('Proveedor (catálogo minorista)'),
                 ),
                 DropdownMenuItem(
                   value: PromoCampaignModel.sponsorTercero,
@@ -650,7 +650,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                 items: [
                   DropdownMenuItem(
                     value: PromoCampaignModel.audienceAliado,
-                    child: _promoDropdownLabel('Solo aliados'),
+                    child: _promoDropdownLabel('Solo minoristas'),
                   ),
                   DropdownMenuItem(
                     value: PromoCampaignModel.audienceImportador,
@@ -658,7 +658,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                   ),
                   DropdownMenuItem(
                     value: PromoCampaignModel.audienceAmbos,
-                    child: _promoDropdownLabel('Aliados e importadores'),
+                    child: _promoDropdownLabel('Minoristas e importadores'),
                   ),
                 ],
                 onChanged: (v) =>

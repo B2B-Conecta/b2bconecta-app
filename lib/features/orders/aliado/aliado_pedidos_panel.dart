@@ -723,7 +723,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             subtitle: 'Hilo con el importador y B2B Conecta',
             infoMessage: OrderSectionHelp.chatPedido,
             child: OrderMotolinkThreadSection(
-              key: ValueKey<String>('trm-aliado-${r.id}'),
+              key: ValueKey<String>('trm-minorista-${r.id}'),
               transactionRequestId: r.id,
               allowReplyAsAliado: _esEnCurso(r.status),
               allowReplyAsAdmin: false,
@@ -885,8 +885,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>(
               chunk.length > 1
-                  ? 'trm-aliado-merge-${chunk.first.ownerId}-${chunk.map((e) => e.id).join("-")}'
-                  : 'trm-aliado-${chunk.single.id}',
+                  ? 'trm-minorista-merge-${chunk.first.ownerId}-${chunk.map((e) => e.id).join("-")}'
+                  : 'trm-minorista-${chunk.single.id}',
             ),
             transactionRequestId: chunk.first.id,
             mergedThreadRequestIds:

@@ -352,7 +352,7 @@ class _AdminEncomiendasReportPanelState
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text(
-                        'Con valoración del aliado',
+                        'Con valoración del minorista',
                         style: TextStyle(fontSize: 13),
                       ),
                       value: _soloConValoracion,
@@ -566,8 +566,8 @@ class _AdminEncomiendasReportPanelState
               controller: _searchCtrl,
               decoration: InputDecoration(
                 hintText: MediaQuery.sizeOf(context).width < 600
-                    ? 'Producto, SKU, aliado…'
-                    : 'Buscar producto, SKU, aliado…',
+                    ? 'Producto, SKU, minorista…'
+                    : 'Buscar producto, SKU, minorista…',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 border: const OutlineInputBorder(),
                 isDense: true,
@@ -675,7 +675,7 @@ class _AdminEncomiendasReportPanelState
     if (docLabel != null && _docPrefFilter != 'all') {
       lines.add('Documento: $docLabel');
     }
-    if (_soloConValoracion) lines.add('Solo con valoración del aliado');
+    if (_soloConValoracion) lines.add('Solo con valoración del minorista');
     if (_soloPagosAprobados) lines.add('Solo pagos aprobados');
     if (_soloEntregados) lines.add('Solo entregados');
     if (_topSoldLimit != null) {
@@ -1377,7 +1377,7 @@ class _AdminEncomiendasReportPanelState
             ),
             const SizedBox(height: 4),
             Text(
-              '${r.aliadoBusinessName ?? "Aliado"} → ${r.ownerBusinessName ?? "Importador"}',
+              '${r.aliadoBusinessName ?? "Minorista"} → ${r.ownerBusinessName ?? "Importador"}',
               style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),

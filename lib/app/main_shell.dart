@@ -218,7 +218,7 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.star_rate,
       label: 'Valoraciones',
       title: 'Valoraciones',
-      subtitle: 'Aliado ↔ importador',
+      subtitle: 'Minorista ↔ importador',
     ),
     AdminShellDestination(
       icon: Icons.payments_outlined,
@@ -232,7 +232,7 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.verified_user,
       label: 'KYC',
       title: 'Verificación',
-      subtitle: 'Aliados · mayoristas',
+      subtitle: 'Minoristas · mayoristas',
     ),
     AdminShellDestination(
       icon: Icons.support_agent_outlined,
@@ -660,7 +660,7 @@ class _MainShellState extends State<MainShell> {
           return _buildB2bDesktopShell(
             role: AppHomeRole.aliado,
             destinations: _aliadoDestinations,
-            railBadgeLabel: 'Panel aliado',
+            railBadgeLabel: 'Panel minorista',
             trailingActions: [_aliadoCartTopBarAction()],
           );
         }
@@ -951,7 +951,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                     const SizedBox(height: 4),
                     Text(
                       'Registre empresas de transporte y conductores '
-                      'para que los aliados elijan en el checkout.',
+                      'para que los minoristas elijan en el checkout.',
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.35,

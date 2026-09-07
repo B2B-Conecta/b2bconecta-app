@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'referral_code_format.dart';
 import 'referral_invite_config.dart';
 import 'external_referrer_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
@@ -72,6 +73,26 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok)));
+  }
+
+  Future<void> _setActive(ExternalReferrerModel row, bool active) async {
+    try {
+      await SupabaseService.adminUpdateExternalReferrer(
+        id: row.id,
+        active: active,
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
+          ),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    }
   }
 
   Future<void> _openCreate() async {
@@ -378,7 +399,8 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
             'Registre vendedores externos. Ellos no usan la app: reciben un '
-            'código y QR para compartir con nuevos aliados/mayoristas.',
+            'código y QR para compartir con nuevos minoristas/mayoristas. '
+            'Desmarque Activo para dejar el código fuera de servicio; no se elimina la cuenta.',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.35,
@@ -405,50 +427,71 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                     return Material(
                       color: AppColors.card,
                       borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => _openDetail(r),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      r.fullName,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15,
-                                        color: AppColors.textPrimary,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => _openDetail(r),
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        r.fullName,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                          color: AppColors.textPrimary,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${r.code} · ${r.referredCount} referido(s)'
-                                      '${r.active ? '' : ' · inactivo'}',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        color: AppColors.textSecondary,
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${r.code} · ${r.referredCount} referido(s)',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      '${r.phone} · ${r.email}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textMuted,
+                                      Text(
+                                        '${r.phone} · ${r.email}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textMuted,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
-                              Icon(
-                                Icons.qr_code_2,
-                                color: AppColors.brandBlue,
-                              ),
-                            ],
-                          ),
+                            ),
+                            Column(
+                              children: [
+                                Checkbox(
+                                  value: r.active,
+                                  onChanged: (v) =>
+                                      _setActive(r, v ?? false),
+                                ),
+                                Text(
+                                  'Activo',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: r.active
+                                        ? AppColors.brandBlue
+                                        : AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Icon(
+                              Icons.qr_code_2,
+                              color: AppColors.brandBlue,
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -487,6 +530,9 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
     _email = TextEditingController(text: e?.email ?? '');
     _notes = TextEditingController(text: e?.notes ?? '');
     _active = e?.active ?? true;
+    _name.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -502,12 +548,18 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
     setState(() => _busy = true);
     try {
       if (widget.existing == null) {
-        await SupabaseService.adminCreateExternalReferrer(
+        final created = await SupabaseService.adminCreateExternalReferrer(
           fullName: _name.text,
           phone: _phone.text,
           email: _email.text,
           notes: _notes.text,
         );
+        if (!_active) {
+          await SupabaseService.adminUpdateExternalReferrer(
+            id: created.id,
+            active: false,
+          );
+        }
       } else {
         await SupabaseService.adminUpdateExternalReferrer(
           id: widget.existing!.id,
@@ -562,6 +614,29 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
                 border: OutlineInputBorder(),
               ),
             ),
+            if (!editing) ...[
+              const SizedBox(height: 8),
+              Text(
+                'El código será ${ReferralCodeFormat.previewCode(_name.text)}. '
+                'Si ya existe, se usará un número (por ejemplo '
+                '${ReferralCodeFormat.stemFromName(_name.text)}2.B2B).',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              Text(
+                'El código ${widget.existing!.code} no cambia al editar el nombre.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             TextField(
               controller: _phone,
@@ -589,18 +664,20 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
                 border: OutlineInputBorder(),
               ),
             ),
-            if (editing) ...[
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Activo'),
-                subtitle: const Text(
-                  'Si está inactivo, el código deja de aceptar registros nuevos.',
-                ),
-                value: _active,
-                onChanged: _busy ? null : (v) => setState(() => _active = v),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Activo'),
+              subtitle: const Text(
+                'Si está inactivo, el código deja de aceptar registros nuevos. '
+                'La cuenta no se elimina.',
               ),
-            ],
+              value: _active,
+              onChanged: _busy
+                  ? null
+                  : (v) => setState(() => _active = v ?? false),
+            ),
             const SizedBox(height: 14),
             FilledButton(
               onPressed: _busy ? null : _save,

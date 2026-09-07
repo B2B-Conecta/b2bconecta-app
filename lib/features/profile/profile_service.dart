@@ -150,7 +150,7 @@ class ProfileService {
     final requestedRole = _normalizeB2bRole(role);
     if (requestedRole == null) {
       throw ArgumentError(
-        'Seleccione un rol válido (importador o aliado) antes de guardar.',
+        'Seleccione un rol válido (importador o minorista) antes de guardar.',
       );
     }
 
@@ -239,7 +239,7 @@ class ProfileService {
         return 'Ese RIF ya está registrado en B2B Conecta. Use el RIF fiscal real de su negocio.';
       }
       if (code == '23502' && msg.contains('role')) {
-        return 'No se pudo guardar el perfil. Vuelva a seleccionar Importador o Aliado e intente de nuevo.';
+        return 'No se pudo guardar el perfil. Vuelva a seleccionar Importador o Minorista e intente de nuevo.';
       }
     }
     return 'No se pudo guardar el perfil. Revise los datos e intente de nuevo.';

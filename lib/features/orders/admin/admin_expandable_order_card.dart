@@ -57,7 +57,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
         : r.tituloFichaPrincipalPedido;
     final resumen = isCheckoutGroup
         ? adminCheckoutGroupResumenLinea(lines)
-        : '${r.totalUnidadesAliado} uds · Total (aliado) '
+        : '${r.totalUnidadesAliado} uds · Total (minorista) '
             '${r.precioTotal.toStringAsFixed(2)} REF';
     final fechaLabel = isCheckoutGroup
         ? ImporterOrderDate.etiquetaGrupo(lines)
@@ -239,7 +239,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         r,
                       ),
                       infoMessage:
-                          'Aliado solicitante e importador proveedor del pedido.',
+                          'Minorista solicitante e importador proveedor del pedido.',
                       child: TransactionRequestPartiesContactSection(
                         request: r,
                         embedded: true,
@@ -287,7 +287,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         lineaElegibleValoracionAliado(r)) ...[
                       const SizedBox(height: kOrderCardSectionGap),
                       OrderCardCollapsibleSection(
-                        title: 'Valoración del aliado',
+                        title: 'Valoración del minorista',
                         subtitle: r.aliadoExperienceStars != null
                             ? '${r.aliadoExperienceStars}/5 post-entrega'
                             : (r.aliadoExperienceSubmittedAt != null
@@ -305,7 +305,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                       const SizedBox(height: kOrderCardSectionGap),
                       OrderCardCollapsibleSection(
                         title: 'Valoración del mayorista',
-                        subtitle: 'Al aliado de este pedido',
+                        subtitle: 'Al minorista de este pedido',
                         child: TransactionRequestImporterRatingAdminSection(
                           request: r,
                           onMutated: onRequestMutated,

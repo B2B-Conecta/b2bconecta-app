@@ -256,7 +256,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
         children: [
           if (!embedInOrderCard) ...[
             Text(
-              'Pedido del aliado',
+              'Pedido del minorista',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: titleSize,
@@ -363,7 +363,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
         children: [
           if (!embedInOrderCard) ...[
             Text(
-              'Carrito del aliado',
+              'Carrito del minorista',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: titleSize,

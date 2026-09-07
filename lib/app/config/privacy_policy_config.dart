@@ -9,9 +9,9 @@ B2B Conecta Marketplace
 Política de privacidad y protección de datos comerciales
 
 Fecha de vigencia: junio de 2026
-Ámbito: relación entre importadores (mayoristas) y aliados (minoristas) en la plataforma B2B Conecta.
+Ámbito: relación entre importadores (mayoristas) y minoristas en la plataforma B2B Conecta.
 
-El presente documento establece las directrices de confidencialidad y protección de datos que rigen en B2B Conecta. Su objetivo es regular de forma transparente el flujo de información de verificación entre aliados minoristas e importadores mayoristas, y blindar el canal de distribución comercial.
+El presente documento establece las directrices de confidencialidad y protección de datos que rigen en B2B Conecta. Su objetivo es regular de forma transparente el flujo de información de verificación entre minoristas e importadores mayoristas, y blindar el canal de distribución comercial.
 
 1. Información recopilada (datos del comercio)
 
@@ -39,13 +39,13 @@ B2B Conecta C.A. asume un compromiso estricto respecto al destino de los datos:
 
 Para la habilitación de cuentas comerciales y la transparencia operativa en transacciones B2B, los importadores pueden verificar la legitimidad de las tiendas minoristas que desean enlazarse con ellos.
 
-Consentimiento explícito del aliado (minorista)
+Consentimiento explícito del minorista
 
-Al registrarse y aceptar esta política, el aliado autoriza expresamente a B2B Conecta a compartir y poner a disposición de los usuarios registrados como importadores/mayoristas la documentación legal y fiscal cargada en la plataforma (incluyendo, de forma enunciativa pero no limitativa: RIF, registro mercantil y dirección comercial).
+Al registrarse y aceptar esta política, el minorista autoriza expresamente a B2B Conecta a compartir y poner a disposición de los usuarios registrados como importadores/mayoristas la documentación legal y fiscal cargada en la plataforma (incluyendo, de forma enunciativa pero no limitativa: RIF, registro mercantil y dirección comercial).
 
 Esta transferencia tiene como única finalidad que el importador valide la condición de comerciante formal del solicitante, verifique su zona geográfica y autorice de forma soberana el acceso a sus catálogos privados de precios y condiciones de despacho.
 
-Los importadores están obligados, en sus términos de uso, a tratar bajo estricta confidencialidad comercial toda la documentación fiscal y legal de los aliados a la que accedan para fines de verificación dentro de B2B Conecta.
+Los importadores están obligados, en sus términos de uso, a tratar bajo estricta confidencialidad comercial toda la documentación fiscal y legal de los minoristas a la que accedan para fines de verificación dentro de B2B Conecta.
 
 4. Cookies, identificadores y tecnologías de seguimiento
 
@@ -53,7 +53,7 @@ B2B Conecta utiliza cookies técnicas, tokens de sesión y almacenamiento local 
 
 5. Control de los datos: derechos de los usuarios
 
-Todos los comercios registrados en B2B Conecta (importador o aliado) conservan facultad sobre sus datos corporativos y pueden ejercer los siguientes derechos ante el canal de soporte de la plataforma:
+Todos los comercios registrados en B2B Conecta (importador o minorista) conservan facultad sobre sus datos corporativos y pueden ejercer los siguientes derechos ante el canal de soporte de la plataforma:
 
 • Acceso y rectificación: consultar la información registrada y corregir datos desactualizados (domicilio, renovaciones de RIF, teléfonos de despacho, etc.).
 • Cancelación y oposición: solicitar la baja de la plataforma. Al procesarse, B2B Conecta eliminará o anonimizará los datos del sistema activo, manteniendo únicamente los registros exigidos por legislación fiscal local si ya se hubieren completado transacciones.

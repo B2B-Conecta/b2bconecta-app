@@ -389,8 +389,8 @@ class _AdminRatingsToolbar extends StatelessWidget {
               const SizedBox(width: 6),
               _filterChip(
                 label: MediaQuery.sizeOf(context).width < 600
-                    ? 'Aliado → Imp.'
-                    : 'Aliado → importador',
+                    ? 'Minorista → Imp.'
+                    : 'Minorista → importador',
                 selected: filter == _AdminRatingFilter.aliadoRatesImporter,
                 onTap: () =>
                     onFilterChanged(_AdminRatingFilter.aliadoRatesImporter),
@@ -398,8 +398,8 @@ class _AdminRatingsToolbar extends StatelessWidget {
               const SizedBox(width: 6),
               _filterChip(
                 label: MediaQuery.sizeOf(context).width < 600
-                    ? 'Imp. → Aliado'
-                    : 'Importador → aliado',
+                    ? 'Imp. → Minorista'
+                    : 'Importador → minorista',
                 selected: filter == _AdminRatingFilter.importerRatesAliado,
                 onTap: () =>
                     onFilterChanged(_AdminRatingFilter.importerRatesAliado),

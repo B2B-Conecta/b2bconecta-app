@@ -49,7 +49,7 @@ abstract final class OrderStatusFlowCopy {
           'Listo para recolección · transporte y punto de retiro',
         TransactionRequestStatus.enTransito ||
         TransactionRequestStatus.enviado =>
-          'En tránsito · el aliado confirma la recepción',
+          'En tránsito · el minorista confirma la recepción',
         TransactionRequestStatus.enPreparacion => 'En preparación',
         TransactionRequestStatus.pendiente => 'Nuevo pedido',
         _ => 'Pedido activo',

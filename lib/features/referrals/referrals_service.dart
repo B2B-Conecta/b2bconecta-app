@@ -3,12 +3,13 @@
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/referrals/admin_referral_row_model.dart';
 import 'package:motolink_pro_app/features/referrals/external_referrer_model.dart';
+import 'package:motolink_pro_app/features/referrals/referral_invite_config.dart';
 
 class ReferralsService {
   ReferralsService._();
 
   static Future<void> applyReferralCode(String code) async {
-    final c = code.trim().toUpperCase();
+    final c = ReferralInviteConfig.normalizeCode(code);
     if (c.isEmpty) {
       throw ArgumentError('Indique un código de referido.');
     }

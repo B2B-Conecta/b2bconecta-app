@@ -153,8 +153,8 @@ class _ImporterOrderFleteComprobanteSectionState
         const SizedBox(height: 6),
         Text(
           carrier != null && carrier.isNotEmpty
-              ? 'Pago del aliado al transportista $carrier.'
-              : 'Pago del aliado al transportista.',
+              ? 'Pago del minorista al transportista $carrier.'
+              : 'Pago del minorista al transportista.',
           style: TextStyle(fontSize: 11, height: 1.35, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
@@ -175,7 +175,7 @@ class _ImporterOrderFleteComprobanteSectionState
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'El aliado aún no registra el comprobante del pago del flete.',
+                    'El minorista aún no registra el comprobante del pago del flete.',
                     style: TextStyle(
                       fontSize: 11.5,
                       height: 1.35,

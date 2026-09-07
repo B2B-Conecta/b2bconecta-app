@@ -74,7 +74,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           'Falta que los importadores avancen a preparación/listo para habilitar el tránsito.';
     } else if (!hasFacturaImportador) {
       bloqueoTransito =
-          'Falta la factura del importador al aliado (pestaña Pedidos del importador).';
+          'Falta la factura del importador al minorista (pestaña Pedidos del importador).';
     }
 
     return Column(
@@ -116,7 +116,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           const SizedBox(height: 12),
         ],
         Text(
-          'Factura del importador al aliado',
+          'Factura del importador al minorista',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
@@ -142,7 +142,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           ),
         const SizedBox(height: 14),
         Text(
-          'Pago del aliado',
+          'Pago del minorista',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
@@ -154,7 +154,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
-              'Sin factura del importador el aliado aún no puede enviar comprobante.',
+              'Sin factura del importador el minorista aún no puede enviar comprobante.',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.textSecondary,

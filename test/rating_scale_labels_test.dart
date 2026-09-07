@@ -36,7 +36,7 @@ void main() {
         comment: 'ok',
         answers: {'product_quality': 5, 'dispatch_time': 3},
         submittedAt: null,
-        aliadoLabel: 'Aliado',
+        aliadoLabel: 'Minorista',
       ),
       const ImportadorReceivedRatingModel(
         id: '2',
@@ -44,7 +44,7 @@ void main() {
         comment: 'ok',
         answers: {'product_quality': 3, 'dispatch_time': 5},
         submittedAt: null,
-        aliadoLabel: 'Aliado',
+        aliadoLabel: 'Minorista',
       ),
     ];
     final avgs = computeDimensionAverages(

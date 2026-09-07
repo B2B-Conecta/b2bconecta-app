@@ -5,9 +5,13 @@ import 'package:motolink_pro_app/app/config/auth_redirect_config.dart';
 /// Link y normalización de códigos de referido.
 abstract final class ReferralInviteConfig {
   static String normalizeCode(String? raw) {
-    final t = raw?.trim().toUpperCase() ?? '';
+    var t = (raw?.trim() ?? '').toUpperCase();
     if (t.isEmpty) return '';
-    return t.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    t = t.replaceAll(RegExp(r'\s+'), '');
+    t = t.replaceAll(RegExp(r'[^A-Z0-9.]'), '');
+    t = t.replaceAll(RegExp(r'\.+'), '.');
+    t = t.replaceAll(RegExp(r'^\.|\.$'), '');
+    return t;
   }
 
   /// Origen para compartir (web actual o producción).

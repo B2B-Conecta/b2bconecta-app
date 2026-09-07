@@ -17,8 +17,8 @@ String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
   switch (pe) {
     case PagoRevisionEstado.pendiente:
       return efectivo
-          ? 'Pendiente de comprobante de efectivo del aliado'
-          : 'Pendiente de comprobante del aliado';
+          ? 'Pendiente de comprobante de efectivo del minorista'
+          : 'Pendiente de comprobante del minorista';
     case PagoRevisionEstado.enRevision:
       if (efectivo && !r.hasComprobantePago) {
         return 'Pago en efectivo en revisión';
@@ -28,8 +28,8 @@ String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
       return efectivo ? 'Pago en efectivo aprobado' : 'Pago aprobado';
     case PagoRevisionEstado.rechazado:
       return efectivo
-          ? 'Comprobante de efectivo rechazado (aliado puede reenviar)'
-          : 'Comprobante rechazado (aliado puede reenviar)';
+          ? 'Comprobante de efectivo rechazado (minorista puede reenviar)'
+          : 'Comprobante rechazado (minorista puede reenviar)';
     default:
       return pe;
   }
@@ -95,7 +95,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
       await SupabaseService.adminAprobarPagoAliado(widget.request.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pago del aliado aprobado.')),
+        const SnackBar(content: Text('Pago del minorista aprobado.')),
       );
       widget.onRefresh();
     } catch (e) {
@@ -185,7 +185,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
       children: [
         if (widget.includeSectionTitle) ...[
           Text(
-            'Pago del aliado',
+            'Pago del minorista',
             style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 12,

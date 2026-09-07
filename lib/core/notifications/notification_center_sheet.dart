@@ -385,10 +385,10 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
     final p = n.productName?.trim();
     final a = n.aliadoBusinessName?.trim();
     if (p != null && p.isNotEmpty && a != null && a.isNotEmpty) {
-      return 'Producto: $p · Aliado: $a';
+      return 'Producto: $p · Minorista: $a';
     }
     if (p != null && p.isNotEmpty) return 'Producto: $p';
-    if (a != null && a.isNotEmpty) return 'Aliado: $a';
+    if (a != null && a.isNotEmpty) return 'Minorista: $a';
     return '';
   }
 

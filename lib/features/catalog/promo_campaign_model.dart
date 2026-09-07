@@ -85,11 +85,11 @@ class PromoCampaignModel {
   static String audienceLabelEs(String? value) {
     switch (value?.trim()) {
       case audienceAliado:
-        return 'Solo aliados';
+        return 'Solo minoristas';
       case audienceImportador:
         return 'Solo importadores';
       case audienceAmbos:
-        return 'Aliados e importadores';
+        return 'Minoristas e importadores';
       default:
         return value ?? '—';
     }

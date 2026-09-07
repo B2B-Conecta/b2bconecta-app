@@ -215,7 +215,7 @@ class _ImporterOrderPagoVerificationSectionState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Comprobante de pago del aliado',
+            'Comprobante de pago del minorista',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
@@ -318,8 +318,8 @@ class _ImporterOrderPagoVerificationSectionState
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 ref.pagoMetodo?.trim() == PagoMetodo.efectivo
-                    ? 'El aliado puede declarar pago en efectivo desde su ficha del pedido.'
-                    : 'El aliado declara método y comprobante en su ficha del pedido.',
+                    ? 'El minorista puede declarar pago en efectivo desde su ficha del pedido.'
+                    : 'El minorista declara método y comprobante en su ficha del pedido.',
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
@@ -340,7 +340,7 @@ class _ImporterOrderPagoVerificationSectionState
         children: [
           if (!widget.hideMajorTitle) ...[
             Text(
-              'Pago del aliado',
+              'Pago del minorista',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 13,
@@ -397,7 +397,7 @@ class _ImporterOrderPagoVerificationSectionState
               mostrarAcciones) ...[
             const SizedBox(height: 6),
             Text(
-              'El aliado recibió el pedido con pago pendiente. Revise el comprobante y confirme el pago.',
+              'El minorista recibió el pedido con pago pendiente. Revise el comprobante y confirme el pago.',
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.35,
@@ -430,8 +430,8 @@ class _ImporterOrderPagoVerificationSectionState
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 r.pagoMetodo?.trim() == PagoMetodo.efectivo
-                    ? 'El aliado puede declarar pago en efectivo desde su ficha del pedido.'
-                    : 'El aliado puede declarar método y adjuntar comprobante desde su ficha del pedido.',
+                    ? 'El minorista puede declarar pago en efectivo desde su ficha del pedido.'
+                    : 'El minorista puede declarar método y adjuntar comprobante desde su ficha del pedido.',
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),

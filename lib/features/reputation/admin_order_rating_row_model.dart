@@ -75,7 +75,7 @@ class AdminOrderRatingRowModel {
   }
 
   String get raterLabelEs =>
-      raterRole == 'aliado' ? 'Aliado → importador' : 'Importador → aliado';
+      raterRole == 'aliado' ? 'Minorista → importador' : 'Importador → minorista';
 
   bool get isBucketV2 => questionnaireVersion == 'bucket_v2';
 

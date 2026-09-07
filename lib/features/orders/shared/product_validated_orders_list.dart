@@ -217,7 +217,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
               OrderListFilterBar(
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),
-                hintText: 'Buscar por aliado',
+                hintText: 'Buscar por minorista',
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

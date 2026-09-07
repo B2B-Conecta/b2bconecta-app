@@ -233,7 +233,7 @@ class _AliadoAuthorizationCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Estado del aliado',
+                    'Estado del minorista',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,

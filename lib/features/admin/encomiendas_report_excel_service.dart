@@ -40,7 +40,7 @@ class EncomiendasReportExcelService {
     'Importador',
     'Pedidos',
     'Unidades',
-    'Total REF (aliado)',
+    'Total REF (minorista)',
   ];
 
   static const _headers = [
@@ -49,16 +49,16 @@ class EncomiendasReportExcelService {
     'Estado',
     'Producto',
     'SKU',
-    'Aliado',
+    'Minorista',
     'Importador',
     'Cantidad',
-    'Total REF (aliado)',
+    'Total REF (minorista)',
     'Pref. documento',
     'Factura importador',
     'Pago estado',
     'Método pago',
     'Estrellas',
-    'Comentario aliado',
+    'Comentario minorista',
     'Fecha valoración',
   ];
 

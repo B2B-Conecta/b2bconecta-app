@@ -294,7 +294,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                   ? 'Tú'
                   : (m.isFromAdmin
                       ? 'B2B Conecta'
-                      : (m.isFromImportador ? 'Importador' : 'Aliado'));
+                      : (m.isFromImportador ? 'Importador' : 'Minorista'));
               final align =
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
               final bg = m.isFromAdmin
@@ -344,7 +344,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             textInputAction: TextInputAction.newline,
             decoration: InputDecoration(
               hintText: widget.allowReplyAsAdmin
-                  ? 'Respuesta al aliado…'
+                  ? 'Respuesta al minorista…'
                   : 'Escriba su mensaje…',
               isDense: true,
               border: const OutlineInputBorder(),

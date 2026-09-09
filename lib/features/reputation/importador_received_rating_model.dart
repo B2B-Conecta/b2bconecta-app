@@ -25,7 +25,7 @@ class ImportadorReceivedRatingModel {
       submittedAt: json['submitted_at'] != null
           ? DateTime.tryParse(json['submitted_at'].toString())
           : null,
-      aliadoLabel: json['aliado_label']?.toString() ?? 'Minorista',
+      aliadoLabel: json['aliado_label']?.toString() ?? 'Tienda minorista',
     );
   }
 

@@ -12,22 +12,22 @@ Fecha de vigencia: junio de 2026
 
 1. Objeto y alcance
 
-B2B Conecta es una plataforma tecnológica B2B operada por B2B Conecta C.A. que conecta minoristas con importadores (mayoristas) de repuestos y accesorios para motocicletas. El uso de la plataforma implica la aceptación de estos términos y de la Política de privacidad de B2B Conecta.
+B2B Conecta es una plataforma tecnológica B2B operada por B2B Conecta C.A. que conecta tiendas minoristas con importadores (mayoristas) de repuestos y accesorios para motocicletas. El uso de la plataforma implica la aceptación de estos términos y de la Política de privacidad de B2B Conecta.
 
 2. Registro y veracidad de la información
 
 El usuario declara que los datos fiscales, documentos, referencias comerciales y evidencias cargadas son veraces, actuales y corresponden a una actividad económica legítima. B2B Conecta y los importadores pueden solicitar documentación adicional para validar el acceso.
 
-3. Acceso de minoristas
+3. Acceso de tiendas minoristas
 
-El acceso de minoristas al catálogo y a operaciones de compra está sujeto a:
+El acceso de tiendas minoristas al catálogo y a operaciones de compra está sujeto a:
 • Aceptación de términos y política de privacidad vigentes.
 • Verificación documental por B2B Conecta (registro inicial / KYC).
 • Autorización soberana de cada importador para acceder a sus catálogos y condiciones comerciales.
 
 4. Obligaciones del importador (mayorista)
 
-El importador se obliga irrevocablemente a tratar bajo la más estricta confidencialidad comercial toda la documentación fiscal y legal de los minoristas a la que tenga acceso para fines de verificación.
+El importador se obliga irrevocablemente a tratar bajo la más estricta confidencialidad comercial toda la documentación fiscal y legal de las tiendas minoristas a la que tenga acceso para fines de verificación.
 
 Queda expresamente prohibido para el importador copiar, transferir, extraer fuera de la plataforma o utilizar dichos datos para fines ajenos a la evaluación comercial directa dentro de B2B Conecta.
 
@@ -39,7 +39,7 @@ La información de precios, inventarios, condiciones de pago, descuentos y polí
 
 6. Pagos y operaciones
 
-Las condiciones de pago, comprobantes, métodos aceptados y confirmaciones entre minorista e importador se rigen por lo acordado en la plataforma y por las políticas de cada importador. B2B Conecta facilita el registro y seguimiento; la relación comercial y cobro es entre las partes.
+Las condiciones de pago, comprobantes, métodos aceptados y confirmaciones entre tienda minorista e importador se rigen por lo acordado en la plataforma y por las políticas de cada importador. B2B Conecta facilita el registro y seguimiento; la relación comercial y cobro es entre las partes.
 
 7. Suspensión y terminación
 
@@ -47,7 +47,7 @@ B2B Conecta puede suspender, rechazar o cancelar cuentas que incumplan estas con
 
 8. Limitación de responsabilidad
 
-B2B Conecta actúa como intermediario tecnológico. No es parte en la venta de mercancía entre importador y minorista, salvo funciones expresamente descritas en la plataforma (por ejemplo, liquidación de comisiones acordadas).
+B2B Conecta actúa como intermediario tecnológico. No es parte en la venta de mercancía entre importador y tienda minorista, salvo funciones expresamente descritas en la plataforma (por ejemplo, liquidación de comisiones acordadas).
 
 9. Actualización
 

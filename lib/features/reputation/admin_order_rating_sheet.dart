@@ -103,7 +103,7 @@ class _AdminOrderRatingSheetState extends State<_AdminOrderRatingSheet> {
         SnackBar(
           content: Text(
             _asAliado
-                ? 'Valoración registrada en nombre del minorista. Se le notificó.'
+                ? 'Valoración registrada en nombre de la tienda minorista. Se le notificó.'
                 : 'Valoración registrada en nombre del mayorista. Se le notificó.',
           ),
           behavior: SnackBarBehavior.floating,
@@ -129,7 +129,7 @@ class _AdminOrderRatingSheetState extends State<_AdminOrderRatingSheet> {
     final subtitle = _asAliado
         ? (widget.request.aliadoBusinessName?.trim().isNotEmpty == true
             ? 'En nombre de: ${widget.request.aliadoBusinessName!.trim()}'
-            : 'En nombre del minorista')
+            : 'En nombre de la tienda minorista')
         : (widget.request.ownerBusinessName?.trim().isNotEmpty == true
             ? 'En nombre de: ${widget.request.ownerBusinessName!.trim()}'
             : 'En nombre del mayorista');
@@ -161,7 +161,7 @@ class _AdminOrderRatingSheetState extends State<_AdminOrderRatingSheet> {
                 const SizedBox(height: 12),
                 Text(
                   _asAliado
-                      ? 'Valorar como minorista'
+                      ? 'Valorar como tienda minorista'
                       : 'Valorar como mayorista',
                   style: TextStyle(
                     fontSize: 17,
@@ -205,7 +205,7 @@ class _AdminOrderRatingSheetState extends State<_AdminOrderRatingSheet> {
                       child: OrderRatingForm(
                         title: _asAliado
                             ? 'Calificación al mayorista'
-                            : 'Calificación al minorista',
+                            : 'Calificación a la tienda minorista',
                         subtitle: subtitle,
                         questionnaire: _questionnaire!,
                         busy: _busy,

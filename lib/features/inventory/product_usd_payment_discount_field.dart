@@ -25,7 +25,7 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Descuento en precio USD (catálogo minorista)',
+                'Descuento en precio USD (catálogo tienda minorista)',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
@@ -37,7 +37,7 @@ class ProductUsdPaymentDiscountField extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Opcional. El minorista verá el precio REF y, aparte, un precio USD '
+          'Opcional. La tienda minorista verá el precio REF y, aparte, un precio USD '
           'con este porcentaje de rebaja (ej. 2 → paga 2 % menos en USD). '
           'Use 0 para quitar el descuento USD del producto.',
           style: TextStyle(

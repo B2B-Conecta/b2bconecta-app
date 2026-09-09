@@ -95,6 +95,55 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
     }
   }
 
+  Future<void> _deleteReferrer(ExternalReferrerModel row) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Eliminar vendedor'),
+          content: Text(
+            'Se borrará «${row.fullName}» y el código ${row.code} quedará libre '
+            'para una nueva alta.\n\n'
+            'Los usuarios que ya se registraron con este código no se eliminan; '
+            'solo se desvincula el referido.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade800,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await SupabaseService.adminDeleteExternalReferrer(row.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Vendedor ${row.fullName} eliminado.')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
+          ),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    }
+  }
+
   Future<void> _openCreate() async {
     final created = await showModalBottomSheet<bool>(
       context: context,
@@ -239,6 +288,18 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _deleteReferrer(row);
+                    },
+                    icon: Icon(Icons.delete_outline, color: Colors.red.shade800),
+                    label: Text(
+                      'Eliminar vendedor',
+                      style: TextStyle(color: Colors.red.shade800),
+                    ),
                   ),
                 ],
               ),
@@ -399,8 +460,9 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
             'Registre vendedores externos. Ellos no usan la app: reciben un '
-            'código y QR para compartir con nuevos minoristas/mayoristas. '
-            'Desmarque Activo para dejar el código fuera de servicio; no se elimina la cuenta.',
+            'código y QR para compartir con nuevas tiendas minoristas/mayoristas. '
+            'Desmarque Activo para dejar el código fuera de servicio. '
+            'Elimine el vendedor si necesita volver a generar el mismo código.',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.35,
@@ -618,8 +680,9 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
               const SizedBox(height: 8),
               Text(
                 'El código será ${ReferralCodeFormat.previewCode(_name.text)}. '
-                'Si ya existe, se usará un número (por ejemplo '
-                '${ReferralCodeFormat.stemFromName(_name.text)}2.B2B).',
+                'Si ese código ya está ocupado, se añade un número '
+                '(${ReferralCodeFormat.stemFromName(_name.text)}2.B2B). '
+                'Para reutilizar el código original, elimine antes el vendedor anterior.',
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.35,
@@ -671,7 +734,7 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
               title: const Text('Activo'),
               subtitle: const Text(
                 'Si está inactivo, el código deja de aceptar registros nuevos. '
-                'La cuenta no se elimina.',
+                'El código sigue ocupado. Para liberarlo, elimine el vendedor.',
               ),
               value: _active,
               onChanged: _busy

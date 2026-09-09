@@ -65,7 +65,7 @@ Future<void> showImporterAliadoKycDetailSheet(
               ],
               TransactionRequestCounterpartyProfileSection(
                 profileId: aliado.id,
-                partyLabel: 'Minorista',
+                partyLabel: 'Tienda minorista',
                 businessName: aliado.businessName,
                 rif: aliado.rif,
                 phone: aliado.phone,
@@ -153,9 +153,9 @@ class _ImporterKycApprovedAliadosPanelState
     if (_loading) return 'Cargando…';
     if (_error != null) return 'Error al cargar';
     final n = _rows.length;
-    if (n == 0) return 'Ningún minorista verificado';
-    if (n == 1) return '1 minorista verificado';
-    return '$n minoristas verificados';
+    if (n == 0) return 'Ninguna tienda minorista verificado';
+    if (n == 1) return '1 tienda minorista verificado';
+    return '$n tiendas minoristas verificados';
   }
 
   @override
@@ -163,11 +163,11 @@ class _ImporterKycApprovedAliadosPanelState
     final filtered = _filtered;
 
     return ProfileCollapsibleSection(
-      title: 'Minoristas verificados (KYC)',
+      title: 'Tiendas minoristas verificados (KYC)',
       subtitle: _sectionSubtitle(),
       initiallyExpanded: false,
       infoMessage:
-          'Minoristas con KYC aprobado',
+          'Tiendas minoristas con KYC aprobado',
       trailingActions: [
         IconButton(
           onPressed: _loading ? null : _load,
@@ -213,12 +213,12 @@ class _ImporterKycApprovedAliadosPanelState
             const SizedBox(height: 10),
             if (_rows.isEmpty)
               Text(
-                'Aún no hay minoristas con KYC aprobado en la plataforma.',
+                'Aún no hay tiendas minoristas con KYC aprobado en la plataforma.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               )
             else if (filtered.isEmpty)
               Text(
-                'Ningún minorista coincide con la búsqueda.',
+                'Ninguna tienda minorista coincide con la búsqueda.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               )
             else

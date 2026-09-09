@@ -19,8 +19,8 @@ abstract final class OrderActionsFlowCopy {
       'Indique el motivo; después podrá valorar el servicio.';
   static const importadorCancelarTitulo = 'Cancelar pedido (importador)';
   static String importadorCancelarIntro(String productName) =>
-      'El pedido de «$productName» se cerrará y se notificará al minorista y a B2B Conecta. '
-      'Indique el motivo; después podrá valorar al minorista.';
+      'El pedido de «$productName» se cerrará y se notificará a la tienda minorista y a B2B Conecta. '
+      'Indique el motivo; después podrá valorar a la tienda minorista.';
   static const cancelarMotivoLabel = 'Motivo de la cancelación';
   static const cancelarMotivoObligatorio = 'Motivo (obligatorio)';
   static const cancelarConfirmar = 'Confirmar cancelación';
@@ -40,13 +40,13 @@ abstract final class OrderActionsFlowCopy {
   static const qtyAceptar = 'Aceptar cantidad';
   static const qtyRechazar = 'Rechazar propuesta';
   static const bloqueoQtyPendiente =
-      'Espere la respuesta del minorista sobre la cantidad antes de avanzar el pedido.';
+      'Espere la respuesta de la tienda minorista sobre la cantidad antes de avanzar el pedido.';
 
   // —— Tránsito (ETA) ——
 
-  static const transitEtaTitulo = '¿Cuándo llegará al minorista?';
+  static const transitEtaTitulo = '¿Cuándo llegará a la tienda minorista?';
   static const transitEtaIntro =
-      'Indique el tiempo estimado de llegada al taller del minorista. '
+      'Indique el tiempo estimado de llegada al taller de la tienda minorista. '
       'Él verá este plazo en el seguimiento.';
   static const transitEtaDias = 'Días (0–365)';
   static const transitEtaHoras = 'Horas (0–23)';
@@ -71,11 +71,11 @@ abstract final class OrderActionsFlowCopy {
       'Pedido entregado con pago pendiente. Complete el comprobante o espere '
       'la aprobación de B2B Conecta.';
   static const valorarImportadorTitulo = 'Valorar al importador';
-  static const valorarAliadoTitulo = 'Valorar al minorista';
+  static const valorarAliadoTitulo = 'Valorar a la tienda minorista';
   static const valorarImportadorIntro =
       'Califique cada aspecto del servicio. El promedio es la valoración general.';
   static const valorarAliadoIntro =
-      'Califique la experiencia con el minorista en este pedido.';
+      'Califique la experiencia con la tienda minorista en este pedido.';
   static const valorarComentarioOpcional =
       'Puede añadir un comentario opcional.';
   static String valorarImportadoresPendientes(int n) =>

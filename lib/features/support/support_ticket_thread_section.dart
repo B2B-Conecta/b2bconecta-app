@@ -178,7 +178,7 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
                   ? 'Tú'
                   : (m.isFromAdmin
                       ? 'B2B Conecta'
-                      : (m.isFromImportador ? 'Importador' : 'Minorista'));
+                      : (m.isFromImportador ? 'Importador' : 'Tienda minorista'));
               final align =
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
               final bg = m.isFromAdmin

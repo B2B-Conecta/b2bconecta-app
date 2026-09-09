@@ -27,7 +27,7 @@ class CarrierPagoMetodosEditor extends StatelessWidget {
       children: [
         Text(
           'Indique los datos de cada método activo. '
-          'El minorista los verá al elegir transportista en el checkout.',
+          'La tienda minorista los verá al elegir transportista en el checkout.',
           style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 10),
@@ -154,7 +154,7 @@ class _CarrierPagoMetodoTileState extends State<_CarrierPagoMetodoTile> {
                     maxLength: 2000,
                     onChanged: (_) => widget.onInstructionsChanged(),
                     decoration: InputDecoration(
-                      labelText: 'Datos para el minorista',
+                      labelText: 'Datos para la tienda minorista',
                       alignLabelWithHint: true,
                       hintText: PagoMetodo.instructionHintEs(widget.code),
                       hintMaxLines: 6,

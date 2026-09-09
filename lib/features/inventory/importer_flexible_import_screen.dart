@@ -94,7 +94,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.sku:
         'Código de artículo de tu facturación o ERP (debe ser único por repuesto).',
     CatalogImportField.name:
-        'Nombre comercial que verán los minoristas en el catálogo.',
+        'Nombre comercial que verán las tiendas minoristas en el catálogo.',
     CatalogImportField.description:
         'Detalle técnico, referencia OEM o notas del repuesto.',
     CatalogImportField.priceUsd:
@@ -114,7 +114,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.hasWarranty:
         'Usa si/no, o días numéricos del ERP (ej. 30, 90 días).',
     CatalogImportField.usdPaymentDiscountPct:
-        '% de descuento adicional si el minorista paga en divisas.',
+        '% de descuento adicional si la tienda minorista paga en divisas.',
     CatalogImportField.volumeTiersJson:
         'Tramos por volumen en JSON (configuración avanzada).',
   };
@@ -379,7 +379,7 @@ class _ImporterFlexibleImportScreenState
                   !_newProductsVisibility.isActive) ...[
                 const SizedBox(height: 10),
                 Text(
-                  'Los repuestos nuevos quedan en pausa (ocultos para minoristas). '
+                  'Los repuestos nuevos quedan en pausa (ocultos para tiendas minoristas). '
                   'Actívalos en Mi inventario cuando quieras publicarlos.',
                   style: TextStyle(
                     fontSize: 12,
@@ -913,7 +913,7 @@ class _ImporterFlexibleImportScreenState
       subtitle: _captureUnmapped && _unmappedHeaders().isNotEmpty
           ? '${_unmappedHeaders().length} columna(s) se guardarán automáticamente. '
               'Puedes mapear manualmente abajo o dejar que B2B Conecta las capture.'
-          : 'Marca, ubicación, código de barras… Usa el ojo para visibilidad minorista.',
+          : 'Marca, ubicación, código de barras… Usa el ojo para visibilidad tienda minorista.',
       child: content,
     );
   }
@@ -938,7 +938,7 @@ class _ImporterFlexibleImportScreenState
                             }
                           }),
                   icon: const Icon(Icons.lock_outline, size: 16),
-                  label: const Text('Ocultar todos para minoristas'),
+                  label: const Text('Ocultar todos para tiendas minoristas'),
                 ),
                 OutlinedButton.icon(
                   onPressed: _importing
@@ -949,7 +949,7 @@ class _ImporterFlexibleImportScreenState
                             }
                           }),
                   icon: const Icon(Icons.visibility_outlined, size: 16),
-                  label: const Text('Mostrar todos a minoristas'),
+                  label: const Text('Mostrar todos a tiendas minoristas'),
                 ),
               ],
             ),
@@ -979,8 +979,8 @@ class _ImporterFlexibleImportScreenState
                 children: [
                   IconButton(
                     tooltip: row.visibleToAliado
-                        ? 'Visible para minoristas (tocar para ocultar)'
-                        : 'Solo interno (tocar para mostrar a minoristas)',
+                        ? 'Visible para tiendas minoristas (tocar para ocultar)'
+                        : 'Solo interno (tocar para mostrar a tiendas minoristas)',
                     onPressed: _importing
                         ? null
                         : () => setState(() {
@@ -1360,7 +1360,7 @@ class _ImporterFlexibleImportScreenState
           const SizedBox(height: 16),
           const _OptionsSubheading(
             title: 'Productos nuevos',
-            hint: 'Visibilidad para minoristas de códigos que aún no están en inventario',
+            hint: 'Visibilidad para tiendas minoristas de códigos que aún no están en inventario',
           ),
           const SizedBox(height: 10),
           if (desktop)

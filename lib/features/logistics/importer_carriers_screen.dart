@@ -191,7 +191,7 @@ class _EmptyCarriersState extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Registre empresas de transporte con cobertura, tarifas y métodos de pago. '
-                'Los minoristas las verán al confirmar pedidos.',
+                'Las tiendas minoristas las verán al confirmar pedidos.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary, height: 1.4),
               ),

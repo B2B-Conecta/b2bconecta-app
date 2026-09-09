@@ -262,7 +262,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       );
       if (!mounted) return;
       final accessLabel = status == KycStatus.aprobado
-          ? 'Acceso habilitado. El minorista recibirá una notificación en la app.'
+          ? 'Acceso habilitado. La tienda minorista recibirá una notificación en la app.'
           : 'KYC global: ${KycStatus.labelEs(status)}.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -613,7 +613,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
               ),
               const SizedBox(width: 8),
               ChoiceChip(
-                label: const Text('Minoristas'),
+                label: const Text('Tiendas minoristas'),
                 selected: _roleFilter == _KycRoleFilter.aliados,
                 onSelected: (_) =>
                     setState(() => _roleFilter = _KycRoleFilter.aliados),

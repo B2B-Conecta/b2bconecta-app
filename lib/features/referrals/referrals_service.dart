@@ -85,6 +85,17 @@ class ReferralsService {
     );
   }
 
+  static Future<void> adminDeleteExternalReferrer(String id) async {
+    final trimmed = id.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('ID requerido.');
+    }
+    await SupabaseAccess.client.rpc(
+      'admin_delete_external_referrer',
+      params: <String, dynamic>{'p_id': trimmed},
+    );
+  }
+
   /// Admin: métricas (vendedores externos con al menos un referido).
   static Future<List<AdminReferralStatRowModel>> listAdminReferralStats({
     int limit = 100,

@@ -236,7 +236,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
             ButtonSegment(value: _ActivityRoleFilter.all, label: Text('Todos')),
             ButtonSegment(
               value: _ActivityRoleFilter.aliado,
-              label: Text('Minoristas'),
+              label: Text('Tiendas minoristas'),
             ),
             ButtonSegment(
               value: _ActivityRoleFilter.importador,

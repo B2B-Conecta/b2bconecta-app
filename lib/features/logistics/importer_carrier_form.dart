@@ -495,7 +495,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                   _section(
                     title: 'Tiempos y tarifas',
                     subtitle:
-                        'Se usan para estimar ETA y costo de envío en el checkout del minorista.',
+                        'Se usan para estimar ETA y costo de envío en el checkout de la tienda minorista.',
                     children: [
                       _twoCol(
                         left: TextField(
@@ -554,7 +554,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                   _section(
                     title: 'Pago del flete',
                     subtitle:
-                        'Indique al minorista si el envío va en su factura o se paga aparte al transportista.',
+                        'Indique a la tienda minorista si el envío va en su factura o se paga aparte al transportista.',
                     children: [
                       ...CarrierFletePagoModo.values.map(
                         (mode) => RadioListTile<String>(
@@ -603,7 +603,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                   const SizedBox(height: 20),
                   _section(
                     title: 'Notas internas',
-                    subtitle: 'Opcional. No se muestran al minorista en checkout.',
+                    subtitle: 'Opcional. No se muestran a la tienda minorista en checkout.',
                     children: [
                       TextField(
                         controller: _notes,

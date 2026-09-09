@@ -170,7 +170,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                     if (widget.isAdminView) ...[
                       const SizedBox(height: 6),
                       Text(
-                        '${_ticket.authorRole == 'importador' ? 'Importador' : 'Minorista'} · '
+                        '${_ticket.authorRole == 'importador' ? 'Importador' : 'Tienda minorista'} · '
                         '${_ticket.creatorDisplayName}',
                         style: TextStyle(
                           fontSize: 12.5,

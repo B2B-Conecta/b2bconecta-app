@@ -36,7 +36,7 @@ class _AdminAliadoMorosidadActionsState extends State<AdminAliadoMorosidadAction
         content: Text(
           suspend
               ? '¿Suspender nuevos pedidos de ${widget.aliadoName} por morosidad? '
-                  'Se notificará al minorista.'
+                  'Se notificará a la tienda minorista.'
               : '¿Permitir que ${widget.aliadoName} vuelva a crear pedidos?',
         ),
         actions: [
@@ -64,7 +64,7 @@ class _AdminAliadoMorosidadActionsState extends State<AdminAliadoMorosidadAction
         SnackBar(
           content: Text(
             suspend
-                ? 'Cuenta suspendida por morosidad. Se notificó al minorista.'
+                ? 'Cuenta suspendida por morosidad. Se notificó a la tienda minorista.'
                 : 'Cuenta reactivada.',
           ),
         ),
@@ -108,7 +108,7 @@ class _AdminAliadoMorosidadActionsState extends State<AdminAliadoMorosidadAction
                 child: Text(
                   suspended
                       ? 'Cuenta suspendida por morosidad'
-                      : 'Minorista con pago pendiente (moroso)',
+                      : 'Tienda minorista con pago pendiente (moroso)',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,

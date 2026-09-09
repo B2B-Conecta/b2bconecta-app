@@ -56,7 +56,7 @@ void main() {
         OwnerAccountRules.canManageTarget(
           viewerIsOwner: false,
           viewerId: 'admin-2',
-          targetId: 'minorista-1',
+          targetId: 'tienda minorista-1',
           targetIsOwner: false,
         ),
         isFalse,
@@ -121,7 +121,7 @@ void main() {
       expect(p.hasActiveAccountAccess, isFalse);
     });
 
-    test('minorista sigue necesitando active', () {
+    test('tienda minorista sigue necesitando active', () {
       final aliado = ProfileModel(
         id: 'a1',
         role: 'aliado',

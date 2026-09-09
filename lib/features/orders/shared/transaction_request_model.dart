@@ -612,7 +612,7 @@ class TransactionRequestModel {
   /// Distingue rechazo inicial, anulación B2B Conecta (post-aprobación) y cancelación por aliado.
   String statusLabelEs({bool aliadoViewer = false}) {
     if (status == TransactionRequestStatus.rechazado && canceladoPorAliado) {
-      return aliadoViewer ? 'Cancelada por usted' : 'Cancelada por el minorista';
+      return aliadoViewer ? 'Cancelada por usted' : 'Cancelada por la tienda minorista';
     }
     if (status == TransactionRequestStatus.rechazado &&
         canceladoPorImportador) {
@@ -837,11 +837,11 @@ class TransactionRequestModel {
     if (destinoEntregaUsaPerfil) {
       return aliadoDireccionFiscalMultilineaEs?.trim().isNotEmpty == true
           ? aliadoDireccionFiscalMultilineaEs!.replaceAll('\n', ', ')
-          : 'Dirección fiscal del minorista';
+          : 'Dirección fiscal de la tienda minorista';
     }
     final t = destinoEntregaTexto?.trim();
     if (t != null && t.isNotEmpty) return t;
-    return 'Destino indicado por el minorista';
+    return 'Destino indicado por la tienda minorista';
   }
 
   /// Una línea para fichas compactas de pedido.

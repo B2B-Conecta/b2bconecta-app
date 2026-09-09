@@ -441,10 +441,10 @@ class OrdersService {
     final profile = await ProfileService.fetchMyProfile();
     final role = profile?.role?.trim().toLowerCase();
     if (role != 'aliado') {
-      throw StateError('Solo los minoristas pueden crear solicitudes de pedido.');
+      throw StateError('Solo las tiendas minoristas pueden crear solicitudes de pedido.');
     }
     if (profile == null) {
-      throw StateError('No se encontró el perfil del minorista.');
+      throw StateError('No se encontró el perfil de la tienda minorista.');
     }
     if (profile.pedidosSuspendidosMorosidad) {
       throw PedidosSuspendidosMorosidadException(
@@ -561,7 +561,7 @@ class OrdersService {
     if (uid == null) throw StateError('No hay sesión activa.');
     final profile = await ProfileService.fetchMyProfile();
     if (profile == null || profile.role?.trim().toLowerCase() != 'aliado') {
-      throw StateError('Solo los minoristas pueden confirmar el carrito.');
+      throw StateError('Solo las tiendas minoristas pueden confirmar el carrito.');
     }
     if (destinoEntregaUsaPerfil) {
       if (!profile.hasFiscalMapsShareLink) {

@@ -53,7 +53,7 @@ class ImporterProductCommercialTermsSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Condiciones para minoristas',
+                        'Condiciones para tiendas minoristas',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,

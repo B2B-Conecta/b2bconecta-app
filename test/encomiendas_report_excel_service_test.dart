@@ -20,7 +20,7 @@ TransactionRequestModel _sampleRow() {
     createdAt: DateTime(2026, 5, 15, 10, 30),
     productName: 'Filtro aceite',
     productSku: 'FLT-001',
-    aliadoBusinessName: 'Minorista Demo',
+    aliadoBusinessName: 'Tienda minorista Demo',
     ownerBusinessName: 'Importador Demo',
     documentTypePreference: DocumentTypePreference.facturaFiscal,
     aliadoExperienceStars: 4,

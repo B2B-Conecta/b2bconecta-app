@@ -263,7 +263,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Pedido anulado. Se notificó al minorista e importador.'),
+          content: Text('Pedido anulado. Se notificó a la tienda minorista e importador.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -378,7 +378,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         const SizedBox(height: kOrderCardSectionGap),
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con minorista, importador y supervisión B2B Conecta',
+          subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-admin-${r.id}'),
@@ -404,7 +404,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         if (primary.esPedidoMoroso) ...[
           AdminAliadoMorosidadActions(
             aliadoId: primary.aliadoId,
-            aliadoName: primary.aliadoBusinessName ?? 'Minorista',
+            aliadoName: primary.aliadoBusinessName ?? 'Tienda minorista',
             pedidosSuspendidosMorosidad: _morosidadFlags[primary.aliadoId]
                     ?.pedidosSuspendidosMorosidad ??
                 false,
@@ -428,7 +428,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         const SizedBox(height: kOrderCardSectionGap),
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con minorista, importador y supervisión B2B Conecta',
+          subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           child: OrderMotolinkThreadSection(
             key: ValueKey<String>('trm-admin-closed-${primary.id}'),
@@ -454,7 +454,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
               aliadoId: adminCheckoutGroupMorosoRef(group).aliadoId,
               aliadoName:
                   adminCheckoutGroupMorosoRef(group).aliadoBusinessName ??
-                      'Minorista',
+                      'Tienda minorista',
               pedidosSuspendidosMorosidad:
                   _morosidadFlags[adminCheckoutGroupMorosoRef(group).aliadoId]
                           ?.pedidosSuspendidosMorosidad ??

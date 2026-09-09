@@ -1026,6 +1026,9 @@ class SupabaseService {
           active: active,
           notes: notes);
 
+  static Future<void> adminDeleteExternalReferrer(String id) =>
+      ReferralsService.adminDeleteExternalReferrer(id);
+
   static Future<List<AdminReferralStatRowModel>> listAdminReferralStats({
     int limit = 100,
     int offset = 0,

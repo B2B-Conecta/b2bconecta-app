@@ -74,10 +74,10 @@ Future<void> showImporterOrderRatingSheet(
           : (cancellationReason != null &&
                   cancellationReason.trim().isNotEmpty)
               ? 'Valorar tras cancelación'
-              : 'Valorar minorista',
+              : 'Valorar tienda minorista',
       headerSubtitle: request.aliadoBusinessName?.trim().isNotEmpty == true
           ? request.aliadoBusinessName!.trim()
-          : 'Minorista en este pedido',
+          : 'Tienda minorista en este pedido',
       child: _ImporterOrderRatingSheetBody(
         request: request,
         onSubmitted: onSubmitted,
@@ -465,7 +465,7 @@ class _ImporterOrderRatingSheetBodyState extends State<_ImporterOrderRatingSheet
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valoración del minorista registrada.')),
+        const SnackBar(content: Text('Valoración de la tienda minorista registrada.')),
       );
       widget.onSubmitted();
     } catch (e) {
@@ -475,7 +475,7 @@ class _ImporterOrderRatingSheetBodyState extends State<_ImporterOrderRatingSheet
         SnackBar(
           content: Text(
             raw.contains('ya fue registrada')
-                ? 'Ya valoró a este minorista en este pedido.'
+                ? 'Ya valoró a este tienda minorista en este pedido.'
                 : 'No se pudo enviar la valoración.',
           ),
         ),
@@ -501,7 +501,7 @@ class _ImporterOrderRatingSheetBodyState extends State<_ImporterOrderRatingSheet
           border: Border.all(color: Colors.purple.shade200),
         ),
         child: const Text(
-          'Ya registró su valoración de este minorista en este pedido.',
+          'Ya registró su valoración de este tienda minorista en este pedido.',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         ),
       );
@@ -522,10 +522,10 @@ class _ImporterOrderRatingSheetBodyState extends State<_ImporterOrderRatingSheet
     return OrderRatingForm(
       title: esCancelacion
           ? 'Valorar tras la cancelación'
-          : 'Calificá la experiencia con el minorista',
+          : 'Calificá la experiencia con la tienda minorista',
       subtitle: esCancelacion
-          ? 'Su motivo quedó registrado. Califique al minorista; puede ampliar el comentario.'
-          : 'Comunicación y Pagos (escala 1–5). El minorista no verá su nombre en su panel de reputación.',
+          ? 'Su motivo quedó registrado. Califique a la tienda minorista; puede ampliar el comentario.'
+          : 'Comunicación y Pagos (escala 1–5). La tienda minorista no verá su nombre en su panel de reputación.',
       questionnaire: _questionnaire!,
       busy: _busy,
       emphasized: true,
@@ -607,8 +607,8 @@ class _ImporterOrderRatingBarState extends State<ImporterOrderRatingBar> {
     return OrderRatingPendingBar(
       pending: !_alreadyRated,
       completedSummary:
-          _alreadyRated ? 'Minorista valorado en este pedido' : null,
-      pendingLabel: 'Valorar minorista',
+          _alreadyRated ? 'Tienda minorista valorado en este pedido' : null,
+      pendingLabel: 'Valorar tienda minorista',
       onTapPending: () => showImporterOrderRatingSheet(
         context,
         request: widget.request,

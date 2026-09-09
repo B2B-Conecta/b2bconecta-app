@@ -75,7 +75,7 @@ class AdminOrderRatingRowModel {
   }
 
   String get raterLabelEs =>
-      raterRole == 'aliado' ? 'Minorista → importador' : 'Importador → minorista';
+      raterRole == 'aliado' ? 'Tienda minorista → importador' : 'Importador → tienda minorista';
 
   bool get isBucketV2 => questionnaireVersion == 'bucket_v2';
 

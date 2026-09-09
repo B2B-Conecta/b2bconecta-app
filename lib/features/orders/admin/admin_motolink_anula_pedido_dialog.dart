@@ -16,7 +16,7 @@ Future<String?> showAdminMotolinkAnulaPedidoDialog(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'El pedido «$productName» pasará a cerrado y se notificará al minorista e importador. '
+              'El pedido «$productName» pasará a cerrado y se notificará a la tienda minorista e importador. '
               'Si ya se había descontado inventario, se reintegra la cantidad.',
               style: const TextStyle(fontSize: 13, height: 1.35),
             ),

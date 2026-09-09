@@ -97,7 +97,7 @@ String _enPreparacionSubtitle(
     if (p != null && p.isNotEmpty) {
       return 'Preparación en su almacén · $p';
     }
-    return 'Preparación en su almacén (pedido del minorista vía B2B Conecta)';
+    return 'Preparación en su almacén (pedido de la tienda minorista vía B2B Conecta)';
   }
   final p = r.resumenProveedoresLineaTimeline;
   if (p != null && p.isNotEmpty) {
@@ -226,7 +226,7 @@ class CourierTimelineWidget extends StatelessWidget {
       _CourierStep(
         icon: Icons.home_work_outlined,
         title: 'Entregado',
-        subtitle: 'Cierre en taller del minorista',
+        subtitle: 'Cierre en taller de la tienda minorista',
         at: r.atEntregado,
         done: _pasoEntregadoHecho(r),
         current: r.status == TransactionRequestStatus.entregado,

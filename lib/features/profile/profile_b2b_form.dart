@@ -1128,7 +1128,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               infoTitle: 'Términos y privacidad',
               infoMessage: mobile
                   ? 'Debe aceptar términos y privacidad para usar B2B Conecta.'
-                  : 'Minoristas e importadores deben aceptar los términos y la '
+                  : 'Tiendas tiendas minoristas e importadores deben aceptar los términos y la '
                       'política de privacidad vigentes antes de usar B2B Conecta.',
             ),
             TermsAcceptanceSection(

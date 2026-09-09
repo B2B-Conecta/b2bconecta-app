@@ -46,7 +46,7 @@ String adminCheckoutGroupResumenLinea(List<TransactionRequestModel> lines) {
   final uds = adminCheckoutGroupTotalUds(lines);
   final ref = adminCheckoutGroupTotalRef(lines);
   if (lines.length == 1) {
-    return '$uds uds · Total (minorista) ${ref.toStringAsFixed(2)} REF';
+    return '$uds uds · Total (tienda minorista) ${ref.toStringAsFixed(2)} REF';
   }
   final importers = lines
       .map((e) => e.ownerId.trim())

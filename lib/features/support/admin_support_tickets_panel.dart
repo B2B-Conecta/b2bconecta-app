@@ -251,7 +251,7 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            '${t.authorRole == 'importador' ? 'Importador' : 'Minorista'} · '
+                                            '${t.authorRole == 'importador' ? 'Importador' : 'Tienda minorista'} · '
                                             '${t.creatorDisplayName}',
                                             style: TextStyle(
                                               fontSize: 12.5,

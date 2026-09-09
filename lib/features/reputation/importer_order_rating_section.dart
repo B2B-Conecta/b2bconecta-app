@@ -101,7 +101,7 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valoración del minorista registrada.')),
+        const SnackBar(content: Text('Valoración de la tienda minorista registrada.')),
       );
       setState(() => _alreadyRated = true);
       widget.onChanged();
@@ -112,7 +112,7 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
         SnackBar(
           content: Text(
             raw.contains('ya fue registrada')
-                ? 'Ya valoró a este minorista en este pedido.'
+                ? 'Ya valoró a este tienda minorista en este pedido.'
                 : 'No se pudo enviar la valoración.',
           ),
         ),
@@ -156,7 +156,7 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
           border: Border.all(color: Colors.purple.shade200),
         ),
         child: const Text(
-          'Valoración del minorista registrada en este pedido.',
+          'Valoración de la tienda minorista registrada en este pedido.',
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       );
@@ -167,7 +167,7 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
       children: [
         const Divider(height: 20),
         Text(
-          'Valorar minorista (post-entrega)',
+          'Valorar tienda minorista (post-entrega)',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 13,
@@ -176,10 +176,10 @@ class _ImporterOrderRatingSectionState extends State<ImporterOrderRatingSection>
         ),
         const SizedBox(height: 8),
         OrderRatingForm(
-          title: '¿Cómo fue la experiencia con este minorista?',
+          title: '¿Cómo fue la experiencia con este tienda minorista?',
           subtitle:
               'Calificá Comunicación y Pagos (por defecto Regular). Podés añadir un comentario opcional. '
-              'El minorista no verá su identidad en su panel de reputación.',
+              'La tienda minorista no verá su identidad en su panel de reputación.',
           questionnaire: _questionnaire!,
           busy: _busy,
           onSubmit: _enviar,

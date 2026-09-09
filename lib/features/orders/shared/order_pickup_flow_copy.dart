@@ -56,36 +56,36 @@ abstract final class OrderPickupFlowCopy {
 
   static const importadorPasoTransporte = 'Paso 1 · Transporte';
 
-  static const importadorEsperaAliadoTitulo = 'Esperando al minorista';
+  static const importadorEsperaAliadoTitulo = 'Esperando a la tienda minorista';
   static const importadorEsperaAliadoCuerpo =
       'Debe elegir un transportista del catálogo o dejar la entrega a elección del importador.';
 
   static const importadorAliadoSinPlataformaTitulo = 'Entrega a elección del importador';
   static const importadorAliadoSinPlataformaCuerpo =
-      'El minorista no eligió transportista del catálogo. Indique dónde retiran la mercancía.';
+      'La tienda minorista no eligió transportista del catálogo. Indique dónde retiran la mercancía.';
 
   static const importadorSinTransportistasTitulo = 'Entrega sin transportista del catálogo';
   static const importadorSinTransportistasCuerpo =
-      'No tiene transportistas activos. Indique dónde el minorista o su transporte retirará el pedido.';
+      'No tiene transportistas activos. Indique dónde la tienda minorista o su transporte retirará el pedido.';
 
   static const importadorTransportistaPendienteTitulo = 'Falta elegir transportista';
   static const importadorTransportistaPendienteCuerpo =
-      'El minorista aún no ha confirmado cuál transportista del catálogo usará.';
+      'La tienda minorista aún no ha confirmado cuál transportista del catálogo usará.';
 
-  static const importadorTransportistaElegidoTitulo = 'Transportista del minorista';
+  static const importadorTransportistaElegidoTitulo = 'Transportista de la tienda minorista';
 
   // —— Importador: recolección ——
 
   static const importadorPasoRecoleccion = 'Paso 2 · Punto de recolección';
 
   static const importadorEsperaParaRecoleccion =
-      'Cuando el minorista defina el transporte, podrá indicar aquí dónde retiran la mercancía.';
+      'Cuando la tienda minorista defina el transporte, podrá indicar aquí dónde retiran la mercancía.';
 
   static const importadorRecoleccionTuTurnoTitulo = 'Indique dónde retiran la mercancía';
   static String importadorRecoleccionConTransportista(String? carrierName) =>
       '${carrierName ?? 'El transportista'} retirará el pedido. Elija la dirección de recolección.';
   static const importadorRecoleccionEntregaAliado =
-      'El minorista dejó la entrega a su criterio. Indique dónde retiran la mercancía.';
+      'La tienda minorista dejó la entrega a su criterio. Indique dónde retiran la mercancía.';
   static const importadorRecoleccionGenerica =
       'Elija si retiran desde su almacén, la base del transportista u otra ubicación guardada.';
 
@@ -111,11 +111,11 @@ abstract final class OrderPickupFlowCopy {
   // —— Bloqueos al avanzar ——
 
   static const bloqueoEsperaAliadoTransporte =
-      'Primero el minorista debe definir el transporte (elegir transportista o dejar la entrega a elección del importador).';
+      'Primero la tienda minorista debe definir el transporte (elegir transportista o dejar la entrega a elección del importador).';
   static const bloqueoFaltaRecoleccion =
       'Antes de «En tránsito», elija el punto de recolección en la sección del pedido.';
   static const bloqueoFaltaTransportista =
-      'El minorista debe elegir un transportista del catálogo antes de marcar «En tránsito».';
+      'La tienda minorista debe elegir un transportista del catálogo antes de marcar «En tránsito».';
 
   // —— Ubicaciones alternas (config) ——
 

@@ -192,7 +192,7 @@ class _TransactionRequestDetailScreenState
                       )
                       .aliadoCancelacionMotivo!
                       .trim(),
-                  title: 'Pedido cancelado por el minorista',
+                  title: 'Pedido cancelado por la tienda minorista',
                   tone: _NoteCardTone.warning,
                 ),
                 const SizedBox(height: 12),
@@ -372,7 +372,7 @@ class _TransactionRequestDetailScreenState
             Expanded(
               child: Text(
                 'Han pasado 3 o más días hábiles sin completar el pago. B2B Conecta puede restringir la cuenta '
-                'del minorista para pedidos futuros si no se regulariza.',
+                'de la tienda minorista para pedidos futuros si no se regulariza.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -538,7 +538,7 @@ class _TransactionRequestDetailScreenState
         OrderCardCollapsibleSection(
           title: 'Partes del pedido',
           subtitle: TransactionRequestPartiesContactSection.partiesSubtitle(r),
-          infoMessage: 'Minorista e importador involucrados en el pedido.',
+          infoMessage: 'Tienda minorista e importador involucrados en el pedido.',
           child: TransactionRequestPartiesContactSection(
             request: r,
             embedded: true,
@@ -577,7 +577,7 @@ class _TransactionRequestDetailScreenState
         if (expLine != null) ...[
           const SizedBox(height: kOrderCardSectionGap),
           OrderCardCollapsibleSection(
-            title: 'Valoración del minorista',
+            title: 'Valoración de la tienda minorista',
             subtitle: expLine.aliadoExperienceStars != null
                 ? '${expLine.aliadoExperienceStars}/5 post-entrega'
                 : (expLine.aliadoExperienceSubmittedAt != null
@@ -595,7 +595,7 @@ class _TransactionRequestDetailScreenState
             const SizedBox(height: kOrderCardSectionGap),
             OrderCardCollapsibleSection(
               title: 'Valoración del mayorista',
-              subtitle: 'Al minorista de este pedido',
+              subtitle: 'A la tienda minorista de este pedido',
               child: TransactionRequestImporterRatingAdminSection(
                 request: expLine,
                 onMutated: () => setState(() {

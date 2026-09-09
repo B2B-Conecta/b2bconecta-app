@@ -35,14 +35,14 @@ class AdminCompactAliadoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AdminCollapsibleSection(
       title: _CompactPartyHeader(
-        label: 'Minorista',
+        label: 'Tienda minorista',
         name: businessName,
         kycStatus: kycStatus,
       ),
       subtitle: _subtitleWidget(),
       child: TransactionRequestCounterpartyProfileSection(
         profileId: profileId,
-        partyLabel: 'Minorista',
+        partyLabel: 'Tienda minorista',
         businessName: businessName,
         rif: rif,
         phone: phone,

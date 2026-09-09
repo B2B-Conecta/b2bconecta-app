@@ -121,7 +121,7 @@ abstract final class PagoMetodo {
         return 'Dónde y cuándo entregar el efectivo\n'
             'Persona de contacto y teléfono';
       default:
-        return 'Datos que el minorista necesita para realizar el pago';
+        return 'Datos que la tienda minorista necesita para realizar el pago';
     }
   }
 }

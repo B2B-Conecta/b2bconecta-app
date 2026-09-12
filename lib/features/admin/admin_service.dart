@@ -89,6 +89,38 @@ class AdminService {
         .toList();
   }
 
+  static Future<int> ownerSetImporterProductsActive({
+    required List<String> productIds,
+    required bool isActive,
+  }) async {
+    final ids = productIds.where((id) => id.trim().isNotEmpty).toList();
+    if (ids.isEmpty) return 0;
+    final res = await SupabaseAccess.client.rpc(
+      'owner_set_importer_products_active',
+      params: <String, dynamic>{
+        'p_product_ids': ids,
+        'p_is_active': isActive,
+      },
+    );
+    if (res is int) return res;
+    if (res is num) return res.toInt();
+    return int.tryParse(res?.toString() ?? '') ?? 0;
+  }
+
+  static Future<int> ownerDeleteImporterProducts({
+    required List<String> productIds,
+  }) async {
+    final ids = productIds.where((id) => id.trim().isNotEmpty).toList();
+    if (ids.isEmpty) return 0;
+    final res = await SupabaseAccess.client.rpc(
+      'owner_delete_importer_products',
+      params: <String, dynamic>{'p_product_ids': ids},
+    );
+    if (res is int) return res;
+    if (res is num) return res.toInt();
+    return int.tryParse(res?.toString() ?? '') ?? 0;
+  }
+
   static Future<void> ownerSetProfileRole({
     required String profileId,
     required String role,

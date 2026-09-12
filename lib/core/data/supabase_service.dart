@@ -978,6 +978,20 @@ class SupabaseService {
   }) =>
       AdminService.ownerListImporterCatalog(importerId: importerId);
 
+  static Future<int> ownerSetImporterProductsActive({
+    required List<String> productIds,
+    required bool isActive,
+  }) =>
+      AdminService.ownerSetImporterProductsActive(
+        productIds: productIds,
+        isActive: isActive,
+      );
+
+  static Future<int> ownerDeleteImporterProducts({
+    required List<String> productIds,
+  }) =>
+      AdminService.ownerDeleteImporterProducts(productIds: productIds);
+
   static Future<void> ownerSetProfileRole({
     required String profileId,
     required String role,

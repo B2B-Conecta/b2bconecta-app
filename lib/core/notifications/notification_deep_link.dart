@@ -68,7 +68,7 @@ void navigateFromNotificationPayload({
         return;
     }
   }
-  if (t0 == 'promocion') {
+  if (t0 == 'promocion' || t0 == 'inventario') {
     switch (homeRole) {
       case AppHomeRole.importador:
         MainShellTabController.navigateToImporterInventoryForNotification();

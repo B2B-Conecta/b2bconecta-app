@@ -353,6 +353,10 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         icon = Icons.campaign_outlined;
         bg = AppColors.brand;
         break;
+      case 'inventario':
+        icon = Icons.inventory_2_outlined;
+        bg = AppColors.brand;
+        break;
       case 'soporte':
         icon = Icons.support_agent_outlined;
         bg = Colors.blue.shade700;

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/admin/owner_catalog_filter.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 
-/// Owner: catálogo de un mayorista (solo lectura, incluye pausados).
+/// Owner: catálogo de un mayorista (incluye pausados; puede pausar o quitar).
 class OwnerImporterCatalogScreen extends StatefulWidget {
   const OwnerImporterCatalogScreen({
     super.key,
@@ -42,6 +43,7 @@ class _OwnerImporterCatalogScreenState
   List<PartModel> _items = const [];
   bool _loading = true;
   String? _error;
+  String? _busyId;
   OwnerCatalogVisibility _visibility = OwnerCatalogVisibility.todos;
 
   @override
@@ -86,6 +88,100 @@ class _OwnerImporterCatalogScreenState
         visibility: _visibility,
       );
 
+  Future<bool> _confirm({
+    required String title,
+    required String body,
+    required String confirmLabel,
+    bool destructive = false,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: destructive
+                ? FilledButton.styleFrom(backgroundColor: Colors.red.shade700)
+                : null,
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _setActive(PartModel part, {required bool active}) async {
+    final verb = active ? 'publicar' : 'pausar';
+    final ok = await _confirm(
+      title: active ? 'Publicar producto' : 'Pausar producto',
+      body: active
+          ? '¿Volver a mostrar «${part.nombre}» a las tiendas minoristas?'
+          : '¿Ocultar «${part.nombre}» del catálogo de las tiendas? '
+              'El SKU se conserva.',
+      confirmLabel: active ? 'Publicar' : 'Pausar',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busyId = part.id);
+    try {
+      await SupabaseService.ownerSetImporterProductsActive(
+        productIds: [part.id],
+        isActive: active,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(active ? 'Producto publicado.' : 'Producto en pausa.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo $verb: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
+  Future<void> _delete(PartModel part) async {
+    final ok = await _confirm(
+      title: 'Quitar producto',
+      body: '¿Eliminar «${part.nombre}» del inventario del mayorista? '
+          'Las tiendas dejarán de verlo. El historial de pedidos se conserva.',
+      confirmLabel: 'Quitar',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busyId = part.id);
+    try {
+      await SupabaseService.ownerDeleteImporterProducts(productIds: [part.id]);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Producto eliminado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo quitar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final published = _items.where((p) => p.isActive).length;
@@ -96,7 +192,13 @@ class _OwnerImporterCatalogScreenState
       appBar: AppBar(
         title: Text(widget.importerName),
       ),
-      body: Column(
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: AppBreakpoints.formMaxWidth,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
@@ -105,8 +207,8 @@ class _OwnerImporterCatalogScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Catálogo del mayorista. Solo lectura: incluye SKUs en pausa '
-                  'que las tiendas no ven.',
+                  'Incluye SKUs en pausa. Pausar los oculta a las tiendas; '
+                  'quitar los borra del inventario. El historial de pedidos se conserva.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -217,12 +319,24 @@ class _OwnerImporterCatalogScreenState
                                 itemCount: filtered.length,
                                 separatorBuilder: (_, __) =>
                                     const SizedBox(height: 8),
-                                itemBuilder: (context, i) =>
-                                    _CatalogRow(part: filtered[i]),
+                                itemBuilder: (context, i) {
+                                  final part = filtered[i];
+                                  return _CatalogRow(
+                                    part: part,
+                                    busy: _busyId == part.id,
+                                    onToggleActive: () => _setActive(
+                                      part,
+                                      active: !part.isActive,
+                                    ),
+                                    onDelete: () => _delete(part),
+                                  );
+                                },
                               ),
                       ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
@@ -264,9 +378,17 @@ class _StatChip extends StatelessWidget {
 }
 
 class _CatalogRow extends StatelessWidget {
-  const _CatalogRow({required this.part});
+  const _CatalogRow({
+    required this.part,
+    required this.busy,
+    required this.onToggleActive,
+    required this.onDelete,
+  });
 
   final PartModel part;
+  final bool busy;
+  final VoidCallback onToggleActive;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -339,6 +461,36 @@ class _CatalogRow extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  if (busy)
+                    const LinearProgressIndicator(color: AppColors.brand)
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(40),
+                            ),
+                            onPressed: onToggleActive,
+                            child: Text(
+                              part.isActive ? 'Pausar' : 'Publicar',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(40),
+                              foregroundColor: Colors.red.shade700,
+                            ),
+                            onPressed: onDelete,
+                            child: const Text('Quitar'),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
@@ -54,7 +56,7 @@ class _AdminAccountManagementPanelState
       _error = null;
     });
     try {
-      final rows = await SupabaseService.ownerListProfiles();
+      final rows = await SupabaseService.ownerListProfilesWithDossier();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -99,11 +101,7 @@ class _AdminAccountManagementPanelState
         case _AccountStateFilter.todos:
           break;
       }
-      if (q.isEmpty) return true;
-      final name = (p.businessName ?? '').toLowerCase();
-      final rif = (p.rif ?? '').toLowerCase();
-      final email = (p.email ?? '').toLowerCase();
-      return name.contains(q) || rif.contains(q) || email.contains(q);
+      return ownerAccountMatchesQuery(p, q);
     }).toList();
   }
 
@@ -390,7 +388,8 @@ class _AdminAccountManagementPanelState
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(
-            'Roles, bloqueo y baja de cuentas. El historial de pedidos se conserva.',
+            'Ficha completa (correo, teléfono y datos fiscales). '
+            'Roles, bloqueo y baja; el historial de pedidos se conserva.',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -423,7 +422,7 @@ class _AdminAccountManagementPanelState
           TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
-              hintText: 'Buscar por nombre, RIF o correo…',
+              hintText: 'Buscar por nombre, RIF, correo o teléfono…',
               prefixIcon: const Icon(Icons.search, size: 20),
               isDense: true,
               border: OutlineInputBorder(
@@ -498,7 +497,7 @@ class _AdminAccountManagementPanelState
   }
 }
 
-class _AccountCard extends StatelessWidget {
+class _AccountCard extends StatefulWidget {
   const _AccountCard({
     required this.profile,
     required this.viewerId,
@@ -520,14 +519,21 @@ class _AccountCard extends StatelessWidget {
   final VoidCallback onDeactivate;
 
   @override
+  State<_AccountCard> createState() => _AccountCardState();
+}
+
+class _AccountCardState extends State<_AccountCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
     final status = OwnerAccountRules.statusLabelEs(
       role: profile.role,
       accountAccessStatus: profile.accountAccessStatus,
       deactivatedAt: profile.deactivatedAt,
     );
-    final isSelf = profile.id == viewerId;
-    final note = profile.accountReviewNote?.trim();
+    final isSelf = profile.id == widget.viewerId;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -535,48 +541,54 @@ class _AccountCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          onExpansionChanged: (open) => setState(() => _expanded = open),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  profile.businessName?.trim().isNotEmpty == true
+                      ? profile.businessName!.trim()
+                      : (profile.email ?? 'Sin nombre'),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              _StatusChip(label: status, deactivated: profile.isDeactivated),
+            ],
+          ),
+          subtitle: _expanded
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    profile.businessName?.trim().isNotEmpty == true
-                        ? profile.businessName!.trim()
-                        : (profile.email ?? 'Sin nombre'),
+                    [
+                      ProfileRoleLabels.labelEs(profile.role),
+                      if (profile.email != null) profile.email,
+                      if (profile.phone != null) profile.phone,
+                      if (isSelf) 'Su cuenta',
+                    ].join(' · '),
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      fontSize: 12.5,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
-                _StatusChip(label: status, deactivated: profile.isDeactivated),
-              ],
+          children: [
+            OwnerAccountDossier(
+              profile: profile,
+              isSelf: isSelf,
             ),
-            const SizedBox(height: 6),
-            Text(
-              [
-                ProfileRoleLabels.labelEs(profile.role),
-                if (profile.email != null) profile.email,
-                if (profile.rif != null) profile.rif,
-                if (isSelf) 'Su cuenta',
-              ].join(' · '),
-              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-            ),
-            if (note != null && note.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                note,
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-              ),
-            ],
-            if (canManage) ...[
+            if (widget.canManage) ...[
               const SizedBox(height: 12),
-              if (busy)
+              if (widget.busy)
                 const LinearProgressIndicator(color: AppColors.brand)
               else
                 Wrap(
@@ -584,26 +596,26 @@ class _AccountCard extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     OutlinedButton(
-                      onPressed: onChangeRole,
+                      onPressed: widget.onChangeRole,
                       child: const Text('Cambiar rol'),
                     ),
                     if (profile.isDeactivated ||
                         profile.accountAccessStatus?.trim() ==
                             AccountAccessStatus.rejected)
                       FilledButton(
-                        onPressed: onReactivate,
+                        onPressed: widget.onReactivate,
                         child: const Text('Reactivar'),
                       )
                     else ...[
                       OutlinedButton(
-                        onPressed: onBlock,
+                        onPressed: widget.onBlock,
                         child: const Text('Bloquear'),
                       ),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red.shade700,
                         ),
-                        onPressed: onDeactivate,
+                        onPressed: widget.onDeactivate,
                         child: const Text('Eliminar'),
                       ),
                     ],

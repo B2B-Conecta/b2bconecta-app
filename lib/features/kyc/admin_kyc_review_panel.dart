@@ -6,6 +6,8 @@ import 'aliado_doc_type.dart';
 import 'document_review_status.dart';
 import 'kyc_status.dart';
 import 'profile_document_model.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -18,7 +20,13 @@ enum _KycRoleFilter { todos, aliados, mayoristas }
 
 /// Admin: cola de verificación (aliados KYC + mayoristas / importadores).
 class AdminKycReviewPanel extends StatefulWidget {
-  const AdminKycReviewPanel({super.key});
+  const AdminKycReviewPanel({
+    super.key,
+    this.viewerIsOwner = false,
+  });
+
+  /// El owner ve y busca el correo de Auth en cada expediente.
+  final bool viewerIsOwner;
 
   @override
   State<AdminKycReviewPanel> createState() => _AdminKycReviewPanelState();
@@ -70,7 +78,15 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       _error = null;
     });
     try {
-      final rows = await SupabaseService.fetchB2BProfilesForAdminKycReview();
+      var rows = await SupabaseService.fetchB2BProfilesForAdminKycReview();
+      if (widget.viewerIsOwner) {
+        try {
+          final emails = await SupabaseService.ownerAuthEmailsByProfileId();
+          rows = rows.map((p) => p.withAuthEmail(emails[p.id])).toList();
+        } catch (_) {
+          // KYC sigue útil sin correo si el RPC owner falla.
+        }
+      }
       if (!mounted) return;
       setState(() {
         _profiles = rows;
@@ -131,11 +147,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
         case _KycRoleFilter.todos:
           break;
       }
-      if (q.isNotEmpty) {
-        final name = (p.businessName ?? '').toLowerCase();
-        final rif = (p.rif ?? '').toLowerCase();
-        if (!name.contains(q) && !rif.contains(q)) return false;
-      }
+      if (q.isNotEmpty && !ownerAccountMatchesQuery(p, q)) return false;
       switch (_filter) {
         case _KycQueueFilter.todos:
           return true;
@@ -426,139 +438,15 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   }
 
   Widget _importadorProfileSummary(ProfileModel p) {
-    final lines = <String>[
-      if (p.rif?.trim().isNotEmpty == true) 'RIF: ${p.rif!.trim()}',
-      if (p.phone?.trim().isNotEmpty == true) 'Tel: ${p.phone!.trim()}',
-      [
-        p.estado?.trim(),
-        p.ciudad?.trim(),
-      ].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
-      if (p.direccion?.trim().isNotEmpty == true) p.direccion!.trim(),
-    ].where((s) => s.trim().isNotEmpty).toList();
-
-    final legalName = p.legalContactName?.trim();
-    final legalEmail = p.legalContactEmail?.trim();
-    final legalPhone = p.legalContactPhone?.trim();
-    final hasLegal = p.hasLegalContact;
-    final termsOk = p.hasAcceptedCurrentTerms;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _referralAttributionBox(p),
-        Text(
-          'Perfil del mayorista',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
+        OwnerAccountDossier(
+          profile: p,
+          title: 'Perfil del mayorista',
+          showAuthEmail: widget.viewerIsOwner,
         ),
-        const SizedBox(height: 8),
-        for (final line in lines)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              line,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.35,
-              ),
-            ),
-          ),
-        if (p.fiscalMapsUrl?.trim().isNotEmpty == true) ...[
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () async {
-                final uri = Uri.tryParse(p.fiscalMapsUrl!.trim());
-                if (uri == null) return;
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              },
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('Ver en Google Maps'),
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        Text(
-          'Referencia legal',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderSubtle),
-            borderRadius: BorderRadius.circular(8),
-            color: AppColors.brandBlueContainer,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: hasLegal
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        legalName!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        legalEmail!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        legalPhone!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    'Sin referencia legal completa.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          termsOk
-              ? 'Términos y privacidad: aceptados'
-              : 'Términos y privacidad: pendientes',
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: termsOk ? AppColors.successGreen : AppColors.textSecondary,
-          ),
-        ),
-        if (p.accountReviewNote?.trim().isNotEmpty == true) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Nota previa: ${p.accountReviewNote!.trim()}',
-            style: TextStyle(
-              fontSize: 12.5,
-              color: Colors.red.shade800,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -591,7 +479,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
             controller: _searchCtrl,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Buscar por empresa o RIF…',
+              hintText: widget.viewerIsOwner
+                  ? 'Buscar por empresa, RIF, correo o teléfono…'
+                  : 'Buscar por empresa, RIF o teléfono…',
               prefixIcon: const Icon(Icons.search),
               isDense: true,
               border: OutlineInputBorder(
@@ -719,11 +609,22 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    subtitle: Text(
-                                      '${ProfileRoleLabels.labelEs(role)}'
-                                      '${p.rif != null && p.rif!.trim().isNotEmpty ? ' · ${p.rif}' : ''}'
-                                      '${p.hasReferralAttribution ? ' · Referido' : ''}',
-                                    ),
+                                    subtitle: expanded
+                                        ? null
+                                        : Text(
+                                            [
+                                              ProfileRoleLabels.labelEs(role),
+                                              if (p.email != null) p.email,
+                                              if (p.rif != null &&
+                                                  p.rif!.trim().isNotEmpty)
+                                                p.rif,
+                                              if (p.phone != null &&
+                                                  p.phone!.trim().isNotEmpty)
+                                                p.phone,
+                                              if (p.hasReferralAttribution)
+                                                'Referido',
+                                            ].join(' · '),
+                                          ),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -838,6 +739,13 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                                   CrossAxisAlignment.stretch,
                                               children: [
                                                 _referralAttributionBox(p),
+                                                OwnerAccountDossier(
+                                                  profile: p,
+                                                  title: 'Datos de la tienda',
+                                                  showAuthEmail:
+                                                      widget.viewerIsOwner,
+                                                ),
+                                                const SizedBox(height: 12),
                                                 Wrap(
                                                   spacing: 8,
                                                   runSpacing: 8,

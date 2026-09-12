@@ -967,6 +967,12 @@ class SupabaseService {
   static Future<List<ProfileModel>> ownerListProfiles() =>
       AdminService.ownerListProfiles();
 
+  static Future<List<ProfileModel>> ownerListProfilesWithDossier() =>
+      AdminService.ownerListProfilesWithDossier();
+
+  static Future<Map<String, String>> ownerAuthEmailsByProfileId() =>
+      AdminService.ownerAuthEmailsByProfileId();
+
   static Future<void> ownerSetProfileRole({
     required String profileId,
     required String role,

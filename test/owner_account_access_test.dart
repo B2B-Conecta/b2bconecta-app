@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
@@ -102,6 +103,39 @@ void main() {
       expect(deleted.hasActiveAccountAccess, isFalse);
       expect(deleted.isReadyForMainApp, isFalse);
       expect(deleted.isDeactivated, isTrue);
+    });
+
+    test('withAuthEmail adjunta correo sin perder el resto de la ficha', () {
+      final p = ProfileModel(
+        id: 'a1',
+        role: 'aliado',
+        businessName: 'Taller Sur',
+        phone: '04121234567',
+        ciudad: 'Valencia',
+      );
+      final withMail = p.withAuthEmail('tienda@example.com');
+      expect(withMail.email, 'tienda@example.com');
+      expect(withMail.phone, '04121234567');
+      expect(withMail.businessName, 'Taller Sur');
+      expect(p.email, isNull);
+    });
+
+    test('busqueda owner incluye correo, telefono y ciudad', () {
+      final p = ProfileModel(
+        id: 'a1',
+        role: 'aliado',
+        businessName: 'Taller Sur',
+        rif: 'J-99887766',
+        phone: '04121234567',
+        email: 'tienda@example.com',
+        ciudad: 'Valencia',
+        estado: 'Carabobo',
+      );
+      expect(ownerAccountMatchesQuery(p, 'tienda@'), isTrue);
+      expect(ownerAccountMatchesQuery(p, '0412'), isTrue);
+      expect(ownerAccountMatchesQuery(p, 'valen'), isTrue);
+      expect(ownerAccountMatchesQuery(p, '9988'), isTrue);
+      expect(ownerAccountMatchesQuery(p, 'zzz'), isFalse);
     });
 
     test('fromJson lee is_owner, deactivated_at y email', () {

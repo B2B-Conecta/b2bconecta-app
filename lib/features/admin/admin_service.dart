@@ -50,6 +50,30 @@ class AdminService {
         .toList();
   }
 
+  /// Owner: ficha completa (perfiles + correo de Auth).
+  static Future<List<ProfileModel>> ownerListProfilesWithDossier() async {
+    final listed = await ownerListProfiles();
+    final res = await SupabaseAccess.client.from('profiles').select();
+    final byId = <String, ProfileModel>{};
+    for (final e in res) {
+      final p = ProfileModel.fromJson(Map<String, dynamic>.from(e as Map));
+      if (p.id.isNotEmpty) byId[p.id] = p;
+    }
+    return listed
+        .map((row) => (byId[row.id] ?? row).withAuthEmail(row.email))
+        .toList();
+  }
+
+  /// Owner: mapa perfil → correo de Auth.
+  static Future<Map<String, String>> ownerAuthEmailsByProfileId() async {
+    final rows = await ownerListProfiles();
+    return {
+      for (final row in rows)
+        if (row.email != null && row.email!.trim().isNotEmpty)
+          row.id: row.email!.trim(),
+    };
+  }
+
   static Future<void> ownerSetProfileRole({
     required String profileId,
     required String role,

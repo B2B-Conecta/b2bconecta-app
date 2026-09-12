@@ -2,6 +2,7 @@
 -- Restablecer contraseñas de usuarios @motoconecta.seed (sin re-seed completo)
 -- =============================================================================
 --   admin*@motoconecta.seed      → admin123
+--   owner@motoconecta.seed       → admin123
 --   importador*@motoconecta.seed → importador123
 --   aliado*@motoconecta.seed     → aliado123
 --
@@ -15,6 +16,7 @@ update auth.users
 set
   encrypted_password = case
     when email like 'admin%@motoconecta.seed'
+      or email = 'owner@motoconecta.seed'
       then crypt('admin123', gen_salt('bf'))
     when email like 'importador%@motoconecta.seed'
       then crypt('importador123', gen_salt('bf'))

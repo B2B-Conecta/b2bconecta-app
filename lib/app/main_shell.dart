@@ -335,7 +335,7 @@ class _MainShellState extends State<MainShell> {
       const AdminEncomiendasReportPanel(),
       const AdminOrderRatingsPanel(),
       const AdminCommissionSettlementsPanel(),
-      const AdminKycReviewPanel(),
+      AdminKycReviewPanel(viewerIsOwner: _profile.isOwner),
       const AdminSupportTicketsPanel(),
       if (_profile.isOwner) AdminAccountManagementPanel(viewer: _profile),
     ];

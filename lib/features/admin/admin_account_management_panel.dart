@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/admin/owner_importer_catalog_screen.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
@@ -586,45 +587,120 @@ class _AccountCardState extends State<_AccountCard> {
               profile: profile,
               isSelf: isSelf,
             ),
-            if (widget.canManage) ...[
+            if (profile.role?.trim().toLowerCase() == 'importador' ||
+                widget.canManage) ...[
               const SizedBox(height: 12),
               if (widget.busy)
                 const LinearProgressIndicator(color: AppColors.brand)
               else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton(
-                      onPressed: widget.onChangeRole,
-                      child: const Text('Cambiar rol'),
-                    ),
-                    if (profile.isDeactivated ||
-                        profile.accountAccessStatus?.trim() ==
-                            AccountAccessStatus.rejected)
-                      FilledButton(
-                        onPressed: widget.onReactivate,
-                        child: const Text('Reactivar'),
-                      )
-                    else ...[
-                      OutlinedButton(
-                        onPressed: widget.onBlock,
-                        child: const Text('Bloquear'),
-                      ),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red.shade700,
-                        ),
-                        onPressed: widget.onDeactivate,
-                        child: const Text('Eliminar'),
-                      ),
-                    ],
-                  ],
+                _AccountActions(
+                  showCatalog:
+                      profile.role?.trim().toLowerCase() == 'importador',
+                  canManage: widget.canManage,
+                  blocked: profile.isDeactivated ||
+                      profile.accountAccessStatus?.trim() ==
+                          AccountAccessStatus.rejected,
+                  onOpenCatalog: () => OwnerImporterCatalogScreen.open(
+                    context,
+                    importerId: profile.id,
+                    importerName:
+                        profile.businessName?.trim().isNotEmpty == true
+                            ? profile.businessName!.trim()
+                            : (profile.email ?? 'Mayorista'),
+                  ),
+                  onChangeRole: widget.onChangeRole,
+                  onBlock: widget.onBlock,
+                  onReactivate: widget.onReactivate,
+                  onDeactivate: widget.onDeactivate,
                 ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AccountActions extends StatelessWidget {
+  const _AccountActions({
+    required this.showCatalog,
+    required this.canManage,
+    required this.blocked,
+    required this.onOpenCatalog,
+    required this.onChangeRole,
+    required this.onBlock,
+    required this.onReactivate,
+    required this.onDeactivate,
+  });
+
+  final bool showCatalog;
+  final bool canManage;
+  final bool blocked;
+  final VoidCallback onOpenCatalog;
+  final VoidCallback onChangeRole;
+  final VoidCallback onBlock;
+  final VoidCallback onReactivate;
+  final VoidCallback onDeactivate;
+
+  static ButtonStyle get _wide => OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
+        visualDensity: VisualDensity.standard,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showCatalog)
+          OutlinedButton.icon(
+            style: _wide,
+            onPressed: onOpenCatalog,
+            icon: const Icon(Icons.inventory_2_outlined, size: 18),
+            label: const Text('Ver catálogo'),
+          ),
+        if (showCatalog && canManage) const SizedBox(height: 8),
+        if (canManage) ...[
+          OutlinedButton(
+            style: _wide,
+            onPressed: onChangeRole,
+            child: const Text('Cambiar rol'),
+          ),
+          const SizedBox(height: 8),
+          if (blocked)
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              onPressed: onReactivate,
+              child: const Text('Reactivar'),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide,
+                    onPressed: onBlock,
+                    child: const Text('Bloquear'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide.copyWith(
+                      foregroundColor: WidgetStatePropertyAll(
+                        Colors.red.shade700,
+                      ),
+                    ),
+                    onPressed: onDeactivate,
+                    child: const Text('Eliminar'),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ],
     );
   }
 }

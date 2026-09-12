@@ -973,6 +973,11 @@ class SupabaseService {
   static Future<Map<String, String>> ownerAuthEmailsByProfileId() =>
       AdminService.ownerAuthEmailsByProfileId();
 
+  static Future<List<PartModel>> ownerListImporterCatalog({
+    required String importerId,
+  }) =>
+      AdminService.ownerListImporterCatalog(importerId: importerId);
+
   static Future<void> ownerSetProfileRole({
     required String profileId,
     required String role,

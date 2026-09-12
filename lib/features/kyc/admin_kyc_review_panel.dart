@@ -8,6 +8,7 @@ import 'kyc_status.dart';
 import 'profile_document_model.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/admin/owner_importer_catalog_screen.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -677,6 +678,38 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                                   CrossAxisAlignment.stretch,
                                               children: [
                                                 _importadorProfileSummary(p),
+                                                if (widget.viewerIsOwner) ...[
+                                                  const SizedBox(height: 12),
+                                                  Align(
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: OutlinedButton.icon(
+                                                      onPressed: () =>
+                                                          OwnerImporterCatalogScreen
+                                                              .open(
+                                                        context,
+                                                        importerId: p.id,
+                                                        importerName: p
+                                                                    .businessName
+                                                                    ?.trim()
+                                                                    .isNotEmpty ==
+                                                                true
+                                                            ? p.businessName!
+                                                                .trim()
+                                                            : (p.email ??
+                                                                'Mayorista'),
+                                                      ),
+                                                      icon: const Icon(
+                                                        Icons
+                                                            .inventory_2_outlined,
+                                                        size: 18,
+                                                      ),
+                                                      label: const Text(
+                                                        'Ver catálogo',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
                                                 const SizedBox(height: 12),
                                                 Wrap(
                                                   spacing: 8,

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/admin/owner_catalog_filter.dart';
+import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
@@ -175,6 +177,56 @@ void main() {
         accountAccessStatus: AccountAccessStatus.draft,
       );
       expect(draft.hasActiveAccountAccess, isFalse);
+    });
+  });
+
+  group('owner catalog filter', () {
+    final items = [
+      const PartModel(
+        id: '1',
+        nombre: 'Cable acelerador',
+        sku: 'ALL-BAL-120',
+        category: 'Transmisión',
+        precio: 6,
+        stock: 150,
+        isActive: true,
+      ),
+      const PartModel(
+        id: '2',
+        nombre: 'Filtro aceite',
+        sku: 'FLT-01',
+        category: 'Motor',
+        precio: 4,
+        stock: 10,
+        isActive: false,
+      ),
+    ];
+
+    test('separa publicados y pausados y busca por sku', () {
+      expect(
+        ownerCatalogFilter(
+          items: items,
+          rawQuery: '',
+          visibility: OwnerCatalogVisibility.publicados,
+        ).map((p) => p.id),
+        ['1'],
+      );
+      expect(
+        ownerCatalogFilter(
+          items: items,
+          rawQuery: '',
+          visibility: OwnerCatalogVisibility.pausados,
+        ).map((p) => p.id),
+        ['2'],
+      );
+      expect(
+        ownerCatalogFilter(
+          items: items,
+          rawQuery: 'flt-01',
+          visibility: OwnerCatalogVisibility.todos,
+        ).single.id,
+        '2',
+      );
     });
   });
 }

@@ -1,6 +1,7 @@
 
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
+import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 class AdminService {
@@ -72,6 +73,20 @@ class AdminService {
         if (row.email != null && row.email!.trim().isNotEmpty)
           row.id: row.email!.trim(),
     };
+  }
+
+  /// Owner: catálogo de un mayorista, incluyendo pausados.
+  static Future<List<PartModel>> ownerListImporterCatalog({
+    required String importerId,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'owner_list_importer_catalog',
+      params: <String, dynamic>{'p_importador_id': importerId},
+    );
+    if (res is! List) return const [];
+    return res
+        .map((e) => PartModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   static Future<void> ownerSetProfileRole({

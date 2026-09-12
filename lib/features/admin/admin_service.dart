@@ -161,4 +161,17 @@ class AdminService {
       },
     );
   }
+
+  static Future<void> ownerHardDeleteProfile({
+    required String profileId,
+    required String confirm,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'owner_hard_delete_profile',
+      params: <String, dynamic>{
+        'p_profile_id': profileId,
+        'p_confirm': confirm.trim(),
+      },
+    );
+  }
 }

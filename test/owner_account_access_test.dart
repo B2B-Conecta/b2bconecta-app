@@ -66,6 +66,30 @@ void main() {
       );
     });
 
+    test('el borrado definitivo solo confirma con el correo exacto', () {
+      expect(
+        OwnerAccountRules.hardDeleteConfirmMatches(
+          typed: 'aliado1@motoconecta.seed',
+          email: 'Aliado1@motoconecta.seed',
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.hardDeleteConfirmMatches(
+          typed: 'aliado1',
+          email: 'aliado1@motoconecta.seed',
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.hardDeleteConfirmMatches(
+          typed: '  ',
+          email: 'aliado1@motoconecta.seed',
+        ),
+        isFalse,
+      );
+    });
+
     test('etiqueta de baja lógica vs bloqueo, sin Superadmin', () {
       expect(
         OwnerAccountRules.statusLabelEs(

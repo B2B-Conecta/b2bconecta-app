@@ -31,4 +31,15 @@ abstract final class OwnerAccountRules {
     if (access == 'draft') return 'Borrador';
     return 'Sin estado';
   }
+
+  /// Confirmación de borrado definitivo: debe coincidir el correo de Auth.
+  static bool hardDeleteConfirmMatches({
+    required String typed,
+    required String? email,
+  }) {
+    final t = typed.trim().toLowerCase();
+    final e = email?.trim().toLowerCase();
+    if (t.isEmpty || e == null || e.isEmpty) return false;
+    return t == e;
+  }
 }

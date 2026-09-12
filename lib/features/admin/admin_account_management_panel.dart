@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/features/admin/owner_account_delete_dialog.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
@@ -14,7 +15,7 @@ enum _AccountRoleFilter { todos, aliados, importadores, administracion }
 
 enum _AccountStateFilter { todos, activas, bloqueadas, eliminadas }
 
-/// Solo owner: roles, bloqueo y baja lógica de cuentas.
+/// Solo owner: roles, bloqueo, baja lógica y borrado de Auth.
 class AdminAccountManagementPanel extends StatefulWidget {
   const AdminAccountManagementPanel({
     super.key,
@@ -312,36 +313,12 @@ class _AdminAccountManagementPanelState
   }
 
   Future<void> _deactivate(ProfileModel p) async {
-    final note = await _promptNote(
-      title: 'Eliminar cuenta',
-      confirmLabel: 'Continuar',
-    );
-    if (note == null) return;
-    if (!mounted) return;
-    final ok = await showDialog<bool>(
+    final note = await showOwnerAccountDeleteDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar baja'),
-        content: Text(
-          'Es una baja lógica: la cuenta deja de entrar, no se borra el usuario '
-          'ni el historial de pedidos.\n\n'
-          '${p.businessName ?? p.email ?? p.id}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      profile: p,
+      kind: OwnerAccountDeleteKind.soft,
     );
-    if (ok != true) return;
-    if (!mounted) return;
+    if (note == null || !mounted) return;
     final done = await _runBusy(p, () async {
       await SupabaseService.ownerDeactivateProfile(
         profileId: p.id,
@@ -352,6 +329,28 @@ class _AdminAccountManagementPanelState
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Cuenta deshabilitada (baja lógica).'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _hardDelete(ProfileModel p) async {
+    final confirm = await showOwnerAccountDeleteDialog(
+      context: context,
+      profile: p,
+      kind: OwnerAccountDeleteKind.hard,
+    );
+    if (confirm == null || !mounted) return;
+    final done = await _runBusy(p, () async {
+      await SupabaseService.ownerHardDeleteProfile(
+        profileId: p.id,
+        confirm: confirm,
+      );
+    });
+    if (!mounted || !done) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cuenta borrada de Auth. El correo quedó libre.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -390,7 +389,8 @@ class _AdminAccountManagementPanelState
         children: [
           Text(
             'Ficha completa (correo, teléfono y datos fiscales). '
-            'Roles, bloqueo y baja; el historial de pedidos se conserva.',
+            'Eliminar es baja lógica. Borrar definitiva quita Auth y libera '
+            'el correo; no se puede si hay pedidos.',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -471,6 +471,7 @@ class _AdminAccountManagementPanelState
                   onBlock: () => _block(p),
                   onReactivate: () => _reactivate(p),
                   onDeactivate: () => _deactivate(p),
+                  onHardDelete: () => _hardDelete(p),
                 ),
               ),
             ),
@@ -508,6 +509,7 @@ class _AccountCard extends StatefulWidget {
     required this.onBlock,
     required this.onReactivate,
     required this.onDeactivate,
+    required this.onHardDelete,
   });
 
   final ProfileModel profile;
@@ -518,6 +520,7 @@ class _AccountCard extends StatefulWidget {
   final VoidCallback onBlock;
   final VoidCallback onReactivate;
   final VoidCallback onDeactivate;
+  final VoidCallback onHardDelete;
 
   @override
   State<_AccountCard> createState() => _AccountCardState();
@@ -612,6 +615,8 @@ class _AccountCardState extends State<_AccountCard> {
                   onBlock: widget.onBlock,
                   onReactivate: widget.onReactivate,
                   onDeactivate: widget.onDeactivate,
+                  onHardDelete: widget.onHardDelete,
+                  deactivated: profile.isDeactivated,
                 ),
             ],
           ],
@@ -626,21 +631,25 @@ class _AccountActions extends StatelessWidget {
     required this.showCatalog,
     required this.canManage,
     required this.blocked,
+    required this.deactivated,
     required this.onOpenCatalog,
     required this.onChangeRole,
     required this.onBlock,
     required this.onReactivate,
     required this.onDeactivate,
+    required this.onHardDelete,
   });
 
   final bool showCatalog;
   final bool canManage;
   final bool blocked;
+  final bool deactivated;
   final VoidCallback onOpenCatalog;
   final VoidCallback onChangeRole;
   final VoidCallback onBlock;
   final VoidCallback onReactivate;
   final VoidCallback onDeactivate;
+  final VoidCallback onHardDelete;
 
   static ButtonStyle get _wide => OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(44),
@@ -699,6 +708,28 @@ class _AccountActions extends StatelessWidget {
                 ),
               ],
             ),
+          if (blocked && !deactivated) ...[
+            const SizedBox(height: 8),
+            OutlinedButton(
+              style: _wide.copyWith(
+                foregroundColor: WidgetStatePropertyAll(
+                  Colors.red.shade700,
+                ),
+              ),
+              onPressed: onDeactivate,
+              child: const Text('Eliminar'),
+            ),
+          ],
+          const SizedBox(height: 8),
+          OutlinedButton(
+            style: _wide.copyWith(
+              foregroundColor: WidgetStatePropertyAll(
+                Colors.red.shade800,
+              ),
+            ),
+            onPressed: onHardDelete,
+            child: const Text('Borrar definitiva'),
+          ),
         ],
       ],
     );

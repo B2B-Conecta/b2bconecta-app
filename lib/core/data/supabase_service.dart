@@ -1015,6 +1015,15 @@ class SupabaseService {
   }) =>
       AdminService.ownerDeactivateProfile(profileId: profileId, note: note);
 
+  static Future<void> ownerHardDeleteProfile({
+    required String profileId,
+    required String confirm,
+  }) =>
+      AdminService.ownerHardDeleteProfile(
+        profileId: profileId,
+        confirm: confirm,
+      );
+
   static Future<void> applyReferralCode(String code) =>
       ReferralsService.applyReferralCode(code);
 

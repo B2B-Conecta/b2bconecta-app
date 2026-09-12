@@ -967,6 +967,31 @@ class SupabaseService {
   static Future<List<ProfileModel>> ownerListProfiles() =>
       AdminService.ownerListProfiles();
 
+  static Future<List<ProfileModel>> ownerListProfilesWithDossier() =>
+      AdminService.ownerListProfilesWithDossier();
+
+  static Future<Map<String, String>> ownerAuthEmailsByProfileId() =>
+      AdminService.ownerAuthEmailsByProfileId();
+
+  static Future<List<PartModel>> ownerListImporterCatalog({
+    required String importerId,
+  }) =>
+      AdminService.ownerListImporterCatalog(importerId: importerId);
+
+  static Future<int> ownerSetImporterProductsActive({
+    required List<String> productIds,
+    required bool isActive,
+  }) =>
+      AdminService.ownerSetImporterProductsActive(
+        productIds: productIds,
+        isActive: isActive,
+      );
+
+  static Future<int> ownerDeleteImporterProducts({
+    required List<String> productIds,
+  }) =>
+      AdminService.ownerDeleteImporterProducts(productIds: productIds);
+
   static Future<void> ownerSetProfileRole({
     required String profileId,
     required String role,
@@ -989,6 +1014,90 @@ class SupabaseService {
     required String note,
   }) =>
       AdminService.ownerDeactivateProfile(profileId: profileId, note: note);
+
+  static Future<void> ownerHardDeleteProfile({
+    required String profileId,
+    required String confirm,
+  }) =>
+      AdminService.ownerHardDeleteProfile(
+        profileId: profileId,
+        confirm: confirm,
+      );
+
+  static Future<String> ownerCreateAccount({
+    required String email,
+    required String password,
+    required String role,
+    required String businessName,
+    String? rif,
+    String? phone,
+    String? estado,
+    String? ciudad,
+    String? direccion,
+    String? fiscalMapsUrl,
+    String? legalContactName,
+    String? legalContactEmail,
+    String? legalContactPhone,
+    bool activate = true,
+  }) =>
+      AdminService.ownerCreateAccount(
+        email: email,
+        password: password,
+        role: role,
+        businessName: businessName,
+        rif: rif,
+        phone: phone,
+        estado: estado,
+        ciudad: ciudad,
+        direccion: direccion,
+        fiscalMapsUrl: fiscalMapsUrl,
+        legalContactName: legalContactName,
+        legalContactEmail: legalContactEmail,
+        legalContactPhone: legalContactPhone,
+        activate: activate,
+      );
+
+  static Future<void> ownerUpdateAccountDossier({
+    required String profileId,
+    required String businessName,
+    String? rif,
+    String? phone,
+    String? estado,
+    String? ciudad,
+    String? direccion,
+    String? fiscalMapsUrl,
+    String? legalContactName,
+    String? legalContactEmail,
+    String? legalContactPhone,
+  }) =>
+      AdminService.ownerUpdateAccountDossier(
+        profileId: profileId,
+        businessName: businessName,
+        rif: rif,
+        phone: phone,
+        estado: estado,
+        ciudad: ciudad,
+        direccion: direccion,
+        fiscalMapsUrl: fiscalMapsUrl,
+        legalContactName: legalContactName,
+        legalContactEmail: legalContactEmail,
+        legalContactPhone: legalContactPhone,
+      );
+
+  static Future<void> ownerUploadProfileDocument({
+    required String profileId,
+    required String docType,
+    required Uint8List bytes,
+    required String fileName,
+    bool markApproved = true,
+  }) =>
+      AdminService.ownerUploadProfileDocument(
+        profileId: profileId,
+        docType: docType,
+        bytes: bytes,
+        fileName: fileName,
+        markApproved: markApproved,
+      );
 
   static Future<void> applyReferralCode(String code) =>
       ReferralsService.applyReferralCode(code);

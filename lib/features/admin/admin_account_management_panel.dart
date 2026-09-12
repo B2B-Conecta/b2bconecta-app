@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/features/admin/owner_account_delete_dialog.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_dossier_form.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/admin/owner_importer_catalog_screen.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
@@ -11,7 +16,7 @@ enum _AccountRoleFilter { todos, aliados, importadores, administracion }
 
 enum _AccountStateFilter { todos, activas, bloqueadas, eliminadas }
 
-/// Solo owner: roles, bloqueo y baja lógica de cuentas.
+/// Solo owner: alta, expediente, roles, bloqueo, baja lógica y borrado de Auth.
 class AdminAccountManagementPanel extends StatefulWidget {
   const AdminAccountManagementPanel({
     super.key,
@@ -54,7 +59,7 @@ class _AdminAccountManagementPanelState
       _error = null;
     });
     try {
-      final rows = await SupabaseService.ownerListProfiles();
+      final rows = await SupabaseService.ownerListProfilesWithDossier();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -99,11 +104,7 @@ class _AdminAccountManagementPanelState
         case _AccountStateFilter.todos:
           break;
       }
-      if (q.isEmpty) return true;
-      final name = (p.businessName ?? '').toLowerCase();
-      final rif = (p.rif ?? '').toLowerCase();
-      final email = (p.email ?? '').toLowerCase();
-      return name.contains(q) || rif.contains(q) || email.contains(q);
+      return ownerAccountMatchesQuery(p, q);
     }).toList();
   }
 
@@ -276,12 +277,20 @@ class _AdminAccountManagementPanelState
   }
 
   Future<void> _reactivate(ProfileModel p) async {
+    final firstActivate = OwnerAccountRules.canActivateAccess(
+      accountAccessStatus: p.accountAccessStatus,
+      deactivatedAt: p.deactivatedAt,
+    );
+    final who = p.businessName ?? p.email ?? 'esta cuenta';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reactivar cuenta'),
+        title: Text(firstActivate ? 'Activar cuenta' : 'Reactivar cuenta'),
         content: Text(
-          '¿Restaurar el acceso de ${p.businessName ?? p.email ?? 'esta cuenta'}?',
+          firstActivate
+              ? '¿Habilitar $who con el expediente ya cargado? '
+                  'Podrá entrar sin repetir el registro inicial.'
+              : '¿Restaurar el acceso de $who?',
         ),
         actions: [
           TextButton(
@@ -290,7 +299,7 @@ class _AdminAccountManagementPanelState
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reactivar'),
+            child: Text(firstActivate ? 'Activar' : 'Reactivar'),
           ),
         ],
       ),
@@ -305,44 +314,22 @@ class _AdminAccountManagementPanelState
     });
     if (!mounted || !done) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Cuenta reactivada.'),
+      SnackBar(
+        content: Text(
+          firstActivate ? 'Cuenta activada.' : 'Cuenta reactivada.',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   Future<void> _deactivate(ProfileModel p) async {
-    final note = await _promptNote(
-      title: 'Eliminar cuenta',
-      confirmLabel: 'Continuar',
-    );
-    if (note == null) return;
-    if (!mounted) return;
-    final ok = await showDialog<bool>(
+    final note = await showOwnerAccountDeleteDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar baja'),
-        content: Text(
-          'Es una baja lógica: la cuenta deja de entrar, no se borra el usuario '
-          'ni el historial de pedidos.\n\n'
-          '${p.businessName ?? p.email ?? p.id}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      profile: p,
+      kind: OwnerAccountDeleteKind.soft,
     );
-    if (ok != true) return;
-    if (!mounted) return;
+    if (note == null || !mounted) return;
     final done = await _runBusy(p, () async {
       await SupabaseService.ownerDeactivateProfile(
         profileId: p.id,
@@ -353,6 +340,28 @@ class _AdminAccountManagementPanelState
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Cuenta deshabilitada (baja lógica).'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _hardDelete(ProfileModel p) async {
+    final confirm = await showOwnerAccountDeleteDialog(
+      context: context,
+      profile: p,
+      kind: OwnerAccountDeleteKind.hard,
+    );
+    if (confirm == null || !mounted) return;
+    final done = await _runBusy(p, () async {
+      await SupabaseService.ownerHardDeleteProfile(
+        profileId: p.id,
+        confirm: confirm,
+      );
+    });
+    if (!mounted || !done) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cuenta borrada de Auth. El correo quedó libre.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -390,8 +399,23 @@ class _AdminAccountManagementPanelState
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(
-            'Roles, bloqueo y baja de cuentas. El historial de pedidos se conserva.',
+            'Ficha completa (correo, teléfono y datos fiscales). '
+            'Puede crear cuentas y cargarles el expediente. '
+            'Eliminar es baja lógica. Borrar definitiva quita Auth y libera '
+            'el correo; no se puede si hay pedidos.',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            onPressed: () async {
+              final changed = await OwnerAccountDossierForm.open(context);
+              if (changed == true && mounted) await _load();
+            },
+            icon: const Icon(Icons.person_add_outlined, size: 18),
+            label: const Text('Nueva cuenta'),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -423,7 +447,7 @@ class _AdminAccountManagementPanelState
           TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
-              hintText: 'Buscar por nombre, RIF o correo…',
+              hintText: 'Buscar por nombre, RIF, correo o teléfono…',
               prefixIcon: const Icon(Icons.search, size: 20),
               isDense: true,
               border: OutlineInputBorder(
@@ -467,10 +491,18 @@ class _AdminAccountManagementPanelState
                   viewerId: widget.viewer.id,
                   canManage: _canManage(p),
                   busy: _busyId == p.id,
+                  onEditDossier: () async {
+                    final changed = await OwnerAccountDossierForm.open(
+                      context,
+                      existing: p,
+                    );
+                    if (changed == true && mounted) await _load();
+                  },
                   onChangeRole: () => _changeRole(p),
                   onBlock: () => _block(p),
                   onReactivate: () => _reactivate(p),
                   onDeactivate: () => _deactivate(p),
+                  onHardDelete: () => _hardDelete(p),
                 ),
               ),
             ),
@@ -498,36 +530,47 @@ class _AdminAccountManagementPanelState
   }
 }
 
-class _AccountCard extends StatelessWidget {
+class _AccountCard extends StatefulWidget {
   const _AccountCard({
     required this.profile,
     required this.viewerId,
     required this.canManage,
     required this.busy,
+    required this.onEditDossier,
     required this.onChangeRole,
     required this.onBlock,
     required this.onReactivate,
     required this.onDeactivate,
+    required this.onHardDelete,
   });
 
   final ProfileModel profile;
   final String viewerId;
   final bool canManage;
   final bool busy;
+  final VoidCallback onEditDossier;
   final VoidCallback onChangeRole;
   final VoidCallback onBlock;
   final VoidCallback onReactivate;
   final VoidCallback onDeactivate;
+  final VoidCallback onHardDelete;
+
+  @override
+  State<_AccountCard> createState() => _AccountCardState();
+}
+
+class _AccountCardState extends State<_AccountCard> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
     final status = OwnerAccountRules.statusLabelEs(
       role: profile.role,
       accountAccessStatus: profile.accountAccessStatus,
       deactivatedAt: profile.deactivatedAt,
     );
-    final isSelf = profile.id == viewerId;
-    final note = profile.accountReviewNote?.trim();
+    final isSelf = profile.id == widget.viewerId;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -535,84 +578,234 @@ class _AccountCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          onExpansionChanged: (open) => setState(() => _expanded = open),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  profile.businessName?.trim().isNotEmpty == true
+                      ? profile.businessName!.trim()
+                      : (profile.email ?? 'Sin nombre'),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              _StatusChip(label: status, deactivated: profile.isDeactivated),
+            ],
+          ),
+          subtitle: _expanded
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    profile.businessName?.trim().isNotEmpty == true
-                        ? profile.businessName!.trim()
-                        : (profile.email ?? 'Sin nombre'),
+                    [
+                      ProfileRoleLabels.labelEs(profile.role),
+                      if (profile.email != null) profile.email,
+                      if (profile.phone != null) profile.phone,
+                      if (isSelf) 'Su cuenta',
+                    ].join(' · '),
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      fontSize: 12.5,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
-                _StatusChip(label: status, deactivated: profile.isDeactivated),
-              ],
+          children: [
+            OwnerAccountDossier(
+              profile: profile,
+              isSelf: isSelf,
             ),
-            const SizedBox(height: 6),
-            Text(
-              [
-                ProfileRoleLabels.labelEs(profile.role),
-                if (profile.email != null) profile.email,
-                if (profile.rif != null) profile.rif,
-                if (isSelf) 'Su cuenta',
-              ].join(' · '),
-              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-            ),
-            if (note != null && note.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                note,
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-              ),
-            ],
-            if (canManage) ...[
+            if (profile.role?.trim().toLowerCase() == 'importador' ||
+                widget.canManage) ...[
               const SizedBox(height: 12),
-              if (busy)
+              if (widget.busy)
                 const LinearProgressIndicator(color: AppColors.brand)
               else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton(
-                      onPressed: onChangeRole,
-                      child: const Text('Cambiar rol'),
-                    ),
-                    if (profile.isDeactivated ||
-                        profile.accountAccessStatus?.trim() ==
-                            AccountAccessStatus.rejected)
-                      FilledButton(
-                        onPressed: onReactivate,
-                        child: const Text('Reactivar'),
-                      )
-                    else ...[
-                      OutlinedButton(
-                        onPressed: onBlock,
-                        child: const Text('Bloquear'),
-                      ),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red.shade700,
-                        ),
-                        onPressed: onDeactivate,
-                        child: const Text('Eliminar'),
-                      ),
-                    ],
-                  ],
+                _AccountActions(
+                  showCatalog:
+                      profile.role?.trim().toLowerCase() == 'importador',
+                  canManage: widget.canManage,
+                  blocked: profile.isDeactivated ||
+                      profile.accountAccessStatus?.trim() ==
+                          AccountAccessStatus.rejected,
+                  canActivate: OwnerAccountRules.canActivateAccess(
+                    accountAccessStatus: profile.accountAccessStatus,
+                    deactivatedAt: profile.deactivatedAt,
+                  ),
+                  onOpenCatalog: () => OwnerImporterCatalogScreen.open(
+                    context,
+                    importerId: profile.id,
+                    importerName:
+                        profile.businessName?.trim().isNotEmpty == true
+                            ? profile.businessName!.trim()
+                            : (profile.email ?? 'Mayorista'),
+                  ),
+                  onEditDossier: widget.onEditDossier,
+                  onChangeRole: widget.onChangeRole,
+                  onBlock: widget.onBlock,
+                  onReactivate: widget.onReactivate,
+                  onDeactivate: widget.onDeactivate,
+                  onHardDelete: widget.onHardDelete,
+                  deactivated: profile.isDeactivated,
                 ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AccountActions extends StatelessWidget {
+  const _AccountActions({
+    required this.showCatalog,
+    required this.canManage,
+    required this.blocked,
+    required this.deactivated,
+    required this.canActivate,
+    required this.onOpenCatalog,
+    required this.onEditDossier,
+    required this.onChangeRole,
+    required this.onBlock,
+    required this.onReactivate,
+    required this.onDeactivate,
+    required this.onHardDelete,
+  });
+
+  final bool showCatalog;
+  final bool canManage;
+  final bool blocked;
+  final bool deactivated;
+  final bool canActivate;
+  final VoidCallback onOpenCatalog;
+  final VoidCallback onEditDossier;
+  final VoidCallback onChangeRole;
+  final VoidCallback onBlock;
+  final VoidCallback onReactivate;
+  final VoidCallback onDeactivate;
+  final VoidCallback onHardDelete;
+
+  static ButtonStyle get _wide => OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
+        visualDensity: VisualDensity.standard,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showCatalog)
+          OutlinedButton.icon(
+            style: _wide,
+            onPressed: onOpenCatalog,
+            icon: const Icon(Icons.inventory_2_outlined, size: 18),
+            label: const Text('Ver catálogo'),
+          ),
+        if (showCatalog && canManage) const SizedBox(height: 8),
+        if (canManage) ...[
+          OutlinedButton(
+            style: _wide,
+            onPressed: onEditDossier,
+            child: const Text('Expediente'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            style: _wide,
+            onPressed: onChangeRole,
+            child: const Text('Cambiar rol'),
+          ),
+          const SizedBox(height: 8),
+          if (canActivate || blocked)
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              onPressed: onReactivate,
+              child: Text(canActivate ? 'Activar' : 'Reactivar'),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide,
+                    onPressed: onBlock,
+                    child: const Text('Bloquear'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide.copyWith(
+                      foregroundColor: WidgetStatePropertyAll(
+                        Colors.red.shade700,
+                      ),
+                    ),
+                    onPressed: onDeactivate,
+                    child: const Text('Eliminar'),
+                  ),
+                ),
+              ],
+            ),
+          if (canActivate) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide,
+                    onPressed: onBlock,
+                    child: const Text('Bloquear'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide.copyWith(
+                      foregroundColor: WidgetStatePropertyAll(
+                        Colors.red.shade700,
+                      ),
+                    ),
+                    onPressed: onDeactivate,
+                    child: const Text('Eliminar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (blocked && !deactivated) ...[
+            const SizedBox(height: 8),
+            OutlinedButton(
+              style: _wide.copyWith(
+                foregroundColor: WidgetStatePropertyAll(
+                  Colors.red.shade700,
+                ),
+              ),
+              onPressed: onDeactivate,
+              child: const Text('Eliminar'),
+            ),
+          ],
+          const SizedBox(height: 8),
+          OutlinedButton(
+            style: _wide.copyWith(
+              foregroundColor: WidgetStatePropertyAll(
+                Colors.red.shade800,
+              ),
+            ),
+            onPressed: onHardDelete,
+            child: const Text('Borrar definitiva'),
+          ),
+        ],
+      ],
     );
   }
 }

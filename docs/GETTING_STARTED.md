@@ -42,9 +42,24 @@ Usuarios seed (solo local):
 
 | Rol | Email | Contraseña |
 |-----|--------|------------|
+| Owner (Cuentas) | `owner@motoconecta.seed` | `admin123` |
 | Admin | `admin@motoconecta.seed` | `admin123` |
 | Aliado | `aliado1@motoconecta.seed` | `aliado123` |
 | Importador | `importador1@motoconecta.seed` | `importador123` |
+
+Si el reset ya corrió y falta el owner, sin borrar el resto:
+
+```bash
+supabase db query -f supabase/scripts/seed_local_owner.sql
+```
+
+En DEV (proyecto linked), el mismo owner de prueba:
+
+```bash
+supabase db query --linked -f supabase/scripts/seed_local_owner.sql
+```
+
+No pisa a `gimenopueyo@gmail.com` si ya es owner. El seed completo (`seed.sql`) solo toca cuentas `@motoconecta.seed`.
 
 ## 3. Correr la app
 

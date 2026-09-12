@@ -31,4 +31,25 @@ abstract final class OwnerAccountRules {
     if (access == 'draft') return 'Borrador';
     return 'Sin estado';
   }
+
+  /// Borrador o en revisión: el owner puede habilitar con el expediente ya cargado.
+  static bool canActivateAccess({
+    required String? accountAccessStatus,
+    DateTime? deactivatedAt,
+  }) {
+    if (deactivatedAt != null) return false;
+    final access = accountAccessStatus?.trim();
+    return access == 'draft' || access == 'pending_review';
+  }
+
+  /// Confirmación de borrado definitivo: debe coincidir el correo de Auth.
+  static bool hardDeleteConfirmMatches({
+    required String typed,
+    required String? email,
+  }) {
+    final t = typed.trim().toLowerCase();
+    final e = email?.trim().toLowerCase();
+    if (t.isEmpty || e == null || e.isEmpty) return false;
+    return t == e;
+  }
 }

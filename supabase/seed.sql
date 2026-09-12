@@ -11,12 +11,13 @@
 --
 -- Contraseñas seed (solo desarrollo):
 --   admin*@motoconecta.seed      → admin123
+--   owner@motoconecta.seed       → admin123
 --   importador*@motoconecta.seed → importador123
 --   aliado*@motoconecta.seed     → aliado123
 --
 -- Incluye: 15 importadores (2 × 15 SKU + 10 × 5 SKU; 13–15 catálogo vacío para carga masiva),
 -- datos de pago demo por método (Zelle, Pago Móvil, Binance, USDT, transferencia, efectivo),
--- 3 aliados (solo aliado1 con pedidos demo), 2 admins,
+-- 3 aliados (solo aliado1 con pedidos demo), 3 admins (incluye owner local),
 -- pedidos entregados con pago aprobado + método de pago y comprobante,
 -- valoraciones bucket_v2 de demo (admin / reputación importador) y
 -- E3 tramos comisión: importador11 ≈ 4 500 USD/mes (5 %), importador12 ≈ 10 500 USD/mes (3 %).
@@ -34,6 +35,7 @@
 --   importador13–15: sin productos (plantilla carga masiva)
 --   aliado1@motoconecta.seed … aliado3@motoconecta.seed (solo aliado1 con pedidos)
 --   admin@motoconecta.seed, admin2@motoconecta.seed
+--   owner@motoconecta.seed → pestaña Cuentas (super user local)
 --
 -- Contraseñas: admin123 | importador123 | aliado123 (según prefijo del email)
 -- =============================================================================
@@ -126,7 +128,8 @@ where id in (
   'c2000002-0000-4000-8000-000000000001'::uuid,
   'c2000003-0000-4000-8000-000000000001'::uuid,
   'c3000001-0000-4000-8000-000000000001'::uuid,
-  'c3000002-0000-4000-8000-000000000001'::uuid
+  'c3000002-0000-4000-8000-000000000001'::uuid,
+  'c3000003-0000-4000-8000-000000000001'::uuid
 );
 
 delete from auth.identities
@@ -165,7 +168,8 @@ seed_users (id, email) as (
     ('c2000002-0000-4000-8000-000000000001'::uuid, 'aliado2@motoconecta.seed'),
     ('c2000003-0000-4000-8000-000000000001'::uuid, 'aliado3@motoconecta.seed'),
     ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed'),
-    ('c3000002-0000-4000-8000-000000000001'::uuid, 'admin2@motoconecta.seed')
+    ('c3000002-0000-4000-8000-000000000001'::uuid, 'admin2@motoconecta.seed'),
+    ('c3000003-0000-4000-8000-000000000001'::uuid, 'owner@motoconecta.seed')
 )
 insert into auth.users (
   instance_id,
@@ -192,6 +196,7 @@ select
   s.email,
   case
     when s.email like 'admin%@motoconecta.seed'
+      or s.email = 'owner@motoconecta.seed'
       then extensions.crypt('admin123', extensions.gen_salt('bf'))
     when s.email like 'importador%@motoconecta.seed'
       then extensions.crypt('importador123', extensions.gen_salt('bf'))
@@ -256,7 +261,8 @@ from (
     ('c2000002-0000-4000-8000-000000000001'::uuid, 'aliado2@motoconecta.seed'),
     ('c2000003-0000-4000-8000-000000000001'::uuid, 'aliado3@motoconecta.seed'),
     ('c3000001-0000-4000-8000-000000000001'::uuid, 'admin@motoconecta.seed'),
-    ('c3000002-0000-4000-8000-000000000001'::uuid, 'admin2@motoconecta.seed')
+    ('c3000002-0000-4000-8000-000000000001'::uuid, 'admin2@motoconecta.seed'),
+    ('c3000003-0000-4000-8000-000000000001'::uuid, 'owner@motoconecta.seed')
 ) as s(id, email)
 where exists (select 1 from auth.users u where u.id = s.id)
   and not exists (
@@ -624,6 +630,23 @@ values
     null,
     0,
     now()
+  ),
+  (
+    'c3000003-0000-4000-8000-000000000001',
+    'B2B Conecta Owner',
+    'J-300000000',
+    'administrador',
+    '+58 212-3000000',
+    null,
+    'Distrito Capital',
+    'Caracas',
+    'Oficina B2B Conecta (cuenta owner local).',
+    null,
+    null,
+    null,
+    null,
+    0,
+    now()
   )
 on conflict (id) do update set
   business_name = excluded.business_name,
@@ -649,6 +672,22 @@ set
   -- Debe coincidir con TermsConfig.currentVersion para evitar re-onboarding en demos.
   terms_version = '2026-06-13'
 where role in ('importador', 'administrador', 'aliado');
+
+-- Owner local (pestaña Cuentas). No pisa a gimenopueyo si el seed corre en DEV.
+do $owner$
+begin
+  perform public._allow_profile_privilege ();
+  update public.profiles
+  set is_owner = true
+  where id = 'c3000003-0000-4000-8000-000000000001'
+    and not exists (
+      select 1
+      from public.profiles p
+      where p.is_owner
+        and p.id is distinct from 'c3000003-0000-4000-8000-000000000001'
+    );
+end;
+$owner$;
 
 -- Demo E2.1: ventana rolling = histórico mientras no hay order_ratings en seed.
 update public.profiles
@@ -1156,6 +1195,7 @@ where p.id = v.product_id;
 
 -- ---------------------------------------------------------------------------
 -- Pedidos demo E1.1: pago aprobado por importador (confirmado_por = importador_id)
+-- cantidad >= 5 (piso de plataforma / min_order_qty).
 -- paid_lines = líneas que cuentan en catalog_paid_orders_30d (ventana 30 días)
 -- ---------------------------------------------------------------------------
 with seed_boost_targets (importador_id, paid_lines) as (
@@ -1226,8 +1266,8 @@ select
   pp.importador_id,
   pp.product_id,
   'entregado'::text,
-  1 + (pp.line_no % 3),
-  round((pp.unit_price * (1 + (pp.line_no % 3)))::numeric, 4),
+  5 + (pp.line_no % 3),
+  round((pp.unit_price * (5 + (pp.line_no % 3)))::numeric, 4),
   0.05,
   (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'binance'])[
     1 + (pp.line_no % 5)
@@ -1269,8 +1309,8 @@ select
   'c1000003-0000-4000-8000-000000000001'::uuid,
   p.id,
   'entregado',
-  1,
-  p.price_usd,
+  5,
+  round((p.price_usd * 5)::numeric, 4),
   0.05,
   'transferencia',
   'aprobado',
@@ -1328,7 +1368,7 @@ select
   v.importador_id,
   v.product_id,
   'entregado'::text,
-  1,
+  5,
   v.precio_total_usd,
   v.commission_rate_snapshot,
   round((v.precio_total_usd * v.commission_rate_snapshot)::numeric, 4),

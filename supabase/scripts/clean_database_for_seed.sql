@@ -17,7 +17,7 @@
 
 begin;
 
--- UUIDs fijos del seed (15 importadores, 3 aliados, 2 admins)
+-- UUIDs fijos del seed (15 importadores, 3 aliados, 3 admins incl. owner)
 create temporary table _seed_profile_ids (id uuid primary key) on commit drop;
 
 insert into _seed_profile_ids (id)
@@ -41,7 +41,8 @@ values
   ('c2000002-0000-4000-8000-000000000001'::uuid),
   ('c2000003-0000-4000-8000-000000000001'::uuid),
   ('c3000001-0000-4000-8000-000000000001'::uuid),
-  ('c3000002-0000-4000-8000-000000000001'::uuid);
+  ('c3000002-0000-4000-8000-000000000001'::uuid),
+  ('c3000003-0000-4000-8000-000000000001'::uuid);
 
 -- ---------------------------------------------------------------------------
 -- 1) Devolver inventario descontado por pedidos seed (antes de borrar filas)

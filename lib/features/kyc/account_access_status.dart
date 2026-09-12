@@ -21,6 +21,22 @@ abstract final class AccountAccessStatus {
     }
   }
 
+  /// Etiqueta corta para chips de lista (KYC / Cuentas).
+  static String labelEsCompact(String? status) {
+    switch (status?.trim()) {
+      case draft:
+        return 'Borrador';
+      case pendingReview:
+        return 'En revisión';
+      case active:
+        return 'Activa';
+      case rejected:
+        return 'Rechazada';
+      default:
+        return 'Sin estado';
+    }
+  }
+
   /// Admin activo entra. Aliado e importador requieren `active`.
   /// Baja lógica (`deactivatedAt`) bloquea cualquier rol.
   static bool allowsAppAccess({

@@ -186,7 +186,7 @@ class ProfileModel {
 
   final DateTime? referredAt;
 
-  /// Correo de Auth; solo llega en listados owner (`owner_list_profiles`).
+  /// Correo de Auth; el owner lo ve en Cuentas y en KYC.
   final String? email;
 
   /// Propietario de la plataforma. No se muestra como rol en la UI.
@@ -307,6 +307,66 @@ class ProfileModel {
       if (r == 'importador' && !hasLegalContact) return false;
     }
     return true;
+  }
+
+  /// Adjunta el correo de Auth (p. ej. desde `owner_list_profiles`).
+  ProfileModel withAuthEmail(String? value) {
+    final next = value?.trim();
+    if (next == null || next.isEmpty || next == email) return this;
+    return ProfileModel(
+      id: id,
+      businessName: businessName,
+      rif: rif,
+      role: role,
+      phone: phone,
+      createdAt: createdAt,
+      creditScore: creditScore,
+      creditLimit: creditLimit,
+      kycStatus: kycStatus,
+      accountAccessStatus: accountAccessStatus,
+      termsAcceptedAt: termsAcceptedAt,
+      termsVersion: termsVersion,
+      accountReviewNote: accountReviewNote,
+      primerosPedidosContadoEntregados: primerosPedidosContadoEntregados,
+      creditoConsumidoAcumulado: creditoConsumidoAcumulado,
+      creditoPreactivadoPorAdmin: creditoPreactivadoPorAdmin,
+      pedidosSuspendidosMorosidad: pedidosSuspendidosMorosidad,
+      estado: estado,
+      ciudad: ciudad,
+      direccion: direccion,
+      legalContactName: legalContactName,
+      legalContactEmail: legalContactEmail,
+      legalContactPhone: legalContactPhone,
+      logoStoragePath: logoStoragePath,
+      fiscalMapsUrl: fiscalMapsUrl,
+      latitude: latitude,
+      longitude: longitude,
+      locationUpdatedAt: locationUpdatedAt,
+      ratingAvgReceived: ratingAvgReceived,
+      ratingCountReceived: ratingCountReceived,
+      ratingAvgReceivedRolling100: ratingAvgReceivedRolling100,
+      ratingCountReceivedRolling100: ratingCountReceivedRolling100,
+      ratingDimensionsReceivedRolling100: ratingDimensionsReceivedRolling100,
+      ratingAsPayerAvg: ratingAsPayerAvg,
+      ratingAsPayerCount: ratingAsPayerCount,
+      ratingAsPayerAvgRolling100: ratingAsPayerAvgRolling100,
+      ratingAsPayerCountRolling100: ratingAsPayerCountRolling100,
+      ratingDimensionsAsPayerRolling100: ratingDimensionsAsPayerRolling100,
+      acceptedPagoMetodos: acceptedPagoMetodos,
+      pagoMetodoInstrucciones: pagoMetodoInstrucciones,
+      pagoSoloDivisas: pagoSoloDivisas,
+      referralCode: referralCode,
+      referredByProfileId: referredByProfileId,
+      referredByExternalId: referredByExternalId,
+      referredByExternalName: referredByExternalName,
+      referredByExternalCode: referredByExternalCode,
+      referredByExternalPhone: referredByExternalPhone,
+      referredByExternalEmail: referredByExternalEmail,
+      referredAt: referredAt,
+      email: next,
+      isOwner: isOwner,
+      deactivatedAt: deactivatedAt,
+    );
   }
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {

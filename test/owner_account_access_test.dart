@@ -1,5 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_create_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/admin/owner_catalog_filter.dart';
+import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
@@ -63,6 +67,52 @@ void main() {
       );
     });
 
+    test('un borrador se puede activar; una activa no', () {
+      expect(
+        OwnerAccountRules.canActivateAccess(
+          accountAccessStatus: AccountAccessStatus.draft,
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.canActivateAccess(
+          accountAccessStatus: AccountAccessStatus.active,
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.canActivateAccess(
+          accountAccessStatus: AccountAccessStatus.draft,
+          deactivatedAt: DateTime.utc(2026, 9, 1),
+        ),
+        isFalse,
+      );
+    });
+
+    test('el borrado definitivo solo confirma con el correo exacto', () {
+      expect(
+        OwnerAccountRules.hardDeleteConfirmMatches(
+          typed: 'aliado1@motoconecta.seed',
+          email: 'Aliado1@motoconecta.seed',
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.hardDeleteConfirmMatches(
+          typed: 'aliado1',
+          email: 'aliado1@motoconecta.seed',
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.hardDeleteConfirmMatches(
+          typed: '  ',
+          email: 'aliado1@motoconecta.seed',
+        ),
+        isFalse,
+      );
+    });
+
     test('etiqueta de baja lógica vs bloqueo, sin Superadmin', () {
       expect(
         OwnerAccountRules.statusLabelEs(
@@ -104,6 +154,39 @@ void main() {
       expect(deleted.isDeactivated, isTrue);
     });
 
+    test('withAuthEmail adjunta correo sin perder el resto de la ficha', () {
+      final p = ProfileModel(
+        id: 'a1',
+        role: 'aliado',
+        businessName: 'Taller Sur',
+        phone: '04121234567',
+        ciudad: 'Valencia',
+      );
+      final withMail = p.withAuthEmail('tienda@example.com');
+      expect(withMail.email, 'tienda@example.com');
+      expect(withMail.phone, '04121234567');
+      expect(withMail.businessName, 'Taller Sur');
+      expect(p.email, isNull);
+    });
+
+    test('busqueda owner incluye correo, telefono y ciudad', () {
+      final p = ProfileModel(
+        id: 'a1',
+        role: 'aliado',
+        businessName: 'Taller Sur',
+        rif: 'J-99887766',
+        phone: '04121234567',
+        email: 'tienda@example.com',
+        ciudad: 'Valencia',
+        estado: 'Carabobo',
+      );
+      expect(ownerAccountMatchesQuery(p, 'tienda@'), isTrue);
+      expect(ownerAccountMatchesQuery(p, '0412'), isTrue);
+      expect(ownerAccountMatchesQuery(p, 'valen'), isTrue);
+      expect(ownerAccountMatchesQuery(p, '9988'), isTrue);
+      expect(ownerAccountMatchesQuery(p, 'zzz'), isFalse);
+    });
+
     test('fromJson lee is_owner, deactivated_at y email', () {
       final p = ProfileModel.fromJson({
         'id': 'u1',
@@ -141,6 +224,95 @@ void main() {
         accountAccessStatus: AccountAccessStatus.draft,
       );
       expect(draft.hasActiveAccountAccess, isFalse);
+    });
+  });
+
+  group('OwnerAccountCreateRules', () {
+    test('exige correo, contraseña coincidente y nombre', () {
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'tienda@test.com',
+          password: 'secret1',
+          passwordConfirm: 'secret1',
+          businessName: 'Tienda Norte',
+          role: 'aliado',
+        ),
+        isNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'mal',
+          password: 'secret1',
+          passwordConfirm: 'secret1',
+          businessName: 'Tienda',
+          role: 'aliado',
+        ),
+        isNotNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'tienda@test.com',
+          password: 'secret1',
+          passwordConfirm: 'otra',
+          businessName: 'Tienda',
+          role: 'aliado',
+        ),
+        isNotNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateDossier(businessName: '  '),
+        isNotNull,
+      );
+    });
+  });
+
+  group('owner catalog filter', () {
+    final items = [
+      const PartModel(
+        id: '1',
+        nombre: 'Cable acelerador',
+        sku: 'ALL-BAL-120',
+        category: 'Transmisión',
+        precio: 6,
+        stock: 150,
+        isActive: true,
+      ),
+      const PartModel(
+        id: '2',
+        nombre: 'Filtro aceite',
+        sku: 'FLT-01',
+        category: 'Motor',
+        precio: 4,
+        stock: 10,
+        isActive: false,
+      ),
+    ];
+
+    test('separa publicados y pausados y busca por sku', () {
+      expect(
+        ownerCatalogFilter(
+          items: items,
+          rawQuery: '',
+          visibility: OwnerCatalogVisibility.publicados,
+        ).map((p) => p.id),
+        ['1'],
+      );
+      expect(
+        ownerCatalogFilter(
+          items: items,
+          rawQuery: '',
+          visibility: OwnerCatalogVisibility.pausados,
+        ).map((p) => p.id),
+        ['2'],
+      );
+      expect(
+        ownerCatalogFilter(
+          items: items,
+          rawQuery: 'flt-01',
+          visibility: OwnerCatalogVisibility.todos,
+        ).single.id,
+        '2',
+      );
     });
   });
 }

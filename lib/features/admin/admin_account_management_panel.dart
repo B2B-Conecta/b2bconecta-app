@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/admin/owner_account_delete_dialog.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_dossier_form.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 import 'package:motolink_pro_app/features/admin/owner_importer_catalog_screen.dart';
@@ -15,7 +16,7 @@ enum _AccountRoleFilter { todos, aliados, importadores, administracion }
 
 enum _AccountStateFilter { todos, activas, bloqueadas, eliminadas }
 
-/// Solo owner: roles, bloqueo, baja lógica y borrado de Auth.
+/// Solo owner: alta, expediente, roles, bloqueo, baja lógica y borrado de Auth.
 class AdminAccountManagementPanel extends StatefulWidget {
   const AdminAccountManagementPanel({
     super.key,
@@ -276,12 +277,20 @@ class _AdminAccountManagementPanelState
   }
 
   Future<void> _reactivate(ProfileModel p) async {
+    final firstActivate = OwnerAccountRules.canActivateAccess(
+      accountAccessStatus: p.accountAccessStatus,
+      deactivatedAt: p.deactivatedAt,
+    );
+    final who = p.businessName ?? p.email ?? 'esta cuenta';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reactivar cuenta'),
+        title: Text(firstActivate ? 'Activar cuenta' : 'Reactivar cuenta'),
         content: Text(
-          '¿Restaurar el acceso de ${p.businessName ?? p.email ?? 'esta cuenta'}?',
+          firstActivate
+              ? '¿Habilitar $who con el expediente ya cargado? '
+                  'Podrá entrar sin repetir el registro inicial.'
+              : '¿Restaurar el acceso de $who?',
         ),
         actions: [
           TextButton(
@@ -290,7 +299,7 @@ class _AdminAccountManagementPanelState
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reactivar'),
+            child: Text(firstActivate ? 'Activar' : 'Reactivar'),
           ),
         ],
       ),
@@ -305,8 +314,10 @@ class _AdminAccountManagementPanelState
     });
     if (!mounted || !done) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Cuenta reactivada.'),
+      SnackBar(
+        content: Text(
+          firstActivate ? 'Cuenta activada.' : 'Cuenta reactivada.',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -389,9 +400,22 @@ class _AdminAccountManagementPanelState
         children: [
           Text(
             'Ficha completa (correo, teléfono y datos fiscales). '
+            'Puede crear cuentas y cargarles el expediente. '
             'Eliminar es baja lógica. Borrar definitiva quita Auth y libera '
             'el correo; no se puede si hay pedidos.',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            onPressed: () async {
+              final changed = await OwnerAccountDossierForm.open(context);
+              if (changed == true && mounted) await _load();
+            },
+            icon: const Icon(Icons.person_add_outlined, size: 18),
+            label: const Text('Nueva cuenta'),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -467,6 +491,13 @@ class _AdminAccountManagementPanelState
                   viewerId: widget.viewer.id,
                   canManage: _canManage(p),
                   busy: _busyId == p.id,
+                  onEditDossier: () async {
+                    final changed = await OwnerAccountDossierForm.open(
+                      context,
+                      existing: p,
+                    );
+                    if (changed == true && mounted) await _load();
+                  },
                   onChangeRole: () => _changeRole(p),
                   onBlock: () => _block(p),
                   onReactivate: () => _reactivate(p),
@@ -505,6 +536,7 @@ class _AccountCard extends StatefulWidget {
     required this.viewerId,
     required this.canManage,
     required this.busy,
+    required this.onEditDossier,
     required this.onChangeRole,
     required this.onBlock,
     required this.onReactivate,
@@ -516,6 +548,7 @@ class _AccountCard extends StatefulWidget {
   final String viewerId;
   final bool canManage;
   final bool busy;
+  final VoidCallback onEditDossier;
   final VoidCallback onChangeRole;
   final VoidCallback onBlock;
   final VoidCallback onReactivate;
@@ -603,6 +636,10 @@ class _AccountCardState extends State<_AccountCard> {
                   blocked: profile.isDeactivated ||
                       profile.accountAccessStatus?.trim() ==
                           AccountAccessStatus.rejected,
+                  canActivate: OwnerAccountRules.canActivateAccess(
+                    accountAccessStatus: profile.accountAccessStatus,
+                    deactivatedAt: profile.deactivatedAt,
+                  ),
                   onOpenCatalog: () => OwnerImporterCatalogScreen.open(
                     context,
                     importerId: profile.id,
@@ -611,6 +648,7 @@ class _AccountCardState extends State<_AccountCard> {
                             ? profile.businessName!.trim()
                             : (profile.email ?? 'Mayorista'),
                   ),
+                  onEditDossier: widget.onEditDossier,
                   onChangeRole: widget.onChangeRole,
                   onBlock: widget.onBlock,
                   onReactivate: widget.onReactivate,
@@ -632,7 +670,9 @@ class _AccountActions extends StatelessWidget {
     required this.canManage,
     required this.blocked,
     required this.deactivated,
+    required this.canActivate,
     required this.onOpenCatalog,
+    required this.onEditDossier,
     required this.onChangeRole,
     required this.onBlock,
     required this.onReactivate,
@@ -644,7 +684,9 @@ class _AccountActions extends StatelessWidget {
   final bool canManage;
   final bool blocked;
   final bool deactivated;
+  final bool canActivate;
   final VoidCallback onOpenCatalog;
+  final VoidCallback onEditDossier;
   final VoidCallback onChangeRole;
   final VoidCallback onBlock;
   final VoidCallback onReactivate;
@@ -672,17 +714,23 @@ class _AccountActions extends StatelessWidget {
         if (canManage) ...[
           OutlinedButton(
             style: _wide,
+            onPressed: onEditDossier,
+            child: const Text('Expediente'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            style: _wide,
             onPressed: onChangeRole,
             child: const Text('Cambiar rol'),
           ),
           const SizedBox(height: 8),
-          if (blocked)
+          if (canActivate || blocked)
             FilledButton(
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(44),
               ),
               onPressed: onReactivate,
-              child: const Text('Reactivar'),
+              child: Text(canActivate ? 'Activar' : 'Reactivar'),
             )
           else
             Row(
@@ -708,6 +756,32 @@ class _AccountActions extends StatelessWidget {
                 ),
               ],
             ),
+          if (canActivate) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide,
+                    onPressed: onBlock,
+                    child: const Text('Bloquear'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    style: _wide.copyWith(
+                      foregroundColor: WidgetStatePropertyAll(
+                        Colors.red.shade700,
+                      ),
+                    ),
+                    onPressed: onDeactivate,
+                    child: const Text('Eliminar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (blocked && !deactivated) ...[
             const SizedBox(height: 8),
             OutlinedButton(

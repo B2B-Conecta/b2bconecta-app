@@ -1024,6 +1024,81 @@ class SupabaseService {
         confirm: confirm,
       );
 
+  static Future<String> ownerCreateAccount({
+    required String email,
+    required String password,
+    required String role,
+    required String businessName,
+    String? rif,
+    String? phone,
+    String? estado,
+    String? ciudad,
+    String? direccion,
+    String? fiscalMapsUrl,
+    String? legalContactName,
+    String? legalContactEmail,
+    String? legalContactPhone,
+    bool activate = true,
+  }) =>
+      AdminService.ownerCreateAccount(
+        email: email,
+        password: password,
+        role: role,
+        businessName: businessName,
+        rif: rif,
+        phone: phone,
+        estado: estado,
+        ciudad: ciudad,
+        direccion: direccion,
+        fiscalMapsUrl: fiscalMapsUrl,
+        legalContactName: legalContactName,
+        legalContactEmail: legalContactEmail,
+        legalContactPhone: legalContactPhone,
+        activate: activate,
+      );
+
+  static Future<void> ownerUpdateAccountDossier({
+    required String profileId,
+    required String businessName,
+    String? rif,
+    String? phone,
+    String? estado,
+    String? ciudad,
+    String? direccion,
+    String? fiscalMapsUrl,
+    String? legalContactName,
+    String? legalContactEmail,
+    String? legalContactPhone,
+  }) =>
+      AdminService.ownerUpdateAccountDossier(
+        profileId: profileId,
+        businessName: businessName,
+        rif: rif,
+        phone: phone,
+        estado: estado,
+        ciudad: ciudad,
+        direccion: direccion,
+        fiscalMapsUrl: fiscalMapsUrl,
+        legalContactName: legalContactName,
+        legalContactEmail: legalContactEmail,
+        legalContactPhone: legalContactPhone,
+      );
+
+  static Future<void> ownerUploadProfileDocument({
+    required String profileId,
+    required String docType,
+    required Uint8List bytes,
+    required String fileName,
+    bool markApproved = true,
+  }) =>
+      AdminService.ownerUploadProfileDocument(
+        profileId: profileId,
+        docType: docType,
+        bytes: bytes,
+        fileName: fileName,
+        markApproved: markApproved,
+      );
+
   static Future<void> applyReferralCode(String code) =>
       ReferralsService.applyReferralCode(code);
 

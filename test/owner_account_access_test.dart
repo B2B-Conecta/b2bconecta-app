@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_create_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 import 'package:motolink_pro_app/features/admin/owner_catalog_filter.dart';
@@ -61,6 +62,28 @@ void main() {
           viewerId: 'admin-2',
           targetId: 'tienda minorista-1',
           targetIsOwner: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('un borrador se puede activar; una activa no', () {
+      expect(
+        OwnerAccountRules.canActivateAccess(
+          accountAccessStatus: AccountAccessStatus.draft,
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.canActivateAccess(
+          accountAccessStatus: AccountAccessStatus.active,
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.canActivateAccess(
+          accountAccessStatus: AccountAccessStatus.draft,
+          deactivatedAt: DateTime.utc(2026, 9, 1),
         ),
         isFalse,
       );
@@ -201,6 +224,45 @@ void main() {
         accountAccessStatus: AccountAccessStatus.draft,
       );
       expect(draft.hasActiveAccountAccess, isFalse);
+    });
+  });
+
+  group('OwnerAccountCreateRules', () {
+    test('exige correo, contraseña coincidente y nombre', () {
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'tienda@test.com',
+          password: 'secret1',
+          passwordConfirm: 'secret1',
+          businessName: 'Tienda Norte',
+          role: 'aliado',
+        ),
+        isNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'mal',
+          password: 'secret1',
+          passwordConfirm: 'secret1',
+          businessName: 'Tienda',
+          role: 'aliado',
+        ),
+        isNotNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'tienda@test.com',
+          password: 'secret1',
+          passwordConfirm: 'otra',
+          businessName: 'Tienda',
+          role: 'aliado',
+        ),
+        isNotNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateDossier(businessName: '  '),
+        isNotNull,
+      );
     });
   });
 

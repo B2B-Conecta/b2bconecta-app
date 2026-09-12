@@ -77,6 +77,19 @@ class AuthService {
     return _auth.updateUser(UserAttributes(password: newPassword));
   }
 
+  /// Exige la contraseña actual (re-login) antes de guardar la nueva.
+  static Future<UserResponse> updatePasswordWithCurrent({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final email = _auth.currentUser?.email?.trim();
+    if (email == null || email.isEmpty) {
+      throw const AuthException('No hay una sesión con correo.');
+    }
+    await signInWithPassword(email: email, password: currentPassword);
+    return updatePassword(newPassword);
+  }
+
   static Future<void> signOut() async {
     await AuthRecoveryStorage.clearPendingPasswordRecovery();
     await PushNotificationService.instance.unregisterCurrentDevice();

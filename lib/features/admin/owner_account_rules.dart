@@ -32,6 +32,16 @@ abstract final class OwnerAccountRules {
     return 'Sin estado';
   }
 
+  /// Borrador o en revisión: el owner puede habilitar con el expediente ya cargado.
+  static bool canActivateAccess({
+    required String? accountAccessStatus,
+    DateTime? deactivatedAt,
+  }) {
+    if (deactivatedAt != null) return false;
+    final access = accountAccessStatus?.trim();
+    return access == 'draft' || access == 'pending_review';
+  }
+
   /// Confirmación de borrado definitivo: debe coincidir el correo de Auth.
   static bool hardDeleteConfirmMatches({
     required String typed,

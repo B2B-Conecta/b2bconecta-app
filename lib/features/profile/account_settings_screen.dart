@@ -16,18 +16,24 @@ class AccountSettingsScreen extends StatefulWidget {
 }
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
+  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _saving = false;
+  bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
   @override
   void dispose() {
+    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
+
+  bool get _hasCurrentPassword =>
+      _currentPasswordController.text.trim().isNotEmpty;
 
   void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -40,8 +46,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   Future<void> _updatePassword() async {
+    final current = _currentPasswordController.text;
     final a = _newPasswordController.text;
     final b = _confirmPasswordController.text;
+    if (current.isEmpty) {
+      _showSnack('Ingrese su contraseña actual.', isError: true);
+      return;
+    }
     if (a.length < 6) {
       _showSnack('La nueva contraseña debe tener al menos 6 caracteres.',
           isError: true);
@@ -51,11 +62,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       _showSnack('Las contraseñas no coinciden.', isError: true);
       return;
     }
+    if (a == current) {
+      _showSnack('La nueva contraseña debe ser distinta a la actual.',
+          isError: true);
+      return;
+    }
 
     setState(() => _saving = true);
     try {
-      await AuthService.updatePassword(a);
+      await AuthService.updatePasswordWithCurrent(
+        currentPassword: current,
+        newPassword: a,
+      );
       if (!mounted) return;
+      _currentPasswordController.clear();
       _newPasswordController.clear();
       _confirmPasswordController.clear();
       _showSnack('Contraseña actualizada correctamente.');
@@ -201,11 +221,34 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             _sectionHeader(
               'Cambiar contraseña',
               subtitle:
-                  'Introduce una contraseña nueva mientras tengas sesión iniciada.',
+                  'Ingrese primero su contraseña actual. Luego podrá escribir la nueva.',
             ),
             const SizedBox(height: 18),
             TextField(
+              controller: _currentPasswordController,
+              obscureText: _obscureCurrent,
+              autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.next,
+              onChanged: (_) => setState(() {}),
+              decoration: _inputDecoration(
+                hint: 'Contraseña actual',
+                prefixIcon: Icons.lock_outline,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureCurrent
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscureCurrent = !_obscureCurrent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _newPasswordController,
+              enabled: _hasCurrentPassword,
               obscureText: _obscureNew,
               autofillHints: const [AutofillHints.newPassword],
               textInputAction: TextInputAction.next,
@@ -219,18 +262,22 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         : Icons.visibility_off_outlined,
                     color: AppColors.textSecondary,
                   ),
-                  onPressed: () =>
-                      setState(() => _obscureNew = !_obscureNew),
+                  onPressed: _hasCurrentPassword
+                      ? () => setState(() => _obscureNew = !_obscureNew)
+                      : null,
                 ),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _confirmPasswordController,
+              enabled: _hasCurrentPassword,
               obscureText: _obscureConfirm,
               autofillHints: const [AutofillHints.newPassword],
               textInputAction: TextInputAction.done,
-              onSubmitted: _saving ? null : (_) => _updatePassword(),
+              onSubmitted: _saving || !_hasCurrentPassword
+                  ? null
+                  : (_) => _updatePassword(),
               decoration: _inputDecoration(
                 hint: 'Confirmar contraseña',
                 prefixIcon: Icons.lock_outlined,
@@ -241,8 +288,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         : Icons.visibility_off_outlined,
                     color: AppColors.textSecondary,
                   ),
-                  onPressed: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
+                  onPressed: _hasCurrentPassword
+                      ? () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm)
+                      : null,
                 ),
               ),
             ),
@@ -250,7 +299,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             SizedBox(
               height: 48,
               child: FilledButton(
-                onPressed: _saving ? null : _updatePassword,
+                onPressed:
+                    _saving || !_hasCurrentPassword ? null : _updatePassword,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.brand,
                   foregroundColor: Colors.white,

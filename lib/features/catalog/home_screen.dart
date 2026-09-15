@@ -13,6 +13,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'aliado_catalog_layout.dart';
+import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
 import 'promo_popup_frequency.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
@@ -74,9 +75,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _catalogCrossAxisCount = 2;
+  int _catalogCrossAxisCount = 5;
+  final _catalogScrollController = ScrollController();
 
-  int get _catalogPageSize => _catalogCrossAxisCount * 4;
+  int get _catalogPageSize =>
+      AliadoCatalogLayout.pageSizeForCount(_catalogCrossAxisCount);
 
   late Future<List<PartModel>> _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
@@ -142,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _maxPriceController.dispose();
     _ownerEstadoFilterController.dispose();
     _ownerCiudadFilterController.dispose();
+    _catalogScrollController.dispose();
     super.dispose();
   }
 
@@ -372,6 +376,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (reset) {
       _loadedParts.clear();
       _hasMoreProducts = true;
+      if (_catalogScrollController.hasClients) {
+        _catalogScrollController.jumpTo(0);
+      }
     }
     if (!_hasMoreProducts) return List<PartModel>.unmodifiable(_loadedParts);
 
@@ -385,29 +392,41 @@ class _HomeScreenState extends State<HomeScreen> {
       _hasMoreProducts = false;
     }
     _loadedParts.addAll(nextBatch);
+    _scheduleCatalogFill();
     return List<PartModel>.unmodifiable(_loadedParts);
+  }
+
+  void _scheduleCatalogFill() {
+    scheduleLoadMoreIfViewportNotFilled(
+      controller: _catalogScrollController,
+      hasMore: _hasMoreProducts,
+      isLoading: _isLoadingMore,
+      loadMore: _loadMoreProducts,
+    );
   }
 
   Future<void> _loadMoreProducts() async {
     if (_isLoadingMore || !_hasMoreProducts) return;
-    _isLoadingMore = true;
-    final freshFuture = _fetchProducts(reset: false);
-    setState(() {
-      _partsFuture = freshFuture;
-    });
+    setState(() => _isLoadingMore = true);
     try {
-      await freshFuture;
+      await _fetchProducts(reset: false);
       if (!mounted) return;
-      if (!_hasMoreProducts) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ya no hay mas productos para cargar.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      setState(() {});
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudieron cargar más productos.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
-      _isLoadingMore = false;
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+        _scheduleCatalogFill();
+      } else {
+        _isLoadingMore = false;
+      }
     }
   }
 
@@ -953,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           );
                         }
-                        final parts = snapshot.data ?? [];
+                        final parts = _loadedParts;
                         if (parts.isEmpty) {
                           return ListView(
                             children: [
@@ -970,15 +989,24 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           );
                         }
-                        return Column(
+                        return Stack(
                           children: [
-                            Expanded(
+                            NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (infiniteScrollShouldLoadMore(
+                                  notification,
+                                )) {
+                                  _loadMoreProducts();
+                                }
+                                return false;
+                              },
                               child: GridView.builder(
+                                controller: _catalogScrollController,
                                 padding: EdgeInsets.fromLTRB(
                                   hPad,
                                   0,
                                   hPad,
-                                  8,
+                                  _isLoadingMore ? 56 : 16,
                                 ),
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
@@ -1013,36 +1041,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               ),
                             ),
-                            if (_hasMoreProducts)
-                              Padding(
-                                padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
-                                child: Align(
-                                  alignment: Alignment.center,
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth: isDesktopCatalog
-                                          ? 360
-                                          : double.infinity,
-                                    ),
-                                    child: SizedBox(
-                                      width: isDesktopCatalog
-                                          ? null
-                                          : double.infinity,
-                                      child: ElevatedButton(
-                                      onPressed: _isLoadingMore
-                                          ? null
-                                          : _loadMoreProducts,
-                                      child: _isLoadingMore
-                                          ? const SizedBox(
-                                              width: 22,
-                                              height: 22,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2.5,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                          : const Text('Ver más productos'),
-                                      ),
+                            if (_isLoadingMore)
+                              const Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 12,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: AppColors.brand,
                                     ),
                                   ),
                                 ),

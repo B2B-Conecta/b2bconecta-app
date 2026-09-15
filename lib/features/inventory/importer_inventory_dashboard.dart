@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'importer_inventory_layout.dart';
+import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'product_volume_tiers.dart';
 import 'importer_bulk_usd_discount_dialog.dart';
@@ -45,8 +46,12 @@ class ImporterInventoryDashboard extends StatefulWidget {
 
 class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard> {
   final _searchController = TextEditingController();
+  final _inventoryScrollController = ScrollController();
   Future<InventoryMetrics>? _metricsFuture;
   Future<List<PartModel>>? _partsFuture;
+  final List<PartModel> _loadedParts = <PartModel>[];
+  bool _hasMoreInventory = true;
+  bool _loadingMoreInventory = false;
   String _categoryFilter = 'Todas';
   bool _filterLowStock = false;
   bool _filterHidden = false;
@@ -79,20 +84,81 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   void dispose() {
     MainShellTabController.registerImporterInventoryReload(null);
     _searchController.dispose();
+    _inventoryScrollController.dispose();
     super.dispose();
   }
 
   void _reload() {
     setState(() {
+      _loadedParts.clear();
+      _hasMoreInventory = true;
       _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
-      _partsFuture = SupabaseService.fetchMyInventory(
-        searchQuery: _searchController.text,
-        category: _categoryFilter,
-        onlyLowStock: _filterLowStock,
-        onlyInactive: _filterHidden,
-        onlyActive: _filterActiveOnly,
-      );
+      _partsFuture = _fetchInventoryPage(reset: true);
     });
+  }
+
+  Future<List<PartModel>> _fetchInventoryPage({required bool reset}) async {
+    if (reset) {
+      _loadedParts.clear();
+      _hasMoreInventory = true;
+      if (_inventoryScrollController.hasClients) {
+        _inventoryScrollController.jumpTo(0);
+      }
+    }
+    if (!_hasMoreInventory) {
+      return List<PartModel>.unmodifiable(_loadedParts);
+    }
+
+    final batch = await SupabaseService.fetchMyInventory(
+      limit: ImporterInventoryLayout.pageSize,
+      offset: _loadedParts.length,
+      searchQuery: _searchController.text,
+      category: _categoryFilter,
+      onlyLowStock: _filterLowStock,
+      onlyInactive: _filterHidden,
+      onlyActive: _filterActiveOnly,
+    );
+    if (batch.length < ImporterInventoryLayout.pageSize) {
+      _hasMoreInventory = false;
+    }
+    _loadedParts.addAll(batch);
+    _visibleParts = List<PartModel>.unmodifiable(_loadedParts);
+    _scheduleInventoryFill();
+    return List<PartModel>.unmodifiable(_loadedParts);
+  }
+
+  void _scheduleInventoryFill() {
+    scheduleLoadMoreIfViewportNotFilled(
+      controller: _inventoryScrollController,
+      hasMore: _hasMoreInventory,
+      isLoading: _loadingMoreInventory,
+      loadMore: _loadMoreInventory,
+    );
+  }
+
+  Future<void> _loadMoreInventory() async {
+    if (_loadingMoreInventory || !_hasMoreInventory) return;
+    setState(() => _loadingMoreInventory = true);
+    try {
+      await _fetchInventoryPage(reset: false);
+      if (!mounted) return;
+      setState(() {});
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudieron cargar más productos.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingMoreInventory = false);
+        _scheduleInventoryFill();
+      } else {
+        _loadingMoreInventory = false;
+      }
+    }
   }
 
   Future<void> _pullToRefresh() async {
@@ -1481,7 +1547,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     required double hPad,
     required double listBottomPadding,
   }) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
+    if (snapshot.connectionState == ConnectionState.waiting &&
+        _loadedParts.isEmpty) {
       return const [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -1491,7 +1558,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         ),
       ];
     }
-    if (snapshot.hasError) {
+    if (snapshot.hasError && _loadedParts.isEmpty) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -1505,14 +1572,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       ];
     }
 
-    final parts = snapshot.data ?? [];
-    if (snapshot.hasData &&
-        (parts.length != _visibleParts.length ||
-            parts.any((p) => !_visibleParts.any((v) => v.id == p.id)))) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _visibleParts = parts);
-      });
-    }
+    final parts = _loadedParts;
 
     if (parts.isEmpty) {
       final hasFilters = _filterLowStock ||
@@ -1583,6 +1643,22 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               _buildProductTile(parts[i], desktop: isDesktop),
         ),
       ),
+      if (_loadingMoreInventory)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 28),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.brand,
+                ),
+              ),
+            ),
+          ),
+        ),
     ];
   }
 
@@ -1717,22 +1793,31 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                       return RefreshIndicator(
                         onRefresh: _pullToRefresh,
                         color: AppColors.brand,
-                        child: CustomScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: _buildInventoryHeader(
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            if (infiniteScrollShouldLoadMore(notification)) {
+                              _loadMoreInventory();
+                            }
+                            return false;
+                          },
+                          child: CustomScrollView(
+                            controller: _inventoryScrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: _buildInventoryHeader(
+                                  isDesktop: isDesktop,
+                                  hPad: hPad,
+                                ),
+                              ),
+                              ..._inventoryBodySlivers(
+                                snapshot,
                                 isDesktop: isDesktop,
                                 hPad: hPad,
+                                listBottomPadding: listBottomPadding,
                               ),
-                            ),
-                            ..._inventoryBodySlivers(
-                              snapshot,
-                              isDesktop: isDesktop,
-                              hPad: hPad,
-                              listBottomPadding: listBottomPadding,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },

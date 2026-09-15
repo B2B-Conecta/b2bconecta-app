@@ -4,6 +4,7 @@ import 'admin_order_rating_row_model.dart';
 import 'rating_questionnaire_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'rating_scale_labels.dart';
 import 'aliado_order_experience_display.dart';
@@ -25,6 +26,7 @@ class AdminOrderRatingsPanel extends StatefulWidget {
 }
 
 class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
+  final _scrollController = ScrollController();
   bool _loading = true;
   String? _error;
   List<AdminOrderRatingRowModel> _rows = const [];
@@ -45,6 +47,21 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scheduleRatingsFill() {
+    scheduleLoadMoreIfViewportNotFilled(
+      controller: _scrollController,
+      hasMore: !_end,
+      isLoading: _loading,
+      loadMore: _loadMore,
+    );
   }
 
   List<AdminOrderRatingRowModel> get _filteredRows {
@@ -194,6 +211,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         _loading = false;
         _error = null;
       });
+      _scheduleRatingsFill();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -218,6 +236,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         _end = batch.length < _pageSize;
         _loading = false;
       });
+      _scheduleRatingsFill();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -269,64 +288,66 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        children: [
-          _AdminRatingsToolbar(
-            totalCount: _rows.length,
-            filteredCount: filtered.length,
-            filter: _filter,
-            loading: _loading,
-            onFilterChanged: (f) => setState(() => _filter = f),
-            onRefresh: _load,
-          ),
-          const SizedBox(height: 10),
-          if (filtered.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Text(
-                  'Ninguna valoración coincide con el filtro.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (infiniteScrollShouldLoadMore(notification)) {
+            _loadMore();
+          }
+          return false;
+        },
+        child: ListView(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            _AdminRatingsToolbar(
+              totalCount: _rows.length,
+              filteredCount: filtered.length,
+              filter: _filter,
+              loading: _loading,
+              onFilterChanged: (f) => setState(() => _filter = f),
+              onRefresh: _load,
+            ),
+            const SizedBox(height: 10),
+            if (filtered.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'Ninguna valoración coincide con el filtro.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              ...filtered.map(
+                (r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _AdminOrderRatingCard(
+                    row: r,
+                    questionnaire: _questionnaireFor(r),
+                    onHideComment: (!r.commentHidden &&
+                            r.comment.trim().isNotEmpty)
+                        ? () => _setCommentHidden(r, hidden: true)
+                        : null,
+                    onRestoreComment: r.commentHidden
+                        ? () => _setCommentHidden(r, hidden: false)
+                        : null,
+                  ),
                 ),
               ),
-            )
-          else
-            ...filtered.map(
-              (r) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _AdminOrderRatingCard(
-                  row: r,
-                  questionnaire: _questionnaireFor(r),
-                  onHideComment: (!r.commentHidden &&
-                          r.comment.trim().isNotEmpty)
-                      ? () => _setCommentHidden(r, hidden: true)
-                      : null,
-                  onRestoreComment: r.commentHidden
-                      ? () => _setCommentHidden(r, hidden: false)
-                      : null,
+            if (_loading && _rows.isNotEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
               ),
-            ),
-          if (!_end) ...[
-            const SizedBox(height: 8),
-            Center(
-              child: _loading
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : TextButton(
-                      onPressed: _loadMore,
-                      child: const Text('Cargar más'),
-                    ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }

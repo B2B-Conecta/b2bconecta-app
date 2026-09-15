@@ -16,4 +16,6 @@ abstract final class ImporterInventoryLayout {
     if (deleteOnly) return isDesktop(width) ? 132 : 112;
     return isDesktop(width) ? 188 : 160;
   }
+
+  static const int pageSize = 40;
 }

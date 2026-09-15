@@ -25,7 +25,9 @@ abstract final class AliadoCatalogLayout {
     return showDistance ? 0.50 : 0.56;
   }
 
-  static int pageSize(double width) => crossAxisCount(width) * 4;
+  static int pageSizeForCount(int columns) => columns * 4;
+
+  static int pageSize(double width) => pageSizeForCount(crossAxisCount(width));
 
   static double horizontalPadding(double width) =>
       isDesktop(width) ? 0 : 16;

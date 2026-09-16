@@ -479,6 +479,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
       ),
+      if ((part.category ?? '').trim().isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Categoría: ${part.category!.trim()}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.brandBlue,
+            ),
+          ),
+        ),
+      ],
       const SizedBox(height: 8),
       if (_importerLine.isNotEmpty) ...[
         Text(

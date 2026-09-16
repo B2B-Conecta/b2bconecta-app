@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_sort_mode.dart';
@@ -13,6 +14,7 @@ class CatalogService {
   CatalogService._();
 
   static Future<List<ImporterOption>> fetchImporterOptions() async {
+    return retryOnJwtIssuedAtFuture(() async {
     final response = await SupabaseAccess.client
         .from('profiles')
         .select('id, business_name, estado, ciudad')
@@ -33,10 +35,15 @@ class CatalogService {
         })
         .where((o) => o.id.isNotEmpty && o.businessName.isNotEmpty)
         .toList();
+    });
   }
 
   /// Número total de filas que cumplen [filters] (respeta RLS).
-  static Future<int> fetchProductsCount({CatalogFilters? filters}) async {
+  static Future<int> fetchProductsCount({CatalogFilters? filters}) {
+    return retryOnJwtIssuedAtFuture(() => _fetchProductsCount(filters: filters));
+  }
+
+  static Future<int> _fetchProductsCount({CatalogFilters? filters}) async {
     final f = filters ?? CatalogFilters.empty;
     final searchPlan = await _resolveCatalogSearch(f);
     if (searchPlan.isEmptyResult) return 0;
@@ -243,6 +250,16 @@ class CatalogService {
     int limit = 6,
     int offset = 0,
     CatalogFilters? filters,
+  }) {
+    return retryOnJwtIssuedAtFuture(
+      () => _fetchParts(limit: limit, offset: offset, filters: filters),
+    );
+  }
+
+  static Future<List<PartModel>> _fetchParts({
+    int limit = 6,
+    int offset = 0,
+    CatalogFilters? filters,
   }) async {
     final f = filters ?? CatalogFilters.empty;
     final searchPlan = await _resolveCatalogSearch(f);
@@ -282,20 +299,16 @@ class CatalogService {
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
         .toList();
     if (searchPlan.productScores.isNotEmpty) {
-      // Con búsqueda textual: priorizar relevancia RPC, boost/reputación como desempate.
+      // Con búsqueda textual: priorizar relevancia RPC, el modo de orden como desempate.
       parts.sort((a, b) {
         final sa = searchPlan.productScores[a.id] ?? 0;
         final sb = searchPlan.productScores[b.id] ?? 0;
         final byScore = sb.compareTo(sa);
         if (byScore != 0) return byScore;
-        return f.sortMode == CatalogSortMode.reputation
-            ? comparePartsForCatalogReputation(a, b)
-            : comparePartsForCatalogBoost(a, b);
+        return comparePartsForSortMode(a, b, f.sortMode);
       });
-    } else if (f.sortMode == CatalogSortMode.reputation) {
-      parts.sort(comparePartsForCatalogReputation);
     } else {
-      parts.sort(comparePartsForCatalogBoost);
+      parts.sort((a, b) => comparePartsForSortMode(a, b, f.sortMode));
     }
     if (offset >= parts.length) return [];
     final end = (offset + limit).clamp(0, parts.length);

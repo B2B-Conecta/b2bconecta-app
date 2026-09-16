@@ -11,7 +11,7 @@ class CatalogFilters {
     this.minPrice,
     this.maxPrice,
     this.onlyActiveProducts = true,
-    this.sortMode = CatalogSortMode.recommended,
+    this.sortMode = CatalogSortMode.defaultMode,
     this.sortReferenceLat,
     this.sortReferenceLng,
     this.minOwnerRatingAvg,
@@ -84,7 +84,7 @@ class CatalogFilters {
         maxPrice != null ||
         hasReputationThreshold ||
         onlyWithCommercialDiscount ||
-        sortMode != CatalogSortMode.recommended;
+        sortMode != CatalogSortMode.defaultMode;
   }
 
   List<String> get effectiveOwnerIds {

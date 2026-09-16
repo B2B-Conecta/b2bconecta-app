@@ -366,6 +366,9 @@ allow_dynamic_registration = false
 [functions.send-push-notification]
 verify_jwt = false
 
+[functions.map-coverage]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
@@ -381,6 +384,7 @@ deno_version = 2
 FCM_SERVER_KEY = "env(MOTOLINK_FCM_SERVER_KEY)"
 FCM_SERVICE_ACCOUNT_JSON = "env(MOTOLINK_FCM_SERVICE_ACCOUNT_JSON)"
 PUSH_WEBHOOK_SECRET = "env(MOTOLINK_PUSH_WEBHOOK_SECRET)"
+MAP_COVERAGE_TOKEN = "env(MAP_COVERAGE_TOKEN)"
 
 [analytics]
 enabled = true

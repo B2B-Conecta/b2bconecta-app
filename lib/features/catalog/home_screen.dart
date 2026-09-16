@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _promoPopupCheckScheduled = false;
 
 
-  CatalogSortMode _catalogSortMode = CatalogSortMode.recommended;
+  CatalogSortMode _catalogSortMode = CatalogSortMode.defaultMode;
   double? _minOwnerRatingAvg;
   int? _minOwnerRatingCount;
   bool _onlyWithCommercialDiscount = false;
@@ -213,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedImporterIds = {};
       _selectedCategoryLabel = 'Todos';
-      _catalogSortMode = CatalogSortMode.recommended;
+      _catalogSortMode = CatalogSortMode.defaultMode;
       _minOwnerRatingAvg = null;
       _minOwnerRatingCount = null;
       _onlyWithCommercialDiscount = false;
@@ -345,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (draft.sortMode == CatalogSortMode.nearest) {
       final ok = await _ensureGpsForNearestSort();
       if (!ok && mounted) {
-        setState(() => _catalogSortMode = CatalogSortMode.recommended);
+        setState(() => _catalogSortMode = CatalogSortMode.defaultMode);
       }
     } else {
       final la = widget.profile.latitude;
@@ -585,7 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
       chips.add(_activeFilterChip(
         label: 'Orden: ${draft.sortMode.labelEs}',
         onDeleted: () {
-          _setCatalogSortMode(CatalogSortMode.recommended);
+          _setCatalogSortMode(CatalogSortMode.defaultMode);
           _applyFiltersFromUi();
         },
       ));
@@ -1158,6 +1158,20 @@ class _ProductGridCard extends StatelessWidget {
                         height: 1.15,
                       ),
                     ),
+                    if ((part.category ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        part.category!.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compact ? 9 : 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.brandBlue,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Row(
                       children: [

@@ -123,7 +123,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     setState(() {
       _category = 'Todos';
       _importerIds.clear();
-      _sortMode = CatalogSortMode.recommended;
+      _sortMode = CatalogSortMode.defaultMode;
       _minRatingAvg = null;
       _minRatingCount = null;
       _onlyWithCommercialDiscount = false;
@@ -279,6 +279,8 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     ),
                     subtitle: Text(
                       switch (mode) {
+                        CatalogSortMode.category =>
+                          'Agrupa por categoría y ordena A–Z dentro de cada una.',
                         CatalogSortMode.recommended =>
                           'Prioriza actividad reciente y reputación (últ. 100).',
                         CatalogSortMode.nearest =>

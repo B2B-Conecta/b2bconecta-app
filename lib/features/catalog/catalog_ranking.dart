@@ -1,4 +1,5 @@
 import 'part_model.dart';
+import 'catalog_sort_mode.dart';
 
 /// Orden de catálogo aliado (E1.1 + E2.1): boost por pagos confirmados, luego reputación rolling 100.
 int comparePartsForCatalogBoost(PartModel a, PartModel b) {
@@ -19,6 +20,35 @@ int comparePartsForCatalogBoost(PartModel a, PartModel b) {
   }
 
   return a.id.compareTo(b.id);
+}
+
+String _categorySortKey(PartModel p) => (p.category ?? '').trim().toLowerCase();
+
+String _nameSortKey(PartModel p) => p.nombre.trim().toLowerCase();
+
+/// Categoría A–Z (vacías al final), luego nombre A–Z.
+int comparePartsByCategoryThenName(PartModel a, PartModel b) {
+  final ca = _categorySortKey(a);
+  final cb = _categorySortKey(b);
+  if (ca.isEmpty && cb.isNotEmpty) return 1;
+  if (cb.isEmpty && ca.isNotEmpty) return -1;
+  final byCat = ca.compareTo(cb);
+  if (byCat != 0) return byCat;
+  final byName = _nameSortKey(a).compareTo(_nameSortKey(b));
+  if (byName != 0) return byName;
+  return a.id.compareTo(b.id);
+}
+
+int comparePartsForSortMode(PartModel a, PartModel b, CatalogSortMode mode) {
+  switch (mode) {
+    case CatalogSortMode.category:
+      return comparePartsByCategoryThenName(a, b);
+    case CatalogSortMode.reputation:
+      return comparePartsForCatalogReputation(a, b);
+    case CatalogSortMode.recommended:
+    case CatalogSortMode.nearest:
+      return comparePartsForCatalogBoost(a, b);
+  }
 }
 
 /// Orden E2.2: reputación rolling primero, luego boost E1.1.

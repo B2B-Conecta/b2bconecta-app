@@ -9,7 +9,7 @@ class AliadoCatalogFiltersDraft {
     required this.ownerCiudad,
     required this.minPrice,
     required this.maxPrice,
-    this.sortMode = CatalogSortMode.recommended,
+    this.sortMode = CatalogSortMode.defaultMode,
     this.minOwnerRatingAvg,
     this.minOwnerRatingCount,
     this.onlyWithCommercialDiscount = false,
@@ -42,7 +42,7 @@ class AliadoCatalogFiltersDraft {
       (minOwnerRatingAvg != null && minOwnerRatingAvg! > 0) ||
       (minOwnerRatingCount != null && minOwnerRatingCount! > 0);
 
-  bool get hasNonDefaultSort => sortMode != CatalogSortMode.recommended;
+  bool get hasNonDefaultSort => sortMode != CatalogSortMode.defaultMode;
 
   /// Filtros del panel (excluye texto de búsqueda principal).
   bool get hasAnyPanelFilter =>

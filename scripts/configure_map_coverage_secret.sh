@@ -28,17 +28,17 @@ if [[ -z "$TOKEN" ]]; then
   echo ""
 fi
 
-echo "Enlazando $PROJECT_REF…"
+echo "Enlazando ${PROJECT_REF}..."
 supabase link --project-ref "$PROJECT_REF" --yes
 
-echo "Secret MAP_COVERAGE_TOKEN → $PROJECT_REF"
+echo "Secret MAP_COVERAGE_TOKEN -> ${PROJECT_REF}"
 supabase secrets set --project-ref "$PROJECT_REF" "MAP_COVERAGE_TOKEN=$TOKEN"
 
-echo "Deploy Edge Function map-coverage…"
+echo "Deploy Edge Function map-coverage..."
 supabase functions deploy map-coverage --project-ref "$PROJECT_REF" --no-verify-jwt
 
 echo ""
 echo "URL: https://${PROJECT_REF}.supabase.co/functions/v1/map-coverage"
 echo "Header: Authorization: Bearer <token>"
-echo "Método: GET"
+echo "Metodo: GET"
 echo "Pase URL + token por canal seguro (no por WhatsApp)."

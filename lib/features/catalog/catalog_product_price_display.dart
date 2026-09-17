@@ -54,19 +54,6 @@ class CatalogProductPriceDisplay extends StatelessWidget {
           )
         : null;
 
-    final promoChips = showPromotionChips
-        ? CatalogProductOfferChips(
-            listPriceUsd: listPriceUsd,
-            salePriceUsd: salePriceUsd,
-            discountRules: discountRules,
-            refUnitUsd: refUnit,
-            compact: compact,
-            ownerPagoSoloDivisas: ownerPagoSoloDivisas,
-          )
-        : const SizedBox.shrink();
-
-    final promoHeight = compact ? 32.0 : 44.0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -78,14 +65,13 @@ class CatalogProductPriceDisplay extends StatelessWidget {
           strikeSize: compact ? 9 : 10,
         ),
         if (showPromotionChips)
-          SizedBox(
-            height: promoHeight,
-            child: ClipRect(
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: promoChips,
-              ),
-            ),
+          CatalogProductOfferChips(
+            listPriceUsd: listPriceUsd,
+            salePriceUsd: salePriceUsd,
+            discountRules: discountRules,
+            refUnitUsd: refUnit,
+            compact: compact,
+            ownerPagoSoloDivisas: ownerPagoSoloDivisas,
           ),
       ],
     );

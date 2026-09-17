@@ -1113,7 +1113,6 @@ class _ProductGridCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                flex: 11,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Stack(
@@ -1142,163 +1141,149 @@ class _ProductGridCard extends StatelessWidget {
                 ),
               ),
               SizedBox(height: compact ? 4 : 6),
-              Expanded(
-                flex: 13,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      part.nombre,
-                      maxLines: 2,
+              Text(
+                part.nombre,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 12 : 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  height: 1.15,
+                ),
+              ),
+              if ((part.category ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 1),
+                Text(
+                  part.category!.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: compact ? 9 : 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.brandBlue,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  ImporterCatalogLogo(
+                    storagePath: part.ownerLogoStoragePath,
+                    size: compact ? 14 : 16,
+                  ),
+                  if (part.ownerLogoStoragePath?.trim().isNotEmpty == true)
+                    SizedBox(width: compact ? 4 : 5),
+                  Expanded(
+                    child: Text(
+                      importerLine,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: compact ? 12 : 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        height: 1.15,
+                        fontSize: compact ? 9 : 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        height: 1.1,
                       ),
                     ),
-                    if ((part.category ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        part.category!.trim(),
+                  ),
+                ],
+              ),
+              if (!compact && locLine.isNotEmpty)
+                Text(
+                  locLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                    height: 1.1,
+                  ),
+                ),
+              if (part.ownerRatingAvg != null &&
+                  (part.ownerRatingCount ?? 0) > 0) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.star,
+                      size: compact ? 10 : 11,
+                      color: Colors.amber.shade800,
+                    ),
+                    const SizedBox(width: 2),
+                    Flexible(
+                      child: Text(
+                        '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: compact ? 9 : 9.5,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.brandBlue,
-                          height: 1.1,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        ImporterCatalogLogo(
-                          storagePath: part.ownerLogoStoragePath,
-                          size: compact ? 14 : 16,
-                        ),
-                        if (part.ownerLogoStoragePath?.trim().isNotEmpty ==
-                            true)
-                          SizedBox(width: compact ? 4 : 5),
-                        Expanded(
-                          child: Text(
-                            importerLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: compact ? 9 : 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                              height: 1.1,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (!compact && locLine.isNotEmpty)
-                      Text(
-                        locLine,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                          height: 1.1,
-                        ),
-                      ),
-                    if (part.ownerRatingAvg != null &&
-                        (part.ownerRatingCount ?? 0) > 0) ...[
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star,
-                            size: compact ? 10 : 11,
-                            color: Colors.amber.shade800,
-                          ),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: Text(
-                              '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: compact ? 9 : 9.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (showDistanceChips) ...[
-                      const SizedBox(height: 2),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Chip(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          label: Text(
-                            _distanceChipLabel(part),
-                            style: TextStyle(
-                              fontSize: compact ? 9 : 9.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          backgroundColor:
-                              AppColors.brandBlue.withOpacity(0.1),
-                          side: BorderSide(
-                            color: AppColors.brandBlue.withOpacity(0.35),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 2),
-                    Expanded(
-                      child: CatalogProductPriceDisplay(
-                        listPriceUsd: part.precio,
-                        salePriceUsd: part.salePriceUsd,
-                        discountRules: part.discountRules,
-                        catalogGrid: true,
-                        compact: compact,
-                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
-                      ),
-                    ),
-                    Divider(height: 1, color: AppColors.borderSubtle),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
-                            color: AppColors.successGreen,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: compact ? 10 : 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
+              ],
+              if (showDistanceChips) ...[
+                const SizedBox(height: 2),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Chip(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    label: Text(
+                      _distanceChipLabel(part),
+                      style: TextStyle(
+                        fontSize: compact ? 9 : 9.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    backgroundColor: AppColors.brandBlue.withOpacity(0.1),
+                    side: BorderSide(
+                      color: AppColors.brandBlue.withOpacity(0.35),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
+              CatalogProductPriceDisplay(
+                listPriceUsd: part.precio,
+                salePriceUsd: part.salePriceUsd,
+                discountRules: part.discountRules,
+                catalogGrid: true,
+                compact: compact,
+                ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+              ),
+              Divider(height: 8, color: AppColors.borderSubtle),
+              Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppColors.successGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact ? 10 : 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

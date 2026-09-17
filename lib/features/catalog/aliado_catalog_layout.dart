@@ -19,10 +19,10 @@ abstract final class AliadoCatalogLayout {
     required bool showDistance,
   }) {
     final cols = crossAxisCount(width);
-    if (cols >= 5) return showDistance ? 0.70 : 0.76;
-    if (cols == 4) return showDistance ? 0.66 : 0.72;
-    if (cols == 3) return showDistance ? 0.60 : 0.66;
-    return showDistance ? 0.50 : 0.56;
+    if (cols >= 5) return showDistance ? 0.74 : 0.80;
+    if (cols == 4) return showDistance ? 0.70 : 0.76;
+    if (cols == 3) return showDistance ? 0.64 : 0.70;
+    return showDistance ? 0.54 : 0.62;
   }
 
   static int pageSizeForCount(int columns) => columns * 4;

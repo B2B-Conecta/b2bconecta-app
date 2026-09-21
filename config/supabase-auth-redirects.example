@@ -29,6 +29,12 @@
 #   o: bash scripts/configure_supabase_smtp.sh staging|production
 # Ver config/smtp.env.example
 #
+# Google Sign-In (Auth → Providers → Google):
+#   Enable provider with Web Client ID + secret from Google Cloud.
+#   Authorized redirect URIs in Google Cloud must include:
+#     https://<project-ref>.supabase.co/auth/v1/callback
+#   App redirect URLs above already cover web + ve.com.b2bconecta.app://auth-callback
+#
 # Password recovery on web uses PKCE: open the email link in the SAME browser
 # (and same origin) where "Forgot password" was clicked.
 #

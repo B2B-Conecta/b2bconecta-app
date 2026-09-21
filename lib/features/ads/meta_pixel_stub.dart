@@ -1,5 +1,12 @@
 void syncMetaPixel({required bool marketingAllowed}) {}
 
-void trackCompleteRegistration({String? email}) {}
+void trackRegistrationStarted({String? identity}) {}
 
 void trackSubmitApplication({String? userId}) {}
+
+void trackCompleteRegistration({String? email, String? userId}) {}
+
+void trackPurchase({
+  required String orderId,
+  required double valueUsd,
+}) {}

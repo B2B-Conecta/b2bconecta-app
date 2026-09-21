@@ -60,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (widget.startInRegister) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _syncBrowserPath(_AuthMode.register);
+        trackRegistrationStarted();
       });
     }
     _bootstrapReferralFromUrl();
@@ -92,6 +93,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     _syncBrowserPath(mode);
     setState(() => _mode = mode);
+    if (mode == _AuthMode.register) {
+      trackRegistrationStarted();
+    }
   }
 
   Future<void> _bootstrapReferralFromUrl() async {
@@ -201,7 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
         referralCode: referral.isEmpty ? null : referral,
       );
-      trackCompleteRegistration(email: email);
       if (!mounted) return;
       if (res.session != null) {
         _showSnackBar('Cuenta creada. Bienvenido.');
@@ -217,6 +220,33 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e, stackTrace) {
       debugPrint('[signUp] $e\n$stackTrace');
       _showSnackBar('No se pudo completar el registro.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    if (_mode == _AuthMode.register) {
+      trackRegistrationStarted();
+    }
+    setState(() => _isLoading = true);
+    try {
+      final referral =
+          ReferralInviteConfig.normalizeCode(_referralController.text);
+      final launched = await AuthService.signInWithGoogle(
+        referralCode: referral.isEmpty ? null : referral,
+      );
+      if (!launched && mounted) {
+        _showSnackBar('No se pudo abrir Google.', isError: true);
+      }
+    } on AuthException catch (e) {
+      debugPrint('[google] ${e.message}');
+      if (!mounted) return;
+      _showSnackBar(AuthService.mapAuthErrorMessage(e.message), isError: true);
+    } catch (e, stackTrace) {
+      debugPrint('[google] $e\n$stackTrace');
+      if (!mounted) return;
+      _showSnackBar('No se pudo continuar con Google.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -415,6 +445,48 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildGoogleButton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Divider(color: AppColors.borderSubtle)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                'o',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: AppColors.borderSubtle)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: _isLoading ? null : _signInWithGoogle,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            side: BorderSide(color: AppColors.borderSubtle),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text(
+            'Continuar con Google',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFooterLinks() {
     return Column(
       children: [
@@ -579,6 +651,8 @@ class _LoginScreenState extends State<LoginScreen> {
               _buildFormFields(),
               const SizedBox(height: 24),
               _buildPrimaryButton(),
+              const SizedBox(height: 14),
+              _buildGoogleButton(),
               const SizedBox(height: 8),
               _buildFooterLinks(),
             ],

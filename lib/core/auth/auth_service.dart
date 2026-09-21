@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_recovery_storage.dart';
 import 'package:motolink_pro_app/app/config/auth_redirect_config.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
+import 'package:motolink_pro_app/features/referrals/referral_invite_storage.dart';
 
 /// Operaciones de Supabase Auth (login, registro, recuperación, actualización).
 class AuthService {
@@ -60,6 +61,20 @@ class AuthService {
       data: (code != null && code.isNotEmpty)
           ? <String, dynamic>{'referral_code': code}
           : null,
+    );
+  }
+
+  /// Google (web y Android). Requiere proveedor Google en Supabase Auth.
+  static Future<bool> signInWithGoogle({String? referralCode}) async {
+    final code = referralCode?.trim().toUpperCase();
+    if (code != null && code.isNotEmpty) {
+      await ReferralInviteStorage.savePendingCode(code);
+    }
+    return _auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: authRedirectUrl,
+      authScreenLaunchMode:
+          kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
     );
   }
 
@@ -123,6 +138,12 @@ class AuthService {
     if (m.contains('code verifier')) {
       return 'Abre el enlace en el mismo navegador donde solicitaste '
           'la recuperación de contraseña.';
+    }
+    if (m.contains('provider') && m.contains('not') && m.contains('enable')) {
+      return 'El ingreso con Google aún no está habilitado en este entorno.';
+    }
+    if (m.contains('popup') && m.contains('closed')) {
+      return 'Se canceló el ingreso con Google.';
     }
     return raw?.isNotEmpty == true
         ? raw!

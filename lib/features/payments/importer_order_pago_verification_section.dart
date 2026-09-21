@@ -6,6 +6,7 @@ import 'pago_revision_estado.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_order_panel_widgets.dart';
@@ -116,6 +117,14 @@ class _ImporterOrderPagoVerificationSectionState
           nuevoEstado: estado,
           rechazoNota: nota,
         );
+      }
+      if (estado == PagoRevisionEstado.aprobado) {
+        for (final line in _lines) {
+          trackPurchase(
+            orderId: line.id,
+            valueUsd: line.precioTotal,
+          );
+        }
       }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

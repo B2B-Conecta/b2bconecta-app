@@ -4,6 +4,8 @@ import 'dart:html' as html;
 import 'marketing_consent.dart';
 import 'meta_pixel_config.dart';
 
+Future<void> hydrateMarketingConsent() async {}
+
 MarketingConsent readMarketingConsent() {
   final raw = _readCookie(MetaPixelConfig.consentCookieName);
   return MarketingConsentCodec.parse(raw);

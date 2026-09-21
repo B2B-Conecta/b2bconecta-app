@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/core/auth/auth_service.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/kyc_notification_match.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
@@ -68,6 +69,7 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
 
   void _onAccessActive() {
     if (!mounted || _isRejected) return;
+    trackCompleteRegistration(userId: widget.profile.id);
     widget.onRefresh();
   }
 

@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
@@ -9,7 +10,7 @@ import 'marketing_consent.dart';
 import 'marketing_consent_storage.dart';
 import 'meta_pixel.dart';
 
-/// Web: banner de cookies de marketing y carga del Pixel si hay consentimiento.
+/// Banner de cookies de marketing (web y móvil) y carga de Pixel / App Events.
 class MarketingConsentHost extends StatefulWidget {
   const MarketingConsentHost({super.key, required this.child});
 
@@ -25,10 +26,17 @@ class _MarketingConsentHostState extends State<MarketingConsentHost> {
   @override
   void initState() {
     super.initState();
-    _consent = kIsWeb ? readMarketingConsent() : MarketingConsent.denied;
-    if (_consent == MarketingConsent.accepted) {
+    _consent = MarketingConsent.unknown;
+    unawaited(_hydrate());
+  }
+
+  Future<void> _hydrate() async {
+    await hydrateMarketingConsent();
+    final next = readMarketingConsent();
+    if (next == MarketingConsent.accepted) {
       syncMetaPixel(marketingAllowed: true);
     }
+    if (mounted) setState(() => _consent = next);
   }
 
   void _choose(MarketingConsent next) {
@@ -41,7 +49,7 @@ class _MarketingConsentHostState extends State<MarketingConsentHost> {
 
   @override
   Widget build(BuildContext context) {
-    final showBanner = kIsWeb && _consent == MarketingConsent.unknown;
+    final showBanner = _consent == MarketingConsent.unknown;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -99,7 +107,8 @@ class _MarketingCookieBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Usamos cookies de marketing (Meta Pixel) para medir anuncios. '
+                    'Usamos medición de anuncios (Meta) para saber si una '
+                    'campaña trajo una instalación o un registro. '
                     'Las cookies técnicas de sesión no requieren este aviso.',
                     style: TextStyle(
                       fontSize: 13,

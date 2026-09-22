@@ -82,9 +82,11 @@
 	<string>3ae0778f0576122ca57499e962e6a0</string>
 	<key>FacebookDisplayName</key>
 	<string>B2B Conecta</string>
+	<key>FacebookAutoInitEnabled</key>
+	<false/>
 	<key>FacebookAutoLogAppEventsEnabled</key>
-	<true/>
+	<false/>
 	<key>FacebookAdvertiserIDCollectionEnabled</key>
-	<true/>
+	<false/>
 </dict>
 </plist>

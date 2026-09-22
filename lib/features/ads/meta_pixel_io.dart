@@ -68,6 +68,7 @@ Future<void> _log(
 void syncMetaPixel({required bool marketingAllowed}) {
   if (!marketingAllowed || !_sdkReady || _activateSent) return;
   _activateSent = true;
+  unawaited(_fb.setAutoLogAppEventsEnabled(true));
   unawaited(_fb.setAdvertiserTracking(enabled: true));
   unawaited(_fb.logEvent(name: 'fb_mobile_activate_app'));
 }

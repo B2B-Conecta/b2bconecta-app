@@ -27,7 +27,6 @@ void main() async {
   }
   _enableAndroidPhotoPicker();
   await dotenv.load(fileName: '.env');
-  await PushNotificationService.instance.initialize();
   ThemeController.instance.attach();
   await ThemeController.instance.load();
 
@@ -62,6 +61,17 @@ void main() async {
     ),
   );
   runApp(MyApp(launchUri: launchUri));
+  // After first frame: FCM/Play Services can hang on some Androids and
+  // freeze the native splash if awaited here.
+  unawaited(_initPushSafely());
+}
+
+Future<void> _initPushSafely() async {
+  try {
+    await PushNotificationService.instance.initialize();
+  } catch (e, stack) {
+    debugPrint('[push] init skipped: $e\n$stack');
+  }
 }
 
 bool _isLocalSupabaseUrl(String url) {

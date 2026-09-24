@@ -119,11 +119,19 @@ class _ImporterOrderPagoVerificationSectionState
         );
       }
       if (estado == PagoRevisionEstado.aprobado) {
-        for (final line in _lines) {
+        final groupId = _lines.first.checkoutGroupId?.trim();
+        if (groupId != null && groupId.isNotEmpty) {
           trackPurchase(
-            orderId: line.id,
-            valueUsd: line.precioTotal,
+            orderId: groupId,
+            valueUsd: _lines.fold<double>(0, (s, l) => s + l.precioTotal),
           );
+        } else {
+          for (final line in _lines) {
+            trackPurchase(
+              orderId: line.id,
+              valueUsd: line.precioTotal,
+            );
+          }
         }
       }
       if (!context.mounted) return;

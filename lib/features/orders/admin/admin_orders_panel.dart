@@ -24,10 +24,10 @@ import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_actions.dar
 import 'package:motolink_pro_app/features/payments/admin_pago_revision_section.dart';
 import 'package:motolink_pro_app/features/payments/efectivo_respaldo_registrar.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
 
 /// Bandeja admin unificada: pedidos en curso, cerrados o todos, con filtros por estado.
 class AdminOrdersPanel extends StatefulWidget {
@@ -380,14 +380,19 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           title: 'Mensajes',
           subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          child: OrderMotolinkThreadSection(
-            key: ValueKey<String>('trm-admin-${r.id}'),
-            transactionRequestId: r.id,
-            allowReplyAsAliado: false,
-            allowReplyAsAdmin: true,
-            onThreadChanged: _load,
-            suppressBuiltinTitle: true,
-            suppressInlineHelp: true,
+          initiallyExpanded: true,
+          child: OrderOpenChatButton(
+            relatedOrderIds: [r.id],
+            onPressed: () {
+              showOrderChatSheet(
+                context: context,
+                transactionRequestId: r.id,
+                allowReplyAsAliado: false,
+                allowReplyAsAdmin: true,
+                title: 'Chat del pedido',
+                onThreadChanged: _load,
+              );
+            },
           ),
         ),
       ],
@@ -430,14 +435,19 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           title: 'Mensajes',
           subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          child: OrderMotolinkThreadSection(
-            key: ValueKey<String>('trm-admin-closed-${primary.id}'),
-            transactionRequestId: primary.id,
-            allowReplyAsAliado: false,
-            allowReplyAsAdmin: true,
-            onThreadChanged: _load,
-            suppressBuiltinTitle: true,
-            suppressInlineHelp: true,
+          initiallyExpanded: true,
+          child: OrderOpenChatButton(
+            relatedOrderIds: [primary.id],
+            onPressed: () {
+              showOrderChatSheet(
+                context: context,
+                transactionRequestId: primary.id,
+                allowReplyAsAliado: false,
+                allowReplyAsAdmin: true,
+                title: 'Chat del pedido',
+                onThreadChanged: _load,
+              );
+            },
           ),
         ),
       ],

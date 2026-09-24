@@ -67,12 +67,18 @@ class MainShellTabController {
   static void notifyImporterInventoryReload() =>
       _refreshImporterInventory?.call();
 
-  /// [ImporterActiveOrdersPanel] registra [reload] al entrar en la pestaña Pedidos o tras avances.
+  /// [ImporterActiveOrdersPanel] / [AliadoPedidosPanel] registran [reload]
+  /// al entrar en Pedidos o tras confirmar un pedido.
   static void registerImporterPedidosReload(VoidCallback? reload) {
     _refreshImporterPedidos = reload;
   }
 
+  static void registerPedidosReload(VoidCallback? reload) =>
+      registerImporterPedidosReload(reload);
+
   static void notifyImporterPedidosReload() => _refreshImporterPedidos?.call();
+
+  static void notifyPedidosReload() => notifyImporterPedidosReload();
 
   /// Importador y aliado (4 pestañas): Perfil = 3, Reputación = 2.
   static void registerB2BProfileTabIndex(int index) =>

@@ -4,6 +4,8 @@ import 'package:motolink_pro_app/features/profile/profile_location_exception.dar
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'cart_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 
@@ -73,15 +75,23 @@ class _CartScreenState extends State<CartScreen> {
           )
           .toList();
 
-      await SupabaseService.checkoutMultiImportadorCart(
+      final orderId = await SupabaseService.checkoutMultiImportadorCart(
         lines: lines,
         destinoEntregaUsaPerfil: result.useProfile,
         destinoEntregaTexto: result.texto,
         destinoEntregaMapsUrl: result.mapsUrl,
         promoByImportador: _cart.promoAttributionPayloadForCheckout(),
       );
+      final purchaseValue = _cart.totalRef();
+      trackPurchase(
+        orderId: orderId.trim().isNotEmpty
+            ? orderId.trim()
+            : 'checkout-${DateTime.now().millisecondsSinceEpoch}',
+        valueUsd: purchaseValue,
+      );
 
       _cart.clear();
+      MainShellTabController.notifyPedidosReload();
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(

@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_l
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -75,15 +76,15 @@ class AdminExpandableOrderCard extends StatelessWidget {
         children: [
           Material(
             color: Colors.transparent,
-            child: InkWell(
-              onTap: onToggle,
-              child: Padding(
+            child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Column(
+                      child: InkWell(
+                        onTap: onToggle,
+                        child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -197,15 +198,37 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      expanded ? Icons.expand_less : Icons.expand_more,
-                      color: AppColors.textSecondary,
+                    ),
+                    OrderChatIconButton(
+                      relatedOrderIds: lines.map((e) => e.id).toList(),
+                      onOpen: () {
+                        showOrderChatSheet(
+                          context: context,
+                          transactionRequestId: lines.first.id,
+                          mergedThreadRequestIds: isCheckoutGroup
+                              ? lines.map((e) => e.id).toList()
+                              : null,
+                          allowReplyAsAliado: false,
+                          allowReplyAsAdmin: true,
+                          title: 'Chat del pedido',
+                          onThreadChanged: onRequestMutated,
+                        );
+                      },
+                    ),
+                    InkWell(
+                      onTap: onToggle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 2),
+                        child: Icon(
+                          expanded ? Icons.expand_less : Icons.expand_more,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
           if (expanded) ...[
             const Divider(height: 1),
             Padding(

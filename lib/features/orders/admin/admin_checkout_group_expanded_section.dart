@@ -15,7 +15,7 @@ import 'package:motolink_pro_app/features/payments/efectivo_respaldo_registrar.d
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Detalle admin de carrito: un proveedor a la vez (timeline, pago, chat único).
@@ -430,18 +430,21 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
           title: 'Mensajes',
           subtitle: 'Hilo con tienda minorista, importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          child: OrderMotolinkThreadSection(
-            key: ValueKey<String>(
-              'trm-admin-grp-${anchor.ownerId}-${chunk.map((e) => e.id).join("-")}',
-            ),
-            transactionRequestId: anchor.id,
-            mergedThreadRequestIds:
-                chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
-            allowReplyAsAliado: false,
-            allowReplyAsAdmin: true,
-            onThreadChanged: onRefresh,
-            suppressBuiltinTitle: true,
-            suppressInlineHelp: true,
+          initiallyExpanded: true,
+          child: OrderOpenChatButton(
+            relatedOrderIds: chunk.map((e) => e.id).toList(),
+            onPressed: () {
+              showOrderChatSheet(
+                context: context,
+                transactionRequestId: anchor.id,
+                mergedThreadRequestIds:
+                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
+                allowReplyAsAliado: false,
+                allowReplyAsAdmin: true,
+                title: 'Chat del pedido',
+                onThreadChanged: onRefresh,
+              );
+            },
           ),
         ),
       ],

@@ -8,6 +8,7 @@ import 'profile_setup_screen.dart';
 import 'account_locked_screen.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
 /// Tras login: carga `profiles` y muestra onboarding o [MainShell].
@@ -20,6 +21,7 @@ class ProfileGate extends StatefulWidget {
 
 class _ProfileGateState extends State<ProfileGate> {
   late Future<ProfileModel?> _profileFuture;
+  ProfileModel? _lastProfile;
 
   @override
   void initState() {
@@ -31,6 +33,16 @@ class _ProfileGateState extends State<ProfileGate> {
     setState(() {
       _profileFuture = SupabaseService.fetchMyProfile();
     });
+  }
+
+  void _maybeTrackCompleteRegistration(ProfileModel? profile) {
+    final prev = _lastProfile;
+    _lastProfile = profile;
+    if (prev == null || profile == null) return;
+    if (prev.hasActiveAccountAccess) return;
+    if (!profile.hasActiveAccountAccess) return;
+    if (!profile.isAliado && !profile.isImportador) return;
+    trackCompleteRegistration(userId: profile.id);
   }
 
   AppHomeRole _homeRoleFor(ProfileModel profile) {
@@ -110,6 +122,7 @@ class _ProfileGateState extends State<ProfileGate> {
         }
 
         final profile = snapshot.data;
+        _maybeTrackCompleteRegistration(profile);
 
         if (profile == null || !profile.hasValidAppRole) {
           return ProfileSetupScreen(

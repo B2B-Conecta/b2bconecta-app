@@ -530,8 +530,9 @@ class _MainShellState extends State<MainShell> {
 
   void _onB2bTabSelected(int i, AppHomeRole role) {
     setState(() => _tabIndex = i);
-    if (role == AppHomeRole.importador && i == 1) {
-      MainShellTabController.notifyImporterPedidosReload();
+    if (i == 1 &&
+        (role == AppHomeRole.importador || role == AppHomeRole.aliado)) {
+      MainShellTabController.notifyPedidosReload();
     }
     if (i == 2 || (role == AppHomeRole.aliado && i == 3)) {
       unawaited(_refreshProfile());

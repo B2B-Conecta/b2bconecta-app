@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'transaction_request_message_model.dart';
+import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
@@ -183,7 +184,9 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = isJwtIssuedAtFutureError(e)
+            ? 'El reloj local y Supabase no coinciden. Cierra el chat y ábrelo de nuevo en unos segundos.'
+            : e.toString();
         _loading = false;
       });
     }

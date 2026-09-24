@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/payments/payments_service.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
@@ -999,18 +1000,20 @@ class OrdersService {
       fetchTransactionRequestMessages(String transactionRequestId) async {
     if (transactionRequestId.isEmpty) return [];
 
-    final response = await SupabaseAccess.client
-        .from('transaction_request_messages')
-        .select(_trMessagesSelect)
-        .eq('transaction_request_id', transactionRequestId)
-        .order('created_at', ascending: true);
+    return retryOnJwtIssuedAtFuture(() async {
+      final response = await SupabaseAccess.client
+          .from('transaction_request_messages')
+          .select(_trMessagesSelect)
+          .eq('transaction_request_id', transactionRequestId)
+          .order('created_at', ascending: true);
 
-    final list = response as List<dynamic>;
-    return list
-        .map((row) => TransactionRequestMessageModel.fromJson(
-              Map<String, dynamic>.from(row as Map),
-            ))
-        .toList();
+      final list = response as List<dynamic>;
+      return list
+          .map((row) => TransactionRequestMessageModel.fromJson(
+                Map<String, dynamic>.from(row as Map),
+              ))
+          .toList();
+    });
   }
 
   /// Mensajes de varias líneas del mismo carrito/importador, ordenados por fecha.
@@ -1026,6 +1029,7 @@ class OrdersService {
     if (ids.length == 1) {
       return fetchTransactionRequestMessages(ids.single);
     }
+    return retryOnJwtIssuedAtFuture(() async {
     final response = await SupabaseAccess.client
         .from('transaction_request_messages')
         .select(_trMessagesSelect)
@@ -1040,6 +1044,7 @@ class OrdersService {
           ),
         )
         .toList();
+    });
   }
 
   /// Un canal Realtime por solicitud; desuscribir cada uno con [SupabaseAccess.unsubscribeChannel].
@@ -1070,11 +1075,13 @@ class OrdersService {
     final t = body.trim();
     if (t.isEmpty) return;
 
-    await SupabaseAccess.client.from('transaction_request_messages').insert({
-      'transaction_request_id': transactionRequestId,
-      'author_id': uid,
-      'author_role': 'importador',
-      'body': t,
+    await retryOnJwtIssuedAtFuture(() {
+      return SupabaseAccess.client.from('transaction_request_messages').insert({
+        'transaction_request_id': transactionRequestId,
+        'author_id': uid,
+        'author_role': 'importador',
+        'body': t,
+      });
     });
   }
 
@@ -1087,11 +1094,13 @@ class OrdersService {
     final t = body.trim();
     if (t.isEmpty) return;
 
-    await SupabaseAccess.client.from('transaction_request_messages').insert({
-      'transaction_request_id': transactionRequestId,
-      'author_id': uid,
-      'author_role': 'aliado',
-      'body': t,
+    await retryOnJwtIssuedAtFuture(() {
+      return SupabaseAccess.client.from('transaction_request_messages').insert({
+        'transaction_request_id': transactionRequestId,
+        'author_id': uid,
+        'author_role': 'aliado',
+        'body': t,
+      });
     });
   }
 
@@ -1104,11 +1113,13 @@ class OrdersService {
     final t = body.trim();
     if (t.isEmpty) return;
 
-    await SupabaseAccess.client.from('transaction_request_messages').insert({
-      'transaction_request_id': transactionRequestId,
-      'author_id': uid,
-      'author_role': 'administrador',
-      'body': t,
+    await retryOnJwtIssuedAtFuture(() {
+      return SupabaseAccess.client.from('transaction_request_messages').insert({
+        'transaction_request_id': transactionRequestId,
+        'author_id': uid,
+        'author_role': 'administrador',
+        'body': t,
+      });
     });
   }
 

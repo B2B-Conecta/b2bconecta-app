@@ -31,7 +31,7 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
@@ -75,6 +75,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     super.initState();
     _searchCtrl = TextEditingController();
     _searchCtrl.addListener(_onSearchTextChanged);
+    MainShellTabController.registerPedidosReload(
+      () => _load(silent: true),
+    );
     MainShellTabController.registerPedidosNotificationDeepLink(
       _onNotificationPedidosDeepLink,
     );
@@ -83,6 +86,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   @override
   void dispose() {
+    MainShellTabController.registerPedidosReload(null);
     MainShellTabController.registerPedidosNotificationDeepLink(null);
     _searchCtrl.dispose();
     super.dispose();
@@ -722,14 +726,22 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             title: 'Mensajes',
             subtitle: 'Hilo con el importador y B2B Conecta',
             infoMessage: OrderSectionHelp.chatPedido,
-            child: OrderMotolinkThreadSection(
-              key: ValueKey<String>('trm-tienda minorista-${r.id}'),
-              transactionRequestId: r.id,
-              allowReplyAsAliado: _esEnCurso(r.status),
-              allowReplyAsAdmin: false,
-              onThreadChanged: _refreshExpandedCard,
-              suppressBuiltinTitle: true,
-              suppressInlineHelp: true,
+            initiallyExpanded: true,
+            child: OrderOpenChatButton(
+              relatedOrderIds: [r.id],
+              onPressed: () {
+                final counterpart = r.ownerBusinessName?.trim();
+                showOrderChatSheet(
+                  context: context,
+                  transactionRequestId: r.id,
+                  allowReplyAsAliado: _esEnCurso(r.status),
+                  allowReplyAsAdmin: false,
+                  title: (counterpart != null && counterpart.isNotEmpty)
+                      ? 'Chat · $counterpart'
+                      : 'Chat del pedido',
+                  onThreadChanged: _refreshExpandedCard,
+                );
+              },
             ),
           ),
         ],
@@ -882,20 +894,24 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ? OrderActionsFlowCopy.carritoChatImportador(chunk.first.ownerBusinessName)
               : 'Hilo con el importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          child: OrderMotolinkThreadSection(
-            key: ValueKey<String>(
-              chunk.length > 1
-                  ? 'trm-tienda minorista-merge-${chunk.first.ownerId}-${chunk.map((e) => e.id).join("-")}'
-                  : 'trm-tienda minorista-${chunk.single.id}',
-            ),
-            transactionRequestId: chunk.first.id,
-            mergedThreadRequestIds:
-                chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
-            allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
-            allowReplyAsAdmin: false,
-            onThreadChanged: _refreshExpandedCard,
-            suppressBuiltinTitle: true,
-            suppressInlineHelp: true,
+          initiallyExpanded: true,
+          child: OrderOpenChatButton(
+            relatedOrderIds: chunk.map((e) => e.id).toList(),
+            onPressed: () {
+              final counterpart = chunk.first.ownerBusinessName?.trim();
+              showOrderChatSheet(
+                context: context,
+                transactionRequestId: chunk.first.id,
+                mergedThreadRequestIds:
+                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
+                allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
+                allowReplyAsAdmin: false,
+                title: (counterpart != null && counterpart.isNotEmpty)
+                    ? 'Chat · $counterpart'
+                    : 'Chat del pedido',
+                onThreadChanged: _refreshExpandedCard,
+              );
+            },
           ),
         ),
       ],
@@ -1080,6 +1096,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 bundleCheckoutGroupId: cgForBundle,
               )
           : null,
+      onChatChanged: _refreshExpandedCard,
     );
   }
 

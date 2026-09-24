@@ -12,7 +12,7 @@ import 'importer_aliado_solicitud_section.dart';
 import 'importer_order_date_badge.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
@@ -119,11 +119,15 @@ class ImporterExpandableOrderCard extends StatelessWidget {
             color: expanded
                 ? AppColors.surfaceTinted.withOpacity(0.55)
                 : Colors.transparent,
-            child: InkWell(
-              onTap: onToggle,
-              child: Padding(
+            child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-                child: Column(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: onToggle,
+                        child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -137,11 +141,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         OrderStatusHeaderChips(
                           statusLabel: statusLabel,
                           showMoroso: anyPagoPendienteTrasEntrega,
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          expanded ? Icons.expand_less : Icons.expand_more,
-                          color: AppColors.textSecondary,
                         ),
                       ],
                     ),
@@ -268,8 +267,25 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                     ],
                   ],
                 ),
+                      ),
+                    ),
+                    OrderChatIconButton(
+                      relatedOrderIds: lines.map((e) => e.id).toList(),
+                      onOpen: () => _openChat(context, lines, isCheckoutGroup),
+                    ),
+                    InkWell(
+                      onTap: onToggle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2, left: 2),
+                        child: Icon(
+                          expanded ? Icons.expand_less : Icons.expand_more,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ),
           if (ratingBar != null) ratingBar!,
           if (nextStatus != null &&
@@ -469,28 +485,11 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         OrderCardCollapsibleSection(
                           title: 'Mensajes',
                           subtitle: 'Chat con la tienda minorista',
-                          child: OrderMotolinkThreadSection(
-                            key: ValueKey<String>(
-                              isCheckoutGroup
-                                  ? 'trm-imp-merge-${lines.map((e) => e.id).join("-")}'
-                                  : 'trm-imp-${r.id}',
-                            ),
-                            transactionRequestId: lines.first.id,
-                            mergedThreadRequestIds: isCheckoutGroup
-                                ? lines.map((e) => e.id).toList()
-                                : null,
-                            allowReplyAsAliado: false,
-                            allowReplyAsAdmin: false,
-                            allowReplyAsImportador: lines.any(
-                              (l) =>
-                                  l.status !=
-                                      TransactionRequestStatus.entregado &&
-                                  l.status !=
-                                      TransactionRequestStatus.rechazado,
-                            ),
-                            onThreadChanged: onThreadChanged,
-                            suppressBuiltinTitle: true,
-                            suppressInlineHelp: true,
+                          initiallyExpanded: true,
+                          child: OrderOpenChatButton(
+                            relatedOrderIds: lines.map((e) => e.id).toList(),
+                            onPressed: () =>
+                                _openChat(context, lines, isCheckoutGroup),
                           ),
                         ),
                         if (expandedFooter != null) ...[
@@ -516,6 +515,25 @@ class ImporterExpandableOrderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _openChat(
+    BuildContext context,
+    List<TransactionRequestModel> lines,
+    bool isCheckoutGroup,
+  ) {
+    final shop = lines.first.aliadoBusinessName?.trim();
+    showOrderChatSheet(
+      context: context,
+      transactionRequestId: lines.first.id,
+      mergedThreadRequestIds:
+          isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+      allowReplyAsAliado: false,
+      allowReplyAsAdmin: false,
+      allowReplyAsImportador: lines.any((l) => orderChatReplyOpen(l.status)),
+      title: (shop != null && shop.isNotEmpty) ? 'Chat · $shop' : 'Chat del pedido',
+      onThreadChanged: onThreadChanged,
     );
   }
 }

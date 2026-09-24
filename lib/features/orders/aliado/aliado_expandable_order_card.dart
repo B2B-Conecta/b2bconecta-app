@@ -19,6 +19,7 @@ import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 
 /// Ficha compacta para aliado: resumen y detalle con importador y ciclo del envío.
 class AliadoExpandableOrderCard extends StatelessWidget {
@@ -36,6 +37,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     this.multiImporterPanelBuilder,
     this.ratingBar,
     this.collapsedAccessory,
+    this.onChatChanged,
   });
 
   final TransactionRequestModel request;
@@ -59,6 +61,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
 
   /// Acciones visibles sin expandir (p. ej. aceptar/rechazar ajuste de cantidad).
   final Widget? collapsedAccessory;
+
+  /// Tras enviar o recibir un mensaje desde el chat.
+  final VoidCallback? onChatChanged;
 
   /// Carrito multi-importador: factura, pago y mensajes por proveedor (pestañas).
   final Widget Function(
@@ -128,15 +133,15 @@ class AliadoExpandableOrderCard extends StatelessWidget {
         children: [
           Material(
             color: Colors.transparent,
-            child: InkWell(
-              onTap: onToggle,
-              child: Padding(
+            child: Padding(
                 padding: density.cardHeaderPadding,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Column(
+                      child: InkWell(
+                        onTap: onToggle,
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
@@ -295,16 +300,45 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      expanded ? Icons.expand_less : Icons.expand_more,
-                      size: density.isDesktop ? 20 : 24,
-                      color: AppColors.textSecondary,
+                    ),
+                    OrderChatIconButton(
+                      relatedOrderIds: lines.map((e) => e.id).toList(),
+                      onOpen: () {
+                        final counterpart =
+                            lines.first.ownerBusinessName?.trim();
+                        showOrderChatSheet(
+                          context: context,
+                          transactionRequestId: lines.first.id,
+                          mergedThreadRequestIds: isCheckoutGroup
+                              ? lines.map((e) => e.id).toList()
+                              : null,
+                          allowReplyAsAliado: lines.any(
+                            (l) => TransactionRequestStatus.aliadoPedidosEnCurso
+                                .contains(l.status),
+                          ),
+                          allowReplyAsAdmin: false,
+                          title: (counterpart != null && counterpart.isNotEmpty)
+                              ? 'Chat · $counterpart'
+                              : 'Chat del pedido',
+                          onThreadChanged: onChatChanged,
+                        );
+                      },
+                    ),
+                    InkWell(
+                      onTap: onToggle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 2),
+                        child: Icon(
+                          expanded ? Icons.expand_less : Icons.expand_more,
+                          size: density.isDesktop ? 20 : 24,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
           if (ratingBar != null) ratingBar!,
           if (collapsedAccessory != null) ...[
             Padding(

@@ -11,7 +11,9 @@ import 'kyc_notification_match.dart';
 class NotificationProvider extends ChangeNotifier {
   NotificationProvider({
     required this.homeRole,
-  });
+  }) {
+    active = this;
+  }
 
   final AppHomeRole homeRole;
 
@@ -20,10 +22,33 @@ class NotificationProvider extends ChangeNotifier {
   bool _loading = false;
   bool _ready = false;
 
+  /// Instancia del shell (badges de chat en Pedidos / modal).
+  static NotificationProvider? active;
+
   List<InAppNotificationModel> get items => List<InAppNotificationModel>.unmodifiable(_items);
   bool get isLoading => _loading;
   bool get isReady => _ready;
   int get unreadCount => _items.where((n) => !n.isRead).length;
+
+  int unreadMensajeCountFor(Iterable<String> relatedIds) {
+    return unreadMensajeCount(items: _items, relatedIds: relatedIds);
+  }
+
+  static int unreadMensajeCount({
+    required Iterable<InAppNotificationModel> items,
+    required Iterable<String> relatedIds,
+  }) {
+    final ids = relatedIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    if (ids.isEmpty) return 0;
+    return items.where((n) {
+      if (n.isRead || n.type.trim() != 'mensaje') return false;
+      final rid = n.relatedId?.trim();
+      return rid != null && ids.contains(rid);
+    }).length;
+  }
 
   Future<void> start() async {
     if (_ready) return;
@@ -175,6 +200,9 @@ class NotificationProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (identical(active, this)) {
+      active = null;
+    }
     SupabaseService.unsubscribeChannel(_channel);
     _channel = null;
     super.dispose();

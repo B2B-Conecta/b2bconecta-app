@@ -48,6 +48,9 @@ class ProfileModel {
     this.acceptedPagoMetodos,
     this.pagoMetodoInstrucciones = const {},
     this.pagoSoloDivisas = false,
+    this.minOrderAmountRef = 0,
+    this.minOrderCurrency = 'ref',
+    this.catalogFeaturedUntil,
     this.referralCode,
     this.referredByProfileId,
     this.referredByExternalId,
@@ -168,6 +171,22 @@ class ProfileModel {
 
   /// Importador: solo pagos en divisas/USD; sin descuento línea USD en productos.
   final bool pagoSoloDivisas;
+
+  /// Piso de compra por importador en REF (`profiles.min_order_amount_ref`). 0 = sin mínimo.
+  final double minOrderAmountRef;
+
+  /// Presentación del piso: `ref` o `usd` (`profiles.min_order_currency`).
+  final String minOrderCurrency;
+
+  /// Destacado manual en catálogo (`profiles.catalog_featured_until`).
+  final DateTime? catalogFeaturedUntil;
+
+  bool get hasMinOrderAmount => minOrderAmountRef > 0;
+
+  bool get isCatalogFeatured {
+    final until = catalogFeaturedUntil;
+    return until != null && until.isAfter(DateTime.now());
+  }
 
   /// Legado: códigos en perfiles ya no se generan (solo vendedores externos).
   final String? referralCode;
@@ -355,6 +374,9 @@ class ProfileModel {
       acceptedPagoMetodos: acceptedPagoMetodos,
       pagoMetodoInstrucciones: pagoMetodoInstrucciones,
       pagoSoloDivisas: pagoSoloDivisas,
+      minOrderAmountRef: minOrderAmountRef,
+      minOrderCurrency: minOrderCurrency,
+      catalogFeaturedUntil: catalogFeaturedUntil,
       referralCode: referralCode,
       referredByProfileId: referredByProfileId,
       referredByExternalId: referredByExternalId,
@@ -469,6 +491,11 @@ class ProfileModel {
       pagoMetodoInstrucciones:
           PagoMetodoInstrucciones.parseMap(json['pago_metodo_instrucciones']),
       pagoSoloDivisas: _parseBool(json['pago_solo_divisas']),
+      minOrderAmountRef: _asDoubleNullable(json['min_order_amount_ref']) ?? 0,
+      minOrderCurrency: _text(json['min_order_currency']) ?? 'ref',
+      catalogFeaturedUntil: json['catalog_featured_until'] != null
+          ? DateTime.tryParse(json['catalog_featured_until'].toString())
+          : null,
       referralCode: _text(json['referral_code']),
       referredByProfileId: _text(json['referred_by_profile_id']),
       referredByExternalId: _text(json['referred_by_external_id']),

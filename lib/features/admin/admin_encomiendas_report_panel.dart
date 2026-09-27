@@ -14,6 +14,7 @@ import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'admin_product_sales_ranking.dart';
+import 'admin_catalog_featured_section.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 
@@ -71,12 +72,16 @@ class _AdminEncomiendasReportPanelState
   }
 
   Future<void> _bootstrap() async {
+    await _reloadImporters();
+    await _load();
+  }
+
+  Future<void> _reloadImporters() async {
     try {
       final imp = await SupabaseService.fetchImporterOptions();
       if (!mounted) return;
       setState(() => _importers = imp);
     } catch (_) {}
-    await _load();
   }
 
   @override
@@ -1132,6 +1137,8 @@ class _AdminEncomiendasReportPanelState
                   padding: EdgeInsets.fromLTRB(16, mobile ? 8 : 0, 16, 24),
                   children: [
                     _buildCompactFiltersCard(),
+                    const SizedBox(height: 10),
+                    const AdminCatalogFeaturedSection(),
                     const SizedBox(height: 10),
                     Material(
                       color: AppColors.surfaceTinted,

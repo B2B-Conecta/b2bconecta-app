@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/features/catalog/catalog_sort_mode.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
+import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/core/utils/haversine.dart';
 
 class CatalogService {
@@ -17,7 +18,7 @@ class CatalogService {
     return retryOnJwtIssuedAtFuture(() async {
     final response = await SupabaseAccess.client
         .from('profiles')
-        .select('id, business_name, estado, ciudad')
+        .select('id, business_name, estado, ciudad, catalog_featured_until')
         .eq('role', 'importador')
         .order('business_name', ascending: true);
     final list = response as List<dynamic>;
@@ -31,6 +32,9 @@ class CatalogService {
             businessName: name,
             estado: m['estado']?.toString(),
             ciudad: m['ciudad']?.toString(),
+            catalogFeaturedUntil: m['catalog_featured_until'] != null
+                ? DateTime.tryParse(m['catalog_featured_until'].toString())
+                : null,
           );
         })
         .where((o) => o.id.isNotEmpty && o.businessName.isNotEmpty)
@@ -90,7 +94,7 @@ class CatalogService {
 
   static String _catalogProfileSelect(CatalogFilters filters) {
     const rep =
-        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d';
+        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d, min_order_amount_ref, min_order_currency, catalog_featured_until';
     return _catalogNeedsProfileInner(filters)
         ? 'profiles!inner(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)'
         : 'profiles(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
@@ -120,6 +124,37 @@ class CatalogService {
             ))
         .where((c) => c.id.isNotEmpty)
         .toList();
+  }
+
+  static Future<List<ImporterSalesSnapshot>>
+      adminListImporterSalesSnapshots({int days = 30}) async {
+    final res = await SupabaseAccess.client.rpc(
+      'admin_list_importer_sales_snapshots',
+      params: <String, dynamic>{'p_days': days},
+    );
+    final list = SupabaseAccess.decodeRpcJsonArray(res);
+    return list
+        .whereType<Map>()
+        .map((e) => ImporterSalesSnapshot.fromJson(
+              Map<String, dynamic>.from(e),
+            ))
+        .toList();
+  }
+
+  /// Admin: destaca un importador 7/15/30 días, o 0 para quitar.
+  static Future<DateTime?> adminSetImporterCatalogFeatured({
+    required String importadorId,
+    required int days,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'admin_set_importer_catalog_featured',
+      params: <String, dynamic>{
+        'p_importador_id': importadorId,
+        'p_days': days,
+      },
+    );
+    if (res == null) return null;
+    return DateTime.tryParse(res.toString());
   }
 
   /// Vallas publicitarias de terceros visibles para importadores.

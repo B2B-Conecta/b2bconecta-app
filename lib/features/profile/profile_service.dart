@@ -141,6 +141,8 @@ class ProfileService {
     String? legalContactName,
     String? legalContactEmail,
     String? legalContactPhone,
+    double? minOrderAmountRef,
+    String? minOrderCurrency,
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) {
@@ -180,6 +182,10 @@ class ProfileService {
       payload['legal_contact_name'] = (ln == null || ln.isEmpty) ? null : ln;
       payload['legal_contact_email'] = (le == null || le.isEmpty) ? null : le;
       payload['legal_contact_phone'] = (lp == null || lp.isEmpty) ? null : lp;
+      final minRef = minOrderAmountRef ?? 0;
+      payload['min_order_amount_ref'] = minRef < 0 ? 0 : minRef;
+      final cur = (minOrderCurrency ?? 'ref').trim().toLowerCase();
+      payload['min_order_currency'] = cur == 'usd' ? 'usd' : 'ref';
     }
 
     final fmu = normalizeHttpUrl(fiscalMapsUrl);

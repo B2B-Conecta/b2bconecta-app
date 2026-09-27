@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'importer_min_order.dart';
 
 /// Línea del carrito del aliado (solo en memoria hasta confirmar checkout).
 class CartLine {
@@ -166,11 +167,11 @@ class CartService extends ChangeNotifier {
   }
 
   /// Suma en REF (fuente de verdad); BS solo en UI con tasa.
-  double totalRef() {
-    var s = 0.0;
-    for (final l in _lines) {
-      s += l.precioUnitarioAliadoRef * l.quantity;
-    }
-    return s;
-  }
+  double totalRef() => cartLinesSubtotalRef(_lines);
+
+  List<ImporterMinOrderProgress> importerMinOrderProgress() =>
+      importerMinOrderProgressFor(linesGroupedByImporterName.entries);
+
+  bool get meetsAllImporterMinOrders =>
+      importerMinOrderProgress().every((e) => e.meets);
 }

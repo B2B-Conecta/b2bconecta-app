@@ -19,6 +19,7 @@ import 'package:motolink_pro_app/features/commissions/importer_commission_volume
 import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_mapping.dart';
 import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_result.dart';
 import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dart';
+import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/features/inventory/inventory_service.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
 import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_flag.dart';
@@ -54,6 +55,8 @@ export 'package:motolink_pro_app/core/notifications/notifications_service.dart'
     show NotificationOrderSummary;
 export 'package:motolink_pro_app/features/inventory/inventory_service.dart'
     show InventoryMetrics;
+export 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart'
+    show ImporterSalesSnapshot, ImporterSalesProductPage;
 
 /// Compatibility facade. New code should call the domain service directly
 /// (`OrdersService`, `CatalogService`, …). Existing `SupabaseService.*` calls
@@ -166,6 +169,8 @@ class SupabaseService {
     String? legalContactName,
     String? legalContactEmail,
     String? legalContactPhone,
+    double? minOrderAmountRef,
+    String? minOrderCurrency,
   }) =>
       ProfileService.upsertMyProfile(
           businessName: businessName,
@@ -178,7 +183,9 @@ class SupabaseService {
           fiscalMapsUrl: fiscalMapsUrl,
           legalContactName: legalContactName,
           legalContactEmail: legalContactEmail,
-          legalContactPhone: legalContactPhone);
+          legalContactPhone: legalContactPhone,
+          minOrderAmountRef: minOrderAmountRef,
+          minOrderCurrency: minOrderCurrency);
 
   static String profileSaveErrorMessage(Object error) =>
       ProfileService.profileSaveErrorMessage(error);
@@ -242,6 +249,37 @@ class SupabaseService {
 
   static Future<InventoryMetrics> fetchMyInventoryMetrics() =>
       InventoryService.fetchMyInventoryMetrics();
+
+  static Future<ImporterSalesSnapshot> fetchMySalesSnapshot({int days = 30}) =>
+      InventoryService.fetchMySalesSnapshot(days: days);
+
+  static Future<ImporterSalesProductPage> fetchMySalesProductPage({
+    required String kind,
+    int days = 30,
+    String? search,
+    int limit = 25,
+    int offset = 0,
+  }) =>
+      InventoryService.fetchMySalesProductPage(
+        kind: kind,
+        days: days,
+        search: search,
+        limit: limit,
+        offset: offset,
+      );
+
+  static Future<DateTime?> adminSetImporterCatalogFeatured({
+    required String importadorId,
+    required int days,
+  }) =>
+      CatalogService.adminSetImporterCatalogFeatured(
+        importadorId: importadorId,
+        days: days,
+      );
+
+  static Future<List<ImporterSalesSnapshot>>
+      adminListImporterSalesSnapshots({int days = 30}) =>
+          CatalogService.adminListImporterSalesSnapshots(days: days);
 
   static Future<List<PartModel>> fetchMyInventory({
     int limit = 200,

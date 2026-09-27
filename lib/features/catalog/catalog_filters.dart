@@ -148,12 +148,19 @@ class ImporterOption {
     required this.businessName,
     this.estado,
     this.ciudad,
+    this.catalogFeaturedUntil,
   });
 
   final String id;
   final String businessName;
   final String? estado;
   final String? ciudad;
+  final DateTime? catalogFeaturedUntil;
+
+  bool get isCatalogFeatured {
+    final until = catalogFeaturedUntil;
+    return until != null && until.isAfter(DateTime.now());
+  }
 
   /// Línea corta para tooltip (ubicación del proveedor).
   String get ubicacionLine {

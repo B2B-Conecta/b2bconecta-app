@@ -4,6 +4,7 @@ import 'package:motolink_pro_app/features/payments/broker_pricing.dart';
 import 'product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 import 'package:motolink_pro_app/features/inventory/product_volume_tiers.dart';
+import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 
 /// Modelo de repuesto. Los datos provienen de la tabla Supabase `products`
 /// (`owner_id` → `profiles.id`).
@@ -32,6 +33,9 @@ class PartModel {
     this.ownerRatingAvg,
     this.ownerRatingCount,
     this.ownerCatalogPaidOrders30d,
+    this.ownerMinOrderAmountRef = 0,
+    this.ownerMinOrderCurrency = MinOrderCurrency.ref,
+    this.ownerCatalogFeaturedUntil,
     this.salePriceUsd,
     this.discountRules,
     this.ownerPagoSoloDivisas = false,
@@ -91,6 +95,25 @@ class PartModel {
 
   /// Pedidos pagados confirmados por el importador en ventana E1 (`profiles.catalog_paid_orders_30d`).
   final int? ownerCatalogPaidOrders30d;
+
+  /// Piso de compra del importador en REF (`profiles.min_order_amount_ref`).
+  final double ownerMinOrderAmountRef;
+
+  /// Presentación del piso (`profiles.min_order_currency`).
+  final MinOrderCurrency ownerMinOrderCurrency;
+
+  /// Destacado manual (`profiles.catalog_featured_until`).
+  final DateTime? ownerCatalogFeaturedUntil;
+
+  bool get isCatalogFeatured {
+    final until = ownerCatalogFeaturedUntil;
+    return until != null && until.isAfter(DateTime.now());
+  }
+
+  bool get hasOwnerMinOrderAmount => ownerMinOrderAmountRef > 0;
+
+  String get ownerMinOrderAmountLabelEs =>
+      'Pedido mín. ${formatMinOrderAmount(ownerMinOrderAmountRef, ownerMinOrderCurrency)}';
 
   /// E4: precio mayorista promocional USD (`products.sale_price_usd`).
   final double? salePriceUsd;
@@ -160,6 +183,9 @@ class PartModel {
     final ownerLatLng = _ownerLatLngFromProfiles(json['profiles']);
     final rep = _ownerReputationFromProfiles(json['profiles']);
     final boost = _ownerCatalogBoostFromProfiles(json['profiles']);
+    final minOrder = _ownerMinOrderAmountFromProfiles(json['profiles']);
+    final minCurrency = _ownerMinOrderCurrencyFromProfiles(json['profiles']);
+    final featuredUntil = _ownerFeaturedUntilFromProfiles(json['profiles']);
     final soloDivisas = _ownerPagoSoloDivisasFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
@@ -184,6 +210,9 @@ class PartModel {
       ownerRatingAvg: rep.$1,
       ownerRatingCount: rep.$2,
       ownerCatalogPaidOrders30d: boost,
+      ownerMinOrderAmountRef: minOrder,
+      ownerMinOrderCurrency: minCurrency,
+      ownerCatalogFeaturedUntil: featuredUntil,
       ownerPagoSoloDivisas: soloDivisas,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
@@ -231,6 +260,9 @@ class PartModel {
     double? ownerRatingAvg,
     int? ownerRatingCount,
     int? ownerCatalogPaidOrders30d,
+    double? ownerMinOrderAmountRef,
+    MinOrderCurrency? ownerMinOrderCurrency,
+    DateTime? ownerCatalogFeaturedUntil,
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     bool? ownerPagoSoloDivisas,
@@ -264,6 +296,12 @@ class PartModel {
       ownerRatingCount: ownerRatingCount ?? this.ownerRatingCount,
       ownerCatalogPaidOrders30d:
           ownerCatalogPaidOrders30d ?? this.ownerCatalogPaidOrders30d,
+      ownerMinOrderAmountRef:
+          ownerMinOrderAmountRef ?? this.ownerMinOrderAmountRef,
+      ownerMinOrderCurrency:
+          ownerMinOrderCurrency ?? this.ownerMinOrderCurrency,
+      ownerCatalogFeaturedUntil:
+          ownerCatalogFeaturedUntil ?? this.ownerCatalogFeaturedUntil,
       salePriceUsd: salePriceUsd ?? this.salePriceUsd,
       discountRules: discountRules ?? this.discountRules,
       ownerPagoSoloDivisas:
@@ -282,6 +320,37 @@ class PartModel {
   static Map<String, dynamic>? _discountRulesFromJson(dynamic raw) {
     if (raw == null) return null;
     if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  static double _ownerMinOrderAmountFromProfiles(dynamic profiles) {
+    final m = _profilesMap(profiles);
+    if (m == null) return 0;
+    final v = m['min_order_amount_ref'];
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  static MinOrderCurrency _ownerMinOrderCurrencyFromProfiles(dynamic profiles) {
+    final m = _profilesMap(profiles);
+    if (m == null) return MinOrderCurrency.ref;
+    return MinOrderCurrency.parse(m['min_order_currency']?.toString());
+  }
+
+  static DateTime? _ownerFeaturedUntilFromProfiles(dynamic profiles) {
+    final m = _profilesMap(profiles);
+    if (m == null) return null;
+    final raw = m['catalog_featured_until'];
+    if (raw == null) return null;
+    return DateTime.tryParse(raw.toString());
+  }
+
+  static Map<String, dynamic>? _profilesMap(dynamic profiles) {
+    if (profiles == null) return null;
+    if (profiles is Map) return Map<String, dynamic>.from(profiles);
+    if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+      return Map<String, dynamic>.from(profiles.first as Map);
+    }
     return null;
   }
 

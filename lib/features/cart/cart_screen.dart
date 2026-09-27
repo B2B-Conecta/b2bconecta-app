@@ -8,6 +8,8 @@ import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'importer_min_order.dart';
+import 'min_order_currency.dart';
 
 /// Carrito multi-importador: agrupa por importador y confirma un solo pedido maestro.
 class CartScreen extends StatefulWidget {
@@ -52,7 +54,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _checkout() async {
-    if (_cart.isEmpty || _submitting) return;
+    if (_cart.isEmpty || _submitting || !_cart.meetsAllImporterMinOrders) {
+      return;
+    }
 
     final result = await showDialog<_DestinoEntregaResult?>(
       context: context,
@@ -110,7 +114,10 @@ class _CartScreenState extends State<CartScreen> {
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('$e')),
+        SnackBar(
+          content: Text(cartMinOrderErrorMessage(e) ?? '$e'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -126,11 +133,24 @@ class _CartScreenState extends State<CartScreen> {
     return false;
   }
 
+  ImporterMinOrderProgress? _progressFor(List<CartLine> lines) {
+    final name = lines.isEmpty
+        ? ''
+        : (lines.first.part.ownerBusinessName?.trim().isNotEmpty == true
+            ? lines.first.part.ownerBusinessName!.trim()
+            : 'Importador');
+    final matches = _cart
+        .importerMinOrderProgress()
+        .where((e) => e.importerName == name);
+    return matches.isEmpty ? null : matches.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasa = _tasa;
     final totalRef = _cart.totalRef();
     final totalBs = tasa != null ? totalRef * tasa : null;
+    final canConfirm = !_submitting && _cart.meetsAllImporterMinOrders;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -192,6 +212,46 @@ class _CartScreenState extends State<CartScreen> {
                             ],
                           ),
                         ),
+                        Builder(
+                          builder: (context) {
+                            final progress = _progressFor(entry.value);
+                            if (progress == null || !progress.hasMinimum) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    progress.meets
+                                        ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
+                                        : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: progress.meets
+                                          ? Colors.green.shade800
+                                          : AppColors.brandBlue,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: progress.fraction,
+                                      minHeight: 6,
+                                      backgroundColor: AppColors.borderSubtle,
+                                      color: progress.meets
+                                          ? Colors.green.shade600
+                                          : AppColors.brandAccent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                         ...entry.value.map((line) {
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
@@ -246,11 +306,20 @@ class _CartScreenState extends State<CartScreen> {
                                 color: AppColors.textPrimary,
                               ),
                             ),
+                          if (!_cart.meetsAllImporterMinOrders) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Complete el pedido mínimo de cada importador para confirmar.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.brandBlue,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 10),
                           FilledButton(
-                            onPressed: _submitting
-                                ? null
-                                : _checkout,
+                            onPressed: canConfirm ? _checkout : null,
                             child: _submitting
                                 ? const SizedBox(
                                     height: 22,

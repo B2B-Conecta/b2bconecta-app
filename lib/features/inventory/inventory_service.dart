@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
+import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 
 class InventoryService {
   InventoryService._();
@@ -120,6 +121,46 @@ class InventoryService {
       outOfStock: outOfStock,
       paused: paused,
     );
+  }
+
+  static Future<ImporterSalesSnapshot> fetchMySalesSnapshot({
+    int days = 30,
+  }) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return ImporterSalesSnapshot.empty;
+    final res = await SupabaseAccess.client.rpc(
+      'importador_sales_snapshot',
+      params: <String, dynamic>{'p_days': days},
+    );
+    if (res is Map) {
+      return ImporterSalesSnapshot.fromJson(Map<String, dynamic>.from(res));
+    }
+    return ImporterSalesSnapshot.empty;
+  }
+
+  static Future<ImporterSalesProductPage> fetchMySalesProductPage({
+    required String kind,
+    int days = 30,
+    String? search,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return const ImporterSalesProductPage();
+    final res = await SupabaseAccess.client.rpc(
+      'importador_sales_product_page',
+      params: <String, dynamic>{
+        'p_days': days,
+        'p_kind': kind,
+        'p_search': search,
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+    if (res is Map) {
+      return ImporterSalesProductPage.fromJson(Map<String, dynamic>.from(res));
+    }
+    return const ImporterSalesProductPage();
   }
 
   /// Inventario del importador autenticado (`owner_id = auth.uid()`).

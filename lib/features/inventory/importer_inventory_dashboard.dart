@@ -21,6 +21,7 @@ import 'product_volume_tiers.dart';
 import 'importer_bulk_usd_discount_dialog.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'importer_sales_snapshot.dart';
 
 enum _InventorySelectionMode { none, visibility, delete }
 
@@ -48,6 +49,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   final _searchController = TextEditingController();
   final _inventoryScrollController = ScrollController();
   Future<InventoryMetrics>? _metricsFuture;
+  Future<ImporterSalesSnapshot>? _salesSnapshotFuture;
+  int _salesSnapshotDays = 30;
   Future<List<PartModel>>? _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
   bool _hasMoreInventory = true;
@@ -93,6 +96,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       _loadedParts.clear();
       _hasMoreInventory = true;
       _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
+      _salesSnapshotFuture =
+          SupabaseService.fetchMySalesSnapshot(days: _salesSnapshotDays);
       _partsFuture = _fetchInventoryPage(reset: true);
     });
   }
@@ -1265,6 +1270,29 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                         ),
                       ),
                     ],
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
+              child: FutureBuilder<ImporterSalesSnapshot>(
+                future: _salesSnapshotFuture,
+                builder: (context, snap) {
+                  final data = snap.data;
+                  if (data == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return ImporterSalesSnapshotCard(
+                    snapshot: data,
+                    selectedDays: _salesSnapshotDays,
+                    onDaysChanged: (days) {
+                      setState(() {
+                        _salesSnapshotDays = days;
+                        _salesSnapshotFuture =
+                            SupabaseService.fetchMySalesSnapshot(days: days);
+                      });
+                    },
                   );
                 },
               ),

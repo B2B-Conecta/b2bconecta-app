@@ -22,6 +22,7 @@ import 'profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/onboarding/terms_acceptance_section.dart';
 import 'package:motolink_pro_app/features/referrals/profile_referral_section.dart';
 import 'profile_role_labels.dart';
+import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
 class ProfileB2BForm extends StatefulWidget {
@@ -76,6 +77,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   late final TextEditingController _legalContactNameController;
   late final TextEditingController _legalContactEmailController;
   late final TextEditingController _legalContactPhoneController;
+  late final TextEditingController _minOrderAmountController;
+  late MinOrderCurrency _minOrderCurrency;
   late final TextEditingController _emailDisplayController;
   String _role = 'importador';
   bool _saving = false;
@@ -133,6 +136,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return _role.trim().toLowerCase() == 'importador' || _persistedAsImportador;
   }
 
+  double _parsedMinOrderAmountRef() {
+    final raw = _minOrderAmountController.text.trim().replaceAll(',', '.');
+    if (raw.isEmpty) return 0;
+    return double.tryParse(raw) ?? 0;
+  }
+
   /// Mayorista aún no aprobado: puede completar perfil y enviar a revisión.
   bool get _showImportadorSubmitSection {
     if (!_isImportadorRole) return false;
@@ -186,6 +195,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         TextEditingController(text: i?.legalContactEmail ?? '');
     _legalContactPhoneController =
         TextEditingController(text: i?.legalContactPhone ?? '');
+    final minRef = i?.minOrderAmountRef ?? 0;
+    _minOrderAmountController = TextEditingController(
+      text: minRef > 0 ? minRef.toStringAsFixed(minRef.truncateToDouble() == minRef ? 0 : 2) : '',
+    );
+    _minOrderCurrency = MinOrderCurrency.parse(i?.minOrderCurrency);
     _emailDisplayController = TextEditingController(
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
@@ -234,6 +248,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _legalContactNameController.dispose();
     _legalContactEmailController.dispose();
     _legalContactPhoneController.dispose();
+    _minOrderAmountController.dispose();
     _emailDisplayController.dispose();
     super.dispose();
   }
@@ -469,6 +484,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             _isImportadorRole ? _legalContactEmailController.text : null,
         legalContactPhone:
             _isImportadorRole ? _legalContactPhoneController.text : null,
+        minOrderAmountRef:
+            _isImportadorRole ? _parsedMinOrderAmountRef() : null,
+        minOrderCurrency:
+            _isImportadorRole ? _minOrderCurrency.dbValue : null,
       );
       await _persistAcceptedTermsIfNeeded();
       await _tryGeocodeAndSaveCoordinates();
@@ -571,6 +590,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             _isImportadorRole ? _legalContactEmailController.text : null,
         legalContactPhone:
             _isImportadorRole ? _legalContactPhoneController.text : null,
+        minOrderAmountRef:
+            _isImportadorRole ? _parsedMinOrderAmountRef() : null,
+        minOrderCurrency:
+            _isImportadorRole ? _minOrderCurrency.dbValue : null,
       );
       await _persistAcceptedTermsIfNeeded();
       await _tryGeocodeAndSaveCoordinates();
@@ -1041,6 +1064,70 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                         }
                         return null;
                       },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ProfileCollapsibleSection(
+                title: 'Pedido mínimo',
+                subtitle: 'Monto mínimo por pedido',
+                initiallyExpanded: true,
+                infoMessage: mobile
+                    ? null
+                    : 'Si el carrito no llega a este monto, el aliado no podrá confirmar. '
+                        'Vacío = sin mínimo.',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<MinOrderCurrency>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: MinOrderCurrency.ref,
+                          label: Text('REF'),
+                        ),
+                        ButtonSegment(
+                          value: MinOrderCurrency.usd,
+                          label: Text('Divisa'),
+                        ),
+                      ],
+                      selected: {_minOrderCurrency},
+                      onSelectionChanged: (s) {
+                        setState(() => _minOrderCurrency = s.first);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _minOrderAmountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: _fieldDecoration(
+                        'Ej: 100',
+                        label: 'Mínimo ${_minOrderCurrency.unitLabel}',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) {
+                        if (!_isImportadorRole) return null;
+                        final raw = (v ?? '').trim().replaceAll(',', '.');
+                        if (raw.isEmpty) return null;
+                        final n = double.tryParse(raw);
+                        if (n == null) return 'Indique un monto válido';
+                        if (n < 0) return 'El mínimo no puede ser negativo';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _minOrderCurrency == MinOrderCurrency.usd
+                          ? 'Se muestra en USD. El carrito lo compara en REF.'
+                          : 'El aliado debe alcanzar este monto en el carrito. Vacío = sin mínimo.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textSecondary,
+                        height: 1.3,
+                      ),
                     ),
                   ],
                 ),

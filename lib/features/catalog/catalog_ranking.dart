@@ -1,8 +1,16 @@
 import 'part_model.dart';
 import 'catalog_sort_mode.dart';
 
-/// Orden de catálogo aliado (E1.1 + E2.1): boost por pagos confirmados, luego reputación rolling 100.
+int _compareCatalogFeatured(PartModel a, PartModel b) {
+  final fa = a.isCatalogFeatured ? 1 : 0;
+  final fb = b.isCatalogFeatured ? 1 : 0;
+  return fb.compareTo(fa);
+}
+
+/// Orden de catálogo aliado: destacado admin, luego boost por pagos, luego reputación.
 int comparePartsForCatalogBoost(PartModel a, PartModel b) {
+  final featured = _compareCatalogFeatured(a, b);
+  if (featured != 0) return featured;
   final pa = a.ownerCatalogPaidOrders30d ?? 0;
   final pb = b.ownerCatalogPaidOrders30d ?? 0;
   final cPaid = pb.compareTo(pa);
@@ -51,8 +59,10 @@ int comparePartsForSortMode(PartModel a, PartModel b, CatalogSortMode mode) {
   }
 }
 
-/// Orden E2.2: reputación rolling primero, luego boost E1.1.
+/// Orden E2.2: destacado admin, reputación rolling, luego boost E1.1.
 int comparePartsForCatalogReputation(PartModel a, PartModel b) {
+  final featured = _compareCatalogFeatured(a, b);
+  if (featured != 0) return featured;
   final ra = a.ownerRatingAvg;
   final rb = b.ownerRatingAvg;
   if (ra != null && rb != null) {

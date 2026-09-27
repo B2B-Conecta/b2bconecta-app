@@ -504,6 +504,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             color: AppColors.textSecondary,
           ),
         ),
+        if (part.isCatalogFeatured) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Chip(
+              visualDensity: VisualDensity.compact,
+              backgroundColor: AppColors.brandAccent.withOpacity(0.12),
+              side: BorderSide(color: AppColors.brandAccent.withOpacity(0.4)),
+              label: const Text(
+                'Destacado',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 4),
       ],
       if (location != null) ...[
@@ -600,6 +615,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
       const SizedBox(height: 12),
       _buildStockBadge(desktop: desktop),
+      if (part.hasOwnerMinOrderAmount) ...[
+        const SizedBox(height: 8),
+        Text(
+          '${part.ownerMinOrderAmountLabelEs} por despacho.',
+          style: TextStyle(
+            fontSize: desktop ? 13 : 12.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
       SizedBox(height: desktop ? 20 : 16),
       if ((part.descripcion ?? '').trim().isNotEmpty)
         _SpecBlock(

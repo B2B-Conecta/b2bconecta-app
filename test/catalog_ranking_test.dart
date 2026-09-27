@@ -6,6 +6,8 @@ PartModel _part({
   required String id,
   required String nombre,
   String? category,
+  int? paidOrders,
+  DateTime? featuredUntil,
 }) {
   return PartModel(
     id: id,
@@ -13,6 +15,8 @@ PartModel _part({
     precio: 1,
     stock: 10,
     category: category,
+    ownerCatalogPaidOrders30d: paidOrders,
+    ownerCatalogFeaturedUntil: featuredUntil,
   );
 }
 
@@ -33,5 +37,17 @@ void main() {
     final sorted = [loose, motor]..sort(comparePartsByCategoryThenName);
     expect(sorted.first.id, 'm');
     expect(sorted.last.id, 'z');
+  });
+
+  test('destacado admin queda delante del boost por ventas', () {
+    final regular = _part(id: 'r', nombre: 'Regular', paidOrders: 40);
+    final featured = _part(
+      id: 'f',
+      nombre: 'Destacado',
+      paidOrders: 1,
+      featuredUntil: DateTime.now().add(const Duration(days: 7)),
+    );
+    final sorted = [regular, featured]..sort(comparePartsForCatalogBoost);
+    expect(sorted.first.id, 'f');
   });
 }

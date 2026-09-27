@@ -1130,6 +1130,29 @@ class _ProductGridCard extends StatelessWidget {
                               )
                             : _placeholder(compact),
                       ),
+                      if (part.isCatalogFeatured)
+                        Positioned(
+                          top: compact ? 4 : 6,
+                          left: compact ? 4 : 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.brandAccent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              compact ? '★' : 'Destacado',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
                       if (part.hasWarranty)
                         Positioned(
                           top: compact ? 4 : 6,
@@ -1273,7 +1296,9 @@ class _ProductGridCard extends StatelessWidget {
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
-                      '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
+                      part.hasOwnerMinOrderAmount
+                          ? '${part.stock} en stock · ${part.minOrderQtyLabelEs} · ${part.ownerMinOrderAmountLabelEs}'
+                          : '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

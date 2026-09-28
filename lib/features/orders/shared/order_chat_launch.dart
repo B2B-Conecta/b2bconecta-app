@@ -2,13 +2,52 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_thread.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 
 /// Pedido aún negociable en el hilo (ni entregado ni rechazado).
 bool orderChatReplyOpen(String status) {
   return status != TransactionRequestStatus.entregado &&
       status != TransactionRequestStatus.rechazado;
+}
+
+/// Flags de respuesta del hilo, alineados a Pedidos.
+({bool aliado, bool admin, bool importador}) orderChatInboxReplyFlags({
+  required AppHomeRole role,
+  required OrderChatThread thread,
+}) {
+  return (
+    aliado: role == AppHomeRole.aliado && thread.canReply,
+    admin: role == AppHomeRole.administrador,
+    importador: role == AppHomeRole.importador && thread.canReply,
+  );
+}
+
+/// Abre el hilo existente desde la bandeja, con los mismos permisos que Pedidos.
+void openOrderChatFromInbox({
+  required BuildContext context,
+  required AppHomeRole role,
+  required OrderChatThread thread,
+  VoidCallback? onThreadChanged,
+}) {
+  final ids = thread.requestIds;
+  final merged = ids.length > 1 ? ids : null;
+  final title = thread.counterpartName.trim().isEmpty
+      ? 'Chat del pedido'
+      : 'Chat · ${thread.counterpartName}';
+  final flags = orderChatInboxReplyFlags(role: role, thread: thread);
+  showOrderChatSheet(
+    context: context,
+    transactionRequestId: thread.primaryRequestId,
+    mergedThreadRequestIds: merged,
+    allowReplyAsAliado: flags.aliado,
+    allowReplyAsAdmin: flags.admin,
+    allowReplyAsImportador: flags.importador,
+    title: title,
+    onThreadChanged: onThreadChanged,
+  );
 }
 
 Future<void> showOrderChatSheet({

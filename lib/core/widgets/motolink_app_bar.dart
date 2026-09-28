@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'messages_icon_button.dart';
 import 'motolink_pro_logo.dart';
 import 'theme_mode_bubble.dart';
 
@@ -15,24 +16,27 @@ abstract final class MotolinkAppBarLogoSizes {
   static const double aliado = 44;
 }
 
-/// Barra superior: a la izquierda marca del usuario (logo opcional, nombre, rol);
-/// a la derecha B2B Conecta + descripción; campana de notificaciones.
+/// Barra superior: marca del usuario a la izquierda; tema, mensajes y campana a la derecha.
 class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   const MotolinkAppBar({
     super.key,
     this.currentUserProfile,
     this.onNotificationTap,
+    this.onMessagesTap,
     this.extraActions,
     this.logoHeight = MotolinkAppBarLogoSizes.importador,
     this.unreadNotifications = 0,
+    this.unreadMessages = 0,
   });
 
   /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra B2B Conecta a la derecha.
   final ProfileModel? currentUserProfile;
 
   final VoidCallback? onNotificationTap;
+  final VoidCallback? onMessagesTap;
   final List<Widget>? extraActions;
   final int unreadNotifications;
+  final int unreadMessages;
 
   /// Alto del logo B2B Conecta a la derecha y referencia del logo de usuario.
   final double logoHeight;
@@ -187,6 +191,14 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
           padding: EdgeInsets.only(right: 2),
           child: ThemeModeBubble(compact: true),
         ),
+        if (widget.onMessagesTap != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: MessagesIconButton(
+              onPressed: widget.onMessagesTap!,
+              unreadCount: widget.unreadMessages,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.only(right: 8),
           child: Stack(

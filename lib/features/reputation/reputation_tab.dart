@@ -17,6 +17,8 @@ class ReputationTab extends StatelessWidget {
     required this.homeRole,
     required this.onNotificationTap,
     required this.unreadNotifications,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
     required this.onProfileRefresh,
     this.embedInDesktopShell = false,
   });
@@ -25,6 +27,8 @@ class ReputationTab extends StatelessWidget {
   final AppHomeRole homeRole;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
   final Future<void> Function() onProfileRefresh;
   final bool embedInDesktopShell;
 
@@ -42,6 +46,8 @@ class ReputationTab extends StatelessWidget {
             : MotolinkAppBarLogoSizes.aliado,
         onNotificationTap: onNotificationTap,
         unreadNotifications: unreadNotifications,
+        onMessagesTap: onMessagesTap,
+        unreadMessages: unreadMessages,
       ),
       body: SafeArea(
         child: RefreshIndicator(

@@ -28,6 +28,7 @@ import 'main_shell_tab.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/core/layout/shell/shell_destination.dart';
 import 'package:motolink_pro_app/core/notifications/notification_center_sheet.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_b2b_form.dart';
 import 'package:motolink_pro_app/features/profile/account_settings_screen.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
@@ -176,6 +177,13 @@ class _MainShellState extends State<MainShell> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) => NotificationCenterSheet(provider: _notifications),
+    );
+  }
+
+  Future<void> _openMessagesInbox() {
+    return showOrderChatInboxSheet(
+      context: context,
+      homeRole: widget.homeRole,
     );
   }
 
@@ -374,6 +382,8 @@ class _MainShellState extends State<MainShell> {
         logoHeight: MotolinkAppBarLogoSizes.importador,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -418,6 +428,8 @@ class _MainShellState extends State<MainShell> {
       profile: _profile,
       unreadNotifications: _notifications.unreadCount,
       onNotificationTap: _openNotificationCenter,
+      onMessagesTap: _openMessagesInbox,
+      unreadMessages: _notifications.unreadChatCount,
       onOpenSettings: _openAccountSettings,
       pages: [
         ...panels,
@@ -445,6 +457,8 @@ class _MainShellState extends State<MainShell> {
             onProfileSaved: _refreshProfile,
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
+            onMessagesTap: _openMessagesInbox,
+            unreadMessages: _notifications.unreadChatCount,
           ),
         ],
       ),
@@ -550,6 +564,8 @@ class _MainShellState extends State<MainShell> {
         homeRole: role,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
       _OrdersTab(
@@ -557,6 +573,8 @@ class _MainShellState extends State<MainShell> {
         homeRole: role,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
       ReputationTab(
@@ -564,6 +582,8 @@ class _MainShellState extends State<MainShell> {
         homeRole: role,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
         onProfileRefresh: _refreshProfile,
         embedInDesktopShell: embedded,
       ),
@@ -573,6 +593,8 @@ class _MainShellState extends State<MainShell> {
         onProfileSaved: _refreshProfile,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
     ];
@@ -602,6 +624,8 @@ class _MainShellState extends State<MainShell> {
             profile: _profile,
             unreadNotifications: _notifications.unreadCount,
             onNotificationTap: _openNotificationCenter,
+            onMessagesTap: _openMessagesInbox,
+            unreadMessages: _notifications.unreadChatCount,
             onOpenSettings: _openAccountSettings,
             railBadgeLabel: railBadgeLabel,
             trailingActions: trailingActions,
@@ -752,6 +776,8 @@ class _OrdersTab extends StatelessWidget {
     required this.homeRole,
     required this.onNotificationTap,
     required this.unreadNotifications,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
     this.embedInDesktopShell = false,
   });
 
@@ -759,6 +785,8 @@ class _OrdersTab extends StatelessWidget {
   final AppHomeRole homeRole;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
   final bool embedInDesktopShell;
 
   @override
@@ -774,6 +802,8 @@ class _OrdersTab extends StatelessWidget {
             : MotolinkAppBarLogoSizes.importador,
         onNotificationTap: onNotificationTap,
         unreadNotifications: unreadNotifications,
+        onMessagesTap: onMessagesTap,
+        unreadMessages: unreadMessages,
       ),
       body: switch (homeRole) {
         AppHomeRole.importador => const ImporterActiveOrdersPanel(),
@@ -791,6 +821,8 @@ class _ProfileTab extends StatefulWidget {
     required this.onProfileSaved,
     required this.onNotificationTap,
     required this.unreadNotifications,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
     this.embedInDesktopShell = false,
   });
 
@@ -799,6 +831,8 @@ class _ProfileTab extends StatefulWidget {
   final Future<void> Function() onProfileSaved;
   final VoidCallback onNotificationTap;
   final int unreadNotifications;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
   final bool embedInDesktopShell;
 
   @override
@@ -989,6 +1023,8 @@ class _ProfileTabState extends State<_ProfileTab> {
             : MotolinkAppBarLogoSizes.importador,
         onNotificationTap: widget.onNotificationTap,
         unreadNotifications: widget.unreadNotifications,
+        onMessagesTap: widget.onMessagesTap,
+        unreadMessages: widget.unreadMessages,
         extraActions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

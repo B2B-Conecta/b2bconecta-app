@@ -20,6 +20,8 @@ class DesktopNavigationShell extends StatelessWidget {
     required this.profile,
     required this.unreadNotifications,
     required this.onNotificationTap,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
     required this.onOpenSettings,
     required this.railBadgeLabel,
     this.trailingActions = const [],
@@ -32,6 +34,8 @@ class DesktopNavigationShell extends StatelessWidget {
   final ProfileModel profile;
   final int unreadNotifications;
   final VoidCallback onNotificationTap;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
   final VoidCallback onOpenSettings;
   final String railBadgeLabel;
   final List<Widget> trailingActions;
@@ -64,6 +68,8 @@ class DesktopNavigationShell extends StatelessWidget {
                 DesktopShellTopBar(
                   unreadNotifications: unreadNotifications,
                   onNotificationTap: onNotificationTap,
+                  onMessagesTap: onMessagesTap,
+                  unreadMessages: unreadMessages,
                   trailingActions: trailingActions,
                 ),
                 Padding(

@@ -65,7 +65,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       _AdminOrdersScope.todos =>
         TransactionRequestStatus.adminBandejaUnifiedStatuses,
     };
-    return statuses
+    return TransactionRequestStatus.distinctFilterStatuses(statuses)
         .map(
           (s) => OrderStatusFilterOption(
             status: s,

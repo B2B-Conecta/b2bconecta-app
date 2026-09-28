@@ -18,6 +18,7 @@ class MainShellTabController {
   static bool _importerPedidosPreferNuevosFilter = false;
   static bool _importerPedidosPreferEnProcesoFilter = false;
   static bool _importerPedidosPreferCerradosFilter = false;
+  static String? _pendingImporterPedidosExploreFilter;
   static String? _pendingNotificationType;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
@@ -45,6 +46,7 @@ class MainShellTabController {
     _importerPedidosPreferNuevosFilter = false;
     _importerPedidosPreferEnProcesoFilter = false;
     _importerPedidosPreferCerradosFilter = false;
+    _pendingImporterPedidosExploreFilter = null;
     _pendingNotificationType = null;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
@@ -130,6 +132,21 @@ class MainShellTabController {
   static bool consumeImporterPedidosPreferCerradosFilter() {
     final v = _importerPedidosPreferCerradosFilter;
     _importerPedidosPreferCerradosFilter = false;
+    return v;
+  }
+
+  /// Desde Desempeño de ventas: `nuevos`, `en_proceso` o `cerrados` (sin filtro moroso).
+  static void navigateToImporterPedidosExplore(String filter) {
+    _pendingImporterPedidosExploreFilter = filter;
+    _goTo?.call(1);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _pedidosNotificationDeepLink?.call();
+    });
+  }
+
+  static String? consumeImporterPedidosExploreFilter() {
+    final v = _pendingImporterPedidosExploreFilter;
+    _pendingImporterPedidosExploreFilter = null;
     return v;
   }
 
@@ -370,7 +387,8 @@ class MainShellTabController {
     });
   }
 
-  static void registerAdminSupportNotificationDeepLink(VoidCallback? onNavigate) {
+  static void registerAdminSupportNotificationDeepLink(
+      VoidCallback? onNavigate) {
     _adminSupportNotificationDeepLink = onNavigate;
   }
 

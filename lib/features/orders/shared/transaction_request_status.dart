@@ -146,6 +146,27 @@ abstract final class TransactionRequestStatus {
 
   static String labelEs(String status) => OrderStatusFlowCopy.labelEs(status);
 
+  /// `enviado` es el legado de `en_transito`; un solo chip «En tránsito».
+  static String canonicalFilterStatus(String status) =>
+      status == enviado ? enTransito : status;
+
+  static List<String> distinctFilterStatuses(Iterable<String> statuses) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final s in statuses) {
+      final canonical = canonicalFilterStatus(s);
+      if (!seen.add(canonical)) continue;
+      out.add(canonical);
+    }
+    return out;
+  }
+
+  static bool matchesStatusFilter(String status, String? filter) {
+    if (filter == null || filter.trim().isEmpty) return true;
+    return canonicalFilterStatus(status) ==
+        canonicalFilterStatus(filter.trim());
+  }
+
   /// Siguiente estado que puede aplicar el importador, o null si es terminal.
   /// Ciclo: pendiente → en preparación → listo para despacho → en tránsito.
   static String? nextForImporter(String current) {

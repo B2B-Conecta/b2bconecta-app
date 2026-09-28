@@ -12,6 +12,7 @@ import 'admin_checkout_group_master_header.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
@@ -55,11 +56,9 @@ class AdminExpandableOrderCard extends StatelessWidget {
             ? 'Carrito · ${lines.length} líneas'
                 '${importerCount > 1 ? ' · $importerCount importadores' : ''}'
             : adminCheckoutGroupTitle(lines))
-        : r.tituloFichaPrincipalPedido;
-    final resumen = isCheckoutGroup
-        ? adminCheckoutGroupResumenLinea(lines)
-        : '${r.totalUnidadesAliado} uds · Total (tienda minorista) '
-            '${r.precioTotal.toStringAsFixed(2)} REF';
+        : null;
+    final resumen =
+        isCheckoutGroup ? adminCheckoutGroupResumenLinea(lines) : null;
     final fechaLabel = isCheckoutGroup
         ? ImporterOrderDate.etiquetaGrupo(lines)
         : ImporterOrderDate.etiquetaFecha(r);
@@ -102,49 +101,22 @@ class AdminExpandableOrderCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            titulo,
-                            maxLines: expanded ? 2 : 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                              color: AppColors.textPrimary,
+                          if (isCheckoutGroup && titulo != null)
+                            Text(
+                              titulo,
+                              maxLines: expanded ? 2 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
+                          OrderCardDirectSummary(
+                            lines: lines,
+                            viewerRole: AppHomeRole.administrador,
                           ),
-                          if (!expanded) ...[
-                            if (isCheckoutGroup) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                adminCheckoutGroupTitle(lines),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.3,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Carrito · ${lines.length} líneas'
-                                '${importerCount > 1 ? ' · $importerCount importadores' : ''}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.brandBlue.withOpacity(0.9),
-                                ),
-                              ),
-                            ] else if (r.productSku != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'SKU: ${r.productSku}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
+                          if (resumen != null) ...[
                             const SizedBox(height: 4),
                             Text(
                               resumen,
@@ -154,6 +126,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                          ],
+                          if (!expanded) ...[
                             const SizedBox(height: 4),
                             Text(
                               r.destinoEntregaLineaCompactaEs,

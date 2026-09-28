@@ -17,6 +17,7 @@ import 'package:motolink_pro_app/features/orders/importador/importer_aliado_soli
 import 'aliado_transit_eta_banner.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
@@ -182,32 +183,25 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             ),
                             SizedBox(height: density.isDesktop ? 2 : 4),
                           ],
-                          Text(
-                            isCheckoutGroup
-                                ? tituloCheckoutGrupoAliado(lines)
-                                : r.etiquetaProductoAliado,
-                            maxLines: expanded ? 3 : 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: density.productTitleSize,
+                          if (isCheckoutGroup)
+                            Text(
+                              tituloCheckoutGrupoAliado(lines),
+                              maxLines: expanded ? 3 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: density.productTitleSize,
+                              ),
                             ),
-                          ),
                           if (isCheckoutGroup &&
                               distinctImporterIds.length > 1) ...[
                             SizedBox(height: density.isDesktop ? 4 : 6),
                             _MultiImporterPagoResumenChip(lines: lines),
                           ],
-                          if (!isCheckoutGroup && r.productSku != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'SKU: ${r.productSku}',
-                              style: TextStyle(
-                                fontSize: density.skuTextSize,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                          OrderCardDirectSummary(
+                            lines: lines,
+                            viewerRole: AppHomeRole.aliado,
+                          ),
                           SizedBox(height: density.isDesktop ? 2 : 4),
                           Text(
                             isCheckoutGroup
@@ -730,9 +724,7 @@ class _MultiImporterPagoResumenChip extends StatelessWidget {
 }
 
 String _lineaPrecioResumenAliado(TransactionRequestModel r) {
-  final buf = StringBuffer(
-    '${r.cantidad} uds · ${formatRefAmount(r.precioTotal)} REF',
-  );
+  final buf = StringBuffer('${formatRefAmount(r.precioTotal)} REF');
   if (r.tieneDescuentoDivisasAplicadoEnPedido) {
     buf.write(' (antes ${formatRefAmount(r.refBaseTotalForPago)})');
   }

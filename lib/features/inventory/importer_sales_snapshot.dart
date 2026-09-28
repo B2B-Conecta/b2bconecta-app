@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'importer_sales_explore.dart';
 import 'importer_sales_product_sheet.dart';
 
 class ImporterSalesProductStat {
@@ -69,6 +70,20 @@ class ImporterSalesSnapshot {
   bool get isCatalogFeatured {
     final until = catalogFeaturedUntil;
     return until != null && until.isAfter(DateTime.now());
+  }
+
+  /// Ticket medio del período (REF / pedido, sin rechazados).
+  double get averageTicketRef =>
+      ordersCount <= 0 ? 0 : revenueRef / ordersCount;
+
+  double get unitsPerDay => days <= 0 ? 0 : unitsSold / days;
+
+  double get revenuePerDay => days <= 0 ? 0 : revenueRef / days;
+
+  /// Participación de un SKU sobre lo facturado en el período.
+  double productRevenueShare(ImporterSalesProductStat product) {
+    if (revenueRef <= 0) return 0;
+    return (product.revenue / revenueRef).clamp(0, 1);
   }
 
   factory ImporterSalesSnapshot.fromJson(Map<String, dynamic> json) {
@@ -192,7 +207,8 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                   Color.lerp(AppColors.brandBlue, AppColors.brandAccent, 0.55)!,
                 ],
               ),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(15)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -259,8 +275,8 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   snapshot.ordersCount == 0
-                      ? 'Aún no hay movimiento en los últimos $_days días.'
-                      : '${snapshot.ordersEntregados} entregados · ${snapshot.ordersActive} en curso · ${snapshot.unitsSold} uds',
+                      ? 'Aún no hay movimiento en los últimos $_days días. Toque una métrica cuando haya pedidos.'
+                      : '${snapshot.ordersEntregados} entregados · ${snapshot.ordersActive} en curso · ticket ${formatRefAmount(snapshot.averageTicketRef)} REF',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12.5,
@@ -284,35 +300,63 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                         icon: Icons.local_shipping_outlined,
                         label: 'En curso',
                         value: '${snapshot.ordersActive}',
-                        hint: 'Pedidos activos',
+                        hint: 'Ver detalle',
+                        onTap: () => showImporterSalesMetricSheet(
+                          context: context,
+                          snapshot: snapshot,
+                          kind: ImporterSalesMetricKind.active,
+                        ),
                       ),
                       _MetricTile(
                         icon: Icons.verified_outlined,
                         label: 'Entregados',
                         value: '${snapshot.ordersEntregados}',
-                        hint: 'Cerrados con éxito',
+                        hint: 'Ver detalle',
                         success: snapshot.ordersEntregados > 0,
+                        onTap: () => showImporterSalesMetricSheet(
+                          context: context,
+                          snapshot: snapshot,
+                          kind: ImporterSalesMetricKind.delivered,
+                        ),
                       ),
                       _MetricTile(
                         icon: Icons.inventory_2_outlined,
                         label: 'Unidades',
                         value: '${snapshot.unitsSold}',
-                        hint: 'Vendidas en $_days d',
+                        hint: 'Ver ranking',
+                        onTap: () => showImporterSalesMetricSheet(
+                          context: context,
+                          snapshot: snapshot,
+                          kind: ImporterSalesMetricKind.units,
+                        ),
                       ),
                       _MetricTile(
                         icon: Icons.payments_outlined,
                         label: 'Facturado',
                         value: formatRefAmount(snapshot.revenueRef),
-                        hint: 'REF del período',
+                        hint: 'Ver desglose',
                         emphasize: true,
+                        onTap: () => showImporterSalesMetricSheet(
+                          context: context,
+                          snapshot: snapshot,
+                          kind: ImporterSalesMetricKind.revenue,
+                        ),
                       ),
                     ];
                     if (twoCol) {
                       return Column(
                         children: [
-                          Row(children: [Expanded(child: tiles[0]), const SizedBox(width: 8), Expanded(child: tiles[1])]),
+                          Row(children: [
+                            Expanded(child: tiles[0]),
+                            const SizedBox(width: 8),
+                            Expanded(child: tiles[1])
+                          ]),
                           const SizedBox(height: 8),
-                          Row(children: [Expanded(child: tiles[2]), const SizedBox(width: 8), Expanded(child: tiles[3])]),
+                          Row(children: [
+                            Expanded(child: tiles[2]),
+                            const SizedBox(width: 8),
+                            Expanded(child: tiles[3])
+                          ]),
                         ],
                       );
                     }
@@ -353,7 +397,8 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                         child: _ProductPanel(
                           title: 'Más vendidos',
                           icon: Icons.trending_up_rounded,
-                          empty: 'Cuando entren pedidos, aquí verá sus SKUs estrella.',
+                          empty:
+                              'Cuando entren pedidos, aquí verá sus SKUs estrella.',
                           products: snapshot.topProducts,
                           total: snapshot.topTotal,
                           maxUnits: maxUnits,
@@ -362,6 +407,12 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                             context: context,
                             kind: 'top',
                             days: _days,
+                          ),
+                          onProductTap: (p) => showImporterSalesSkuSheet(
+                            context: context,
+                            snapshot: snapshot,
+                            product: p,
+                            lowRotation: false,
                           ),
                         ),
                       ),
@@ -380,6 +431,12 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                             kind: 'low',
                             days: _days,
                           ),
+                          onProductTap: (p) => showImporterSalesSkuSheet(
+                            context: context,
+                            snapshot: snapshot,
+                            product: p,
+                            lowRotation: true,
+                          ),
                         ),
                       ),
                     ],
@@ -388,7 +445,8 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                   _ProductPanel(
                     title: 'Más vendidos',
                     icon: Icons.trending_up_rounded,
-                    empty: 'Cuando entren pedidos, aquí verá sus SKUs estrella.',
+                    empty:
+                        'Cuando entren pedidos, aquí verá sus SKUs estrella.',
                     products: snapshot.topProducts,
                     total: snapshot.topTotal,
                     maxUnits: maxUnits,
@@ -397,6 +455,12 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                       context: context,
                       kind: 'top',
                       days: _days,
+                    ),
+                    onProductTap: (p) => showImporterSalesSkuSheet(
+                      context: context,
+                      snapshot: snapshot,
+                      product: p,
+                      lowRotation: false,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -412,6 +476,12 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                       context: context,
                       kind: 'low',
                       days: _days,
+                    ),
+                    onProductTap: (p) => showImporterSalesSkuSheet(
+                      context: context,
+                      snapshot: snapshot,
+                      product: p,
+                      lowRotation: true,
                     ),
                   ),
                 ],
@@ -467,6 +537,7 @@ class _MetricTile extends StatelessWidget {
     required this.hint,
     this.success = false,
     this.emphasize = false,
+    this.onTap,
   });
 
   final IconData icon;
@@ -475,6 +546,7 @@ class _MetricTile extends StatelessWidget {
   final String hint;
   final bool success;
   final bool emphasize;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -483,45 +555,62 @@ class _MetricTile extends StatelessWidget {
         : emphasize
             ? AppColors.brandAccent
             : AppColors.brandBlue;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: BoxDecoration(
-        color: Color.lerp(AppColors.card, accent, 0.06),
+    return Material(
+      color: Color.lerp(AppColors.card, accent, 0.06),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withOpacity(0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: accent),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
-            ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accent.withOpacity(0.18)),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: accent,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 18, color: accent),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: accent.withOpacity(0.8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: accent,
+                ),
+              ),
+              Text(
+                hint,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
-          Text(
-            hint,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -575,6 +664,7 @@ class _ProductPanel extends StatelessWidget {
     required this.products,
     required this.maxUnits,
     required this.onOpenList,
+    required this.onProductTap,
     this.total,
     this.showRevenue = false,
     this.lowRotation = false,
@@ -589,6 +679,7 @@ class _ProductPanel extends StatelessWidget {
   final bool showRevenue;
   final bool lowRotation;
   final VoidCallback onOpenList;
+  final ValueChanged<ImporterSalesProductStat> onProductTap;
 
   @override
   Widget build(BuildContext context) {
@@ -641,6 +732,7 @@ class _ProductPanel extends StatelessWidget {
                 maxUnits: maxUnits,
                 showRevenue: showRevenue,
                 lowRotation: lowRotation,
+                onTap: () => onProductTap(preview[i]),
               ),
           if (count > 0)
             Align(
@@ -666,6 +758,7 @@ class _RankedProductLine extends StatelessWidget {
     required this.rank,
     required this.product,
     required this.maxUnits,
+    required this.onTap,
     this.showRevenue = false,
     this.lowRotation = false,
   });
@@ -675,10 +768,12 @@ class _RankedProductLine extends StatelessWidget {
   final int maxUnits;
   final bool showRevenue;
   final bool lowRotation;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final fraction = maxUnits <= 0 ? 0.0 : (product.units / maxUnits).clamp(0.0, 1.0);
+    final fraction =
+        maxUnits <= 0 ? 0.0 : (product.units / maxUnits).clamp(0.0, 1.0);
     final badgeColor = rank == 1
         ? AppColors.brandAccent
         : rank == 2
@@ -691,70 +786,80 @@ class _RankedProductLine extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: badgeColor.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '$rank',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                color: badgeColor,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      trailing,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                if (!lowRotation && maxUnits > 0) ...[
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: fraction,
-                      minHeight: 4,
-                      backgroundColor: AppColors.borderSubtle,
-                      color: AppColors.brandAccent,
+                Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: badgeColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$rank',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: badgeColor,
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              product.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            trailing,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!lowRotation && maxUnits > 0) ...[
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: fraction,
+                            minHeight: 4,
+                            backgroundColor: AppColors.borderSubtle,
+                            color: AppColors.brandAccent,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

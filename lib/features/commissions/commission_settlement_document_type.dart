@@ -1,3 +1,5 @@
+import 'commission_invoice_reference.dart';
+
 /// Tipo de documento al emitir un corte de comisión (E3).
 enum CommissionSettlementDocumentType {
   fiscalInvoice('fiscal_invoice'),
@@ -26,7 +28,7 @@ enum CommissionSettlementDocumentType {
       case CommissionSettlementDocumentType.fiscalInvoice:
         return 'Factura fiscal';
       case CommissionSettlementDocumentType.deliveryNote:
-        return 'ML-NOT';
+        return 'Nota de entrega';
     }
   }
 
@@ -46,16 +48,24 @@ enum CommissionSettlementDocumentType {
       case CommissionSettlementDocumentType.fiscalInvoice:
         return 'Emitir factura';
       case CommissionSettlementDocumentType.deliveryNote:
-        return 'ML-NOT';
+        return 'Emitir nota';
     }
   }
 
-  String get referencePrefix {
+  String get seriesCode {
     switch (this) {
       case CommissionSettlementDocumentType.fiscalInvoice:
-        return 'ML-COM-';
+        return CommissionInvoiceReference.kindCom;
       case CommissionSettlementDocumentType.deliveryNote:
-        return 'ML-NOT-';
+        return CommissionInvoiceReference.kindNot;
     }
   }
+
+  /// Prefijo de documentos nuevos (B2B-COM- / B2B-NOT-).
+  String get referencePrefix =>
+      '${CommissionInvoiceReference.brandPrefix}-$seriesCode-';
+
+  /// Prefijo histórico conservado en filas ya emitidas.
+  String get legacyReferencePrefix =>
+      '${CommissionInvoiceReference.legacyBrandPrefix}-$seriesCode-';
 }

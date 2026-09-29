@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
+import 'package:motolink_pro_app/features/commissions/commission_collected_income_report.dart';
 import 'package:motolink_pro_app/features/commissions/commission_settlement_document_type.dart';
 import 'package:motolink_pro_app/features/commissions/commission_settlement_model.dart';
 import 'package:motolink_pro_app/features/commissions/commission_volume_tiers.dart';
@@ -1416,6 +1417,19 @@ class SupabaseService {
 
   static Future<void> adminCancelCommissionSettlement(String settlementId) =>
       CommissionsService.adminCancelCommissionSettlement(settlementId);
+
+  static Future<CommissionCollectedIncomeReport> fetchCollectedCommissionReport({
+    required DateTime from,
+    required DateTime to,
+    String? importadorId,
+    CommissionSettlementDocumentType? documentType,
+  }) =>
+      CommissionsService.fetchCollectedCommissionReport(
+        from: from,
+        to: to,
+        importadorId: importadorId,
+        documentType: documentType,
+      );
 
   static Future<List<SupportTicketModel>> listMySupportTickets() =>
       SupportService.listMySupportTickets();

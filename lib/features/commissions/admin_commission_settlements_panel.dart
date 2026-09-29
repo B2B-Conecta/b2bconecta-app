@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'commission_collected_income_card.dart';
 import 'commission_settlement_document_type.dart';
 import 'commission_settlement_model.dart';
 import 'importer_commission_volume_context.dart';
@@ -41,6 +42,7 @@ class _AdminCommissionSettlementsPanelState
   final Set<String> _expandedSettlementIds = {};
   final TextEditingController _searchController = TextEditingController();
   CommissionSettlementFilters _filters = const CommissionSettlementFilters();
+  int _incomeCardEpoch = 0;
 
   List<CommissionSettlementModel> get _filteredRows =>
       filterCommissionSettlements(_rows, _filters);
@@ -116,6 +118,32 @@ class _AdminCommissionSettlementsPanelState
     setState(() => _expandedSettlementIds.add(id));
   }
 
+  void _openSettlementFromReport(String settlementId) {
+    CommissionSettlementModel? row;
+    for (final s in _rows) {
+      if (s.id == settlementId) {
+        row = s;
+        break;
+      }
+    }
+    setState(() {
+      _expandedSettlementIds.add(settlementId);
+      final ref = row?.invoiceReference?.trim();
+      if (ref != null && ref.isNotEmpty) {
+        _filters = _filters.copyWithSearch(ref);
+        _searchController.text = ref;
+      }
+    });
+  }
+
+  void _filterImportadorFromReport(String importadorId) {
+    setState(() => _filters = _filters.copyWithImportadorId(importadorId));
+  }
+
+  void _filterDocumentTypeFromReport(CommissionSettlementDocumentType type) {
+    setState(() => _filters = _filters.copyWithDocumentType(type));
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -136,6 +164,7 @@ class _AdminCommissionSettlementsPanelState
         _rows = rows;
         _volumeByImportador = volumeByImportador;
         _loading = false;
+        _incomeCardEpoch++;
       });
       if (MainShellTabController.peekPendingCommissionSettlementId() != null) {
         SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -580,11 +609,12 @@ class _AdminCommissionSettlementsPanelState
         content: Text(
           isNota
               ? 'Se asignará la referencia:\n\n$previewRef\n\n'
-                  'Serie ML-NOT- (sin IVA). La emisión no se puede deshacer.'
+                  'Serie B2B-NOT- (sin IVA). La emisión no se puede deshacer. '
+                  'Las facturas históricas ML-NOT- no se renumeran.'
               : 'Factura fiscal con IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %.\n\n'
                   'Referencia: $previewRef\n'
-                  'Formato: ML-COM-{año}-{secuencia}. '
-                  'Esta acción es irreversible.',
+                  'Formato: B2B-COM-{año}-{secuencia}. '
+                  'Esta acción es irreversible. Las facturas históricas ML-COM- se conservan.',
           style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.textPrimary),
         ),
         actions: [
@@ -932,6 +962,14 @@ class _AdminCommissionSettlementsPanelState
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
             children: [
               const AdminTasaBcvCard(),
+              const SizedBox(height: 12),
+              CommissionCollectedIncomeCard(
+                key: ValueKey('admin-income-$_incomeCardEpoch'),
+                isAdmin: true,
+                onOpenSettlement: _openSettlementFromReport,
+                onFilterImportador: _filterImportadorFromReport,
+                onFilterDocumentType: _filterDocumentTypeFromReport,
+              ),
               if (_rows.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _CommissionSummaryCard(rows: _rows),
@@ -1425,7 +1463,7 @@ class _ConfigCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'ML-COM- (IVA) · ML-NOT- (sin IVA)',
+              'B2B-COM- (IVA) · B2B-NOT- (sin IVA). Históricos ML- se conservan.',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.3,

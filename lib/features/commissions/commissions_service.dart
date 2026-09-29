@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
+import 'package:motolink_pro_app/features/commissions/commission_collected_income_report.dart';
 import 'package:motolink_pro_app/features/commissions/commission_settlement_model.dart';
 import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
 import 'package:motolink_pro_app/features/commissions/bcv_reference_rate_service.dart';
@@ -385,7 +386,7 @@ class CommissionsService {
     );
   }
 
-  /// Vista previa del siguiente Nº (ML-COM- o ML-NOT- según tipo).
+  /// Vista previa del siguiente Nº (B2B-COM- o B2B-NOT- según tipo).
   static Future<String> peekCommissionSettlementReference(
     CommissionSettlementDocumentType documentType,
   ) async {
@@ -529,5 +530,38 @@ class CommissionsService {
       'admin_cancel_commission_settlement',
       params: <String, dynamic>{'p_settlement_id': settlementId},
     );
+  }
+
+  /// Comisión cobrada en el período (paid_at, America/Caracas).
+  /// Admin: total global. Importador: solo su organización (forzado en RPC).
+  static Future<CommissionCollectedIncomeReport> fetchCollectedCommissionReport({
+    required DateTime from,
+    required DateTime to,
+    String? importadorId,
+    CommissionSettlementDocumentType? documentType,
+  }) async {
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final params = <String, dynamic>{
+      'p_from': ymd(from),
+      'p_to': ymd(to),
+    };
+    final org = importadorId?.trim();
+    if (org != null && org.isNotEmpty) {
+      params['p_importador_id'] = org;
+    }
+    if (documentType != null) {
+      params['p_document_type'] = documentType.rpcValue;
+    }
+    final raw = await SupabaseAccess.client.rpc(
+      'motoconecta_collected_commission_report',
+      params: params,
+    );
+    if (raw is Map) {
+      return CommissionCollectedIncomeReport.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
+    }
+    return CommissionCollectedIncomeReport.fromJson(const {});
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import 'commission_collected_income_card.dart';
 import 'commission_settlement_model.dart';
 import 'importer_commission_volume_context.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -37,6 +38,7 @@ class _ImporterCommissionSettlementsSectionState
   String? _error;
   bool _sectionExpanded = false;
   final Set<String> _expandedSettlementIds = {};
+  int _incomeCardEpoch = 0;
   String? _weekFilterKey;
   _ImporterSettlementStatusFilter _statusFilter =
       _ImporterSettlementStatusFilter.todos;
@@ -80,6 +82,7 @@ class _ImporterCommissionSettlementsSectionState
         _rows = results[0] as List<CommissionSettlementModel>;
         _volumeContext = results[1] as ImporterCommissionVolumeContext?;
         _loading = false;
+        _incomeCardEpoch++;
       });
       final pending =
           MainShellTabController.peekPendingCommissionSettlementId();
@@ -227,7 +230,21 @@ class _ImporterCommissionSettlementsSectionState
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    return Card(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CommissionCollectedIncomeCard(
+          key: ValueKey('imp-income-$_incomeCardEpoch'),
+          isAdmin: false,
+          onOpenSettlement: (id) {
+            setState(() {
+              _sectionExpanded = true;
+              _expandedSettlementIds.add(id);
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
         initiallyExpanded: _sectionExpanded,
@@ -396,6 +413,8 @@ class _ImporterCommissionSettlementsSectionState
             ),
         ],
       ),
+    ),
+      ],
     );
   }
 }

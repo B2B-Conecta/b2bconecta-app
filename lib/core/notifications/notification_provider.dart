@@ -30,6 +30,11 @@ class NotificationProvider extends ChangeNotifier {
   bool get isReady => _ready;
   int get unreadCount => _items.where((n) => !n.isRead).length;
 
+  /// No leídos de chat de pedido (no incluye soporte ni otros tipos).
+  int get unreadChatCount => _items.where((n) {
+        return !n.isRead && n.type.trim() == 'mensaje';
+      }).length;
+
   int unreadMensajeCountFor(Iterable<String> relatedIds) {
     return unreadMensajeCount(items: _items, relatedIds: relatedIds);
   }

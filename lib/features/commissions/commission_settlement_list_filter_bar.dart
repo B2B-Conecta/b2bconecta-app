@@ -100,7 +100,7 @@ class _CommissionSettlementListFilterBarState
           onChanged: (v) => _patch((x) => x.copyWithSearch(v)),
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: 'Buscar importador, RIF o referencia',
+            hintText: 'Buscar importador, RIF o referencia (ML- o B2B-)',
             hintStyle: AppColors.hintStyle,
             prefixIcon:
                 Icon(Icons.search, color: AppColors.textSecondary),
@@ -285,7 +285,7 @@ class _CommissionSettlementListFilterBarState
           ),
           const SizedBox(width: 6),
           _chip(
-            label: 'ML-NOT',
+            label: 'Nota (NOT)',
             selected: f.documentType ==
                 CommissionSettlementDocumentType.deliveryNote,
             onTap: () => _patch(

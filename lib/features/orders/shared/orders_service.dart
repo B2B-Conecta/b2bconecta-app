@@ -82,7 +82,7 @@ class OrdersService {
     aliado_id,
     importador_id,
     product_id,
-    products ( name, sku, discount_rules ),
+    products ( name, sku, discount_rules, image_urls ),
     status,
     cantidad,
     precio_total_usd,

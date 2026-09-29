@@ -242,31 +242,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       precioUnitarioAliadoRef: _precioVentaUnit(quantity: quantity),
       delta: quantity,
     );
-    CartService.instance.setQuantity(part.id, quantity);
-  }
-
-  Future<void> _solicitarItemViaCarrito() async {
-    final block = _cartBlockReason();
-    if (block != null) {
-      _showCartBlock(block);
-      return;
-    }
-
-    final minQty = part.minOrderQtyEffective;
-    _putInCart(quantity: minQty);
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    Navigator.of(context).pop();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          minQty == 1
-              ? '1 unidad añadida al carrito.'
-              : '$minQty unidades añadidas al carrito (mínimo de pedido).',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    CartService.instance.setQuantity(part.id, quantity    );
   }
 
   @override
@@ -300,7 +276,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ),
           ),
-          _buildBottomActionBar(context, horizontal: false),
+          _buildBottomActionBar(context),
         ],
       ),
     );
@@ -344,7 +320,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         const SizedBox(height: 20),
                         _buildActionAlerts(),
                         const SizedBox(height: 16),
-                        _buildActionButtons(horizontal: true),
+                        _buildActionButtons(),
                       ],
                     ),
                   ),
@@ -763,50 +739,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildActionButtons({required bool horizontal}) {
-    if (horizontal) {
-      return Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _cartActionsDisabled ? null : _addToCart,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: const Text('Agregar al carrito'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _cartActionsDisabled ? null : _solicitarItemViaCarrito,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: const Text('Solicitar solo este ítem'),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton(
-          onPressed: _cartActionsDisabled ? null : _addToCart,
-          child: const Text('Agregar al carrito'),
+  Widget _buildActionButtons() {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: _cartActionsDisabled ? null : _addToCart,
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
         ),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: _cartActionsDisabled ? null : _solicitarItemViaCarrito,
-          child: const Text('Solicitar solo este ítem'),
-        ),
-      ],
+        child: const Text('Agregar al carrito'),
+      ),
     );
   }
 
-  Widget _buildBottomActionBar(BuildContext context, {required bool horizontal}) {
+  Widget _buildBottomActionBar(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -833,7 +779,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _buildActionAlerts(),
           if (!part.stockCoversMinOrder || _pedidosSuspendidosMorosidad)
             const SizedBox(height: 8),
-          _buildActionButtons(horizontal: horizontal),
+          _buildActionButtons(),
         ],
       ),
     );

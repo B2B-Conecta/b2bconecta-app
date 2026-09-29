@@ -9,7 +9,6 @@ import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.da
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 import 'importer_expandable_order_card.dart';
-import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'importer_cancelar_pedido_dialog.dart';
 import 'importer_order_invoice_section.dart';
@@ -90,6 +89,19 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   }
 
   void _prepareImporterFilterForNotificationDeepLink() {
+    final explore = MainShellTabController.consumeImporterPedidosExploreFilter();
+    if (explore != null) {
+      setState(() {
+        _quickFilter = switch (explore) {
+          'nuevos' => _ImporterQuickFilter.nuevos,
+          'cerrados' => _ImporterQuickFilter.cerrados,
+          _ => _ImporterQuickFilter.enProceso,
+        };
+        _morosoOnly = false;
+      });
+      return;
+    }
+
     if (MainShellTabController.consumeImporterPedidosPreferCerradosFilter()) {
       setState(() {
         _quickFilter = _ImporterQuickFilter.cerrados;
@@ -639,10 +651,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             children: [
               const ImporterThirdPartyAdsCarousel(),
               const ImporterActivePromoBanner(),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(0, 8, 0, 0),
-                child: ImporterKycApprovedAliadosPanel(),
-              ),
               OrderListFilterBar(
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),

@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
 
@@ -70,12 +71,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     final isCheckoutGroup = lines.length > 1;
 
     final uid = SupabaseService.currentUserId;
-    final lineas = r.orderItemsParaVistaImportador(uid);
     final titulo = isCheckoutGroup
         ? tituloCheckoutGrupoImportador(lines, uid)
-        : (lineas.isNotEmpty
-            ? r.tituloPedidoImportador(lineas)
-            : r.etiquetaProductoImportador(uid));
+        : null;
     final promoChip = importerPromoChipForLines(lines);
 
     final destinoTxt = isCheckoutGroup
@@ -145,35 +143,21 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      titulo,
-                      maxLines: expanded ? 4 : 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Icons.storefront_outlined,
-                            size: 14, color: AppColors.textSecondary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            aliadoTxt,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
+                    if (isCheckoutGroup && titulo != null)
+                      Text(
+                        titulo,
+                        maxLines: expanded ? 4 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          height: 1.25,
                         ),
-                      ],
+                      ),
+                    OrderCardDirectSummary(
+                      lines: lines,
+                      viewerRole: AppHomeRole.importador,
+                      importerUserId: uid,
                     ),
                     const SizedBox(height: 4),
                     Row(

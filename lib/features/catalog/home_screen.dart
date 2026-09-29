@@ -58,14 +58,18 @@ class HomeScreen extends StatefulWidget {
     required this.profile,
     this.homeRole = AppHomeRole.importador,
     this.onNotificationTap,
+    this.onMessagesTap,
     this.unreadNotifications = 0,
+    this.unreadMessages = 0,
     this.embedInDesktopShell = false,
   });
 
   final ProfileModel profile;
   final AppHomeRole homeRole;
   final VoidCallback? onNotificationTap;
+  final VoidCallback? onMessagesTap;
   final int unreadNotifications;
+  final int unreadMessages;
 
   /// Sin AppBar propio cuando el shell de escritorio provee chrome.
   final bool embedInDesktopShell;
@@ -659,6 +663,8 @@ class _HomeScreenState extends State<HomeScreen> {
           : MotolinkAppBarLogoSizes.importador,
       onNotificationTap: widget.onNotificationTap,
       unreadNotifications: widget.unreadNotifications,
+      onMessagesTap: widget.onMessagesTap,
+      unreadMessages: widget.unreadMessages,
       extraActions: widget.homeRole == AppHomeRole.aliado
           ? [
               ListenableBuilder(

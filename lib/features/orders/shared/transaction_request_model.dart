@@ -1,4 +1,5 @@
 import 'order_item_model.dart';
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'qty_adjustment_status.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
@@ -44,6 +45,7 @@ class TransactionRequestModel {
     this.atEntregado,
     this.productName,
     this.productSku,
+    this.productImageUrls = const <String>[],
     this.aliadoBusinessName,
     this.aliadoRif,
     this.aliadoPhone,
@@ -182,6 +184,10 @@ class TransactionRequestModel {
   final DateTime? atEntregado;
   final String? productName;
   final String? productSku;
+
+  /// Portadas desde `products.image_urls` (join del listado; puede estar vacío en pedidos históricos).
+  final List<String> productImageUrls;
+
   final String? aliadoBusinessName;
   final String? aliadoRif;
   final String? aliadoPhone;
@@ -936,12 +942,14 @@ class TransactionRequestModel {
     final products = json['products'];
     String? productName;
     String? productSku;
+    List<String> productImageUrls = const <String>[];
     Map<String, dynamic>? productDiscountRules;
     if (products is Map) {
       final pm = Map<String, dynamic>.from(products);
       productName = pm['name']?.toString();
       final s = pm['sku']?.toString().trim();
       productSku = (s != null && s.isNotEmpty) ? s : null;
+      productImageUrls = parseProductImageUrlsJson(pm['image_urls']);
       productDiscountRules = parseDiscountRulesMap(pm['discount_rules']);
     }
 
@@ -1031,6 +1039,7 @@ class TransactionRequestModel {
       atEntregado: _parseDate(json['at_entregado']),
       productName: productName,
       productSku: productSku,
+      productImageUrls: productImageUrls,
       aliadoBusinessName: _nullableText(aliadoMap?['business_name']),
       aliadoRif: _nullableText(aliadoMap?['rif']),
       aliadoPhone: _nullableText(aliadoMap?['phone']),

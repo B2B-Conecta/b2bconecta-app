@@ -18,6 +18,8 @@ class AdminDesktopShell extends StatelessWidget {
     required this.profile,
     required this.unreadNotifications,
     required this.onNotificationTap,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
     required this.onOpenSettings,
   });
 
@@ -28,6 +30,8 @@ class AdminDesktopShell extends StatelessWidget {
   final ProfileModel profile;
   final int unreadNotifications;
   final VoidCallback onNotificationTap;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
   final VoidCallback onOpenSettings;
 
   @override
@@ -40,6 +44,8 @@ class AdminDesktopShell extends StatelessWidget {
       profile: profile,
       unreadNotifications: unreadNotifications,
       onNotificationTap: onNotificationTap,
+      onMessagesTap: onMessagesTap,
+      unreadMessages: unreadMessages,
       onOpenSettings: onOpenSettings,
       railBadgeLabel: 'Panel administrador',
     );

@@ -62,6 +62,9 @@ void main() {
     expect(snap.ordersActive, 0);
     expect(snap.topProducts.single.name, 'Bujía');
     expect(snap.lowRotation.single.units, 0);
+    expect(snap.averageTicketRef, closeTo(62.625, 0.001));
+    expect(snap.productRevenueShare(snap.topProducts.single), closeTo(80 / 250.5, 0.0001));
+    expect(snap.unitsPerDay, closeTo(18 / 30, 0.0001));
   });
 
   test('el piso se presenta en REF o divisa sin cambiar el monto', () {

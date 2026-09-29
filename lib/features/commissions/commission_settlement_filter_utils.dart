@@ -1,3 +1,4 @@
+import 'commission_invoice_reference.dart';
 import 'commission_settlement_document_type.dart';
 import 'commission_settlement_model.dart';
 
@@ -116,10 +117,12 @@ bool commissionSettlementMatchesSearch(
 ) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return true;
+  if (CommissionInvoiceReference.matchesQuery(row.invoiceReference, q)) {
+    return true;
+  }
   final haystack = [
     row.importadorBusinessName,
     row.importadorRif,
-    row.invoiceReference,
   ].whereType<String>().join(' ').toLowerCase();
   return haystack.contains(q);
 }

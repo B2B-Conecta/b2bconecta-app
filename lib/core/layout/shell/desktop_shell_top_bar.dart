@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
 
 /// Barra superior en shells de escritorio: acciones contextuales y notificaciones.
@@ -9,11 +10,15 @@ class DesktopShellTopBar extends StatelessWidget {
     super.key,
     required this.unreadNotifications,
     required this.onNotificationTap,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
     this.trailingActions = const [],
   });
 
   final int unreadNotifications;
   final VoidCallback onNotificationTap;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
   final List<Widget> trailingActions;
 
   @override
@@ -41,6 +46,11 @@ class DesktopShellTopBar extends StatelessWidget {
               const SizedBox(width: 4),
               const ThemeModeBubble(),
               const SizedBox(width: 4),
+              if (onMessagesTap != null)
+                MessagesIconButton(
+                  onPressed: onMessagesTap!,
+                  unreadCount: unreadMessages,
+                ),
               Stack(
                 clipBehavior: Clip.none,
                 children: [

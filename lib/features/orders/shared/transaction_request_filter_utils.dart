@@ -1,4 +1,5 @@
 import 'transaction_request_model.dart';
+import 'transaction_request_status.dart';
 import 'importer_order_date.dart';
 
 /// Filtrado local de solicitudes (búsqueda + estado opcional).
@@ -46,7 +47,14 @@ abstract final class TransactionRequestFilterUtils {
   }) {
     var list = rows.where((r) => matchesSearch(r, searchQuery)).toList();
     if (statusFilter != null && statusFilter.isNotEmpty) {
-      list = list.where((r) => r.status == statusFilter).toList();
+      list = list
+          .where(
+            (r) => TransactionRequestStatus.matchesStatusFilter(
+              r.status,
+              statusFilter,
+            ),
+          )
+          .toList();
     }
     if (morosoOnly) {
       list = list.where((r) => r.esPedidoMoroso).toList();

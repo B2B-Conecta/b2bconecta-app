@@ -59,7 +59,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String? _cancelarBusyId;
 
   static List<OrderStatusFilterOption> get _statusOptions =>
-      TransactionRequestStatus.aliadoPedidosActivosYCerrados
+      TransactionRequestStatus.distinctFilterStatuses(
+        TransactionRequestStatus.aliadoPedidosActivosYCerrados,
+      )
           .map(
             (s) => OrderStatusFilterOption(
               status: s,

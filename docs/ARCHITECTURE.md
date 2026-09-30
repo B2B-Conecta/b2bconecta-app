@@ -113,7 +113,7 @@ Cliente y helpers compartidos: `lib/core/data/supabase_access.dart`. La fachada 
 | `migrations/README.md` | Cómo aplicar local vs remoto |
 | `seed.sql` | Demo local (`db reset`) |
 | `scripts/` | Reset operativo, passwords seed, parches QA |
-| `functions/send-push-notification/` | FCM al cambiar notificaciones |
+| `functions/send-push-notification/` | FCM (móvil) + Web Push (PWA) al insertar `notifications` |
 | `functions/send-account-email/` | Correos de cuenta (logo + invocación desde SQL) |
 | `config.toml` | Docker local (API 54321, seed habilitado) |
 | `motoconecta/` | Puntero al archivo histórico |

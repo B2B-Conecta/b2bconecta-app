@@ -99,14 +99,26 @@ Producción: `https://www.b2bconecta.com.ve`.
 
 Auth (recovery / confirmación): Site URL + Redirect URLs en **cada** Dashboard. Ver `config/supabase-auth-redirects.example`. SMTP: `config/smtp.env` + `bash scripts/configure_supabase_smtp.sh staging`.
 
-## 6. Push (Android/iOS)
+## 6. Push (Android/iOS + PWA Web Push)
 
 ```bash
 cp config/push.env.example config/push.env   # no commitear
+npx web-push generate-vapid-keys             # público en Flutter; privado solo en Edge
 bash scripts/configure_supabase_push_secrets.sh staging
 ```
 
-La web no registra tokens FCM.
+Android/iOS nativo siguen usando FCM (`device_push_tokens`).
+
+La PWA usa Web Push + VAPID (`web_push_subscriptions`). En iPhone/iPad hay que **Añadir a pantalla de inicio** y activar el permiso en Cuenta y seguridad. El build web inyecta los handlers en el Service Worker de Flutter (`scripts/inject_web_push_sw.sh`) sin reemplazar la caché.
+
+Variables:
+
+| Dónde | Clave |
+|-------|--------|
+| `.env` / Vercel | `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` |
+| `config/push.env` + Edge secrets | `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_VAPID_SUBJECT` |
+
+Prueba en local/DEV (no hace falta tocar MAIN): RPC `request_my_web_push_test` o el botón **Enviar prueba** en Cuenta.
 
 ## Scripts útiles
 

@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/app/firebase_options.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'kyc_notification_match.dart';
 import 'notification_deep_link.dart';
+import 'package:motolink_pro_app/core/notifications/web_push_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 
 @pragma('vm:entry-point')
@@ -36,6 +37,7 @@ class PushNotificationService {
   bool _initialized = false;
   String? _currentToken;
   PushNotificationTapHandler? _onTap;
+  _PendingPushTap? _pendingTap;
 
   static const _androidChannel = AndroidNotificationChannel(
     'motolink_alerts',
@@ -45,7 +47,24 @@ class PushNotificationService {
   );
 
   Future<void> initialize() async {
-    if (_initialized || kIsWeb) return;
+    if (_initialized) return;
+    if (kIsWeb) {
+      await WebPushService.instance.initialize(
+        onTap: ({
+          required String type,
+          String? relatedId,
+          String? notificationId,
+        }) {
+          handleExternalTap(
+            type: type,
+            relatedId: relatedId,
+            notificationId: notificationId,
+          );
+        },
+      );
+      _initialized = true;
+      return;
+    }
 
     if (!(Platform.isAndroid || Platform.isIOS)) return;
 
@@ -91,6 +110,16 @@ class PushNotificationService {
 
   void registerTapHandler(PushNotificationTapHandler handler) {
     _onTap = handler;
+    final pending = _pendingTap;
+    if (pending != null) {
+      _pendingTap = null;
+      handler(
+        type: pending.type,
+        relatedId: pending.relatedId,
+        notificationId: pending.notificationId,
+        title: pending.title,
+      );
+    }
   }
 
   void unregisterTapHandler() {
@@ -98,7 +127,11 @@ class PushNotificationService {
   }
 
   Future<void> registerForCurrentUser() async {
-    if (!_initialized || kIsWeb) return;
+    if (!_initialized) return;
+    if (kIsWeb) {
+      await WebPushService.instance.refreshStatus(syncIfGranted: true);
+      return;
+    }
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null || token.trim().isEmpty) return;
@@ -110,7 +143,11 @@ class PushNotificationService {
   }
 
   Future<void> unregisterCurrentDevice() async {
-    if (!_initialized || kIsWeb) return;
+    if (kIsWeb) {
+      await WebPushService.instance.unregisterCurrentDevice();
+      return;
+    }
+    if (!_initialized) return;
     final token = _currentToken;
     if (token != null && token.isNotEmpty) {
       try {
@@ -175,6 +212,20 @@ class PushNotificationService {
     );
   }
 
+  void handleExternalTap({
+    required String type,
+    String? relatedId,
+    String? notificationId,
+    String? title,
+  }) {
+    _dispatchTap(
+      type: type,
+      relatedId: relatedId,
+      notificationId: notificationId,
+      title: title,
+    );
+  }
+
   void _onRemoteTap(RemoteMessage message) {
     final data = message.data;
     _dispatchTap(
@@ -227,7 +278,12 @@ class PushNotificationService {
       );
       return;
     }
-    debugPrint('Push tap without handler: type=$type related=$relatedId');
+    _pendingTap = _PendingPushTap(
+      type: type,
+      relatedId: relatedId,
+      notificationId: notificationId,
+      title: title,
+    );
   }
 
   /// Deep link desde push cuando [MainShell] ya está montado.
@@ -244,4 +300,18 @@ class PushNotificationService {
       title: title,
     );
   }
+}
+
+class _PendingPushTap {
+  const _PendingPushTap({
+    required this.type,
+    this.relatedId,
+    this.notificationId,
+    this.title,
+  });
+
+  final String type;
+  final String? relatedId;
+  final String? notificationId;
+  final String? title;
 }

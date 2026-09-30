@@ -229,6 +229,44 @@ class NotificationsService {
       params: <String, dynamic>{'p_token': token.trim()},
     );
   }
+
+  static Future<void> upsertWebPushSubscription({
+    required String endpoint,
+    required String p256dh,
+    required String auth,
+    String? userAgent,
+    String platform = 'unknown',
+    String environment = 'unknown',
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'upsert_web_push_subscription',
+      params: <String, dynamic>{
+        'p_endpoint': endpoint.trim(),
+        'p_p256dh': p256dh.trim(),
+        'p_auth': auth.trim(),
+        'p_user_agent': userAgent,
+        'p_platform': platform,
+        'p_environment': environment,
+      },
+    );
+  }
+
+  static Future<void> deactivateWebPushSubscription({
+    required String endpoint,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'deactivate_web_push_subscription',
+      params: <String, dynamic>{'p_endpoint': endpoint.trim()},
+    );
+  }
+
+  static Future<void> deactivateMyWebPushSubscriptions() async {
+    await SupabaseAccess.client.rpc('deactivate_my_web_push_subscriptions');
+  }
+
+  static Future<void> requestMyWebPushTest() async {
+    await SupabaseAccess.client.rpc('request_my_web_push_test');
+  }
 }
 
 class NotificationOrderSummary {

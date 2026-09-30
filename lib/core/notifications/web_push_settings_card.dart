@@ -5,7 +5,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_service.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_status.dart';
 
-/// Ajustes de Web Push (solo PWA / navegador).
+/// Ajustes de avisos en la PWA (solo web).
 class WebPushSettingsCard extends StatelessWidget {
   const WebPushSettingsCard({super.key});
 
@@ -16,6 +16,7 @@ class WebPushSettingsCard extends StatelessWidget {
     return AnimatedBuilder(
       animation: service,
       builder: (context, _) {
+        final status = service.status;
         return DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.card,
@@ -28,20 +29,50 @@ class WebPushSettingsCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Notificaciones en este dispositivo',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.brandBlueContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        status.isActive
+                            ? Icons.notifications_active_outlined
+                            : Icons.notifications_none_outlined,
+                        color: AppColors.brandBlue,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Avisos en este dispositivo',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _StatusPill(status: status),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 12),
                 Text(
-                  _copy(service.status),
+                  _copy(status),
                   style: TextStyle(
                     fontSize: 13,
-                    height: 1.35,
+                    height: 1.45,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -51,6 +82,7 @@ class WebPushSettingsCard extends StatelessWidget {
                     service.lastError!,
                     style: TextStyle(
                       fontSize: 12,
+                      height: 1.35,
                       color: Colors.red.shade800,
                     ),
                   ),
@@ -60,15 +92,15 @@ class WebPushSettingsCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    if (service.status.canActivate)
+                    if (status.canActivate)
                       FilledButton(
                         onPressed: () => service.enableFromUserGesture(),
-                        child: const Text('Activar notificaciones'),
+                        child: const Text('Activar avisos'),
                       ),
-                    if (service.status == WebPushUiStatus.subscribed) ...[
+                    if (status == WebPushUiStatus.subscribed) ...[
                       OutlinedButton(
                         onPressed: () => service.disableFromUserGesture(),
-                        child: const Text('Desactivar'),
+                        child: const Text('Pausar'),
                       ),
                       OutlinedButton(
                         onPressed: () async {
@@ -78,27 +110,29 @@ class WebPushSettingsCard extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                    'Enviamos una prueba a este dispositivo.',
+                                    'Te enviamos un aviso de prueba. Bloquea el iPhone para verlo fuera de la app.',
                                   ),
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             }
-                          } catch (e) {
+                          } catch (_) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('No se pudo enviar la prueba: $e'),
+                                const SnackBar(
+                                  content: Text(
+                                    'No pudimos enviar el aviso de prueba. Inténtalo de nuevo.',
+                                  ),
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             }
                           }
                         },
-                        child: const Text('Enviar prueba'),
+                        child: const Text('Probar aviso'),
                       ),
                     ],
-                    if (service.status == WebPushUiStatus.error)
+                    if (status == WebPushUiStatus.error)
                       OutlinedButton(
                         onPressed: () => service.enableFromUserGesture(),
                         child: const Text('Reintentar'),
@@ -116,19 +150,75 @@ class WebPushSettingsCard extends StatelessWidget {
   static String _copy(WebPushUiStatus status) {
     switch (status) {
       case WebPushUiStatus.unsupported:
-        return 'Este navegador no admite notificaciones Web Push.';
+        return 'Este dispositivo no puede mostrar avisos de B2B Conecta. En iPhone usa Safari, añade la app a inicio y ábrela desde el icono.';
       case WebPushUiStatus.iosNeedsInstall:
-        return 'En iPhone o iPad, toque Compartir y luego “Añadir a pantalla de inicio”. Abra B2B Conecta desde el icono y vuelva aquí para activar las notificaciones.';
+        return 'En iPhone o iPad: toca Compartir y luego “Añadir a pantalla de inicio”. Abre B2B Conecta desde el icono y vuelve aquí para activar los avisos.';
       case WebPushUiStatus.permissionDefault:
-        return 'Las notificaciones están apagadas. Solo se piden cuando usted toca Activar.';
+        return 'Te avisamos de pedidos y mensajes aunque no tengas la app abierta. Solo pedimos permiso cuando toques Activar avisos.';
       case WebPushUiStatus.permissionDenied:
-        return 'El permiso está bloqueado en el navegador. En Ajustes → Safari (o Ajustes → B2B Conecta) permita las notificaciones y vuelva a intentar.';
+        return 'Los avisos están bloqueados. En Ajustes del iPhone busca B2B Conecta y permite las notificaciones.';
       case WebPushUiStatus.subscribed:
-        return 'Las notificaciones de este dispositivo están activas, incluso si deja la app en segundo plano.';
+        return 'Listo. Te llegarán pedidos y mensajes aunque dejes la app en segundo plano o bloquees el iPhone.';
       case WebPushUiStatus.expired:
-        return 'La suscripción venció o el navegador la renovó. Actívelas de nuevo.';
+        return 'Hay que volver a activar los avisos en este dispositivo. Toca Activar avisos para continuar.';
       case WebPushUiStatus.error:
-        return 'No se pudo completar la suscripción. Revise la conexión e inténtelo otra vez.';
+        return 'No pudimos activar los avisos. Revisa la conexión e inténtalo de nuevo.';
     }
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.status});
+
+  final WebPushUiStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (status) {
+      WebPushUiStatus.subscribed => 'Activos',
+      WebPushUiStatus.permissionDenied ||
+      WebPushUiStatus.error =>
+        'Requieren atención',
+      WebPushUiStatus.iosNeedsInstall => 'Falta el icono',
+      WebPushUiStatus.unsupported => 'No disponibles',
+      WebPushUiStatus.expired => 'Hay que renovar',
+      WebPushUiStatus.permissionDefault => 'Apagados',
+    };
+    final active = status.isActive;
+    final alert = status == WebPushUiStatus.permissionDenied ||
+        status == WebPushUiStatus.error;
+    final Color bg;
+    final Color fg;
+    if (active) {
+      bg = AppColors.successGreen.withOpacity(0.12);
+      fg = AppColors.successGreen;
+    } else if (alert) {
+      bg = Colors.red.shade50;
+      fg = Colors.red.shade800;
+    } else {
+      bg = AppColors.brandBlueContainer;
+      fg = AppColors.brandBlue;
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              color: fg,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

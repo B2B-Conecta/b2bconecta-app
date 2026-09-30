@@ -94,6 +94,8 @@ void main() {
     expect(WebPushUiStatus.expired.canActivate, isTrue);
     expect(WebPushUiStatus.subscribed.canActivate, isFalse);
     expect(WebPushUiStatus.permissionDenied.canActivate, isFalse);
+    expect(WebPushUiStatus.error.canActivate, isFalse);
+    expect(WebPushUiStatus.iosNeedsInstall.canActivate, isFalse);
     expect(WebPushUiStatus.subscribed.isActive, isTrue);
     expect(WebPushUiStatus.iosNeedsInstall.isActive, isFalse);
   });

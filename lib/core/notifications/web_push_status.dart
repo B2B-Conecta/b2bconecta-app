@@ -12,8 +12,7 @@ enum WebPushUiStatus {
 extension WebPushUiStatusX on WebPushUiStatus {
   bool get canActivate =>
       this == WebPushUiStatus.permissionDefault ||
-      this == WebPushUiStatus.expired ||
-      this == WebPushUiStatus.error;
+      this == WebPushUiStatus.expired;
 
   bool get isActive => this == WebPushUiStatus.subscribed;
 }

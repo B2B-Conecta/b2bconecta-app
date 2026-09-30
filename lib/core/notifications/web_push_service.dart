@@ -61,11 +61,13 @@ class WebPushService extends ChangeNotifier {
   }
 
   Future<WebPushUiStatus> _computeStatus() async {
-    if (!kIsWeb || !WebPushBridge.hasApi || vapidPublicKey == null) {
-      return WebPushUiStatus.unsupported;
-    }
+    if (!kIsWeb) return WebPushUiStatus.unsupported;
+    // iOS Safari tab has no PushManager — still show install steps first.
     if (WebPushBridge.isIos && !WebPushBridge.isStandalone) {
       return WebPushUiStatus.iosNeedsInstall;
+    }
+    if (!WebPushBridge.hasApi || vapidPublicKey == null) {
+      return WebPushUiStatus.unsupported;
     }
     final perm = WebPushBridge.permission();
     if (perm == 'denied') return WebPushUiStatus.permissionDenied;
@@ -82,7 +84,8 @@ class WebPushService extends ChangeNotifier {
     if (!kIsWeb) return;
     final vapid = vapidPublicKey;
     if (vapid == null) {
-      _lastError = 'Falta NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY en este entorno.';
+      _lastError =
+          'Todavía no podemos activar avisos en este entorno. Inténtalo de nuevo en unos minutos.';
       _status = WebPushUiStatus.error;
       notifyListeners();
       return;
@@ -103,7 +106,7 @@ class WebPushService extends ChangeNotifier {
       final subRaw = result['subscription'];
       if (subRaw is! Map) {
         _status = WebPushUiStatus.error;
-        _lastError = 'El navegador no devolvió una suscripción.';
+        _lastError = 'No pudimos guardar el aviso en este dispositivo.';
         notifyListeners();
         return;
       }
@@ -112,7 +115,8 @@ class WebPushService extends ChangeNotifier {
       );
       if (!keys.isValid) {
         _status = WebPushUiStatus.error;
-        _lastError = 'La suscripción recibida no es válida.';
+        _lastError =
+            'El aviso de este dispositivo no es válido. Inténtalo de nuevo.';
         notifyListeners();
         return;
       }
@@ -133,8 +137,10 @@ class WebPushService extends ChangeNotifier {
       _lastError = null;
       notifyListeners();
     } catch (e) {
+      debugPrint('Web Push subscribe failed: $e');
       _status = WebPushUiStatus.error;
-      _lastError = e.toString();
+      _lastError =
+          'No pudimos activar los avisos. Cierra la app, ábrela desde el icono e inténtalo otra vez.';
       notifyListeners();
     }
   }

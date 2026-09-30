@@ -6,7 +6,7 @@
   function parsePayload(event) {
     var data = {
       title: "B2B Conecta",
-      body: "",
+      body: "Tienes un aviso nuevo.",
       type: "mensaje",
       related_id: "",
       notification_id: "",

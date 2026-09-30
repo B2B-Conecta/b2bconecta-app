@@ -7,3 +7,6 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_STAGING_PUBLISHABLE_KEY
 
 # Must match Supabase Auth Site URL + Redirect URLs (config/supabase-auth-redirects.example)
 SUPABASE_AUTH_REDIRECT_URL=https://b2bconecta-app-git-dev-b2bconecta.vercel.app
+
+# Public VAPID key only (private key is a Supabase Edge secret)
+NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY=

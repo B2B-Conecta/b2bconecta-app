@@ -8,7 +8,7 @@
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Anon/publishable key; RLS protects data |
 | `SUPABASE_AUTH_REDIRECT_URL` | Yes | Redirect allow-list is enforced server-side |
 
-Never embed **service_role**, **FCM server keys**, or **webhook secrets** in Flutter or commit them to git.
+Never embed **service_role**, **FCM server keys**, **VAPID private keys**, or **webhook secrets** in Flutter or commit them to git.
 
 ## Gitignored files (never commit)
 
@@ -31,6 +31,7 @@ Copy `config/env/<env>.env.local.example` → `config/env/<env>.env.local` and f
 
 - `google-services.json` / `GoogleService-Info.plist` are client config; restrict API keys in Google Cloud Console by package/bundle ID.
 - FCM credentials for Edge Functions live only in `config/push.env` and Supabase secrets.
+- Web Push: only `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` may live in the Flutter bundle. `WEB_PUSH_VAPID_PRIVATE_KEY` stays in Edge Function secrets.
 
 ## Builds
 

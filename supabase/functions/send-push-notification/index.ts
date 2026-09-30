@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+import { sendWebPush, vapidConfigured } from "./web_push_send.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -214,12 +215,14 @@ Deno.serve(async (req) => {
   const serviceAccount = fcmServiceAccountRaw
     ? parseServiceAccount(fcmServiceAccountRaw)
     : null;
+  const canFcm = !!(fcmLegacyKey || serviceAccount);
+  const canWebPush = vapidConfigured();
 
-  if (!fcmLegacyKey && !serviceAccount) {
+  if (!canFcm && !canWebPush) {
     return jsonResponse({
       ok: true,
       skipped: true,
-      reason: "FCM_SERVER_KEY or FCM_SERVICE_ACCOUNT_JSON not set",
+      reason: "FCM and Web Push VAPID are not configured",
     });
   }
 
@@ -261,7 +264,27 @@ Deno.serve(async (req) => {
     .map((r) => (r as { token?: string }).token?.trim())
     .filter((t): t is string => !!t);
 
-  if (tokens.length === 0) {
+  const { data: webRows, error: webError } = await supabase
+    .from("web_push_subscriptions")
+    .select("endpoint, p256dh, auth")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (webError) {
+    console.error("send-push-notification web push query:", webError.message);
+    return jsonResponse({ error: webError.message }, 500);
+  }
+
+  const webSubs = (webRows ?? [])
+    .map((r) => r as { endpoint?: string; p256dh?: string; auth?: string })
+    .filter((r) => r.endpoint?.trim() && r.p256dh?.trim() && r.auth?.trim())
+    .map((r) => ({
+      endpoint: r.endpoint!.trim(),
+      p256dh: r.p256dh!.trim(),
+      auth: r.auth!.trim(),
+    }));
+
+  if (tokens.length === 0 && webSubs.length === 0) {
     return jsonResponse({ ok: true, skipped: true, reason: "no_device_tokens" });
   }
 
@@ -273,34 +296,64 @@ Deno.serve(async (req) => {
     data.notification_id = payload.notification_id.trim();
   }
 
+  const webPayload = {
+    title,
+    body,
+    type,
+    related_id: relatedId,
+    notification_id: payload.notification_id?.trim() ?? "",
+  };
+
+  let fcmResult: { success: number; failure: number } = { success: 0, failure: 0 };
+  let webResult = { success: 0, failure: 0, gone: 0 };
+
   try {
-    let result: { success: number; failure: number };
-    if (serviceAccount) {
-      const accessToken = await getFcmAccessToken(serviceAccount);
-      result = await sendFcmV1(
-        serviceAccount.project_id,
-        accessToken,
-        tokens,
-        title,
-        body,
-        data,
-      );
-      return jsonResponse({
-        ok: true,
-        api: "v1",
-        tokens: tokens.length,
-        success: result.success,
-        failure: result.failure,
-      });
+    if (canFcm && tokens.length > 0) {
+      if (serviceAccount) {
+        const accessToken = await getFcmAccessToken(serviceAccount);
+        fcmResult = await sendFcmV1(
+          serviceAccount.project_id,
+          accessToken,
+          tokens,
+          title,
+          body,
+          data,
+        );
+      } else {
+        fcmResult = await sendFcmLegacy(fcmLegacyKey!, tokens, title, body, data);
+      }
     }
 
-    result = await sendFcmLegacy(fcmLegacyKey!, tokens, title, body, data);
+    if (canWebPush && webSubs.length > 0) {
+      for (const sub of webSubs) {
+        try {
+          const status = await sendWebPush(sub, webPayload);
+          if (status === "gone") {
+            webResult.gone += 1;
+            await supabase.rpc("deactivate_web_push_endpoint", {
+              p_endpoint: sub.endpoint,
+            });
+          } else {
+            webResult.success += 1;
+          }
+        } catch (e) {
+          webResult.failure += 1;
+          const message = e instanceof Error ? e.message : String(e);
+          console.error(`web push error: ${message}`);
+        }
+      }
+    }
+
     return jsonResponse({
       ok: true,
-      api: "legacy",
+      api: serviceAccount ? "v1" : (canFcm ? "legacy" : "web-push"),
       tokens: tokens.length,
-      success: result.success,
-      failure: result.failure,
+      success: fcmResult.success,
+      failure: fcmResult.failure,
+      web_push: {
+        subscriptions: webSubs.length,
+        ...webResult,
+      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

@@ -8,6 +8,7 @@
     "description": "Marketplace B2B para importadores y aliados.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "id": "/",
     "icons": [
         {
             "src": "icons/Icon-192.png",

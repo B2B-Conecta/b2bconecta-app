@@ -583,6 +583,34 @@ class SupabaseService {
   static Future<void> removeDevicePushToken({required String token}) =>
       NotificationsService.removeDevicePushToken(token: token);
 
+  static Future<void> upsertWebPushSubscription({
+    required String endpoint,
+    required String p256dh,
+    required String auth,
+    String? userAgent,
+    String platform = 'unknown',
+    String environment = 'unknown',
+  }) =>
+      NotificationsService.upsertWebPushSubscription(
+        endpoint: endpoint,
+        p256dh: p256dh,
+        auth: auth,
+        userAgent: userAgent,
+        platform: platform,
+        environment: environment,
+      );
+
+  static Future<void> deactivateWebPushSubscription({
+    required String endpoint,
+  }) =>
+      NotificationsService.deactivateWebPushSubscription(endpoint: endpoint);
+
+  static Future<void> deactivateMyWebPushSubscriptions() =>
+      NotificationsService.deactivateMyWebPushSubscriptions();
+
+  static Future<void> requestMyWebPushTest() =>
+      NotificationsService.requestMyWebPushTest();
+
   static Future<void> acceptTerms({required String version}) =>
       ProfileService.acceptTerms(version: version);
 

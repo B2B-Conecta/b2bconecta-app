@@ -37,6 +37,9 @@ FCM_KEY="${MOTOLINK_FCM_SERVER_KEY:-${FCM_SERVER_KEY:-}}"
 FCM_SA_JSON="${FCM_SERVICE_ACCOUNT_JSON:-}"
 SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
 WEBHOOK="${MOTOLINK_PUSH_WEBHOOK_SECRET:-${PUSH_WEBHOOK_SECRET:-}}"
+VAPID_PUBLIC="${WEB_PUSH_VAPID_PUBLIC_KEY:-}"
+VAPID_PRIVATE="${WEB_PUSH_VAPID_PRIVATE_KEY:-}"
+VAPID_SUBJECT="${WEB_PUSH_VAPID_SUBJECT:-mailto:b2bconecta.ve@gmail.com}"
 
 if [[ -z "$FCM_KEY" && -z "$FCM_SA_JSON" ]]; then
   echo "Configure FCM_SERVER_KEY (legacy) o FCM_SERVICE_ACCOUNT_JSON (recomendado) en config/push.env"
@@ -84,6 +87,15 @@ fi
 if [[ -n "$FCM_SA_JSON" ]]; then
   SECRET_ARGS+=(FCM_SERVICE_ACCOUNT_JSON="$FCM_SA_JSON")
 fi
+if [[ -n "$VAPID_PUBLIC" && -n "$VAPID_PRIVATE" ]]; then
+  SECRET_ARGS+=(
+    WEB_PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC"
+    WEB_PUSH_VAPID_PRIVATE_KEY="$VAPID_PRIVATE"
+    WEB_PUSH_VAPID_SUBJECT="$VAPID_SUBJECT"
+  )
+else
+  echo "Aviso: WEB_PUSH_VAPID_* vacío — la PWA no enviará Web Push en este proyecto."
+fi
 supabase secrets set "${SECRET_ARGS[@]}"
 
 echo "Desplegando Edge Function send-push-notification…"
@@ -93,4 +105,5 @@ echo ""
 echo "Listo. Verificación rápida:"
 echo "  1. En Supabase SQL: select name from vault.secrets where name like 'push_%';"
 echo "  2. Login en app móvil → tabla device_push_tokens debe tener fila para el usuario."
-echo "  3. Insertar notificación de prueba y revisar logs de send-push-notification."
+echo "  3. PWA: Cuenta y seguridad → Activar notificaciones → tabla web_push_subscriptions."
+echo "  4. Insertar notificación de prueba (o RPC request_my_web_push_test) y revisar logs de send-push-notification."

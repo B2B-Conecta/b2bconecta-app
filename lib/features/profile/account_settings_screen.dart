@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,6 +7,7 @@ import 'package:motolink_pro_app/core/auth/auth_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
+import 'package:motolink_pro_app/core/notifications/web_push_settings_card.dart';
 
 /// Contraseña y datos básicos de la sesión (actualización de credenciales).
 class AccountSettingsScreen extends StatefulWidget {
@@ -455,6 +457,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       ),
                       const SizedBox(height: 10),
                       _sessionSection(email),
+                      if (kIsWeb) ...[
+                        const SizedBox(height: 28),
+                        Text(
+                          'Notificaciones',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const WebPushSettingsCard(),
+                      ],
                       const SizedBox(height: 28),
                       Text(
                         'Seguridad',

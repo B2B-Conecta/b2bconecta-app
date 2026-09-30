@@ -17,6 +17,7 @@ class CatalogFilters {
     this.minOwnerRatingAvg,
     this.minOwnerRatingCount,
     this.onlyWithCommercialDiscount = false,
+    this.category,
   });
 
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
@@ -60,7 +61,23 @@ class CatalogFilters {
   /// Solo productos con oferta directa (`sale_price_usd`) o tramos por volumen.
   final bool onlyWithCommercialDiscount;
 
+  /// Categoría exacta de `products.category` (vitrina de un mayorista).
+  final String? category;
+
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
+
+  /// Vitrina de un mayorista: solo su catálogo activo, opcionalmente una categoría.
+  factory CatalogFilters.importerStore({
+    required String importerId,
+    String? category,
+  }) {
+    final cat = category?.trim();
+    return CatalogFilters(
+      ownerId: importerId.trim(),
+      onlyActiveProducts: true,
+      category: (cat == null || cat.isEmpty) ? null : cat,
+    );
+  }
 
   bool get sortByDistanceFromReference =>
       sortMode == CatalogSortMode.nearest &&
@@ -84,6 +101,7 @@ class CatalogFilters {
         maxPrice != null ||
         hasReputationThreshold ||
         onlyWithCommercialDiscount ||
+        (category != null && category!.trim().isNotEmpty) ||
         sortMode != CatalogSortMode.defaultMode;
   }
 
@@ -111,9 +129,11 @@ class CatalogFilters {
     double? minOwnerRatingAvg,
     int? minOwnerRatingCount,
     bool? onlyWithCommercialDiscount,
+    String? category,
     bool clearSortReference = false,
     bool clearMinOwnerRatingAvg = false,
     bool clearMinOwnerRatingCount = false,
+    bool clearCategory = false,
   }) {
     return CatalogFilters(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -137,6 +157,7 @@ class CatalogFilters {
           : (minOwnerRatingCount ?? this.minOwnerRatingCount),
       onlyWithCommercialDiscount:
           onlyWithCommercialDiscount ?? this.onlyWithCommercialDiscount,
+      category: clearCategory ? null : (category ?? this.category),
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'product_warranty_seal.dart';
+import 'importer_store_profile_screen.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -70,6 +71,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   String get _importerLine => (part.ownerBusinessName ?? '').trim().toUpperCase();
+
+  bool get _canOpenImporterStore {
+    final owner = part.ownerId?.trim();
+    if (owner == null || owner.isEmpty) return false;
+    final viewer = _profile;
+    if (viewer == null) return false;
+    return viewer.isAliado || viewer.isAdministrador;
+  }
+
+  void _openImporterStore() {
+    if (!_canOpenImporterStore) return;
+    final owner = part.ownerId?.trim();
+    if (owner == null || owner.isEmpty) return;
+    final viewer = _profile;
+    if (viewer == null) return;
+    ImporterStoreProfileScreen.open(
+      context,
+      importerId: owner,
+      viewer: viewer,
+    );
+  }
 
   String? _ownerLocationLine() {
     final e = part.ownerEstado?.trim();
@@ -461,7 +483,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           alignment: Alignment.centerLeft,
           child: Text(
             'Categoría: ${part.category!.trim()}',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppColors.brandBlue,
@@ -471,13 +493,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
       const SizedBox(height: 8),
       if (_importerLine.isNotEmpty) ...[
-        Text(
-          _importerLine,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-            color: AppColors.textSecondary,
+        InkWell(
+            onTap: _canOpenImporterStore ? _openImporterStore : null,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              _importerLine,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+                color: _canOpenImporterStore
+                    ? AppColors.brandBlue
+                    : AppColors.textSecondary,
+              ),
+            ),
           ),
         ),
         if (part.isCatalogFeatured) ...[

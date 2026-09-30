@@ -22,16 +22,19 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     required this.initial,
     required this.importers,
     required this.scrollController,
+    this.onOpenImporterStore,
   });
 
   final AliadoCatalogFiltersDraft initial;
   final List<ImporterOption> importers;
   final ScrollController scrollController;
+  final ValueChanged<String>? onOpenImporterStore;
 
   static Future<AliadoCatalogFiltersDraft?> show(
     BuildContext context, {
     required AliadoCatalogFiltersDraft initial,
     required List<ImporterOption> importers,
+    ValueChanged<String>? onOpenImporterStore,
   }) {
     return showModalBottomSheet<AliadoCatalogFiltersDraft>(
       context: context,
@@ -49,6 +52,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
           initial: initial,
           importers: importers,
           scrollController: scrollController,
+          onOpenImporterStore: onOpenImporterStore,
         ),
       ),
     );
@@ -533,6 +537,14 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                         o.ubicacionLine,
                         style: const TextStyle(fontSize: 12),
                       ),
+                      secondary: widget.onOpenImporterStore == null
+                          ? null
+                          : IconButton(
+                              tooltip: 'Ver perfil',
+                              icon: const Icon(Icons.storefront_outlined),
+                              onPressed: () =>
+                                  widget.onOpenImporterStore!(o.id),
+                            ),
                     );
                   }),
                 SizedBox(height: bottom + 8),

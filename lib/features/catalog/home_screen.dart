@@ -20,6 +20,7 @@ import 'aliado_promo_campaign_widgets.dart';
 import 'catalog_product_price_display.dart';
 import 'product_warranty_seal.dart';
 import 'importer_catalog_logo.dart';
+import 'importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
@@ -371,6 +372,13 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       initial: _currentFiltersDraft(),
       importers: importers,
+      onOpenImporterStore: (id) {
+        ImporterStoreProfileScreen.open(
+          context,
+          importerId: id,
+          viewer: widget.profile,
+        );
+      },
     );
     if (result == null || !mounted) return;
     await _applyFiltersDraft(result);
@@ -1043,6 +1051,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       );
                                     },
+                                    onImporterTap:
+                                        (p.ownerId?.trim().isNotEmpty ?? false)
+                                            ? () {
+                                                ImporterStoreProfileScreen.open(
+                                                  context,
+                                                  importerId: p.ownerId!.trim(),
+                                                  viewer: widget.profile,
+                                                );
+                                              }
+                                            : null,
                                   );
                                 },
                               ),
@@ -1085,6 +1103,7 @@ class _ProductGridCard extends StatelessWidget {
     this.compact = false,
     this.showDistanceChips = false,
     this.onTap,
+    this.onImporterTap,
   });
 
   final PartModel part;
@@ -1092,6 +1111,7 @@ class _ProductGridCard extends StatelessWidget {
   final bool compact;
   final bool showDistanceChips;
   final VoidCallback? onTap;
+  final VoidCallback? onImporterTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1196,28 +1216,34 @@ class _ProductGridCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 2),
-              Row(
-                children: [
-                  ImporterCatalogLogo(
-                    storagePath: part.ownerLogoStoragePath,
-                    size: compact ? 14 : 16,
-                  ),
-                  if (part.ownerLogoStoragePath?.trim().isNotEmpty == true)
-                    SizedBox(width: compact ? 4 : 5),
-                  Expanded(
-                    child: Text(
-                      importerLine,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: compact ? 9 : 9.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                        height: 1.1,
+              InkWell(
+                onTap: onImporterTap,
+                borderRadius: BorderRadius.circular(6),
+                child: Row(
+                  children: [
+                    ImporterCatalogLogo(
+                      storagePath: part.ownerLogoStoragePath,
+                      size: compact ? 14 : 16,
+                    ),
+                    if (part.ownerLogoStoragePath?.trim().isNotEmpty == true)
+                      SizedBox(width: compact ? 4 : 5),
+                    Expanded(
+                      child: Text(
+                        importerLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compact ? 9 : 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: onImporterTap != null
+                              ? AppColors.brandBlue
+                              : AppColors.textSecondary,
+                          height: 1.1,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (!compact && locLine.isNotEmpty)
                 Text(

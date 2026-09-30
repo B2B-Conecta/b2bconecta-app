@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/features/catalog/catalog_sort_mode.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/core/utils/haversine.dart';
 
@@ -314,25 +315,28 @@ class CatalogService {
       final distanceCompare = f.sortMode == CatalogSortMode.reputation
           ? comparePartsByDistanceThenCatalogReputation
           : comparePartsByDistanceThenCatalogBoost;
-      final withDist = list.map((row) {
-        final p = PartModel.fromJson(row as Map<String, dynamic>);
-        final km = Haversine.distanceKm(
-          refLat,
-          refLng,
-          p.ownerLatitude,
-          p.ownerLongitude,
-        );
-        return p.copyWith(distanceKmFromReference: km);
-      }).toList()
-        ..sort(distanceCompare);
+      final withDist = constrainCatalogPartsToFilters(
+        list.map((row) {
+          final p = PartModel.fromJson(row as Map<String, dynamic>);
+          final km = Haversine.distanceKm(
+            refLat,
+            refLng,
+            p.ownerLatitude,
+            p.ownerLongitude,
+          );
+          return p.copyWith(distanceKmFromReference: km);
+        }),
+        f,
+      )..sort(distanceCompare);
       if (offset >= withDist.length) return [];
       final end = (offset + limit).clamp(0, withDist.length);
       return withDist.sublist(offset, end);
     }
 
-    final parts = list
-        .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
-        .toList();
+    final parts = constrainCatalogPartsToFilters(
+      list.map((row) => PartModel.fromJson(row as Map<String, dynamic>)),
+      f,
+    );
     if (searchPlan.productScores.isNotEmpty) {
       // Con búsqueda textual: priorizar relevancia RPC, el modo de orden como desempate.
       parts.sort((a, b) {
@@ -592,6 +596,10 @@ class CatalogService {
     if (filters.onlyActiveProducts) {
       q = q.eq('is_active', true);
     }
+    final cat = filters.category?.trim();
+    if (cat != null && cat.isNotEmpty) {
+      q = q.eq('category', cat);
+    }
     final minAvg = filters.minOwnerRatingAvg;
     if (minAvg != null && minAvg > 0) {
       q = q.filter(
@@ -616,6 +624,84 @@ class CatalogService {
     // Catálogo B2B (aliados): ocultar sin inventario o por debajo del mínimo de pedido.
     q = q.eq('stock_covers_min_order', true);
     return q;
+  }
+
+  /// Perfil público de un mayorista activo. `null` = no existe o no es visible.
+  static Future<ImporterStoreProfile?> fetchImporterStoreProfile(
+    String importerId,
+  ) {
+    final id = importerId.trim();
+    if (id.isEmpty) return Future<ImporterStoreProfile?>.value(null);
+    return retryOnJwtIssuedAtFuture(() async {
+      final res = await SupabaseAccess.client.rpc(
+        'aliado_importer_store_profile',
+        params: <String, dynamic>{'p_importador_id': id},
+      );
+      final list = SupabaseAccess.decodeRpcJsonArray(res);
+      if (list.isEmpty) return null;
+      final row = list.first;
+      if (row is! Map) return null;
+      final profile = ImporterStoreProfile.fromJson(
+        Map<String, dynamic>.from(row),
+      );
+      if (profile.id.isEmpty) return null;
+      return profile;
+    });
+  }
+
+  /// Categorías de `products.category` de ese mayorista (catálogo activo).
+  static Future<List<String>> fetchImporterStoreCategories(String importerId) {
+    final id = importerId.trim();
+    if (id.isEmpty) return Future<List<String>>.value(const []);
+    return retryOnJwtIssuedAtFuture(() async {
+      final res = await SupabaseAccess.client.rpc(
+        'aliado_importer_store_categories',
+        params: <String, dynamic>{'p_importador_id': id},
+      );
+      final list = SupabaseAccess.decodeRpcJsonArray(res);
+      final out = <String>[];
+      for (final row in list) {
+        if (row is! Map) continue;
+        final c = row['category']?.toString().trim();
+        if (c != null && c.isNotEmpty) out.add(c);
+      }
+      return out;
+    });
+  }
+
+  /// Producto de vitrina de un mayorista. `null` si el ID no es suyo o no es visible.
+  static Future<PartModel?> fetchVisibleImporterStoreProduct({
+    required String importerId,
+    required String productId,
+  }) {
+    final owner = importerId.trim();
+    final pid = productId.trim();
+    if (owner.isEmpty || pid.isEmpty) {
+      return Future<PartModel?>.value(null);
+    }
+    return retryOnJwtIssuedAtFuture(() async {
+      final store = await fetchImporterStoreProfile(owner);
+      if (store == null) return null;
+      final embed = _catalogProfileSelect(CatalogFilters.empty);
+      final row = await SupabaseAccess.client
+          .from('products')
+          .select('*, $embed')
+          .eq('id', pid)
+          .eq('owner_id', owner)
+          .eq('is_active', true)
+          .eq('stock_covers_min_order', true)
+          .maybeSingle();
+      if (row == null) return null;
+      final part = PartModel.fromJson(Map<String, dynamic>.from(row));
+      if (!catalogPartBelongsToImporterStore(
+        importerId: owner,
+        ownerId: part.ownerId,
+        isActive: part.isActive,
+      )) {
+        return null;
+      }
+      return part;
+    });
   }
 }
 

@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/admin/admin_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/commissions/commission_collected_income_report.dart';
@@ -247,6 +248,23 @@ class SupabaseService {
 
   static Future<int> fetchProductsCount({CatalogFilters? filters}) =>
       CatalogService.fetchProductsCount(filters: filters);
+
+  static Future<ImporterStoreProfile?> fetchImporterStoreProfile(
+    String importerId,
+  ) =>
+      CatalogService.fetchImporterStoreProfile(importerId);
+
+  static Future<List<String>> fetchImporterStoreCategories(String importerId) =>
+      CatalogService.fetchImporterStoreCategories(importerId);
+
+  static Future<PartModel?> fetchVisibleImporterStoreProduct({
+    required String importerId,
+    required String productId,
+  }) =>
+      CatalogService.fetchVisibleImporterStoreProduct(
+        importerId: importerId,
+        productId: productId,
+      );
 
   static Future<InventoryMetrics> fetchMyInventoryMetrics() =>
       InventoryService.fetchMyInventoryMetrics();

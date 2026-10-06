@@ -71,15 +71,16 @@ class ProfileKycDocumentsSection extends StatefulWidget {
 
   @override
   State<ProfileKycDocumentsSection> createState() =>
-      _ProfileKycDocumentsSectionState();
+      ProfileKycDocumentsSectionState();
 }
 
-class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> {
+class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> {
   List<ProfileDocumentModel> _docs = [];
   bool _loading = true;
   String? _busyDocType;
   bool _submittingReview = false;
   bool _termsAccepted = false;
+  bool _showDocValidationErrors = false;
 
   @override
   void initState() {
@@ -138,6 +139,68 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
     return null;
   }
 
+  bool _hasRequiredDoc(String type) {
+    if (type == AliadoDocType.cedulaPropietario && widget._isAliado) {
+      return _cedulaAliadoDoc() != null;
+    }
+    return _docFor(type) != null;
+  }
+
+  bool get areInitialDocsComplete {
+    if (!widget._isAliado) return true;
+    for (final t in AliadoDocType.forRole(widget.role)) {
+      if (!_hasRequiredDoc(t)) return false;
+    }
+    return true;
+  }
+
+  /// Marca documentos faltantes en rojo (p. ej. al pulsar Guardar Perfil).
+  /// Devuelve true si están todos completos.
+  bool highlightMissingRequiredDocs({bool showSnackBar = true}) {
+    if (!widget._isAliado || areInitialDocsComplete) {
+      if (_showDocValidationErrors) {
+        setState(() => _showDocValidationErrors = false);
+      }
+      return true;
+    }
+    setState(() => _showDocValidationErrors = true);
+    if (showSnackBar && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Complete los documentos obligatorios del registro inicial.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFFC62828),
+        ),
+      );
+    }
+    return false;
+  }
+
+  /// Valida docs iniciales; bloquea envío si faltan.
+  bool validateInitialDocuments({bool showSnackBar = true}) {
+    final ok = highlightMissingRequiredDocs(showSnackBar: showSnackBar);
+    if (!ok && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutCubic,
+          alignment: 0.12,
+        );
+      });
+    }
+    return ok;
+  }
+
+  void _clearDocValidationErrorsIfComplete() {
+    if (_showDocValidationErrors && areInitialDocsComplete) {
+      setState(() => _showDocValidationErrors = false);
+    }
+  }
+
   String _formatReviewedAt(DateTime? utc) {
     if (utc == null) return '';
     final l = utc.toLocal();
@@ -194,6 +257,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
         ),
       );
       await _load();
+      _clearDocValidationErrorsIfComplete();
       widget.onChanged?.call();
     } catch (e) {
       if (!mounted) return;
@@ -214,6 +278,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
   }
 
   Future<void> _submitReview() async {
+    if (!validateInitialDocuments()) return;
     if (widget.beforeSubmitReview != null) {
       final saved = await widget.beforeSubmitReview!();
       if (!saved || !mounted) return;
@@ -285,6 +350,7 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
         busy: busy,
         reviewedHint: reviewedHint,
         reviewNote: note,
+        requiredError: _showDocValidationErrors && !has,
         onPickCamera: () =>
             _pickAndUpload(type, channel: DocumentPickChannel.camera),
         onPickGallery: () =>
@@ -432,10 +498,12 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
               subtitle: reqProgress.subtitle,
               infoMessage: AliadoKycSectionHelp.requisitosPerfil,
               initiallyExpanded: !reqProgress.allComplete,
+              forceExpanded: _showDocValidationErrors && !reqProgress.allComplete,
               child: AliadoProfileRequirementsBanner(
                 profile: widget.profile,
                 documents: _docs,
                 compact: true,
+                highlightMissing: _showDocValidationErrors,
               ),
             ),
           ],
@@ -448,6 +516,8 @@ class _ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection>
             infoMessage: AliadoKycSectionHelp.registroInicial,
             initiallyExpanded:
                 requiredUploaded < requiredTypes.length || st == KycStatus.rechazado,
+            forceExpanded: _showDocValidationErrors &&
+                requiredUploaded < requiredTypes.length,
             child: Column(
               children: requiredTypes.map(_buildDocTile).toList(),
             ),

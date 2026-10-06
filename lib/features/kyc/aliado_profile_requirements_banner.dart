@@ -70,11 +70,15 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
     required this.profile,
     required this.documents,
     this.compact = false,
+    this.highlightMissing = false,
   });
 
   final ProfileModel? profile;
   final List<ProfileDocumentModel> documents;
   final bool compact;
+
+  /// Tras intentar guardar/enviar: incompletos en rojo como campos obligatorios.
+  final bool highlightMissing;
 
   @override
   Widget build(BuildContext context) {
@@ -82,27 +86,56 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
       profile: profile,
       documents: documents,
     );
+    final errorColor = Colors.red.shade700;
 
     Widget row(String label, bool ok) {
+      final showErr = highlightMissing && !ok;
       return Padding(
         padding: EdgeInsets.only(bottom: compact ? 3 : 4),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              ok ? Icons.check_circle : Icons.radio_button_unchecked,
+              ok
+                  ? Icons.check_circle
+                  : (showErr
+                      ? Icons.error_outline
+                      : Icons.radio_button_unchecked),
               size: compact ? 15 : 16,
-              color: ok ? AppColors.successGreen : Colors.grey.shade500,
+              color: ok
+                  ? AppColors.successGreen
+                  : (showErr ? errorColor : Colors.grey.shade500),
             ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: compact ? 11 : 11.5,
-                  height: 1.25,
-                  color: ok ? AppColors.textPrimary : AppColors.textSecondary,
-                  fontWeight: ok ? FontWeight.w600 : FontWeight.w500,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: compact ? 11 : 11.5,
+                      height: 1.25,
+                      color: showErr
+                          ? errorColor
+                          : (ok
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary),
+                      fontWeight:
+                          ok || showErr ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                  if (showErr)
+                    Text(
+                      'Campo obligatorio',
+                      style: TextStyle(
+                        fontSize: compact ? 10 : 10.5,
+                        height: 1.2,
+                        color: errorColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

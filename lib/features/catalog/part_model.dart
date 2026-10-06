@@ -36,6 +36,7 @@ class PartModel {
     this.ownerMinOrderAmountRef = 0,
     this.ownerMinOrderCurrency = MinOrderCurrency.ref,
     this.ownerCatalogFeaturedUntil,
+    this.ownerCatalogVerifiedAt,
     this.salePriceUsd,
     this.discountRules,
     this.ownerPagoSoloDivisas = false,
@@ -102,13 +103,18 @@ class PartModel {
   /// Presentación del piso (`profiles.min_order_currency`).
   final MinOrderCurrency ownerMinOrderCurrency;
 
-  /// Destacado manual (`profiles.catalog_featured_until`).
+  /// Destacado admin — dorado (`profiles.catalog_featured_until`).
   final DateTime? ownerCatalogFeaturedUntil;
+
+  /// Verificado admin — azul (`profiles.catalog_verified_at`).
+  final DateTime? ownerCatalogVerifiedAt;
 
   bool get isCatalogFeatured {
     final until = ownerCatalogFeaturedUntil;
     return until != null && until.isAfter(DateTime.now());
   }
+
+  bool get isCatalogVerified => ownerCatalogVerifiedAt != null;
 
   bool get hasOwnerMinOrderAmount => ownerMinOrderAmountRef > 0;
 
@@ -186,6 +192,7 @@ class PartModel {
     final minOrder = _ownerMinOrderAmountFromProfiles(json['profiles']);
     final minCurrency = _ownerMinOrderCurrencyFromProfiles(json['profiles']);
     final featuredUntil = _ownerFeaturedUntilFromProfiles(json['profiles']);
+    final verifiedAt = _ownerVerifiedAtFromProfiles(json['profiles']);
     final soloDivisas = _ownerPagoSoloDivisasFromProfiles(json['profiles']);
 
     final isActiveRaw = json['is_active'];
@@ -213,6 +220,7 @@ class PartModel {
       ownerMinOrderAmountRef: minOrder,
       ownerMinOrderCurrency: minCurrency,
       ownerCatalogFeaturedUntil: featuredUntil,
+      ownerCatalogVerifiedAt: verifiedAt,
       ownerPagoSoloDivisas: soloDivisas,
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
@@ -263,6 +271,7 @@ class PartModel {
     double? ownerMinOrderAmountRef,
     MinOrderCurrency? ownerMinOrderCurrency,
     DateTime? ownerCatalogFeaturedUntil,
+    DateTime? ownerCatalogVerifiedAt,
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     bool? ownerPagoSoloDivisas,
@@ -302,6 +311,8 @@ class PartModel {
           ownerMinOrderCurrency ?? this.ownerMinOrderCurrency,
       ownerCatalogFeaturedUntil:
           ownerCatalogFeaturedUntil ?? this.ownerCatalogFeaturedUntil,
+      ownerCatalogVerifiedAt:
+          ownerCatalogVerifiedAt ?? this.ownerCatalogVerifiedAt,
       salePriceUsd: salePriceUsd ?? this.salePriceUsd,
       discountRules: discountRules ?? this.discountRules,
       ownerPagoSoloDivisas:
@@ -341,6 +352,14 @@ class PartModel {
     final m = _profilesMap(profiles);
     if (m == null) return null;
     final raw = m['catalog_featured_until'];
+    if (raw == null) return null;
+    return DateTime.tryParse(raw.toString());
+  }
+
+  static DateTime? _ownerVerifiedAtFromProfiles(dynamic profiles) {
+    final m = _profilesMap(profiles);
+    if (m == null) return null;
+    final raw = m['catalog_verified_at'];
     if (raw == null) return null;
     return DateTime.tryParse(raw.toString());
   }

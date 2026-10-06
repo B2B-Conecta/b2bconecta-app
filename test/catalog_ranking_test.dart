@@ -39,7 +39,14 @@ void main() {
     expect(sorted.last.id, 'z');
   });
 
-  test('destacado admin queda delante del boost por ventas', () {
+  test('boost por ventas prioriza más pedidos pagados', () {
+    final low = _part(id: 'l', nombre: 'Poco', paidOrders: 1);
+    final high = _part(id: 'h', nombre: 'Mucho', paidOrders: 40);
+    final sorted = [low, high]..sort(comparePartsForCatalogBoost);
+    expect(sorted.first.id, 'h');
+  });
+
+  test('destacado queda delante del boost por ventas', () {
     final regular = _part(id: 'r', nombre: 'Regular', paidOrders: 40);
     final featured = _part(
       id: 'f',
@@ -48,6 +55,18 @@ void main() {
       featuredUntil: DateTime.now().add(const Duration(days: 7)),
     );
     final sorted = [regular, featured]..sort(comparePartsForCatalogBoost);
+    expect(sorted.first.id, 'f');
+  });
+
+  test('destacados quedan delante al ordenar por featured', () {
+    final plain = _part(id: 'p', nombre: 'Sin sello', paidOrders: 40);
+    final featured = _part(
+      id: 'f',
+      nombre: 'Destacado',
+      paidOrders: 1,
+      featuredUntil: DateTime.now().add(const Duration(days: 7)),
+    );
+    final sorted = [plain, featured]..sort(comparePartsForCatalogFeatured);
     expect(sorted.first.id, 'f');
   });
 }

@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'product_warranty_seal.dart';
+import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
@@ -511,19 +512,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
         ),
-        if (part.isCatalogFeatured) ...[
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Chip(
-              visualDensity: VisualDensity.compact,
-              backgroundColor: AppColors.brandAccent.withOpacity(0.12),
-              side: BorderSide(color: AppColors.brandAccent.withOpacity(0.4)),
-              label: const Text(
-                'Destacado',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
-              ),
-            ),
+        if (part.isCatalogVerified || part.isCatalogFeatured) ...[
+          const SizedBox(height: 6),
+          ImporterCatalogSealsRow(
+            verified: part.isCatalogVerified,
+            featured: part.isCatalogFeatured,
           ),
         ],
         const SizedBox(height: 4),

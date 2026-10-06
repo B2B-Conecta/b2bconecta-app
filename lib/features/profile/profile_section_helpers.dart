@@ -104,6 +104,7 @@ class ProfileCollapsibleSection extends StatefulWidget {
     this.subtitle,
     required this.child,
     this.initiallyExpanded = false,
+    this.forceExpanded = false,
     this.infoMessage,
     this.infoTitle,
     this.trailingActions = const [],
@@ -113,6 +114,9 @@ class ProfileCollapsibleSection extends StatefulWidget {
   final String? subtitle;
   final Widget child;
   final bool initiallyExpanded;
+
+  /// Si es true, abre la sección (p. ej. tras fallar validación de docs).
+  final bool forceExpanded;
   final String? infoMessage;
   final String? infoTitle;
   final List<Widget> trailingActions;
@@ -128,13 +132,16 @@ class _ProfileCollapsibleSectionState extends State<ProfileCollapsibleSection> {
   @override
   void initState() {
     super.initState();
-    _open = widget.initiallyExpanded;
+    _open = widget.initiallyExpanded || widget.forceExpanded;
   }
 
   @override
   void didUpdateWidget(covariant ProfileCollapsibleSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_open && widget.initiallyExpanded && !oldWidget.initiallyExpanded) {
+      _open = true;
+    }
+    if (widget.forceExpanded && !oldWidget.forceExpanded) {
       _open = true;
     }
   }

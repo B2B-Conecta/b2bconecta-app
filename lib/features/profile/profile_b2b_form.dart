@@ -91,7 +91,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   bool _submittingImportadorReview = false;
 
   /// Ancla scroll desde notificaciones KYC → sección documentación aliado.
-  final GlobalKey _kycDocumentationSectionKey = GlobalKey();
+  final GlobalKey<ProfileKycDocumentsSectionState> _kycDocumentationSectionKey =
+      GlobalKey<ProfileKycDocumentsSectionState>();
 
   /// Rol ya persistido: el selector no puede cambiarse (RLS / negocio).
   bool get _roleLocked {
@@ -460,6 +461,25 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       return;
     }
 
+    // Resalta docs iniciales faltantes (no bloquea el guardado de datos).
+    if (_showAliadoKycSection) {
+      final kyc = _kycDocumentationSectionKey.currentState;
+      if (kyc != null && !kyc.areInitialDocsComplete) {
+        kyc.highlightMissingRequiredDocs();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = _kycDocumentationSectionKey.currentContext;
+          if (ctx != null && ctx.mounted) {
+            Scrollable.ensureVisible(
+              ctx,
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutCubic,
+              alignment: 0.12,
+            );
+          }
+        });
+      }
+    }
+
     setState(() => _saving = true);
     try {
       final mapsUrl = SupabaseService.normalizeHttpUrl(
@@ -811,6 +831,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                               '+58 412…',
                               label: 'Teléfono',
                             ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Campo obligatorio';
+                              }
+                              return null;
+                            },
                           ),
                         ),
                       ],
@@ -837,6 +863,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                         '+58 412…',
                         label: 'Teléfono',
                       ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Campo obligatorio';
+                        }
+                        return null;
+                      },
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -1191,21 +1223,19 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 infoTitle: 'Verificación',
                 infoMessage: AliadoKycSectionHelp.verificacion,
               ),
-            KeyedSubtree(
+            ProfileKycDocumentsSection(
               key: _kycDocumentationSectionKey,
-              child: ProfileKycDocumentsSection(
-                role: 'aliado',
-                profile: widget.initial,
-                kycStatus: widget.initial?.kycStatus,
-                beforeUpload: _ensureProfileForDocumentUpload,
-                beforeSubmitReview: _persistProfileFromForm,
-                registrationLocked: _aliadoRegistrationLocked,
-                onTermsAccepted: widget.onTermsAccepted,
-                onChanged: () {
-                  _bumpAuthorizationSection();
-                  widget.onRelatedDataChanged?.call();
-                },
-              ),
+              role: 'aliado',
+              profile: widget.initial,
+              kycStatus: widget.initial?.kycStatus,
+              beforeUpload: _ensureProfileForDocumentUpload,
+              beforeSubmitReview: _persistProfileFromForm,
+              registrationLocked: _aliadoRegistrationLocked,
+              onTermsAccepted: widget.onTermsAccepted,
+              onChanged: () {
+                _bumpAuthorizationSection();
+                widget.onRelatedDataChanged?.call();
+              },
             ),
           ],
           if (_showTermsSection) ...[

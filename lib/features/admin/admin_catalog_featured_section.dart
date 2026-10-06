@@ -6,7 +6,8 @@ import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 
-/// Destaca hasta 3 mayoristas en el catálogo, con métricas de ventas y rotación.
+/// Sellos admin de mayoristas: Verificado (azul) y Destacado (dorado).
+/// No controla la vitrina: esa es estándar para importadores activos.
 class AdminCatalogFeaturedSection extends StatefulWidget {
   const AdminCatalogFeaturedSection({
     super.key,
@@ -70,10 +71,12 @@ class _AdminCatalogFeaturedSectionState
   List<ImporterSalesSnapshot> get _featured =>
       _rows.where((e) => e.isCatalogFeatured).toList();
 
+  List<ImporterSalesSnapshot> get _verified =>
+      _rows.where((e) => e.isCatalogVerified).toList();
+
   List<ImporterSalesSnapshot> get _candidates {
     final q = _searchCtrl.text.trim().toLowerCase();
     final list = _rows.where((e) {
-      if (e.isCatalogFeatured) return false;
       if (q.isEmpty) return true;
       return (e.businessName ?? '').toLowerCase().contains(q);
     }).toList();
@@ -92,7 +95,7 @@ class _AdminCatalogFeaturedSectionState
     return list;
   }
 
-  Future<void> _setDays(ImporterSalesSnapshot row, int days) async {
+  Future<void> _setFeaturedDays(ImporterSalesSnapshot row, int days) async {
     final id = row.importadorId?.trim() ?? '';
     if (id.isEmpty || _busyId != null) return;
     setState(() => _busyId = id);
@@ -109,8 +112,8 @@ class _AdminCatalogFeaturedSectionState
         SnackBar(
           content: Text(
             days == 0
-                ? 'Se quitó el destacado de ${row.businessName ?? 'el mayorista'}.'
-                : '${row.businessName ?? 'Mayorista'} destacado por $days días.',
+                ? 'Se quitó el sello Destacado de ${row.businessName ?? 'el mayorista'}.'
+                : '${row.businessName ?? 'Mayorista'} marcado como Destacado por $days días.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -120,7 +123,7 @@ class _AdminCatalogFeaturedSectionState
       final raw = e.toString();
       final msg = raw.contains('featured_limit')
           ? 'Solo se pueden destacar 3 mayoristas a la vez.'
-          : 'No se pudo actualizar el destacado.';
+          : 'No se pudo actualizar el sello Destacado.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );
@@ -129,11 +132,49 @@ class _AdminCatalogFeaturedSectionState
     }
   }
 
-  Future<void> _pickDuration(ImporterSalesSnapshot row) async {
+  Future<void> _setVerified(ImporterSalesSnapshot row, bool verified) async {
+    final id = row.importadorId?.trim() ?? '';
+    if (id.isEmpty || _busyId != null) return;
+    setState(() => _busyId = id);
+    try {
+      await SupabaseService.adminSetImporterCatalogVerified(
+        importadorId: id,
+        verified: verified,
+      );
+      if (!mounted) return;
+      widget.onChanged?.call();
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            verified
+                ? '${row.businessName ?? 'Mayorista'} marcado como Verificado.'
+                : 'Se quitó el sello Verificado de ${row.businessName ?? 'el mayorista'}.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo actualizar el sello Verificado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
+  Future<void> _pickFeaturedDuration(ImporterSalesSnapshot row) async {
     if (_featured.length >= 3 && !row.isCatalogFeatured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ya hay 3 mayoristas destacados. Quite uno para sumar otro.'),
+          content: Text(
+            'Ya hay 3 proveedores Destacados. Quite uno para sumar otro.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -159,8 +200,11 @@ class _AdminCatalogFeaturedSectionState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sube sus productos al inicio del catálogo aliado.',
-                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                  'Sello dorado por alto volumen. Sube sus productos al inicio del catálogo.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 for (final d in _dayOptions) ...[
@@ -176,7 +220,7 @@ class _AdminCatalogFeaturedSectionState
         );
       },
     );
-    if (days != null) await _setDays(row, days);
+    if (days != null) await _setFeaturedDays(row, days);
   }
 
   @override
@@ -191,18 +235,18 @@ class _AdminCatalogFeaturedSectionState
           children: [
             Row(
               children: [
-                Icon(Icons.star_outline, size: 20, color: AppColors.brandAccent),
+                Icon(Icons.verified_outlined, size: 20, color: AppColors.brandBlue),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Destacar mayoristas',
+                    'Sellos Verificado y Destacado',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                   ),
                 ),
                 Text(
-                  '${_featured.length} / 3',
+                  'D ${_featured.length}/3 · V ${_verified.length}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
                   ),
@@ -211,7 +255,9 @@ class _AdminCatalogFeaturedSectionState
             ),
             const SizedBox(height: 4),
             Text(
-              'Elija por ventas, pedidos en curso y rotación. Máximo 3 a la vez.',
+              'Verificado (azul): registro completo y oficial. '
+              'Destacado (dorado): alto volumen — máx. 3. '
+              'Ambos los activa admin; no controlan la vitrina.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -247,30 +293,6 @@ class _AdminCatalogFeaturedSectionState
               TextButton(onPressed: _load, child: const Text('Reintentar')),
             ] else ...[
               const SizedBox(height: 12),
-              Text(
-                'En vitrina',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              if (_featured.isEmpty)
-                Text(
-                  'Nadie está destacado. Use la lista de abajo para subir a un mayorista.',
-                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-                )
-              else
-                for (final row in _featured)
-                  _FeaturedImporterCard(
-                    row: row,
-                    busy: _busyId == row.importadorId,
-                    featured: true,
-                    onHighlight: () => _pickDuration(row),
-                    onRemove: () => _setDays(row, 0),
-                  ),
-              const SizedBox(height: 14),
               Text(
                 'Mayoristas',
                 style: TextStyle(
@@ -308,7 +330,7 @@ class _AdminCatalogFeaturedSectionState
               if (_candidates.isEmpty)
                 Text(
                   _searchCtrl.text.trim().isEmpty
-                      ? 'No hay más mayoristas para destacar.'
+                      ? 'No hay mayoristas.'
                       : 'Ningún mayorista coincide con la búsqueda.',
                   style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                 )
@@ -317,8 +339,12 @@ class _AdminCatalogFeaturedSectionState
                   _FeaturedImporterCard(
                     row: row,
                     busy: _busyId == row.importadorId,
-                    featured: false,
-                    onHighlight: () => _pickDuration(row),
+                    onToggleVerified: () =>
+                        _setVerified(row, !row.isCatalogVerified),
+                    onFeature: () => _pickFeaturedDuration(row),
+                    onUnfeature: row.isCatalogFeatured
+                        ? () => _setFeaturedDays(row, 0)
+                        : null,
                   ),
             ],
           ],
@@ -347,32 +373,38 @@ class _FeaturedImporterCard extends StatelessWidget {
   const _FeaturedImporterCard({
     required this.row,
     required this.busy,
-    required this.featured,
-    required this.onHighlight,
-    this.onRemove,
+    required this.onToggleVerified,
+    required this.onFeature,
+    this.onUnfeature,
   });
 
   final ImporterSalesSnapshot row;
   final bool busy;
-  final bool featured;
-  final VoidCallback onHighlight;
-  final VoidCallback? onRemove;
+  final VoidCallback onToggleVerified;
+  final VoidCallback onFeature;
+  final VoidCallback? onUnfeature;
 
   @override
   Widget build(BuildContext context) {
     final name = (row.businessName ?? '').trim().isEmpty
         ? 'Mayorista'
         : row.businessName!.trim();
+    final featured = row.isCatalogFeatured;
+    final verified = row.isCatalogVerified;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      color: featured ? AppColors.brandBlueContainer : AppColors.surfaceTinted,
+      color: (featured || verified)
+          ? AppColors.brandBlueContainer
+          : AppColors.surfaceTinted,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
           color: featured
-              ? AppColors.brandAccent.withOpacity(0.45)
-              : AppColors.borderSubtle,
+              ? const Color(0xFFE8A317).withOpacity(0.55)
+              : verified
+                  ? AppColors.brandBlue.withOpacity(0.35)
+                  : AppColors.borderSubtle,
         ),
       ),
       child: Padding(
@@ -382,9 +414,13 @@ class _FeaturedImporterCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                if (verified) ...[
+                  const Icon(Icons.verified, size: 16, color: AppColors.brandBlue),
+                  const SizedBox(width: 4),
+                ],
                 if (featured) ...[
-                  Icon(Icons.star, size: 16, color: AppColors.brandAccent),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.star, size: 16, color: Color(0xFFE8A317)),
+                  const SizedBox(width: 4),
                 ],
                 Expanded(
                   child: Text(
@@ -408,11 +444,11 @@ class _FeaturedImporterCard extends StatelessWidget {
             if (featured && row.catalogFeaturedUntil != null) ...[
               const SizedBox(height: 2),
               Text(
-                'Hasta ${formatEsShortDateTime(row.catalogFeaturedUntil)}',
-                style: TextStyle(
+                'Destacado hasta ${formatEsShortDateTime(row.catalogFeaturedUntil)}',
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.brandBlue,
+                  color: Color(0xFFB7790D),
                 ),
               ),
             ],
@@ -500,22 +536,37 @@ class _FeaturedImporterCard extends StatelessWidget {
                 ],
               ),
             ),
-            Row(
+            Wrap(
+              spacing: 4,
+              runSpacing: 0,
               children: [
+                TextButton.icon(
+                  onPressed: busy ? null : onToggleVerified,
+                  icon: Icon(
+                    verified ? Icons.verified : Icons.verified_outlined,
+                    size: 18,
+                    color: AppColors.brandBlue,
+                  ),
+                  label: Text(verified ? 'Quitar verificado' : 'Verificado'),
+                ),
                 if (!featured)
                   TextButton.icon(
-                    onPressed: busy ? null : onHighlight,
-                    icon: const Icon(Icons.star_outline, size: 18),
+                    onPressed: busy ? null : onFeature,
+                    icon: const Icon(
+                      Icons.star_outline,
+                      size: 18,
+                      color: Color(0xFFE8A317),
+                    ),
                     label: const Text('Destacar'),
                   )
                 else ...[
                   TextButton(
-                    onPressed: busy ? null : onHighlight,
-                    child: const Text('Renovar'),
+                    onPressed: busy ? null : onFeature,
+                    child: const Text('Renovar destacado'),
                   ),
                   TextButton(
-                    onPressed: busy ? null : onRemove,
-                    child: const Text('Quitar'),
+                    onPressed: busy ? null : onUnfeature,
+                    child: const Text('Quitar destacado'),
                   ),
                 ],
               ],

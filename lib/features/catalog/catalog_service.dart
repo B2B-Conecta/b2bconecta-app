@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
-import 'package:motolink_pro_app/features/catalog/catalog_sort_mode.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
@@ -95,7 +94,7 @@ class CatalogService {
 
   static String _catalogProfileSelect(CatalogFilters filters) {
     const rep =
-        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d, min_order_amount_ref, min_order_currency, catalog_featured_until';
+        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d, min_order_amount_ref, min_order_currency, catalog_featured_until, catalog_verified_at';
     return _catalogNeedsProfileInner(filters)
         ? 'profiles!inner(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)'
         : 'profiles(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
@@ -142,7 +141,7 @@ class CatalogService {
         .toList();
   }
 
-  /// Admin: destaca un importador 7/15/30 días, o 0 para quitar.
+  /// Admin: sello Destacado 7/15/30 días, o 0 para quitar.
   static Future<DateTime?> adminSetImporterCatalogFeatured({
     required String importadorId,
     required int days,
@@ -152,6 +151,22 @@ class CatalogService {
       params: <String, dynamic>{
         'p_importador_id': importadorId,
         'p_days': days,
+      },
+    );
+    if (res == null) return null;
+    return DateTime.tryParse(res.toString());
+  }
+
+  /// Admin: sello Verificado (registro oficial) on/off.
+  static Future<DateTime?> adminSetImporterCatalogVerified({
+    required String importadorId,
+    required bool verified,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'admin_set_importer_catalog_verified',
+      params: <String, dynamic>{
+        'p_importador_id': importadorId,
+        'p_verified': verified,
       },
     );
     if (res == null) return null;
@@ -312,9 +327,7 @@ class CatalogService {
     if (f.sortByDistanceFromReference) {
       final refLat = f.sortReferenceLat!;
       final refLng = f.sortReferenceLng!;
-      final distanceCompare = f.sortMode == CatalogSortMode.reputation
-          ? comparePartsByDistanceThenCatalogReputation
-          : comparePartsByDistanceThenCatalogBoost;
+      final distanceCompare = comparePartsByDistanceThenCatalogBoost;
       final withDist = constrainCatalogPartsToFilters(
         list.map((row) {
           final p = PartModel.fromJson(row as Map<String, dynamic>);

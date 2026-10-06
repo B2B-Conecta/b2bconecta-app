@@ -20,6 +20,7 @@ import 'aliado_promo_campaign_widgets.dart';
 import 'catalog_product_price_display.dart';
 import 'product_warranty_seal.dart';
 import 'importer_catalog_logo.dart';
+import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
@@ -877,7 +878,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                   ),
                   if (activeFilterChips != null) activeFilterChips,
-                  if (_catalogSortMode == CatalogSortMode.reputation &&
+                  if (_catalogSortMode == CatalogSortMode.featured &&
                       widget.homeRole == AppHomeRole.aliado)
                     Padding(
                       padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
@@ -888,26 +889,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
+                          color: const Color(0xFFFFF6E5),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.shade200),
+                          border: Border.all(
+                            color: const Color(0xFFE8A317).withOpacity(0.35),
+                          ),
                         ),
-                        child: Row(
+                        child: const Row(
                           children: [
                             Icon(
-                              Icons.leaderboard_outlined,
+                              Icons.star_rounded,
                               size: 18,
-                              color: Colors.amber.shade900,
+                              color: Color(0xFFE8A317),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Ranking por reputación (últ. 100 valoraciones). '
-                                'Los proveedores mejor calificados aparecen primero.',
+                                'Orden Destacados: primero los proveedores con '
+                                'sello dorado por alto volumen.',
                                 style: TextStyle(
                                   fontSize: 11,
                                   height: 1.35,
-                                  color: Colors.amber.shade900,
+                                  color: Color(0xFF8A5A00),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -1156,27 +1160,15 @@ class _ProductGridCard extends StatelessWidget {
                               )
                             : _placeholder(compact),
                       ),
-                      if (part.isCatalogFeatured)
+                      if (part.isCatalogVerified || part.isCatalogFeatured)
                         Positioned(
                           top: compact ? 4 : 6,
                           left: compact ? 4 : 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brandAccent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              compact ? '★' : 'Destacado',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                          child: ImporterCatalogSealsRow(
+                            verified: part.isCatalogVerified,
+                            featured: part.isCatalogFeatured,
+                            compact: compact,
+                            spacing: 4,
                           ),
                         ),
                       if (part.hasWarranty)

@@ -20,6 +20,7 @@ class ImporterStoreProfile {
     this.minOrderAmountRef = 0,
     this.minOrderCurrency = MinOrderCurrency.ref,
     this.catalogFeaturedUntil,
+    this.catalogVerifiedAt,
     this.pagoSoloDivisas = false,
     this.acceptedPagoMetodos = const [],
   });
@@ -38,8 +39,16 @@ class ImporterStoreProfile {
   final double minOrderAmountRef;
   final MinOrderCurrency minOrderCurrency;
   final DateTime? catalogFeaturedUntil;
+  final DateTime? catalogVerifiedAt;
   final bool pagoSoloDivisas;
   final List<String> acceptedPagoMetodos;
+
+  bool get isCatalogFeatured {
+    final until = catalogFeaturedUntil;
+    return until != null && until.isAfter(DateTime.now());
+  }
+
+  bool get isCatalogVerified => catalogVerifiedAt != null;
 
   String get displayName {
     final n = businessName?.trim();
@@ -108,6 +117,9 @@ class ImporterStoreProfile {
       ),
       catalogFeaturedUntil: json['catalog_featured_until'] != null
           ? DateTime.tryParse(json['catalog_featured_until'].toString())
+          : null,
+      catalogVerifiedAt: json['catalog_verified_at'] != null
+          ? DateTime.tryParse(json['catalog_verified_at'].toString())
           : null,
       pagoSoloDivisas: json['pago_solo_divisas'] == true,
       acceptedPagoMetodos: metodos(json['accepted_pago_metodos']),

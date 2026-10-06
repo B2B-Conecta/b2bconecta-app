@@ -296,6 +296,15 @@ class SupabaseService {
         days: days,
       );
 
+  static Future<DateTime?> adminSetImporterCatalogVerified({
+    required String importadorId,
+    required bool verified,
+  }) =>
+      CatalogService.adminSetImporterCatalogVerified(
+        importadorId: importadorId,
+        verified: verified,
+      );
+
   static Future<List<ImporterSalesSnapshot>>
       adminListImporterSalesSnapshots({int days = 30}) =>
           CatalogService.adminListImporterSalesSnapshots(days: days);

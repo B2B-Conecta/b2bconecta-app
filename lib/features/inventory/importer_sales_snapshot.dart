@@ -35,6 +35,7 @@ class ImporterSalesSnapshot {
     this.importadorId,
     this.businessName,
     this.catalogFeaturedUntil,
+    this.catalogVerifiedAt,
     this.days = 30,
     this.ordersCount = 0,
     this.ordersActive = 0,
@@ -54,6 +55,7 @@ class ImporterSalesSnapshot {
   final String? importadorId;
   final String? businessName;
   final DateTime? catalogFeaturedUntil;
+  final DateTime? catalogVerifiedAt;
   final int days;
   final int ordersCount;
   final int ordersActive;
@@ -71,6 +73,8 @@ class ImporterSalesSnapshot {
     final until = catalogFeaturedUntil;
     return until != null && until.isAfter(DateTime.now());
   }
+
+  bool get isCatalogVerified => catalogVerifiedAt != null;
 
   /// Ticket medio del período (REF / pedido, sin rechazados).
   double get averageTicketRef =>
@@ -92,6 +96,9 @@ class ImporterSalesSnapshot {
       businessName: json['business_name']?.toString().trim(),
       catalogFeaturedUntil: json['catalog_featured_until'] != null
           ? DateTime.tryParse(json['catalog_featured_until'].toString())
+          : null,
+      catalogVerifiedAt: json['catalog_verified_at'] != null
+          ? DateTime.tryParse(json['catalog_verified_at'].toString())
           : null,
       days: _asInt(json['days'], fallback: 30),
       ordersCount: _asInt(json['orders_count']),

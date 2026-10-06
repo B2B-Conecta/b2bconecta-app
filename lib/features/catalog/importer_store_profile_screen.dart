@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
@@ -471,6 +472,14 @@ class _ImporterStoreProfileScreenState
                           color: AppColors.textPrimary,
                         ),
                       ),
+                      if (profile.isCatalogVerified ||
+                          profile.isCatalogFeatured) ...[
+                        const SizedBox(height: 6),
+                        ImporterCatalogSealsRow(
+                          verified: profile.isCatalogVerified,
+                          featured: profile.isCatalogFeatured,
+                        ),
+                      ],
                       if (profile.locationLine.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(

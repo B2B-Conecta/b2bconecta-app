@@ -51,16 +51,16 @@ int comparePartsForSortMode(PartModel a, PartModel b, CatalogSortMode mode) {
   switch (mode) {
     case CatalogSortMode.category:
       return comparePartsByCategoryThenName(a, b);
-    case CatalogSortMode.reputation:
-      return comparePartsForCatalogReputation(a, b);
+    case CatalogSortMode.featured:
+      return comparePartsForCatalogFeatured(a, b);
     case CatalogSortMode.recommended:
     case CatalogSortMode.nearest:
       return comparePartsForCatalogBoost(a, b);
   }
 }
 
-/// Orden E2.2: destacado admin, reputación rolling, luego boost E1.1.
-int comparePartsForCatalogReputation(PartModel a, PartModel b) {
+/// Orden: Destacados primero, luego reputación y ventas.
+int comparePartsForCatalogFeatured(PartModel a, PartModel b) {
   final featured = _compareCatalogFeatured(a, b);
   if (featured != 0) return featured;
   final ra = a.ownerRatingAvg;
@@ -92,16 +92,4 @@ int comparePartsByDistanceThenCatalogBoost(PartModel a, PartModel b) {
   final c = da.compareTo(db);
   if (c != 0) return c;
   return comparePartsForCatalogBoost(a, b);
-}
-
-/// Desempate por distancia (misma distancia → reputación primero).
-int comparePartsByDistanceThenCatalogReputation(PartModel a, PartModel b) {
-  final da = a.distanceKmFromReference;
-  final db = b.distanceKmFromReference;
-  if (da == null && db == null) return comparePartsForCatalogReputation(a, b);
-  if (da == null) return 1;
-  if (db == null) return -1;
-  final c = da.compareTo(db);
-  if (c != 0) return c;
-  return comparePartsForCatalogReputation(a, b);
 }

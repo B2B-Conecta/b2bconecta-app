@@ -41,12 +41,12 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.88,
-        minChildSize: 0.45,
-        maxChildSize: 0.95,
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.96,
         expand: false,
         builder: (_, scrollController) => AliadoCatalogFiltersSheet(
           initial: initial,
@@ -151,18 +151,79 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     }).toList();
   }
 
-  Widget _sectionTitle(String title) {
+  Widget _sectionHeader(String title, {IconData? icon, String? hint}) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 10),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.5,
-          color: AppColors.textSecondary,
-        ),
+      padding: const EdgeInsets.only(top: 22, bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (icon != null) ...[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.brandBlueContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: AppColors.brandBlue),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                if (hint != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    hint,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _choiceChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: true,
+      selectedColor: AppColors.brandBlue,
+      checkmarkColor: Colors.white,
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 13,
+        color: selected ? Colors.white : AppColors.textPrimary,
+      ),
+      backgroundColor: AppColors.surfaceTinted,
+      side: BorderSide(
+        color: selected ? AppColors.brandBlue : AppColors.borderSubtle,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
     );
   }
 
@@ -185,6 +246,82 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     );
   }
 
+  Widget _sortCard(CatalogSortMode mode) {
+    final selected = _sortMode == mode;
+    return Material(
+      color: selected ? AppColors.brandBlueContainer : AppColors.surfaceTinted,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () => setState(() => _sortMode = mode),
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? AppColors.brandBlue.withOpacity(0.55)
+                  : AppColors.borderSubtle,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.brandBlue : AppColors.card,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  mode.iconData,
+                  color: selected ? Colors.white : AppColors.brandBlue,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      mode.labelEs,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      mode.subtitleEs,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected ? AppColors.brandBlue : AppColors.textMuted,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewPadding.bottom;
@@ -195,7 +332,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
 
     return Material(
       color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       child: Column(
         children: [
           Padding(
@@ -213,22 +350,43 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'Filtros',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Categoría, descuentos, ubicación, precio, reputación, proveedores y orden.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filtros',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 22,
+                              letterSpacing: -0.4,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Afiná el catálogo por categoría, orden y proveedor.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -236,76 +394,39 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
           Expanded(
             child: ListView(
               controller: widget.scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               children: [
-                _sectionTitle('CATEGORÍA'),
+                _sectionHeader(
+                  'Categoría',
+                  icon: Icons.category_outlined,
+                  hint: 'Elige un rubro o mira todos los productos.',
+                ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: kAliadoCatalogCategoryLabels.map((label) {
-                    final selected = _category == label;
-                    return FilterChip(
-                      label: Text(label),
-                      selected: selected,
-                      onSelected: (_) => setState(() => _category = label),
-                      selectedColor: AppColors.brand,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: selected ? Colors.white : AppColors.textPrimary,
-                      ),
-                      backgroundColor: Colors.grey.shade200,
-                      side: BorderSide.none,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    return _choiceChip(
+                      label: label,
+                      selected: _category == label,
+                      onTap: () => setState(() => _category = label),
                     );
                   }).toList(),
                 ),
-                _sectionTitle('ORDEN'),
-                ...CatalogSortMode.values.map((mode) {
-                  return RadioListTile<CatalogSortMode>(
-                    value: mode,
-                    groupValue: _sortMode,
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _sortMode = v);
-                    },
-                    contentPadding: EdgeInsets.zero,
-                    activeColor: AppColors.brand,
-                    title: Text(
-                      mode.labelEs,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: Text(
-                      switch (mode) {
-                        CatalogSortMode.category =>
-                          'Agrupa por categoría y ordena A–Z dentro de cada una.',
-                        CatalogSortMode.recommended =>
-                          'Prioriza actividad reciente y reputación (últ. 100).',
-                        CatalogSortMode.nearest =>
-                          'Ordena por distancia a tu ubicación (GPS).',
-                        CatalogSortMode.reputation =>
-                          'Primero importadores mejor valorados (últ. 100).',
-                      },
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  );
-                }),
-                _sectionTitle('REPUTACIÓN DEL PROVEEDOR'),
-                Text(
-                  'Solo productos de importadores que cumplan el umbral (ventana móvil de 100 valoraciones).',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textSecondary,
-                  ),
+                _sectionHeader(
+                  'Orden',
+                  icon: Icons.swap_vert_rounded,
+                  hint: 'Cómo se listan los productos en el catálogo.',
                 ),
-                const SizedBox(height: 8),
+                for (final mode in CatalogSortMode.values) ...[
+                  _sortCard(mode),
+                  const SizedBox(height: 8),
+                ],
+                _sectionHeader(
+                  'Reputación del proveedor',
+                  icon: Icons.star_outline_rounded,
+                  hint:
+                      'Solo productos de importadores que cumplan el umbral (últ. 100 valoraciones).',
+                ),
                 Text(
                   'Promedio mínimo',
                   style: TextStyle(
@@ -314,33 +435,19 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: kAliadoCatalogMinRatingPresets.map((preset) {
-                    final selected = _minRatingAvg == preset.minAvg;
-                    return FilterChip(
-                      label: Text(preset.label),
-                      selected: selected,
-                      onSelected: (_) => setState(() => _minRatingAvg = preset.minAvg),
-                      selectedColor: AppColors.brand,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        color:
-                            selected ? Colors.white : AppColors.textPrimary,
-                      ),
-                      backgroundColor: Colors.grey.shade200,
-                      side: BorderSide.none,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    return _choiceChip(
+                      label: preset.label,
+                      selected: _minRatingAvg == preset.minAvg,
+                      onTap: () => setState(() => _minRatingAvg = preset.minAvg),
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Text(
                   'Cantidad mínima de valoraciones',
                   style: TextStyle(
@@ -349,34 +456,23 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: kAliadoCatalogMinRatingCountPresets.map((preset) {
-                    final selected = _minRatingCount == preset.minCount;
-                    return FilterChip(
-                      label: Text(preset.label),
-                      selected: selected,
-                      onSelected: (_) =>
+                    return _choiceChip(
+                      label: preset.label,
+                      selected: _minRatingCount == preset.minCount,
+                      onTap: () =>
                           setState(() => _minRatingCount = preset.minCount),
-                      selectedColor: AppColors.brand,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        color:
-                            selected ? Colors.white : AppColors.textPrimary,
-                      ),
-                      backgroundColor: Colors.grey.shade200,
-                      side: BorderSide.none,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                     );
                   }).toList(),
                 ),
-                _sectionTitle('UBICACIÓN DEL PROVEEDOR'),
+                _sectionHeader(
+                  'Ubicación del proveedor',
+                  icon: Icons.place_outlined,
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -402,37 +498,24 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     ),
                   ],
                 ),
-                _sectionTitle('DESCUENTOS'),
-                Text(
-                  'Oferta directa, descuento por volumen o % extra en la línea USD (Zelle/divisas).',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textSecondary,
-                  ),
+                _sectionHeader(
+                  'Descuentos',
+                  icon: Icons.local_offer_outlined,
+                  hint:
+                      'Oferta directa, volumen o % extra en la línea USD (Zelle/divisas).',
                 ),
-                const SizedBox(height: 8),
-                FilterChip(
-                  label: const Text('Solo con descuentos'),
+                _choiceChip(
+                  label: 'Solo con descuentos',
                   selected: _onlyWithCommercialDiscount,
-                  onSelected: (v) =>
-                      setState(() => _onlyWithCommercialDiscount = v),
-                  selectedColor: AppColors.brand,
-                  checkmarkColor: Colors.white,
-                  labelStyle: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: _onlyWithCommercialDiscount
-                        ? Colors.white
-                        : AppColors.textPrimary,
-                  ),
-                  backgroundColor: Colors.grey.shade200,
-                  side: BorderSide.none,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  onTap: () => setState(
+                    () => _onlyWithCommercialDiscount =
+                        !_onlyWithCommercialDiscount,
                   ),
                 ),
-                _sectionTitle('PRECIO (REF)'),
+                _sectionHeader(
+                  'Precio (REF)',
+                  icon: Icons.payments_outlined,
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -456,7 +539,11 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     ),
                   ],
                 ),
-                _sectionTitle('PROVEEDORES · $importerSummary'),
+                _sectionHeader(
+                  'Proveedores · $importerSummary',
+                  icon: Icons.storefront_outlined,
+                  hint: 'Filtra por mayorista o abre su vitrina.',
+                ),
                 TextField(
                   controller: _importerSearchController,
                   decoration: _fieldDecoration(
@@ -551,8 +638,19 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
               ],
             ),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, bottom + 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: AppColors.borderSubtle)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 16),
             child: Row(
               children: [
                 Expanded(
@@ -573,6 +671,12 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   child: ElevatedButton(
                     onPressed: () =>
                         Navigator.of(context).pop(_buildDraft()),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     child: const Text('Aplicar filtros'),
                   ),
                 ),

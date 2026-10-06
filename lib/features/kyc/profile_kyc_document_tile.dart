@@ -20,6 +20,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
     this.actionsEnabled = true,
     this.reviewedHint,
     this.reviewNote,
+    this.requiredError = false,
   });
 
   final String title;
@@ -34,19 +35,26 @@ class ProfileKycDocumentTile extends StatelessWidget {
   final String? reviewedHint;
   final String? reviewNote;
 
+  /// Sin archivo tras validar envío/guardado: borde y texto en rojo.
+  final bool requiredError;
+
   @override
   Widget build(BuildContext context) {
+    final showRequired = requiredError && !hasFile;
+    final errorColor = Colors.red.shade700;
     return Material(
       color: AppColors.card,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: AppDecorations.radius12,
         side: BorderSide(
-          color: kycDocumentReviewTileBorderColor(
-            has: hasFile,
-            status: effectiveStatus,
-          ),
-          width: 1.2,
+          color: showRequired
+              ? Colors.red.shade400
+              : kycDocumentReviewTileBorderColor(
+                  has: hasFile,
+                  status: effectiveStatus,
+                ),
+          width: showRequired ? 1.5 : 1.2,
         ),
       ),
       child: Padding(
@@ -59,14 +67,15 @@ class ProfileKycDocumentTile extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: AppColors.textPrimary,
+                color: showRequired ? errorColor : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             _CompactDocStatusLine(
-              statusLabel: statusLabel,
+              statusLabel: showRequired ? 'Campo obligatorio' : statusLabel,
               hasFile: hasFile,
               effectiveStatus: effectiveStatus,
+              requiredError: showRequired,
             ),
             const SizedBox(height: 8),
             MediaPickActionChips(
@@ -106,30 +115,37 @@ class _CompactDocStatusLine extends StatelessWidget {
     required this.statusLabel,
     required this.hasFile,
     required this.effectiveStatus,
+    this.requiredError = false,
   });
 
   final String statusLabel;
   final bool hasFile;
   final String? effectiveStatus;
+  final bool requiredError;
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color) = switch (effectiveStatus) {
-      DocumentReviewStatus.aprobado => (
-          Icons.check_circle_outline,
-          AppColors.successGreen,
-        ),
-      DocumentReviewStatus.rechazado => (
-          Icons.error_outline,
-          Colors.red.shade700,
-        ),
-      DocumentReviewStatus.enRevision => (
-          Icons.schedule,
-          AppColors.brandAccent,
-        ),
-      _ when !hasFile => (Icons.upload_file_outlined, AppColors.textSecondary),
-      _ => (Icons.description_outlined, AppColors.brandBlue),
-    };
+    final (icon, color) = requiredError
+        ? (Icons.error_outline, Colors.red.shade700)
+        : switch (effectiveStatus) {
+            DocumentReviewStatus.aprobado => (
+                Icons.check_circle_outline,
+                AppColors.successGreen,
+              ),
+            DocumentReviewStatus.rechazado => (
+                Icons.error_outline,
+                Colors.red.shade700,
+              ),
+            DocumentReviewStatus.enRevision => (
+                Icons.schedule,
+                AppColors.brandAccent,
+              ),
+            _ when !hasFile => (
+                Icons.upload_file_outlined,
+                AppColors.textSecondary,
+              ),
+            _ => (Icons.description_outlined, AppColors.brandBlue),
+          };
     return Row(
       children: [
         Icon(icon, size: 14, color: color),

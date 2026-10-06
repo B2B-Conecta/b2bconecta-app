@@ -86,9 +86,7 @@ class _MainShellState extends State<MainShell> {
       MainShellTabController.registerB2BProfileTabIndex(3);
     }
     if (widget.homeRole == AppHomeRole.administrador) {
-      MainShellTabController.registerAdminProfileTabIndex(
-        widget.profile.isOwner ? 7 : 6,
-      );
+      MainShellTabController.registerAdminProfileTabIndex(7);
     }
     unawaited(_ensureDailyTasaBcvNotification());
   }
@@ -192,9 +190,7 @@ class _MainShellState extends State<MainShell> {
     if (!mounted || p == null) return;
     setState(() => _profile = p);
     if (widget.homeRole == AppHomeRole.administrador) {
-      MainShellTabController.registerAdminProfileTabIndex(
-        p.isOwner ? 7 : 6,
-      );
+      MainShellTabController.registerAdminProfileTabIndex(7);
     }
   }
 
@@ -270,7 +266,7 @@ class _MainShellState extends State<MainShell> {
   List<AdminShellDestination> get _adminDestinations {
     return [
       ..._adminPanelDestinations,
-      if (_profile.isOwner) _adminCuentasDestination,
+      _adminCuentasDestination,
       _adminProfileDestination,
     ];
   }
@@ -345,7 +341,7 @@ class _MainShellState extends State<MainShell> {
       const AdminCommissionSettlementsPanel(),
       AdminKycReviewPanel(viewerIsOwner: _profile.isOwner),
       const AdminSupportTicketsPanel(),
-      if (_profile.isOwner) AdminAccountManagementPanel(viewer: _profile),
+      AdminAccountManagementPanel(viewer: _profile),
     ];
   }
 
@@ -370,7 +366,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Pestañas admin: Pedidos … Soporte, Cuentas (solo owner) y Perfil.
+  /// Pestañas admin: Pedidos … Soporte, Cuentas y Perfil.
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,

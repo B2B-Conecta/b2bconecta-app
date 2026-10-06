@@ -58,7 +58,7 @@ class MainShellTabController {
     _pendingSupportTicketId = null;
     _adminSupportNotificationDeepLink = null;
     _b2bSupportNotificationDeepLink = null;
-    _adminProfileTabIndex = 6;
+    _adminProfileTabIndex = 7;
   }
 
   /// [ImporterInventoryDashboard] registra [reload] para refrescar stock tras entrega.
@@ -261,7 +261,7 @@ class MainShellTabController {
     });
   }
 
-  static int _adminProfileTabIndex = 6;
+  static int _adminProfileTabIndex = 7;
 
   /// Admin: pestaña Verificación KYC (índice 4).
   static void navigateToAdminKycForNotification() {
@@ -271,7 +271,7 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Perfil (6 sin Cuentas, 7 si el owner ve esa pestaña).
+  /// Admin: pestaña Perfil (índice 7; Cuentas ocupa el 6).
   static void registerAdminProfileTabIndex(int index) {
     _adminProfileTabIndex = index;
   }

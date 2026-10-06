@@ -43,7 +43,7 @@ class AdminService {
         .toList();
   }
 
-  /// Owner: listado de cuentas (RPC `owner_list_profiles`).
+  /// Administrador: listado de cuentas (RPC `owner_list_profiles`).
   static Future<List<ProfileModel>> ownerListProfiles() async {
     final res = await SupabaseAccess.client.rpc('owner_list_profiles');
     if (res is! List) return const [];
@@ -54,7 +54,7 @@ class AdminService {
         .toList();
   }
 
-  /// Owner: ficha completa (perfiles + correo de Auth).
+  /// Administrador: ficha completa (perfiles + correo de Auth).
   static Future<List<ProfileModel>> ownerListProfilesWithDossier() async {
     final listed = await ownerListProfiles();
     final res = await SupabaseAccess.client.from('profiles').select();

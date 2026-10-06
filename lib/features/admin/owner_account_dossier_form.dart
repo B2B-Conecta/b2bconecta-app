@@ -10,22 +10,31 @@ import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 
-/// Owner: alta de cuenta o edición del expediente fiscal y documentos.
+/// Alta de cuenta o edición del expediente fiscal y documentos.
+/// Crear otra cuenta de administración solo si [allowAdminRole] (propietario).
 class OwnerAccountDossierForm extends StatefulWidget {
   const OwnerAccountDossierForm({
     super.key,
     this.existing,
+    this.allowAdminRole = false,
   });
 
   final ProfileModel? existing;
 
+  /// Solo el propietario puede dar de alta otra cuenta de administración.
+  final bool allowAdminRole;
+
   static Future<bool?> open(
     BuildContext context, {
     ProfileModel? existing,
+    bool allowAdminRole = false,
   }) {
     return Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => OwnerAccountDossierForm(existing: existing),
+        builder: (_) => OwnerAccountDossierForm(
+          existing: existing,
+          allowAdminRole: allowAdminRole,
+        ),
       ),
     );
   }
@@ -126,6 +135,7 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
         passwordConfirm: _password2Ctrl.text,
         businessName: _nameCtrl.text,
         role: _role,
+        allowAdminRole: widget.allowAdminRole,
       );
       if (err != null) {
         _snack(err, error: true);
@@ -299,10 +309,10 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final role in const [
+                    for (final role in [
                       'aliado',
                       'importador',
-                      'administrador',
+                      if (widget.allowAdminRole) 'administrador',
                     ])
                       ChoiceChip(
                         label: Text(ProfileRoleLabels.labelEs(role)),

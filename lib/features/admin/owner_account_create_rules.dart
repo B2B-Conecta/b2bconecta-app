@@ -14,6 +14,7 @@ abstract final class OwnerAccountCreateRules {
     required String passwordConfirm,
     required String businessName,
     required String role,
+    bool allowAdminRole = true,
   }) {
     if (!isValidEmail(email)) return 'Indique un correo válido.';
     if (password.length < minPasswordLength) {
@@ -22,6 +23,9 @@ abstract final class OwnerAccountCreateRules {
     if (password != passwordConfirm) return 'Las contraseñas no coinciden.';
     if (businessName.trim().isEmpty) return 'Indique el nombre comercial.';
     final r = role.trim().toLowerCase();
+    if (r == 'administrador' && !allowAdminRole) {
+      return 'Solo el propietario puede crear cuentas de administración.';
+    }
     if (r != 'aliado' && r != 'importador' && r != 'administrador') {
       return 'Elija un rol.';
     }

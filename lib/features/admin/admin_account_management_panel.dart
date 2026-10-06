@@ -16,7 +16,8 @@ enum _AccountRoleFilter { todos, aliados, importadores, administracion }
 
 enum _AccountStateFilter { todos, activas, bloqueadas, eliminadas }
 
-/// Solo owner: alta, expediente, roles, bloqueo, baja lógica y borrado de Auth.
+/// Administración: alta, expediente, bloqueo, baja lógica y borrado de Auth.
+/// Cambiar rol y el catálogo del mayorista siguen reservados al propietario.
 class AdminAccountManagementPanel extends StatefulWidget {
   const AdminAccountManagementPanel({
     super.key,
@@ -108,11 +109,20 @@ class _AdminAccountManagementPanelState
     }).toList();
   }
 
-  bool _canManage(ProfileModel p) => OwnerAccountRules.canManageTarget(
+  bool _canChangeRole(ProfileModel p) => OwnerAccountRules.canManageTarget(
         viewerIsOwner: widget.viewer.isOwner,
         viewerId: widget.viewer.id,
         targetId: p.id,
         targetIsOwner: p.isOwner,
+      );
+
+  bool _canOperate(ProfileModel p) => OwnerAccountRules.canDeleteTarget(
+        viewerIsOwner: widget.viewer.isOwner,
+        viewerRole: widget.viewer.role,
+        viewerId: widget.viewer.id,
+        targetId: p.id,
+        targetIsOwner: p.isOwner,
+        targetRole: p.role,
       );
 
   Future<bool> _runBusy(ProfileModel p, Future<void> Function() action) async {
@@ -411,7 +421,10 @@ class _AdminAccountManagementPanelState
               minimumSize: const Size.fromHeight(44),
             ),
             onPressed: () async {
-              final changed = await OwnerAccountDossierForm.open(context);
+              final changed = await OwnerAccountDossierForm.open(
+                context,
+                allowAdminRole: widget.viewer.isOwner,
+              );
               if (changed == true && mounted) await _load();
             },
             icon: const Icon(Icons.person_add_outlined, size: 18),
@@ -489,12 +502,16 @@ class _AdminAccountManagementPanelState
                 child: _AccountCard(
                   profile: p,
                   viewerId: widget.viewer.id,
-                  canManage: _canManage(p),
+                  canOperate: _canOperate(p),
+                  canChangeRole: _canChangeRole(p),
+                  showCatalog: widget.viewer.isOwner &&
+                      p.role?.trim().toLowerCase() == 'importador',
                   busy: _busyId == p.id,
                   onEditDossier: () async {
                     final changed = await OwnerAccountDossierForm.open(
                       context,
                       existing: p,
+                      allowAdminRole: widget.viewer.isOwner,
                     );
                     if (changed == true && mounted) await _load();
                   },
@@ -534,7 +551,9 @@ class _AccountCard extends StatefulWidget {
   const _AccountCard({
     required this.profile,
     required this.viewerId,
-    required this.canManage,
+    required this.canOperate,
+    required this.canChangeRole,
+    required this.showCatalog,
     required this.busy,
     required this.onEditDossier,
     required this.onChangeRole,
@@ -546,7 +565,9 @@ class _AccountCard extends StatefulWidget {
 
   final ProfileModel profile;
   final String viewerId;
-  final bool canManage;
+  final bool canOperate;
+  final bool canChangeRole;
+  final bool showCatalog;
   final bool busy;
   final VoidCallback onEditDossier;
   final VoidCallback onChangeRole;
@@ -623,16 +644,17 @@ class _AccountCardState extends State<_AccountCard> {
               profile: profile,
               isSelf: isSelf,
             ),
-            if (profile.role?.trim().toLowerCase() == 'importador' ||
-                widget.canManage) ...[
+            if (widget.canOperate ||
+                widget.canChangeRole ||
+                widget.showCatalog) ...[
               const SizedBox(height: 12),
               if (widget.busy)
                 const LinearProgressIndicator(color: AppColors.brand)
               else
                 _AccountActions(
-                  showCatalog:
-                      profile.role?.trim().toLowerCase() == 'importador',
-                  canManage: widget.canManage,
+                  showCatalog: widget.showCatalog,
+                  canOperate: widget.canOperate,
+                  canChangeRole: widget.canChangeRole,
                   blocked: profile.isDeactivated ||
                       profile.accountAccessStatus?.trim() ==
                           AccountAccessStatus.rejected,
@@ -667,7 +689,8 @@ class _AccountCardState extends State<_AccountCard> {
 class _AccountActions extends StatelessWidget {
   const _AccountActions({
     required this.showCatalog,
-    required this.canManage,
+    required this.canOperate,
+    required this.canChangeRole,
     required this.blocked,
     required this.deactivated,
     required this.canActivate,
@@ -681,7 +704,8 @@ class _AccountActions extends StatelessWidget {
   });
 
   final bool showCatalog;
-  final bool canManage;
+  final bool canOperate;
+  final bool canChangeRole;
   final bool blocked;
   final bool deactivated;
   final bool canActivate;
@@ -710,20 +734,25 @@ class _AccountActions extends StatelessWidget {
             icon: const Icon(Icons.inventory_2_outlined, size: 18),
             label: const Text('Ver catálogo'),
           ),
-        if (showCatalog && canManage) const SizedBox(height: 8),
-        if (canManage) ...[
+        if (showCatalog && (canOperate || canChangeRole))
+          const SizedBox(height: 8),
+        if (canOperate) ...[
           OutlinedButton(
             style: _wide,
             onPressed: onEditDossier,
             child: const Text('Expediente'),
           ),
           const SizedBox(height: 8),
+        ],
+        if (canChangeRole) ...[
           OutlinedButton(
             style: _wide,
             onPressed: onChangeRole,
             child: const Text('Cambiar rol'),
           ),
           const SizedBox(height: 8),
+        ],
+        if (canOperate) ...[
           if (canActivate || blocked)
             FilledButton(
               style: FilledButton.styleFrom(

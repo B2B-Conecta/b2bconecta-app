@@ -67,6 +67,88 @@ void main() {
       );
     });
 
+    test('un admin elimina tiendas y mayoristas, no administración ni al propietario', () {
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: false,
+          viewerRole: 'administrador',
+          viewerId: 'admin-2',
+          targetId: 'aliado-1',
+          targetIsOwner: false,
+          targetRole: 'aliado',
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: false,
+          viewerRole: 'administrador',
+          viewerId: 'admin-2',
+          targetId: 'imp-1',
+          targetIsOwner: false,
+          targetRole: 'importador',
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: false,
+          viewerRole: 'administrador',
+          viewerId: 'admin-2',
+          targetId: 'admin-3',
+          targetIsOwner: false,
+          targetRole: 'administrador',
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: false,
+          viewerRole: 'administrador',
+          viewerId: 'admin-2',
+          targetId: 'owner-1',
+          targetIsOwner: true,
+          targetRole: 'administrador',
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: false,
+          viewerRole: 'administrador',
+          viewerId: 'admin-2',
+          targetId: 'admin-2',
+          targetIsOwner: false,
+          targetRole: 'aliado',
+        ),
+        isFalse,
+      );
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: true,
+          viewerRole: 'administrador',
+          viewerId: 'owner-1',
+          targetId: 'admin-2',
+          targetIsOwner: false,
+          targetRole: 'administrador',
+        ),
+        isTrue,
+      );
+      expect(
+        OwnerAccountRules.canDeleteTarget(
+          viewerIsOwner: false,
+          viewerRole: 'aliado',
+          viewerId: 'aliado-9',
+          targetId: 'aliado-1',
+          targetIsOwner: false,
+          targetRole: 'importador',
+        ),
+        isFalse,
+      );
+      expect(OwnerAccountRules.canAssignAdminRole(viewerIsOwner: false), isFalse);
+      expect(OwnerAccountRules.canAssignAdminRole(viewerIsOwner: true), isTrue);
+    });
+
     test('un borrador se puede activar; una activa no', () {
       expect(
         OwnerAccountRules.canActivateAccess(
@@ -236,6 +318,27 @@ void main() {
           passwordConfirm: 'secret1',
           businessName: 'Tienda Norte',
           role: 'aliado',
+        ),
+        isNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'admin@test.com',
+          password: 'secret1',
+          passwordConfirm: 'secret1',
+          businessName: 'Oficina',
+          role: 'administrador',
+          allowAdminRole: false,
+        ),
+        isNotNull,
+      );
+      expect(
+        OwnerAccountCreateRules.validateCreate(
+          email: 'admin@test.com',
+          password: 'secret1',
+          passwordConfirm: 'secret1',
+          businessName: 'Oficina',
+          role: 'administrador',
         ),
         isNull,
       );

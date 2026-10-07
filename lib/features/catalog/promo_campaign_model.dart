@@ -8,6 +8,7 @@ class PromoCampaignModel {
     required this.imageStoragePath,
     required this.imagePublicUrl,
     this.importadorId,
+    this.productId,
     required this.actionType,
     required this.startsAt,
     required this.endsAt,
@@ -25,6 +26,8 @@ class PromoCampaignModel {
   static const actionNone = 'none';
   static const actionFilterImporter = 'filter_importer';
   static const actionExternalUrl = 'external_url';
+  static const actionOpenStore = 'open_store';
+  static const actionOpenProduct = 'open_product';
 
   static const sponsorImportador = 'importador';
   static const sponsorTercero = 'tercero';
@@ -40,6 +43,7 @@ class PromoCampaignModel {
   final String imageStoragePath;
   final String imagePublicUrl;
   final String? importadorId;
+  final String? productId;
   final String actionType;
   final DateTime startsAt;
   final DateTime endsAt;
@@ -68,7 +72,27 @@ class PromoCampaignModel {
         url.isNotEmpty;
   }
 
-  bool get isTappable => filtersImporter || opensExternalUrl;
+  bool get opensStore =>
+      actionType == actionOpenStore &&
+      importadorId != null &&
+      importadorId!.trim().isNotEmpty;
+
+  bool get opensProduct =>
+      actionType == actionOpenProduct &&
+      importadorId != null &&
+      importadorId!.trim().isNotEmpty &&
+      productId != null &&
+      productId!.trim().isNotEmpty;
+
+  bool get isTappable =>
+      filtersImporter || opensExternalUrl || opensStore || opensProduct;
+
+  String get destinationCtaLabel {
+    if (opensProduct) return 'Ver producto';
+    if (opensStore) return 'Ver vitrina';
+    if (filtersImporter) return 'Ver proveedor';
+    return '';
+  }
 
   String get badgeLabel => isThirdParty ? 'Publicidad' : 'Promoción';
 
@@ -104,6 +128,7 @@ class PromoCampaignModel {
       imageStoragePath: json['image_storage_path']?.toString() ?? '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
       importadorId: json['importador_id']?.toString(),
+      productId: json['product_id']?.toString(),
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.parse(json['starts_at'].toString()).toLocal(),
       endsAt: DateTime.parse(json['ends_at'].toString()).toLocal(),
@@ -129,6 +154,7 @@ class PromoCampaignModel {
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
       'importador_id': importadorId,
+      'product_id': productId,
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -157,6 +183,7 @@ class PromoCampaignModel {
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
       'importador_id': importadorId,
+      'product_id': productId,
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -184,6 +211,7 @@ class PromoCampaignModel {
       imageStoragePath: '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
       importadorId: json['importador_id']?.toString(),
+      productId: json['product_id']?.toString(),
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.now(),
       endsAt: DateTime.now(),

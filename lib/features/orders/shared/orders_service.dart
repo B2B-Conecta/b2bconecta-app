@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,6 +13,7 @@ import 'package:motolink_pro_app/features/profile/profile_location_exception.dar
 import 'package:motolink_pro_app/features/orders/shared/stock_insufficient_exception.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_suspendidos_morosidad_exception.dart';
 import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_message_attachment.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_message_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
@@ -994,6 +997,8 @@ class OrdersService {
   }
 
   static const _trMessagesSelect =
+      'id, transaction_request_id, author_id, author_role, body, attachments, created_at';
+  static const _trMessagesSelectLegacy =
       'id, transaction_request_id, author_id, author_role, body, created_at';
 
   static Future<List<TransactionRequestMessageModel>>
@@ -1001,18 +1006,14 @@ class OrdersService {
     if (transactionRequestId.isEmpty) return [];
 
     return retryOnJwtIssuedAtFuture(() async {
-      final response = await SupabaseAccess.client
-          .from('transaction_request_messages')
-          .select(_trMessagesSelect)
-          .eq('transaction_request_id', transactionRequestId)
-          .order('created_at', ascending: true);
-
-      final list = response as List<dynamic>;
-      return list
-          .map((row) => TransactionRequestMessageModel.fromJson(
-                Map<String, dynamic>.from(row as Map),
-              ))
-          .toList();
+      final response = await _selectMessages(
+        (columns) => SupabaseAccess.client
+            .from('transaction_request_messages')
+            .select(columns)
+            .eq('transaction_request_id', transactionRequestId)
+            .order('created_at', ascending: true),
+      );
+      return _messagesFromRows(response);
     });
   }
 
@@ -1030,12 +1031,30 @@ class OrdersService {
       return fetchTransactionRequestMessages(ids.single);
     }
     return retryOnJwtIssuedAtFuture(() async {
-    final response = await SupabaseAccess.client
-        .from('transaction_request_messages')
-        .select(_trMessagesSelect)
-        .inFilter('transaction_request_id', ids)
-        .order('created_at', ascending: true);
+      final response = await _selectMessages(
+        (columns) => SupabaseAccess.client
+            .from('transaction_request_messages')
+            .select(columns)
+            .inFilter('transaction_request_id', ids)
+            .order('created_at', ascending: true),
+      );
+      return _messagesFromRows(response);
+    });
+  }
 
+  static Future<dynamic> _selectMessages(
+    dynamic Function(String columns) query,
+  ) async {
+    try {
+      return await query(_trMessagesSelect);
+    } on PostgrestException catch (e) {
+      final missing = e.code == '42703' || e.message.contains('attachments');
+      if (!missing) rethrow;
+      return query(_trMessagesSelectLegacy);
+    }
+  }
+
+  static List<TransactionRequestMessageModel> _messagesFromRows(dynamic response) {
     final list = response as List<dynamic>;
     return list
         .map(
@@ -1044,7 +1063,6 @@ class OrdersService {
           ),
         )
         .toList();
-    });
   }
 
   /// Un canal Realtime por solicitud; desuscribir cada uno con [SupabaseAccess.unsubscribeChannel].
@@ -1069,58 +1087,168 @@ class OrdersService {
   static Future<void> insertTransactionRequestMessageAsImportador({
     required String transactionRequestId,
     required String body,
-  }) async {
-    final uid = SupabaseAccess.currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-    final t = body.trim();
-    if (t.isEmpty) return;
-
-    await retryOnJwtIssuedAtFuture(() {
-      return SupabaseAccess.client.from('transaction_request_messages').insert({
-        'transaction_request_id': transactionRequestId,
-        'author_id': uid,
-        'author_role': 'importador',
-        'body': t,
-      });
-    });
-  }
+    List<OrderMessageAttachment> attachments = const [],
+    String? messageId,
+  }) =>
+      _insertTransactionRequestMessage(
+        transactionRequestId: transactionRequestId,
+        authorRole: 'importador',
+        body: body,
+        attachments: attachments,
+        messageId: messageId,
+      );
 
   static Future<void> insertTransactionRequestMessageAsAliado({
     required String transactionRequestId,
     required String body,
-  }) async {
-    final uid = SupabaseAccess.currentUserId;
-    if (uid == null) throw StateError('No hay sesión activa.');
-    final t = body.trim();
-    if (t.isEmpty) return;
-
-    await retryOnJwtIssuedAtFuture(() {
-      return SupabaseAccess.client.from('transaction_request_messages').insert({
-        'transaction_request_id': transactionRequestId,
-        'author_id': uid,
-        'author_role': 'aliado',
-        'body': t,
-      });
-    });
-  }
+    List<OrderMessageAttachment> attachments = const [],
+    String? messageId,
+  }) =>
+      _insertTransactionRequestMessage(
+        transactionRequestId: transactionRequestId,
+        authorRole: 'aliado',
+        body: body,
+        attachments: attachments,
+        messageId: messageId,
+      );
 
   static Future<void> insertTransactionRequestMessageAsAdmin({
     required String transactionRequestId,
     required String body,
+    List<OrderMessageAttachment> attachments = const [],
+    String? messageId,
+  }) =>
+      _insertTransactionRequestMessage(
+        transactionRequestId: transactionRequestId,
+        authorRole: 'administrador',
+        body: body,
+        attachments: attachments,
+        messageId: messageId,
+      );
+
+  static Future<String> createSignedUrlForOrderMessageAttachment(
+    String storagePath,
+  ) {
+    final path = storagePath.trim();
+    return SupabaseAccess.client.storage
+        .from(SupabaseAccess.orderMessageAttachmentsBucket)
+        .createSignedUrl(path, 3600);
+  }
+
+  /// Sube un archivo al bucket privado del pedido y deja el mensaje.
+  /// El insert dispara el mismo aviso que un mensaje de texto.
+  static Future<void> sendOrderChatAttachment({
+    required String transactionRequestId,
+    required String authorRole,
+    required String body,
+    required Uint8List bytes,
+    required String fileName,
+    required String mime,
+    required String kind,
+  }) async {
+    final orderId = transactionRequestId.trim();
+    if (orderId.isEmpty) {
+      throw ArgumentError('Pedido inválido.');
+    }
+    if (kind != 'image' && kind != 'video') {
+      throw ArgumentError('Tipo de adjunto inválido.');
+    }
+    if (bytes.isEmpty) {
+      throw OrderMessageLimitException('El archivo está vacío.');
+    }
+    if (kind == 'image' && bytes.length > OrderMessageLimits.maxImageBytes) {
+      throw OrderMessageLimitException(
+        'La foto supera 8 MB después de comprimirla.',
+      );
+    }
+    if (kind == 'video' && bytes.length > OrderMessageLimits.maxVideoBytes) {
+      throw OrderMessageLimitException('El video supera 50 MB.');
+    }
+
+    final messageId = _newUuidV4();
+    final safeName = fileName.trim().isEmpty ? 'archivo' : fileName.trim();
+    final path = '$orderId/$messageId/$safeName';
+    final attachment = OrderMessageAttachment(
+      path: path,
+      kind: kind,
+      mime: mime,
+      name: safeName,
+    );
+
+    await SupabaseAccess.client.storage
+        .from(SupabaseAccess.orderMessageAttachmentsBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: mime, upsert: false),
+        );
+
+    try {
+      await _insertTransactionRequestMessage(
+        transactionRequestId: orderId,
+        authorRole: authorRole,
+        body: body,
+        attachments: [attachment],
+        messageId: messageId,
+      );
+    } catch (e) {
+      try {
+        await SupabaseAccess.client.storage
+            .from(SupabaseAccess.orderMessageAttachmentsBucket)
+            .remove([path]);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  static Future<void> _insertTransactionRequestMessage({
+    required String transactionRequestId,
+    required String authorRole,
+    required String body,
+    List<OrderMessageAttachment> attachments = const [],
+    String? messageId,
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
-    final t = body.trim();
-    if (t.isEmpty) return;
+    final text = body.trim();
+    if (text.isEmpty && attachments.isEmpty) return;
+    if (attachments.length > OrderMessageLimits.maxImagesPerMessage) {
+      throw OrderMessageLimitException(
+        'Un mensaje admite hasta 3 fotos o 1 video.',
+      );
+    }
+    final videos = attachments.where((a) => a.isVideo).length;
+    if (videos > 1 || (videos == 1 && attachments.length > 1)) {
+      throw OrderMessageLimitException('Un mensaje admite un solo video.');
+    }
+
+    final row = <String, dynamic>{
+      'transaction_request_id': transactionRequestId,
+      'author_id': uid,
+      'author_role': authorRole,
+      'body': text,
+    };
+    if (attachments.isNotEmpty) {
+      row['attachments'] = attachments.map((a) => a.toJson()).toList();
+    }
+    final id = messageId?.trim();
+    if (id != null && id.isNotEmpty) row['id'] = id;
 
     await retryOnJwtIssuedAtFuture(() {
-      return SupabaseAccess.client.from('transaction_request_messages').insert({
-        'transaction_request_id': transactionRequestId,
-        'author_id': uid,
-        'author_role': 'administrador',
-        'body': t,
-      });
+      return SupabaseAccess.client
+          .from('transaction_request_messages')
+          .insert(row);
     });
+  }
+
+  static String _newUuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
   /// Admin B2B Conecta: anula un pedido ya aprobado / en curso (no pendiente ni entregado), con motivo.

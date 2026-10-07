@@ -42,6 +42,47 @@ class CatalogService {
     });
   }
 
+  /// Catálogo publicado de un mayorista para el panel admin.
+  ///
+  /// Publicado = `products.is_active` (visible; no está en pausa).
+  /// No filtra `stock_covers_min_order`: eso es si se puede comprar, no si está publicado.
+  /// La RLS de `products` solo deja leer ajenos cuando `is_active` es verdadero.
+  static Future<List<PartModel>> fetchAdminPublishedCatalog({
+    required String importerId,
+    int limit = 40,
+    int offset = 0,
+  }) {
+    final id = importerId.trim();
+    if (id.isEmpty) return Future<List<PartModel>>.value(const []);
+    final page = limit < 1 ? 1 : limit;
+    final start = offset < 0 ? 0 : offset;
+    return retryOnJwtIssuedAtFuture(() async {
+      final response = await SupabaseAccess.client
+          .from('products')
+          .select(
+            'id, owner_id, name, sku, category, price_usd, sale_price_usd, '
+            'image_url, image_urls, is_active, stock',
+          )
+          .eq('owner_id', id)
+          .eq('is_active', true)
+          .order('name', ascending: true)
+          .range(start, start + page - 1);
+      final list = response as List<dynamic>;
+      return list
+          .map(
+            (row) => PartModel.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
+          .where(
+            (part) => catalogPartBelongsToImporterStore(
+              importerId: id,
+              ownerId: part.ownerId,
+              isActive: part.isActive,
+            ),
+          )
+          .toList();
+    });
+  }
+
   /// Número total de filas que cumplen [filters] (respeta RLS).
   static Future<int> fetchProductsCount({CatalogFilters? filters}) {
     return retryOnJwtIssuedAtFuture(() => _fetchProductsCount(filters: filters));

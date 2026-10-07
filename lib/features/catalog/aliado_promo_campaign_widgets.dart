@@ -61,7 +61,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
   }
 
   Future<void> _onTap(PromoCampaignModel c) async {
-    if (c.filtersImporter) {
+    if (c.filtersImporter || c.opensStore || c.opensProduct) {
       widget.onPromoCampaignSelected?.call(c);
       return;
     }
@@ -282,7 +282,9 @@ Future<void> showAliadoPromoPopupDialog({
                       child: const Text('Cerrar'),
                     ),
                   ),
-                  if (campaign.filtersImporter) ...[
+                  if (campaign.filtersImporter ||
+                      campaign.opensStore ||
+                      campaign.opensProduct) ...[
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton(
@@ -290,7 +292,7 @@ Future<void> showAliadoPromoPopupDialog({
                           Navigator.of(ctx).pop();
                           onFilterImporter?.call();
                         },
-                        child: const Text('Ver proveedor'),
+                        child: Text(campaign.destinationCtaLabel),
                       ),
                     ),
                   ] else if (campaign.opensExternalUrl) ...[
@@ -409,7 +411,9 @@ Future<void> showAliadoActivePromotionsSheet({
                         await showAliadoPromoPopupDialog(
                           context: context,
                           campaign: c,
-                          onFilterImporter: c.filtersImporter
+                          onFilterImporter: c.filtersImporter ||
+                                  c.opensStore ||
+                                  c.opensProduct
                               ? () => onPromoCampaignSelected?.call(c)
                               : null,
                         );

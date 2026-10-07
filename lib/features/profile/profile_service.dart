@@ -322,6 +322,15 @@ class ProfileService {
     }
   }
 
+  /// Marca que la persona volvió a la app. El servidor ignora llamadas
+  /// repetidas dentro de la misma hora.
+  static Future<void> touchMyLastActive() async {
+    if (SupabaseAccess.client.auth.currentSession == null) return;
+    try {
+      await SupabaseAccess.client.rpc('touch_my_last_active');
+    } catch (_) {}
+  }
+
   /// Importadores (`role = importador`) para el filtro del catálogo.
   static Future<void> acceptTerms({required String version}) async {
     await SupabaseAccess.client.rpc(

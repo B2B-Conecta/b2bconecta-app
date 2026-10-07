@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
+import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -20,6 +21,12 @@ Widget _promoDropdownLabel(String text) {
     overflow: TextOverflow.ellipsis,
     maxLines: 1,
   );
+}
+
+String _productOptionLabel(PartModel part) {
+  final sku = part.sku?.trim();
+  if (sku != null && sku.isNotEmpty) return '${part.nombre} · $sku';
+  return part.nombre;
 }
 
 /// Subsección admin: CRUD de campañas promocionales E1.2.
@@ -100,6 +107,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           imageStoragePath: c.imageStoragePath,
           imagePublicUrl: c.imagePublicUrl,
           importadorId: c.importadorId,
+          productId: c.productId,
           actionType: c.actionType,
           startsAt: c.startsAt,
           endsAt: c.endsAt,
@@ -334,6 +342,9 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late String _sponsorType;
   late String _audience;
   String? _importadorId;
+  String? _productId;
+  List<PartModel> _products = const [];
+  bool _productsLoading = false;
   late DateTime _startsAt;
   late DateTime _endsAt;
   late bool _isActive;
@@ -346,13 +357,23 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   bool get _isThirdParty =>
       _sponsorType == PromoCampaignModel.sponsorTercero;
 
+  bool get _needsImporter =>
+      !_isThirdParty &&
+      (_actionType == PromoCampaignModel.actionFilterImporter ||
+          _actionType == PromoCampaignModel.actionOpenStore ||
+          _actionType == PromoCampaignModel.actionOpenProduct);
+
   void _onSponsorTypeChanged(String? value) {
     if (value == null) return;
     setState(() {
       _sponsorType = value;
       if (_isThirdParty) {
         _importadorId = null;
-        if (_actionType == PromoCampaignModel.actionFilterImporter) {
+        _productId = null;
+        _products = const [];
+        if (_actionType == PromoCampaignModel.actionFilterImporter ||
+            _actionType == PromoCampaignModel.actionOpenStore ||
+            _actionType == PromoCampaignModel.actionOpenProduct) {
           _actionType = PromoCampaignModel.actionExternalUrl;
         }
         if (_audience == PromoCampaignModel.audienceAliado &&
@@ -390,6 +411,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
             ? PromoCampaignModel.actionExternalUrl
             : PromoCampaignModel.actionFilterImporter);
     _importadorId = e?.importadorId;
+    _productId = e?.productId;
     final now = DateTime.now();
     _startsAt = e?.startsAt ?? DateTime(now.year, now.month, now.day);
     _endsAt = e?.endsAt ??
@@ -397,6 +419,52 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _isActive = e?.isActive ?? true;
     _imagePath = e?.imageStoragePath;
     _imageUrl = e?.imagePublicUrl;
+    if (_actionType == PromoCampaignModel.actionOpenProduct &&
+        _importadorId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadPublishedProducts();
+      });
+    }
+  }
+
+  Future<void> _loadPublishedProducts() async {
+    final importerId = _importadorId?.trim();
+    if (importerId == null ||
+        importerId.isEmpty ||
+        _actionType != PromoCampaignModel.actionOpenProduct) {
+      if (!mounted) return;
+      setState(() {
+        _products = const [];
+        _productsLoading = false;
+      });
+      return;
+    }
+    setState(() => _productsLoading = true);
+    try {
+      final all = <PartModel>[];
+      var offset = 0;
+      const page = 80;
+      while (all.length < 400) {
+        final batch = await SupabaseService.fetchAdminPublishedCatalog(
+          importerId: importerId,
+          limit: page,
+          offset: offset,
+        );
+        if (!mounted || _importadorId?.trim() != importerId) return;
+        all.addAll(batch);
+        if (batch.length < page) break;
+        offset += page;
+      }
+      if (!mounted || _importadorId?.trim() != importerId) return;
+      setState(() => _products = all);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _products = const []);
+    } finally {
+      if (mounted && _importadorId?.trim() == importerId) {
+        setState(() => _productsLoading = false);
+      }
+    }
   }
 
   @override
@@ -482,9 +550,10 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       campaignType: _type,
       imageStoragePath: _imagePath ?? '',
       imagePublicUrl: _imageUrl ?? '',
-      importadorId: !thirdParty &&
-              _actionType == PromoCampaignModel.actionFilterImporter
-          ? _importadorId
+      importadorId: _needsImporter ? _importadorId : null,
+      productId: !thirdParty &&
+              _actionType == PromoCampaignModel.actionOpenProduct
+          ? _productId
           : null,
       actionType: _actionType,
       startsAt: _startsAt,
@@ -515,13 +584,31 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       );
       return;
     }
-    if (!_isThirdParty &&
-        _actionType == PromoCampaignModel.actionFilterImporter &&
-        (_importadorId == null || _importadorId!.isEmpty)) {
+    if (_needsImporter &&
+        (_importadorId == null || _importadorId!.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccione un proveedor para el CTA.')),
+        const SnackBar(content: Text('Seleccione un proveedor.')),
       );
       return;
+    }
+    if (!_isThirdParty &&
+        _actionType == PromoCampaignModel.actionOpenProduct) {
+      final selected = _productId?.trim();
+      final belongs = selected != null &&
+          selected.isNotEmpty &&
+          _products.any((p) => p.id == selected);
+      if (_productsLoading || !belongs) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _productsLoading
+                  ? 'Espere a que carguen los productos del proveedor.'
+                  : 'Seleccione un producto publicado de ese proveedor.',
+            ),
+          ),
+        );
+        return;
+      }
     }
     if (_isThirdParty && _advertiserNameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -719,14 +806,32 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                         child: _promoDropdownLabel('Filtrar proveedor'),
                       ),
                       DropdownMenuItem(
+                        value: PromoCampaignModel.actionOpenStore,
+                        child: _promoDropdownLabel('Vitrina del proveedor'),
+                      ),
+                      DropdownMenuItem(
+                        value: PromoCampaignModel.actionOpenProduct,
+                        child: _promoDropdownLabel('Producto específico'),
+                      ),
+                      DropdownMenuItem(
                         value: PromoCampaignModel.actionNone,
                         child: _promoDropdownLabel('Solo informativa'),
                       ),
                     ],
-              onChanged: (v) => setState(() => _actionType = v ?? _actionType),
+              onChanged: (v) {
+                setState(() {
+                  _actionType = v ?? _actionType;
+                  if (_actionType != PromoCampaignModel.actionOpenProduct) {
+                    _productId = null;
+                    _products = const [];
+                  }
+                });
+                if (_actionType == PromoCampaignModel.actionOpenProduct) {
+                  _loadPublishedProducts();
+                }
+              },
             ),
-            if (!_isThirdParty &&
-                _actionType == PromoCampaignModel.actionFilterImporter) ...[
+            if (_needsImporter) ...[
               const SizedBox(height: 10),
               DropdownButtonFormField<String?>(
                 value: _importadorId,
@@ -736,10 +841,17 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  DropdownMenuItem<String?>(
+                  const DropdownMenuItem<String?>(
                     value: null,
-                    child: _promoDropdownLabel('Seleccione…'),
+                    child: Text('Seleccione…'),
                   ),
+                  if (_importadorId != null &&
+                      _importadorId!.isNotEmpty &&
+                      !widget.importers.any((o) => o.id == _importadorId))
+                    DropdownMenuItem<String?>(
+                      value: _importadorId,
+                      child: _promoDropdownLabel('Proveedor asignado'),
+                    ),
                   ...widget.importers.map(
                     (o) => DropdownMenuItem<String?>(
                       value: o.id,
@@ -747,8 +859,53 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                     ),
                   ),
                 ],
-                onChanged: (v) => setState(() => _importadorId = v),
+                onChanged: (v) {
+                  final changed = v != _importadorId;
+                  setState(() {
+                    _importadorId = v;
+                    if (changed) _productId = null;
+                  });
+                  if (_actionType == PromoCampaignModel.actionOpenProduct) {
+                    _loadPublishedProducts();
+                  }
+                },
               ),
+            ],
+            if (!_isThirdParty &&
+                _actionType == PromoCampaignModel.actionOpenProduct) ...[
+              const SizedBox(height: 10),
+              if (_productsLoading)
+                const LinearProgressIndicator()
+              else
+                DropdownButtonFormField<String?>(
+                  value: _products.any((p) => p.id == _productId)
+                      ? _productId
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Producto publicado',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    DropdownMenuItem<String?>(
+                      value: null,
+                      child: _promoDropdownLabel(
+                        _importadorId == null
+                            ? 'Seleccione un proveedor'
+                            : 'Seleccione…',
+                      ),
+                    ),
+                    ..._products.map(
+                      (p) => DropdownMenuItem<String?>(
+                        value: p.id,
+                        child: _promoDropdownLabel(_productOptionLabel(p)),
+                      ),
+                    ),
+                  ],
+                  onChanged: _importadorId == null
+                      ? null
+                      : (v) => setState(() => _productId = v),
+                ),
             ],
             if (_isThirdParty &&
                 _actionType == PromoCampaignModel.actionExternalUrl) ...[

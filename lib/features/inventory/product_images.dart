@@ -1,6 +1,14 @@
 /// Utilidades para fotos de producto (máx. [kMaxProductImages]).
 const kMaxProductImages = 3;
 
+/// Filtro del inventario del proveedor. Se aplica en la consulta paginada
+/// sobre `products.image_urls` (y `image_url` legado), sin una consulta por fila.
+enum ProductPhotoListFilter {
+  all,
+  withPhotos,
+  withoutPhotos,
+}
+
 const _allowedImageExtensions = {'jpg', 'jpeg', 'png', 'webp'};
 
 bool isAllowedProductImageExtension(String ext) {

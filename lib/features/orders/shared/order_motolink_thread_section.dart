@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'order_message_attachment.dart';
+import 'order_message_media.dart';
+import 'order_message_pick.dart';
 import 'transaction_request_message_model.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -192,6 +195,13 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     }
   }
 
+  String? get _replyRole {
+    if (widget.allowReplyAsAliado) return 'aliado';
+    if (widget.allowReplyAsAdmin) return 'administrador';
+    if (widget.allowReplyAsImportador) return 'importador';
+    return null;
+  }
+
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _sending) return;
@@ -216,6 +226,59 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
       }
       _ctrl.clear();
       await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _sendAttachment({
+    required bool video,
+    required bool camera,
+  }) async {
+    if (_sending || _replyRole == null) return;
+    PreparedOrderAttachment? prepared;
+    try {
+      prepared = video
+          ? await prepareOrderChatVideo(fromCamera: camera)
+          : await prepareOrderChatImage(fromCamera: camera);
+    } on OrderMessageLimitException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo obtener el archivo: $e')),
+      );
+      return;
+    }
+    if (prepared == null || !mounted) return;
+
+    setState(() => _sending = true);
+    try {
+      await SupabaseService.sendOrderChatAttachment(
+        transactionRequestId: widget.transactionRequestId,
+        authorRole: _replyRole!,
+        body: _ctrl.text.trim(),
+        bytes: prepared.bytes,
+        fileName: prepared.fileName,
+        mime: prepared.mime,
+        kind: prepared.kind,
+      );
+      _ctrl.clear();
+      await _load();
+    } on OrderMessageLimitException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -328,9 +391,16 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
                     ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      child: Text(
-                        m.body,
-                        style: const TextStyle(fontSize: 13, height: 1.35),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (m.body.trim().isNotEmpty)
+                            Text(
+                              m.body,
+                              style: const TextStyle(fontSize: 13, height: 1.35),
+                            ),
+                          OrderMessageMediaStrip(attachments: m.attachments),
+                        ],
                       ),
                     ),
                   ),
@@ -342,6 +412,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           const SizedBox(height: 10),
           TextField(
             controller: _ctrl,
+            enabled: !_sending,
             minLines: 1,
             maxLines: 4,
             textInputAction: TextInputAction.newline,
@@ -353,7 +424,13 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
               border: const OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 8),
+          OrderMessageAttachButtons(
+            enabled: !_sending,
+            onPhotoCamera: () => _sendAttachment(video: false, camera: true),
+            onPhotoGallery: () => _sendAttachment(video: false, camera: false),
+            onVideoCamera: () => _sendAttachment(video: true, camera: true),
+            onVideoGallery: () => _sendAttachment(video: true, camera: false),
+          ),
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton(

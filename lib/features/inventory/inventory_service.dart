@@ -172,6 +172,7 @@ class InventoryService {
     bool onlyLowStock = false,
     bool onlyInactive = false,
     bool onlyActive = false,
+    ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return [];
@@ -202,6 +203,23 @@ class InventoryService {
 
     if (onlyActive) {
       query = query.eq('is_active', true);
+    }
+
+    // Misma fila que ya se lee: `image_urls` jsonb y portada `image_url`.
+    // El rango de paginación se aplica después, sobre el conjunto filtrado.
+    switch (photoFilter) {
+      case ProductPhotoListFilter.all:
+        break;
+      case ProductPhotoListFilter.withPhotos:
+        query = query.or(
+          'image_urls.neq.[],and(image_url.not.is.null,image_url.neq.)',
+        );
+        break;
+      case ProductPhotoListFilter.withoutPhotos:
+        query = query
+            .filter('image_urls', 'eq', '[]')
+            .or('image_url.is.null,image_url.eq.');
+        break;
     }
 
     final response = await query

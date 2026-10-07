@@ -215,7 +215,7 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.analytics,
       label: 'Reportes',
       title: 'Reportes',
-      subtitle: 'Encomiendas · Promos · Usuarios',
+      subtitle: 'Encomiendas · Promos · Catálogos',
     ),
     AdminShellDestination(
       icon: Icons.star_rate_outlined,

@@ -109,13 +109,57 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+type FcmSendResult = {
+  success: number;
+  failure: number;
+  dropTokens: string[];
+};
+
+function fcmErrorCode(body: string): string {
+  try {
+    const json = JSON.parse(body) as {
+      error?: { status?: string; details?: Array<{ errorCode?: string }> };
+    };
+    const details = json.error?.details;
+    if (Array.isArray(details)) {
+      for (const detail of details) {
+        if (detail?.errorCode) return detail.errorCode;
+      }
+    }
+    if (json.error?.status) return json.error.status;
+  } catch {
+    // body is not JSON
+  }
+  const lower = body.toLowerCase();
+  if (lower.includes("notregistered")) return "NotRegistered";
+  if (lower.includes("invalidregistration")) return "InvalidRegistration";
+  if (lower.includes("unregistered")) return "UNREGISTERED";
+  return "unknown";
+}
+
+function fcmTokenShouldDrop(status: number, body: string): boolean {
+  const code = fcmErrorCode(body);
+  const normalized = code.toUpperCase();
+  if (
+    normalized === "UNREGISTERED" ||
+    normalized === "NOT_FOUND" ||
+    normalized === "NOTREGISTERED" ||
+    normalized === "INVALIDREGISTRATION"
+  ) {
+    return true;
+  }
+  if (status === 404 && normalized === "NOT_FOUND") return true;
+  const lower = body.toLowerCase();
+  return lower.includes("registration token") && lower.includes("not a valid");
+}
+
 async function sendFcmLegacy(
   serverKey: string,
   tokens: string[],
   title: string,
   body: string,
   data: Record<string, string>,
-): Promise<{ success: number; failure: number }> {
+): Promise<FcmSendResult> {
   const res = await fetch("https://fcm.googleapis.com/fcm/send", {
     method: "POST",
     headers: {
@@ -127,18 +171,28 @@ async function sendFcmLegacy(
       notification: { title, body },
       data,
       priority: "high",
+      android_channel_id: "motolink_alerts",
     }),
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`FCM legacy HTTP ${res.status}: ${text}`);
+    throw new Error(`FCM legacy HTTP ${res.status}`);
   }
 
   const payload = await res.json();
+  const results = Array.isArray(payload.results) ? payload.results : [];
+  const dropTokens: string[] = [];
+  results.forEach((result: { error?: string }, index: number) => {
+    const error = (result?.error ?? "").toLowerCase();
+    if (error === "notregistered" || error === "invalidregistration") {
+      const token = tokens[index];
+      if (token) dropTokens.push(token);
+    }
+  });
   return {
     success: Number(payload.success ?? 0),
     failure: Number(payload.failure ?? 0),
+    dropTokens,
   };
 }
 
@@ -149,9 +203,10 @@ async function sendFcmV1(
   title: string,
   body: string,
   data: Record<string, string>,
-): Promise<{ success: number; failure: number }> {
+): Promise<FcmSendResult> {
   let success = 0;
   let failure = 0;
+  const dropTokens: string[] = [];
 
   for (const token of tokens) {
     const res = await fetch(
@@ -171,6 +226,8 @@ async function sendFcmV1(
               priority: "HIGH",
               notification: {
                 channel_id: "motolink_alerts",
+                sound: "default",
+                default_vibrate_timings: true,
               },
             },
             apns: {
@@ -190,11 +247,13 @@ async function sendFcmV1(
     } else {
       failure += 1;
       const text = await res.text();
-      console.error(`FCM v1 token error: ${text}`);
+      const code = fcmErrorCode(text);
+      console.error(`FCM v1 rejected status=${res.status} code=${code}`);
+      if (fcmTokenShouldDrop(res.status, text)) dropTokens.push(token);
     }
   }
 
-  return { success, failure };
+  return { success, failure, dropTokens };
 }
 
 Deno.serve(async (req) => {
@@ -285,6 +344,11 @@ Deno.serve(async (req) => {
     }));
 
   if (tokens.length === 0 && webSubs.length === 0) {
+    console.log(JSON.stringify({
+      notification_id: payload.notification_id?.trim() ?? "",
+      user_id: userId,
+      skipped: "no_device_tokens",
+    }));
     return jsonResponse({ ok: true, skipped: true, reason: "no_device_tokens" });
   }
 
@@ -304,7 +368,7 @@ Deno.serve(async (req) => {
     notification_id: payload.notification_id?.trim() ?? "",
   };
 
-  let fcmResult: { success: number; failure: number } = { success: 0, failure: 0 };
+  let fcmResult: FcmSendResult = { success: 0, failure: 0, dropTokens: [] };
   let webResult = { success: 0, failure: 0, gone: 0 };
 
   try {
@@ -321,6 +385,17 @@ Deno.serve(async (req) => {
         );
       } else {
         fcmResult = await sendFcmLegacy(fcmLegacyKey!, tokens, title, body, data);
+      }
+      for (const dead of fcmResult.dropTokens) {
+        const { error: dropError } = await supabase.rpc(
+          "deactivate_device_push_token",
+          { p_token: dead },
+        );
+        if (dropError) {
+          console.error(
+            `deactivate_device_push_token failed: ${dropError.code ?? ""}`,
+          );
+        }
       }
     }
 
@@ -344,12 +419,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log(JSON.stringify({
+      notification_id: payload.notification_id?.trim() ?? "",
+      user_id: userId,
+      tokens: tokens.length,
+      fcm_success: fcmResult.success,
+      fcm_failure: fcmResult.failure,
+      fcm_dropped: fcmResult.dropTokens.length,
+      web_success: webResult.success,
+      web_failure: webResult.failure,
+    }));
+
     return jsonResponse({
       ok: true,
       api: serviceAccount ? "v1" : (canFcm ? "legacy" : "web-push"),
       tokens: tokens.length,
       success: fcmResult.success,
       failure: fcmResult.failure,
+      dropped: fcmResult.dropTokens.length,
       web_push: {
         subscriptions: webSubs.length,
         ...webResult,

@@ -14,6 +14,7 @@ import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 import 'package:motolink_pro_app/features/catalog/product_warranty_seal.dart';
+import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 /// Acceso a datos de la vitrina. En la app usa [SupabaseService]; en tests se inyecta.
@@ -69,12 +70,16 @@ class ImporterStoreProfileScreen extends StatefulWidget {
     required this.viewer,
     this.initialCategory,
     this.catalogSource,
+    this.onOpenSupplierChat,
   });
 
   final String importerId;
   final ProfileModel viewer;
   final String? initialCategory;
   final ImporterStoreCatalogSource? catalogSource;
+
+  /// Sustituye la apertura real en pruebas. No recarga la vitrina.
+  final Future<void> Function(BuildContext context)? onOpenSupplierChat;
 
   static Future<void> open(
     BuildContext context, {
@@ -262,6 +267,36 @@ class _ImporterStoreProfileScreenState
     );
   }
 
+  bool get _canMessageSupplier => showStoreSupplierChatButton(
+        viewerRole: widget.viewer.role,
+        viewerId: widget.viewer.id,
+        importerId: widget.importerId,
+      );
+
+  Future<void> _openSupplierChat() async {
+    final custom = widget.onOpenSupplierChat;
+    if (custom != null) {
+      await custom(context);
+      return;
+    }
+    try {
+      final threadId = await StoreSupplierChatService.openOrCreate(
+        importadorId: widget.importerId,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => StoreSupplierChatScreen(threadId: threadId),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo abrir el mensaje: $e')),
+      );
+    }
+  }
+
   Future<void> _openMaps(String url) async {
     final uri = Uri.tryParse(url.trim());
     if (uri == null) return;
@@ -279,6 +314,15 @@ class _ImporterStoreProfileScreenState
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_profile?.displayName ?? 'Mayorista'),
+        actions: [
+          if (_profile != null && _canMessageSupplier)
+            IconButton(
+              key: const Key('store-supplier-chat'),
+              tooltip: 'Mensaje al proveedor',
+              onPressed: _openSupplierChat,
+              icon: const Icon(Icons.chat_bubble_outline),
+            ),
+        ],
       ),
       body: Align(
         alignment: Alignment.topCenter,

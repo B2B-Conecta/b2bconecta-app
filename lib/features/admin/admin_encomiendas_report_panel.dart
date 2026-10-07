@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'admin_product_sales_ranking.dart';
 import 'admin_catalog_featured_section.dart';
+import 'admin_published_catalogs_section.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 
@@ -1047,6 +1048,11 @@ class _AdminEncomiendasReportPanelState
           label: Text('Referidos'),
           icon: Icon(Icons.share_outlined, size: 18),
         ),
+        const ButtonSegment(
+          value: 4,
+          label: Text('Catálogos'),
+          icon: Icon(Icons.storefront_outlined, size: 18),
+        ),
       ],
       selected: {_sectionIndex},
       onSelectionChanged: (s) => setState(() => _sectionIndex = s.first),
@@ -1090,6 +1096,19 @@ class _AdminEncomiendasReportPanelState
             child: _sectionSwitcher(),
           ),
           const Expanded(child: AdminReferralsPanel()),
+        ],
+      );
+    }
+
+    if (_sectionIndex == 4) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _sectionSwitcher(),
+          ),
+          const Expanded(child: AdminPublishedCatalogsSection()),
         ],
       );
     }

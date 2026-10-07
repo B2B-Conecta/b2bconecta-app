@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 
@@ -42,6 +43,23 @@ void navigateFromNotificationPayload({
   }
   if (t0 == 'supervision' && homeRole == AppHomeRole.administrador) {
     MainShellTabController.navigateToAdminActivosForNotification();
+    return;
+  }
+  if (t0 == 'actividad') {
+    if ((relatedId ?? '').trim() == 'registro') {
+      MainShellTabController.navigateToProfileKycDocumentation();
+      return;
+    }
+    MainShellTabController.goTo(0);
+    return;
+  }
+  if (t0 == 'mensaje_directo') {
+    final threadId = (relatedId ?? '').trim();
+    if (threadId.isNotEmpty &&
+        (homeRole == AppHomeRole.aliado ||
+            homeRole == AppHomeRole.importador)) {
+      openStoreSupplierChat(threadId);
+    }
     return;
   }
   if (t0 == 'mensaje') {

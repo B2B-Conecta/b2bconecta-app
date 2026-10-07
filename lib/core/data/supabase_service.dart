@@ -24,6 +24,7 @@ import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dar
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/features/inventory/inventory_service.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_flag.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_approved_aliado_model.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_service.dart';
@@ -246,6 +247,17 @@ class SupabaseService {
   static Future<List<ImporterOption>> fetchImporterOptions() =>
       CatalogService.fetchImporterOptions();
 
+  static Future<List<PartModel>> fetchAdminPublishedCatalog({
+    required String importerId,
+    int limit = 40,
+    int offset = 0,
+  }) =>
+      CatalogService.fetchAdminPublishedCatalog(
+        importerId: importerId,
+        limit: limit,
+        offset: offset,
+      );
+
   static Future<int> fetchProductsCount({CatalogFilters? filters}) =>
       CatalogService.fetchProductsCount(filters: filters);
 
@@ -317,6 +329,7 @@ class SupabaseService {
     bool onlyLowStock = false,
     bool onlyInactive = false,
     bool onlyActive = false,
+    ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
   }) =>
       InventoryService.fetchMyInventory(
           limit: limit,
@@ -325,7 +338,8 @@ class SupabaseService {
           category: category,
           onlyLowStock: onlyLowStock,
           onlyInactive: onlyInactive,
-          onlyActive: onlyActive);
+          onlyActive: onlyActive,
+          photoFilter: photoFilter);
 
   static Future<Map<String, dynamic>?> fetchProductDiscountRulesById(
     String productId,
@@ -897,6 +911,30 @@ class SupabaseService {
   }) =>
       OrdersService.insertTransactionRequestMessageAsAdmin(
           transactionRequestId: transactionRequestId, body: body);
+
+  static Future<String> createSignedUrlForOrderMessageAttachment(
+    String storagePath,
+  ) =>
+      OrdersService.createSignedUrlForOrderMessageAttachment(storagePath);
+
+  static Future<void> sendOrderChatAttachment({
+    required String transactionRequestId,
+    required String authorRole,
+    required String body,
+    required Uint8List bytes,
+    required String fileName,
+    required String mime,
+    required String kind,
+  }) =>
+      OrdersService.sendOrderChatAttachment(
+        transactionRequestId: transactionRequestId,
+        authorRole: authorRole,
+        body: body,
+        bytes: bytes,
+        fileName: fileName,
+        mime: mime,
+        kind: kind,
+      );
 
   static Future<void> adminAnulaPedidoPorMotolink({
     required String transactionRequestId,

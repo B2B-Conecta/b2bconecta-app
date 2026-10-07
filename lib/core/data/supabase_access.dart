@@ -8,6 +8,7 @@ abstract final class SupabaseAccess {
   static const productImagesBucket = 'product-images';
   static const profileDocumentsBucket = 'profile-documents';
   static const orderInvoicesBucket = 'order-invoices';
+  static const orderMessageAttachmentsBucket = 'order-message-attachments';
   static const orderPaymentProofsBucket = 'order-payment-proofs';
   static const commissionSettlementInvoicesBucket =
       'commission-settlement-invoices';

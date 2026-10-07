@@ -61,9 +61,12 @@ void main() async {
     ),
   );
   runApp(MyApp(launchUri: launchUri));
-  // After first frame: FCM/Play Services can hang on some Androids and
-  // freeze the native splash if awaited here.
-  unawaited(_initPushSafely());
+  // After the first frame the activity is resumed, so Android can show the
+  // POST_NOTIFICATIONS prompt. Awaiting FCM here freezes the native splash.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    PushNotificationService.instance.markUiReady();
+    unawaited(_initPushSafely());
+  });
 }
 
 Future<void> _initPushSafely() async {

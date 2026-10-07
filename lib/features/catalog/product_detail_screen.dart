@@ -13,6 +13,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields_sectio
 import 'product_warranty_seal.dart';
 import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
+import 'store_supplier_chat.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -79,6 +80,47 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final viewer = _profile;
     if (viewer == null) return false;
     return viewer.isAliado || viewer.isAdministrador;
+  }
+
+  bool get _canAskAboutProduct {
+    final owner = part.ownerId?.trim() ?? '';
+    final viewer = _profile;
+    if (viewer == null || owner.isEmpty || part.id.trim().isEmpty) {
+      return false;
+    }
+    return showStoreSupplierChatButton(
+      viewerRole: viewer.role,
+      viewerId: viewer.id,
+      importerId: owner,
+    );
+  }
+
+  Future<void> _askAboutProduct() async {
+    if (!_canAskAboutProduct) return;
+    final owner = part.ownerId!.trim();
+    try {
+      final threadId = await StoreSupplierChatService.openOrCreate(
+        importadorId: owner,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => StoreSupplierChatScreen(
+            threadId: threadId,
+            aboutProduct: StoreSupplierProductContext(
+              id: part.id,
+              name: part.nombre,
+              sku: part.sku,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo abrir la pregunta: $e')),
+      );
+    }
   }
 
   void _openImporterStore() {
@@ -764,15 +806,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildActionButtons() {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-        onPressed: _cartActionsDisabled ? null : _addToCart,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_canAskAboutProduct) ...[
+          OutlinedButton.icon(
+            key: const Key('ask-about-product'),
+            onPressed: _askAboutProduct,
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Preguntar sobre este producto'),
+          ),
+          const SizedBox(height: 8),
+        ],
+        FilledButton(
+          onPressed: _cartActionsDisabled ? null : _addToCart,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          child: const Text('Agregar al carrito'),
         ),
-        child: const Text('Agregar al carrito'),
-      ),
+      ],
     );
   }
 

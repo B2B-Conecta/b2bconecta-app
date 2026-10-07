@@ -99,13 +99,15 @@ class InventoryService {
 
     final rows = await SupabaseAccess.client
         .from('products')
-        .select('stock, is_active')
+        .select('stock, is_active, image_url, image_urls')
         .eq('owner_id', uid);
 
     final list = rows as List<dynamic>;
     var total = 0;
     var outOfStock = 0;
     var paused = 0;
+    var withPhotos = 0;
+    var withoutPhotos = 0;
     for (final row in list) {
       final m = Map<String, dynamic>.from(row as Map);
       total++;
@@ -115,11 +117,21 @@ class InventoryService {
       final ia = m['is_active'];
       final active = ia is bool ? ia : ia?.toString() == 'true';
       if (!active) paused++;
+      if (productRowHasPhotos(
+        imageUrls: m['image_urls'],
+        imageUrl: m['image_url'],
+      )) {
+        withPhotos++;
+      } else {
+        withoutPhotos++;
+      }
     }
     return InventoryMetrics(
       totalProducts: total,
       outOfStock: outOfStock,
       paused: paused,
+      withPhotos: withPhotos,
+      withoutPhotos: withoutPhotos,
     );
   }
 
@@ -172,6 +184,7 @@ class InventoryService {
     bool onlyLowStock = false,
     bool onlyInactive = false,
     bool onlyActive = false,
+    ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return [];
@@ -202,6 +215,23 @@ class InventoryService {
 
     if (onlyActive) {
       query = query.eq('is_active', true);
+    }
+
+    // Misma fila que ya se lee: `image_urls` jsonb y portada `image_url`.
+    // El rango de paginación se aplica después, sobre el conjunto filtrado.
+    switch (photoFilter) {
+      case ProductPhotoListFilter.all:
+        break;
+      case ProductPhotoListFilter.withPhotos:
+        query = query.or(
+          'image_urls.neq.[],and(image_url.not.is.null,image_url.neq.)',
+        );
+        break;
+      case ProductPhotoListFilter.withoutPhotos:
+        query = query
+            .filter('image_urls', 'eq', '[]')
+            .or('image_url.is.null,image_url.eq.');
+        break;
     }
 
     final response = await query
@@ -586,6 +616,8 @@ class InventoryMetrics {
     required this.totalProducts,
     required this.outOfStock,
     required this.paused,
+    this.withPhotos = 0,
+    this.withoutPhotos = 0,
   });
 
   static const InventoryMetrics zero = InventoryMetrics(
@@ -597,4 +629,6 @@ class InventoryMetrics {
   final int totalProducts;
   final int outOfStock;
   final int paused;
+  final int withPhotos;
+  final int withoutPhotos;
 }

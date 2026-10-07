@@ -32,6 +32,7 @@ import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
@@ -729,21 +730,31 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             subtitle: 'Hilo con el importador y B2B Conecta',
             infoMessage: OrderSectionHelp.chatPedido,
             initiallyExpanded: true,
-            child: OrderOpenChatButton(
-              relatedOrderIds: [r.id],
-              onPressed: () {
-                final counterpart = r.ownerBusinessName?.trim();
-                showOrderChatSheet(
-                  context: context,
-                  transactionRequestId: r.id,
-                  allowReplyAsAliado: _esEnCurso(r.status),
-                  allowReplyAsAdmin: false,
-                  title: (counterpart != null && counterpart.isNotEmpty)
-                      ? 'Chat · $counterpart'
-                      : 'Chat del pedido',
-                  onThreadChanged: _refreshExpandedCard,
-                );
-              },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OrderOpenChatButton(
+                  relatedOrderIds: [r.id],
+                  onPressed: () {
+                    final counterpart = r.ownerBusinessName?.trim();
+                    showOrderChatSheet(
+                      context: context,
+                      transactionRequestId: r.id,
+                      allowReplyAsAliado: _esEnCurso(r.status),
+                      allowReplyAsAdmin: false,
+                      title: (counterpart != null && counterpart.isNotEmpty)
+                          ? 'Chat · $counterpart'
+                          : 'Chat del pedido',
+                      onThreadChanged: _refreshExpandedCard,
+                    );
+                  },
+                ),
+                OrderReturnButtons(
+                  lines: [r],
+                  allowReplyAsAliado: true,
+                  allowReplyAsImportador: false,
+                ),
+              ],
             ),
           ),
         ],
@@ -897,23 +908,34 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               : 'Hilo con el importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
-          child: OrderOpenChatButton(
-            relatedOrderIds: chunk.map((e) => e.id).toList(),
-            onPressed: () {
-              final counterpart = chunk.first.ownerBusinessName?.trim();
-              showOrderChatSheet(
-                context: context,
-                transactionRequestId: chunk.first.id,
-                mergedThreadRequestIds:
-                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
-                allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
-                allowReplyAsAdmin: false,
-                title: (counterpart != null && counterpart.isNotEmpty)
-                    ? 'Chat · $counterpart'
-                    : 'Chat del pedido',
-                onThreadChanged: _refreshExpandedCard,
-              );
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderOpenChatButton(
+                relatedOrderIds: chunk.map((e) => e.id).toList(),
+                onPressed: () {
+                  final counterpart = chunk.first.ownerBusinessName?.trim();
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: chunk.first.id,
+                    mergedThreadRequestIds: chunk.length > 1
+                        ? chunk.map((e) => e.id).toList()
+                        : null,
+                    allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
+                    allowReplyAsAdmin: false,
+                    title: (counterpart != null && counterpart.isNotEmpty)
+                        ? 'Chat · $counterpart'
+                        : 'Chat del pedido',
+                    onThreadChanged: _refreshExpandedCard,
+                  );
+                },
+              ),
+              OrderReturnButtons(
+                lines: chunk,
+                allowReplyAsAliado: true,
+                allowReplyAsImportador: false,
+              ),
+            ],
           ),
         ),
       ],

@@ -333,7 +333,12 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         bg = Colors.indigo.shade700;
         break;
       case 'mensaje':
+      case 'mensaje_directo':
         icon = Icons.chat_bubble_outline;
+        bg = AppColors.brandBlue;
+        break;
+      case 'actividad':
+        icon = Icons.notifications_active_outlined;
         bg = AppColors.brandBlue;
         break;
       case 'pedido':

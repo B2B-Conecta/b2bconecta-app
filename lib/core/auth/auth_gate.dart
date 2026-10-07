@@ -20,6 +20,7 @@ import 'auth_recovery_storage.dart';
 import 'auth_uri_callback_clear_stub.dart'
     if (dart.library.html) 'auth_uri_callback_clear_web.dart';
 import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
+import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
@@ -404,6 +405,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           ? 'session_restore'
           : 'password';
       unawaited(SupabaseService.logUserLoginEvent(source: source));
+      unawaited(ProfileService.touchMyLastActive());
     }
 
     if (mounted) {
@@ -427,6 +429,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshSessionIfLoggedIn());
+      unawaited(ProfileService.touchMyLastActive());
     }
   }
 

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/app/firebase_options.dart';
@@ -13,9 +16,68 @@ import 'notification_deep_link.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 
+const _kAndroidChannelId = 'motolink_alerts';
+const _kAndroidChannelName = 'B2B Conecta';
+const _kAndroidChannelDescription = 'Pedidos, pagos y mensajes de B2B Conecta';
+const _kNotificationIcon = '@drawable/ic_stat_notification';
+const _kPushPermissionRequested = 'b2b_push_permission_requested';
+
+const _androidChannel = AndroidNotificationChannel(
+  _kAndroidChannelId,
+  _kAndroidChannelName,
+  description: _kAndroidChannelDescription,
+  importance: Importance.high,
+  playSound: true,
+  enableVibration: true,
+);
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // El bloque `notification` lo muestra el sistema. Solo los data-only
+  // necesitan un aviso local, para no duplicar el de la bandeja.
+  if (message.notification != null) return;
+  final title = message.data['title']?.toString().trim() ?? '';
+  final body = message.data['body']?.toString().trim() ?? '';
+  if (title.isEmpty && body.isEmpty) return;
+
+  final plugin = FlutterLocalNotificationsPlugin();
+  const androidInit = AndroidInitializationSettings(_kNotificationIcon);
+  await plugin.initialize(
+    const InitializationSettings(
+      android: androidInit,
+      iOS: DarwinInitializationSettings(),
+    ),
+  );
+  await plugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(_androidChannel);
+  await plugin.show(
+    DateTime.now().millisecondsSinceEpoch.remainder(100000),
+    title.isNotEmpty ? title : 'B2B Conecta',
+    body.isNotEmpty ? body : title,
+    NotificationDetails(
+      android: AndroidNotificationDetails(
+        _androidChannel.id,
+        _androidChannel.name,
+        channelDescription: _androidChannel.description,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: _kNotificationIcon,
+        playSound: true,
+        enableVibration: true,
+      ),
+      iOS: const DarwinNotificationDetails(),
+    ),
+    payload: [
+      message.data['type']?.toString() ?? 'mensaje',
+      message.data['related_id']?.toString() ?? '',
+      message.data['notification_id']?.toString() ?? '',
+      title,
+    ].join('|'),
+  );
 }
 
 typedef PushNotificationTapHandler = void Function({
@@ -26,7 +88,7 @@ typedef PushNotificationTapHandler = void Function({
 });
 
 /// Registro FCM, notificaciones del sistema y deep links al tocar.
-class PushNotificationService {
+class PushNotificationService with WidgetsBindingObserver {
   PushNotificationService._();
 
   static final PushNotificationService instance = PushNotificationService._();
@@ -34,19 +96,33 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
+  Future<void>? _initFuture;
+  final Completer<void> _uiReady = Completer<void>();
   bool _initialized = false;
+  bool _observingLifecycle = false;
   String? _currentToken;
   PushNotificationTapHandler? _onTap;
   _PendingPushTap? _pendingTap;
 
-  static const _androidChannel = AndroidNotificationChannel(
-    'motolink_alerts',
-    'B2B Conecta',
-    description: 'Pedidos, pagos y mensajes de B2B Conecta',
-    importance: Importance.high,
-  );
+  /// La actividad ya pintó un frame: Android puede mostrar el permiso.
+  void markUiReady() {
+    if (!_uiReady.isCompleted) _uiReady.complete();
+  }
 
   Future<void> initialize() async {
+    if (_initialized) return;
+    if (_initFuture != null) return _initFuture!;
+    final run = _initialize();
+    _initFuture = run;
+    try {
+      await run;
+    } catch (e) {
+      if (identical(_initFuture, run)) _initFuture = null;
+      rethrow;
+    }
+  }
+
+  Future<void> _initialize() async {
     if (_initialized) return;
     if (kIsWeb) {
       await WebPushService.instance.initialize(
@@ -71,7 +147,7 @@ class PushNotificationService {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings(_kNotificationIcon);
     const iosInit = DarwinInitializationSettings();
     await _local.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
@@ -87,12 +163,6 @@ class PushNotificationService {
           ?.createNotificationChannel(_androidChannel);
     }
 
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_onRemoteTap);
     final initial = await FirebaseMessaging.instance.getInitialMessage();
@@ -102,10 +172,28 @@ class PushNotificationService {
 
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       _currentToken = token;
-      SupabaseService.upsertDevicePushToken(token: token);
+      unawaited(() async {
+        try {
+          await _upsertToken(token);
+        } catch (e, st) {
+          debugPrint('Push token refresh failed: $e\n$st');
+        }
+      }());
     });
 
+    if (!_observingLifecycle) {
+      WidgetsBinding.instance.addObserver(this);
+      _observingLifecycle = true;
+    }
+
     _initialized = true;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(registerForCurrentUser());
+    }
   }
 
   void registerTapHandler(PushNotificationTapHandler handler) {
@@ -127,19 +215,65 @@ class PushNotificationService {
   }
 
   Future<void> registerForCurrentUser() async {
-    if (!_initialized) return;
+    await initialize();
     if (kIsWeb) {
       await WebPushService.instance.refreshStatus(syncIfGranted: true);
       return;
     }
+    if (!_initialized) return;
+    await _uiReady.future;
     try {
+      await _requestPermissionIfNeeded();
+      if (!await _notificationsGranted()) return;
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null || token.trim().isEmpty) return;
       _currentToken = token;
-      await SupabaseService.upsertDevicePushToken(token: token);
+      await _upsertToken(token);
     } catch (e, st) {
       debugPrint('Push token registration failed: $e\n$st');
     }
+  }
+
+  Future<void> _requestPermissionIfNeeded() async {
+    final messaging = FirebaseMessaging.instance;
+    final current = await messaging.getNotificationSettings();
+    if (_isGranted(current.authorizationStatus)) return;
+
+    if (Platform.isAndroid) {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_kPushPermissionRequested) == true) return;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      await prefs.setBool(_kPushPermissionRequested, true);
+      return;
+    }
+
+    if (current.authorizationStatus == AuthorizationStatus.notDetermined) {
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
+  }
+
+  Future<bool> _notificationsGranted() async {
+    final settings = await FirebaseMessaging.instance.getNotificationSettings();
+    return _isGranted(settings.authorizationStatus);
+  }
+
+  bool _isGranted(AuthorizationStatus status) {
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+  }
+
+  Future<void> _upsertToken(String token) async {
+    if (SupabaseService.currentUserId == null) return;
+    if (!await _notificationsGranted()) return;
+    await SupabaseService.upsertDevicePushToken(token: token);
   }
 
   Future<void> unregisterCurrentDevice() async {
@@ -174,22 +308,29 @@ class PushNotificationService {
       notificationId: notificationId,
       title: title,
     );
-    await _local.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      BrandCopy.display(title),
-      BrandCopy.display(body),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _local.show(
+        DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        BrandCopy.display(title),
+        BrandCopy.display(body),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _androidChannel.id,
+            _androidChannel.name,
+            channelDescription: _androidChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: _kNotificationIcon,
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: const DarwinNotificationDetails(),
         ),
-        iOS: const DarwinNotificationDetails(),
-      ),
-      payload: payload,
-    );
+        payload: payload,
+      );
+    } catch (e, st) {
+      debugPrint('Local notification failed: $e\n$st');
+    }
   }
 
   void _onForegroundMessage(RemoteMessage message) {

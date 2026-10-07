@@ -240,15 +240,40 @@ class _HomeScreenState extends State<HomeScreen> {
     _applyFiltersFromUi();
   }
 
-  void _onPromoCampaignSelected(PromoCampaignModel campaign) {
-    if (!campaign.filtersImporter) return;
-    final importadorId = campaign.importadorId?.trim();
-    if (importadorId == null || importadorId.isEmpty) return;
-    CartService.instance.setPromoAttribution(
-      importadorId: importadorId,
-      campaignId: campaign.id,
+  Future<void> _onPromoCampaignSelected(PromoCampaignModel campaign) async {
+    if (campaign.filtersImporter) {
+      final importadorId = campaign.importadorId?.trim();
+      if (importadorId == null || importadorId.isEmpty) return;
+      CartService.instance.setPromoAttribution(
+        importadorId: importadorId,
+        campaignId: campaign.id,
+      );
+      _applyImporterFilterFromPromo(importadorId);
+      return;
+    }
+    if (campaign.opensStore) {
+      final importadorId = campaign.importadorId!.trim();
+      final profile =
+          await SupabaseService.fetchImporterStoreProfile(importadorId);
+      if (!mounted || profile == null) return;
+      await ImporterStoreProfileScreen.open(
+        context,
+        importerId: importadorId,
+        viewer: widget.profile,
+      );
+      return;
+    }
+    if (!campaign.opensProduct) return;
+    final part = await SupabaseService.fetchVisibleImporterStoreProduct(
+      importerId: campaign.importadorId!.trim(),
+      productId: campaign.productId!.trim(),
     );
-    _applyImporterFilterFromPromo(importadorId);
+    if (!mounted || part == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailScreen(part: part),
+      ),
+    );
   }
 
   Future<void> _openActivePromotionsSheet(
@@ -272,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
         context: context,
         campaign: c,
         onDismissed: () => PromoPopupFrequency.markShown(c.id),
-        onFilterImporter: c.filtersImporter
+        onFilterImporter: c.filtersImporter || c.opensStore || c.opensProduct
             ? () => _onPromoCampaignSelected(c)
             : null,
       );

@@ -1,3 +1,5 @@
+import 'order_message_attachment.dart';
+
 /// Mensaje aliado ↔ B2B Conecta en un pedido (`transaction_request_messages`).
 class TransactionRequestMessageModel {
   const TransactionRequestMessageModel({
@@ -7,6 +9,7 @@ class TransactionRequestMessageModel {
     required this.authorRole,
     required this.body,
     this.createdAt,
+    this.attachments = const [],
   });
 
   final String id;
@@ -15,6 +18,7 @@ class TransactionRequestMessageModel {
   final String authorRole;
   final String body;
   final DateTime? createdAt;
+  final List<OrderMessageAttachment> attachments;
 
   bool get isFromAdmin => authorRole.trim() == 'administrador';
 
@@ -32,6 +36,7 @@ class TransactionRequestMessageModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
+      attachments: parseOrderMessageAttachments(json['attachments']),
     );
   }
 }

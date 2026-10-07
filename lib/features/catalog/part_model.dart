@@ -140,6 +140,12 @@ class PartModel {
   String? get coverImageUrl =>
       productCoverImageUrl(imageUrls, legacy: imagenUrl);
 
+  /// Sin fotos: ni `image_urls` ni la portada legada `image_url`.
+  bool get hasPhotos {
+    final cover = coverImageUrl?.trim();
+    return cover != null && cover.isNotEmpty;
+  }
+
   bool get tieneOfertaDirecta => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: precio,
         salePriceUsd: salePriceUsd,

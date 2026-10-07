@@ -35,10 +35,14 @@ class ProductImageGalleryEditor extends StatelessWidget {
   final ValueChanged<List<ProductImageEditSlot>> onChanged;
   final bool enabled;
 
-  Future<void> _pickImage(BuildContext context, int index) async {
+  Future<void> _pickImage(
+    BuildContext context,
+    int index, {
+    DocumentPickChannel channel = DocumentPickChannel.gallery,
+  }) async {
     if (index != slots.length) return;
     try {
-      final picked = await pickKycDocument(channel: DocumentPickChannel.gallery);
+      final picked = await pickKycDocument(channel: channel);
       if (picked == null) return;
       var ext = picked.fileName.contains('.')
           ? picked.fileName.split('.').last.toLowerCase()
@@ -104,8 +108,26 @@ class ProductImageGalleryEditor extends StatelessWidget {
         ),
         if (canAdd && enabled) ...[
           const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => _pickImage(
+                context,
+                count,
+                channel: DocumentPickChannel.camera,
+              ),
+              icon: const Icon(Icons.photo_camera_outlined, size: 18),
+              label: const Text('Tomar foto'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.brand,
+                side: const BorderSide(color: AppColors.brand),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
-            'Toca un recuadro vacío para agregar. La primera foto es la portada.',
+            'Toca un recuadro vacío para elegir de la galería, o usa Tomar foto. La primera foto es la portada.',
             style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ],

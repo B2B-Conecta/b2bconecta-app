@@ -13,6 +13,7 @@ import 'importer_order_date_badge.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
@@ -470,10 +471,20 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           title: 'Mensajes',
                           subtitle: 'Chat con la tienda minorista',
                           initiallyExpanded: true,
-                          child: OrderOpenChatButton(
-                            relatedOrderIds: lines.map((e) => e.id).toList(),
-                            onPressed: () =>
-                                _openChat(context, lines, isCheckoutGroup),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              OrderOpenChatButton(
+                                relatedOrderIds: lines.map((e) => e.id).toList(),
+                                onPressed: () =>
+                                    _openChat(context, lines, isCheckoutGroup),
+                              ),
+                              OrderReturnButtons(
+                                lines: lines,
+                                allowReplyAsAliado: false,
+                                allowReplyAsImportador: true,
+                              ),
+                            ],
                           ),
                         ),
                         if (expandedFooter != null) ...[

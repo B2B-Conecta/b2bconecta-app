@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 const _importerA = '11111111-1111-1111-1111-111111111111';
@@ -85,13 +86,16 @@ Future<void> _pumpStore(
   WidgetTester tester, {
   required ImporterStoreCatalogSource source,
   String importerId = _importerA,
+  ProfileModel viewer = _viewer,
+  Future<void> Function(BuildContext context)? onOpenSupplierChat,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       home: ImporterStoreProfileScreen(
         importerId: importerId,
-        viewer: _viewer,
+        viewer: viewer,
         catalogSource: source,
+        onOpenSupplierChat: onOpenSupplierChat,
       ),
     ),
   );
@@ -398,4 +402,73 @@ void main() {
       expect(visibleLookups, 0);
     },
   );
+
+  test('el mensaje de la vitrina solo lo ve la tienda ajena', () {
+    expect(
+      showStoreSupplierChatButton(
+        viewerRole: 'aliado',
+        viewerId: 'aliado-1',
+        importerId: _importerA,
+      ),
+      isTrue,
+    );
+    expect(
+      showStoreSupplierChatButton(
+        viewerRole: 'importador',
+        viewerId: _importerA,
+        importerId: _importerA,
+      ),
+      isFalse,
+    );
+    expect(
+      showStoreSupplierChatButton(
+        viewerRole: 'aliado',
+        viewerId: _importerA,
+        importerId: _importerA,
+      ),
+      isFalse,
+    );
+  });
+
+  testWidgets('abrir el mensaje no recarga la vitrina', (tester) async {
+    var profileLoads = 0;
+    var opened = 0;
+    await _pumpStore(
+      tester,
+      source: _source(
+        fetchProfile: (id) async {
+          profileLoads++;
+          return _profile(id: id);
+        },
+      ),
+      onOpenSupplierChat: (_) async {
+        opened++;
+      },
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-supplier-chat')), findsOneWidget);
+    expect(profileLoads, 1);
+
+    await tester.tap(find.byKey(const Key('store-supplier-chat')));
+    await tester.pumpAndSettle();
+
+    expect(opened, 1);
+    expect(profileLoads, 1);
+    expect(find.text('Mayorista Andino'), findsWidgets);
+    expect(find.text('Frenos'), findsOneWidget);
+  });
+
+  testWidgets('el proveedor no ve el botón en su vitrina', (tester) async {
+    await _pumpStore(
+      tester,
+      viewer: const ProfileModel(
+        id: _importerA,
+        role: 'importador',
+        businessName: 'Mayorista Andino',
+      ),
+      source: _source(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-supplier-chat')), findsNothing);
+  });
 }

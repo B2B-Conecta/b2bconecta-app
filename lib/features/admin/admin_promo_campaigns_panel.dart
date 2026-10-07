@@ -108,6 +108,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           imagePublicUrl: c.imagePublicUrl,
           importadorId: c.importadorId,
           productId: c.productId,
+          productIds: c.productIds,
           actionType: c.actionType,
           startsAt: c.startsAt,
           endsAt: c.endsAt,
@@ -342,7 +343,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late String _sponsorType;
   late String _audience;
   String? _importadorId;
-  String? _productId;
+  final Set<String> _selectedProductIds = {};
   List<PartModel> _products = const [];
   bool _productsLoading = false;
   late DateTime _startsAt;
@@ -369,7 +370,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       _sponsorType = value;
       if (_isThirdParty) {
         _importadorId = null;
-        _productId = null;
+        _selectedProductIds.clear();
         _products = const [];
         if (_actionType == PromoCampaignModel.actionFilterImporter ||
             _actionType == PromoCampaignModel.actionOpenStore ||
@@ -411,7 +412,9 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
             ? PromoCampaignModel.actionExternalUrl
             : PromoCampaignModel.actionFilterImporter);
     _importadorId = e?.importadorId;
-    _productId = e?.productId;
+    _selectedProductIds
+      ..clear()
+      ..addAll(e?.resolvedProductIds ?? const []);
     final now = DateTime.now();
     _startsAt = e?.startsAt ?? DateTime(now.year, now.month, now.day);
     _endsAt = e?.endsAt ??
@@ -552,9 +555,14 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       imagePublicUrl: _imageUrl ?? '',
       importadorId: _needsImporter ? _importadorId : null,
       productId: !thirdParty &&
-              _actionType == PromoCampaignModel.actionOpenProduct
-          ? _productId
+              _actionType == PromoCampaignModel.actionOpenProduct &&
+              _selectedProductIds.isNotEmpty
+          ? _selectedProductIds.first
           : null,
+      productIds: !thirdParty &&
+              _actionType == PromoCampaignModel.actionOpenProduct
+          ? _selectedProductIds.toList()
+          : const [],
       actionType: _actionType,
       startsAt: _startsAt,
       endsAt: _endsAt,
@@ -593,17 +601,19 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     }
     if (!_isThirdParty &&
         _actionType == PromoCampaignModel.actionOpenProduct) {
-      final selected = _productId?.trim();
-      final belongs = selected != null &&
-          selected.isNotEmpty &&
-          _products.any((p) => p.id == selected);
+      final selected = _selectedProductIds
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final belongs = selected.isNotEmpty &&
+          selected.every((id) => _products.any((p) => p.id == id));
       if (_productsLoading || !belongs) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               _productsLoading
                   ? 'Espere a que carguen los productos del proveedor.'
-                  : 'Seleccione un producto publicado de ese proveedor.',
+                  : 'Seleccione uno o más productos publicados de ese proveedor.',
             ),
           ),
         );
@@ -811,7 +821,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                       ),
                       DropdownMenuItem(
                         value: PromoCampaignModel.actionOpenProduct,
-                        child: _promoDropdownLabel('Producto específico'),
+                        child: _promoDropdownLabel('Producto(s) específico(s)'),
                       ),
                       DropdownMenuItem(
                         value: PromoCampaignModel.actionNone,
@@ -822,7 +832,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                 setState(() {
                   _actionType = v ?? _actionType;
                   if (_actionType != PromoCampaignModel.actionOpenProduct) {
-                    _productId = null;
+                    _selectedProductIds.clear();
                     _products = const [];
                   }
                 });
@@ -863,7 +873,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                   final changed = v != _importadorId;
                   setState(() {
                     _importadorId = v;
-                    if (changed) _productId = null;
+                    if (changed) _selectedProductIds.clear();
                   });
                   if (_actionType == PromoCampaignModel.actionOpenProduct) {
                     _loadPublishedProducts();
@@ -876,36 +886,66 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               const SizedBox(height: 10),
               if (_productsLoading)
                 const LinearProgressIndicator()
-              else
-                DropdownButtonFormField<String?>(
-                  value: _products.any((p) => p.id == _productId)
-                      ? _productId
-                      : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Producto publicado',
-                    border: OutlineInputBorder(),
+              else ...[
+                InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: _selectedProductIds.isEmpty
+                        ? 'Productos publicados'
+                        : 'Productos publicados (${_selectedProductIds.length})',
+                    border: const OutlineInputBorder(),
+                    helperText: _importadorId == null
+                        ? 'Seleccione un proveedor'
+                        : 'Puede marcar uno o varios (ej. 2 cauchos).',
                   ),
-                  items: [
-                    DropdownMenuItem<String?>(
-                      value: null,
-                      child: _promoDropdownLabel(
-                        _importadorId == null
-                            ? 'Seleccione un proveedor'
-                            : 'Seleccione…',
-                      ),
-                    ),
-                    ..._products.map(
-                      (p) => DropdownMenuItem<String?>(
-                        value: p.id,
-                        child: _promoDropdownLabel(_productOptionLabel(p)),
-                      ),
-                    ),
-                  ],
-                  onChanged: _importadorId == null
-                      ? null
-                      : (v) => setState(() => _productId = v),
+                  child: _importadorId == null || _products.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            _importadorId == null
+                                ? 'Seleccione un proveedor…'
+                                : 'No hay productos publicados para este proveedor.',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        )
+                      : ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 220),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _products.length,
+                            itemBuilder: (context, i) {
+                              final p = _products[i];
+                              final selected =
+                                  _selectedProductIds.contains(p.id);
+                              return CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                value: selected,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                title: Text(
+                                  _productOptionLabel(p),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                onChanged: (v) {
+                                  setState(() {
+                                    if (v == true) {
+                                      _selectedProductIds.add(p.id);
+                                    } else {
+                                      _selectedProductIds.remove(p.id);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
                 ),
+              ],
             ],
             if (_isThirdParty &&
                 _actionType == PromoCampaignModel.actionExternalUrl) ...[

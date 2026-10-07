@@ -9,6 +9,7 @@ class PromoCampaignModel {
     required this.imagePublicUrl,
     this.importadorId,
     this.productId,
+    this.productIds = const [],
     required this.actionType,
     required this.startsAt,
     required this.endsAt,
@@ -43,7 +44,9 @@ class PromoCampaignModel {
   final String imageStoragePath;
   final String imagePublicUrl;
   final String? importadorId;
+  /// Compat: primer producto de [productIds].
   final String? productId;
+  final List<String> productIds;
   final String actionType;
   final DateTime startsAt;
   final DateTime endsAt;
@@ -59,6 +62,17 @@ class PromoCampaignModel {
   bool get isPopup => campaignType == typePopup;
   bool get isThirdParty => sponsorType == sponsorTercero;
   bool get isImporterSponsored => sponsorType == sponsorImportador;
+
+  List<String> get resolvedProductIds {
+    final fromList = productIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (fromList.isNotEmpty) return fromList;
+    final single = productId?.trim();
+    if (single != null && single.isNotEmpty) return [single];
+    return const [];
+  }
 
   bool get filtersImporter =>
       actionType == actionFilterImporter &&
@@ -81,14 +95,15 @@ class PromoCampaignModel {
       actionType == actionOpenProduct &&
       importadorId != null &&
       importadorId!.trim().isNotEmpty &&
-      productId != null &&
-      productId!.trim().isNotEmpty;
+      resolvedProductIds.isNotEmpty;
 
   bool get isTappable =>
       filtersImporter || opensExternalUrl || opensStore || opensProduct;
 
   String get destinationCtaLabel {
-    if (opensProduct) return 'Ver producto';
+    if (opensProduct) {
+      return resolvedProductIds.length > 1 ? 'Ver productos' : 'Ver producto';
+    }
     if (opensStore) return 'Ver vitrina';
     if (filtersImporter) return 'Ver proveedor';
     return '';
@@ -119,7 +134,24 @@ class PromoCampaignModel {
     }
   }
 
+  static List<String> _parseProductIds(dynamic raw, {String? fallbackId}) {
+    final out = <String>[];
+    if (raw is List) {
+      for (final e in raw) {
+        final id = e?.toString().trim() ?? '';
+        if (id.isNotEmpty && !out.contains(id)) out.add(id);
+      }
+    }
+    if (out.isEmpty) {
+      final single = fallbackId?.trim();
+      if (single != null && single.isNotEmpty) out.add(single);
+    }
+    return out;
+  }
+
   factory PromoCampaignModel.fromJson(Map<String, dynamic> json) {
+    final single = json['product_id']?.toString();
+    final ids = _parseProductIds(json['product_ids'], fallbackId: single);
     return PromoCampaignModel(
       id: json['id']?.toString() ?? '',
       internalTitle: json['internal_title']?.toString() ?? '',
@@ -128,7 +160,8 @@ class PromoCampaignModel {
       imageStoragePath: json['image_storage_path']?.toString() ?? '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
       importadorId: json['importador_id']?.toString(),
-      productId: json['product_id']?.toString(),
+      productId: ids.isEmpty ? single : ids.first,
+      productIds: ids,
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.parse(json['starts_at'].toString()).toLocal(),
       endsAt: DateTime.parse(json['ends_at'].toString()).toLocal(),
@@ -145,6 +178,7 @@ class PromoCampaignModel {
   }
 
   Map<String, dynamic> toInsertJson({required String createdBy}) {
+    final ids = resolvedProductIds;
     return {
       'internal_title': internalTitle.trim(),
       'display_title': displayTitle?.trim().isEmpty ?? true
@@ -154,7 +188,8 @@ class PromoCampaignModel {
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
       'importador_id': importadorId,
-      'product_id': productId,
+      'product_id': ids.isEmpty ? null : ids.first,
+      'product_ids': ids,
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -174,6 +209,7 @@ class PromoCampaignModel {
   }
 
   Map<String, dynamic> toUpdateJson() {
+    final ids = resolvedProductIds;
     return {
       'internal_title': internalTitle.trim(),
       'display_title': displayTitle?.trim().isEmpty ?? true
@@ -183,7 +219,8 @@ class PromoCampaignModel {
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
       'importador_id': importadorId,
-      'product_id': productId,
+      'product_id': ids.isEmpty ? null : ids.first,
+      'product_ids': ids,
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -203,6 +240,8 @@ class PromoCampaignModel {
 
   /// Respuesta compacta del RPC aliado / vallas importador.
   factory PromoCampaignModel.fromAliadoRpcJson(Map<String, dynamic> json) {
+    final single = json['product_id']?.toString();
+    final ids = _parseProductIds(json['product_ids'], fallbackId: single);
     return PromoCampaignModel(
       id: json['id']?.toString() ?? '',
       internalTitle: '',
@@ -211,7 +250,8 @@ class PromoCampaignModel {
       imageStoragePath: '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
       importadorId: json['importador_id']?.toString(),
-      productId: json['product_id']?.toString(),
+      productId: ids.isEmpty ? single : ids.first,
+      productIds: ids,
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.now(),
       endsAt: DateTime.now(),

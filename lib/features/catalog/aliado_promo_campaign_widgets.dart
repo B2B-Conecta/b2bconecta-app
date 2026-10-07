@@ -75,7 +75,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
-    final bannerHeight = widget.compact ? 96.0 : 132.0;
+    // Creativos son panorámicos; contain evita recortar el mensaje del anuncio.
+    final bannerAspect = widget.compact ? (16 / 6) : (16 / 5);
     final horizontalPadding = widget.compact ? 0.0 : 16.0;
 
     return Padding(
@@ -83,8 +84,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: bannerHeight,
+          AspectRatio(
+            aspectRatio: bannerAspect,
             child: PageView.builder(
               controller: _pageController,
               itemCount: items.length,
@@ -92,7 +93,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
               itemBuilder: (context, index) {
                 final c = items[index];
                 return Material(
-                  color: Colors.white,
+                  color: AppColors.fieldFill,
                   borderRadius: BorderRadius.circular(12),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
@@ -102,7 +103,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                       children: [
                         Image.network(
                           c.imagePublicUrl,
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
                           errorBuilder: (_, __, ___) => Container(
                             color: AppColors.fieldFill,
                             alignment: Alignment.center,
@@ -210,15 +212,23 @@ Future<void> showAliadoPromoPopupDialog({
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Image.network(
-                  campaign.imagePublicUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: AppColors.fieldFill,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(ctx).height * 0.48,
+                ),
+                child: ColoredBox(
+                  color: AppColors.fieldFill,
+                  child: Image.network(
+                    campaign.imagePublicUrl,
+                    fit: BoxFit.contain,
+                    width: double.infinity,
                     alignment: Alignment.center,
-                    child: const Icon(Icons.broken_image_outlined, size: 40),
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 180,
+                      color: AppColors.fieldFill,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined, size: 40),
+                    ),
                   ),
                 ),
               ),
@@ -433,7 +443,7 @@ Future<void> showAliadoActivePromotionsSheet({
                                 c.imagePublicUrl,
                                 width: 72,
                                 height: 72,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                                 errorBuilder: (_, __, ___) => Container(
                                   width: 72,
                                   height: 72,

@@ -264,9 +264,128 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (!campaign.opensProduct) return;
+    final importerId = campaign.importadorId!.trim();
+    final ids = campaign.resolvedProductIds;
+    if (ids.isEmpty) return;
+
+    if (ids.length == 1) {
+      await _openPromoProductDetail(
+        importerId: importerId,
+        productId: ids.first,
+      );
+      return;
+    }
+
+    final parts = <PartModel>[];
+    for (final id in ids) {
+      final part = await SupabaseService.fetchVisibleImporterStoreProduct(
+        importerId: importerId,
+        productId: id,
+      );
+      if (part != null) parts.add(part);
+    }
+    if (!mounted || parts.isEmpty) return;
+    if (parts.length == 1) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => ProductDetailScreen(part: parts.first),
+        ),
+      );
+      return;
+    }
+
+    final chosen = await showModalBottomSheet<PartModel>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Productos de la promoción',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                Text(
+                  campaign.promoLabel,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.45,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: parts.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final p = parts[i];
+                      final sku = (p.sku ?? '').trim();
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          p.nombre,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: sku.isEmpty
+                            ? null
+                            : Text(
+                                'SKU $sku',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.pop(ctx, p),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || chosen == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailScreen(part: chosen),
+      ),
+    );
+  }
+
+  Future<void> _openPromoProductDetail({
+    required String importerId,
+    required String productId,
+  }) async {
     final part = await SupabaseService.fetchVisibleImporterStoreProduct(
-      importerId: campaign.importadorId!.trim(),
-      productId: campaign.productId!.trim(),
+      importerId: importerId,
+      productId: productId,
     );
     if (!mounted || part == null) return;
     await Navigator.of(context).push<void>(

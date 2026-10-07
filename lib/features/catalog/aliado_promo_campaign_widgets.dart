@@ -75,115 +75,128 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
-    // Creativos son panorámicos; contain evita recortar el mensaje del anuncio.
-    final bannerAspect = widget.compact ? (16 / 6) : (16 / 5);
+    // En web/desktop el ancho es grande: un AspectRatio 16:5 deja la valla
+    // enorme y el grid (Expanded) casi sin alto. Tope de altura + contain.
     final horizontalPadding = widget.compact ? 0.0 : 16.0;
+    final maxBannerHeight = widget.compact ? 128.0 : 152.0;
+    final minBannerHeight = widget.compact ? 96.0 : 112.0;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AspectRatio(
-            aspectRatio: bannerAspect,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: items.length,
-              onPageChanged: (i) => setState(() => _page = i),
-              itemBuilder: (context, index) {
-                final c = items[index];
-                return Material(
-                  color: AppColors.fieldFill,
-                  borderRadius: BorderRadius.circular(12),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: c.isTappable ? () => _onTap(c) : null,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          c.imagePublicUrl,
-                          fit: BoxFit.contain,
-                          alignment: Alignment.center,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: AppColors.fieldFill,
-                            alignment: Alignment.center,
-                            child: const Icon(Icons.broken_image_outlined),
-                          ),
-                        ),
-                        Positioned(
-                          left: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brand.withOpacity(0.92),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              c.badgeLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          // Preferencia panorámica (~3.5:1), limitada para no comerse el catálogo.
+          final idealHeight = width / 3.5;
+          final bannerHeight =
+              idealHeight.clamp(minBannerHeight, maxBannerHeight).toDouble();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: bannerHeight,
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: items.length,
+                  onPageChanged: (i) => setState(() => _page = i),
+                  itemBuilder: (context, index) {
+                    final c = items[index];
+                    return Material(
+                      color: AppColors.fieldFill,
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: c.isTappable ? () => _onTap(c) : null,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              c.imagePublicUrl,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: AppColors.fieldFill,
+                                alignment: Alignment.center,
+                                child:
+                                    const Icon(Icons.broken_image_outlined),
                               ),
                             ),
-                          ),
-                        ),
-                        if (c.isTappable)
-                          Positioned(
-                            right: 8,
-                            bottom: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.55),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                c.promoLabel,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                            Positioned(
+                              left: 8,
+                              top: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brand.withOpacity(0.92),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  c.badgeLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          if (items.length > 1) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                items.length,
-                (i) => Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i == _page
-                        ? AppColors.brand
-                        : Colors.grey.shade400,
-                  ),
+                            if (c.isTappable)
+                              Positioned(
+                                right: 8,
+                                bottom: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.55),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    c.promoLabel,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
-        ],
+              if (items.length > 1) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    items.length,
+                    (i) => Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i == _page
+                            ? AppColors.brand
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }

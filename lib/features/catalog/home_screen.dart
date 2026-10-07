@@ -265,6 +265,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (!campaign.opensProduct) return;
     final importerId = campaign.importadorId!.trim();
+    CartService.instance.setPromoAttribution(
+      importadorId: importerId,
+      campaignId: campaign.id,
+    );
     final ids = campaign.resolvedProductIds;
     if (ids.isEmpty) return;
 
@@ -282,7 +286,16 @@ class _HomeScreenState extends State<HomeScreen> {
         importerId: importerId,
         productId: id,
       );
-      if (part != null) parts.add(part);
+      if (part == null) continue;
+      // Asegura precio/chip de valla en el sheet aunque el mapa RPC falle.
+      parts.add(
+        campaign.hasProductDiscount
+            ? part.copyWith(
+                activeCampaignDiscountPercent: campaign.discountPercent,
+                activePromoCampaignId: campaign.id,
+              )
+            : part,
+      );
     }
     if (!mounted || parts.isEmpty) return;
     if (parts.length == 1) {
@@ -294,82 +307,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final chosen = await showModalBottomSheet<PartModel>(
+    final chosen = await showAliadoPromoProductsSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Productos de la promoción',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 17,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                Text(
-                  campaign.promoLabel,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.45,
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: parts.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final p = parts[i];
-                      final sku = (p.sku ?? '').trim();
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          p.nombre,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: sku.isEmpty
-                            ? null
-                            : Text(
-                                'SKU $sku',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.pop(ctx, p),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      campaign: campaign,
+      parts: parts,
     );
     if (!mounted || chosen == null) return;
     await Navigator.of(context).push<void>(
@@ -1082,22 +1023,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                  AliadoPromoBannerCarousel(
-                    campaigns: bannerPromos,
-                    onPromoCampaignSelected: _onPromoCampaignSelected,
-                    compact: isDesktopCatalog,
-                  ),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
-                    child: Text(
-                      '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
-                      style: TextStyle(
-                        fontSize: isDesktopCatalog ? 14 : 13,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
                   Expanded(
                     child: FutureBuilder<List<PartModel>>(
                       future: _partsFuture,
@@ -1135,10 +1060,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         }
                         final parts = _loadedParts;
+                        final resultsLabel =
+                            '${_catalogTotal ?? parts.length} repuestos encontrados';
+                        final resultsStyle = TextStyle(
+                          fontSize: isDesktopCatalog ? 14 : 13,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        );
+
                         if (parts.isEmpty) {
                           return ListView(
                             children: [
-                              const SizedBox(height: 160),
+                              if (bannerPromos.isNotEmpty)
+                                AliadoPromoBannerCarousel(
+                                  campaigns: bannerPromos,
+                                  onPromoCampaignSelected:
+                                      _onPromoCampaignSelected,
+                                  compact: isDesktopCatalog,
+                                ),
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
+                                child: Text(resultsLabel, style: resultsStyle),
+                              ),
+                              const SizedBox(height: 120),
                               Center(
                                 child: Text(
                                   _activeFilters.hasAnyFilter
@@ -1151,6 +1095,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           );
                         }
+
+                        // Un solo scroll: la valla va arriba del contenido y
+                        // se desplaza con el catálogo (deja de quedar fija).
                         return Stack(
                           children: [
                             NotificationListener<ScrollNotification>(
@@ -1162,55 +1109,93 @@ class _HomeScreenState extends State<HomeScreen> {
                                 }
                                 return false;
                               },
-                              child: GridView.builder(
+                              child: CustomScrollView(
                                 controller: _catalogScrollController,
-                                padding: EdgeInsets.fromLTRB(
-                                  hPad,
-                                  0,
-                                  hPad,
-                                  _isLoadingMore ? 56 : 16,
-                                ),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: crossAxisCount,
-                                  mainAxisSpacing: gridSpacing,
-                                  crossAxisSpacing: gridSpacing,
-                                  childAspectRatio:
-                                      AliadoCatalogLayout.childAspectRatio(
-                                    catalogWidth,
-                                    showDistance: _activeFilters
-                                        .sortByDistanceFromReference,
+                                slivers: [
+                                  if (bannerPromos.isNotEmpty)
+                                    SliverToBoxAdapter(
+                                      child: AliadoPromoBannerCarousel(
+                                        campaigns: bannerPromos,
+                                        onPromoCampaignSelected:
+                                            _onPromoCampaignSelected,
+                                        compact: isDesktopCatalog,
+                                      ),
+                                    ),
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        hPad,
+                                        4,
+                                        hPad,
+                                        8,
+                                      ),
+                                      child: Text(
+                                        resultsLabel,
+                                        style: resultsStyle,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                itemCount: parts.length,
-                                itemBuilder: (context, index) {
-                                  final p = parts[index];
-                                  return _ProductGridCard(
-                                    part: p,
-                                    profile: widget.profile,
-                                    compact: true,
-                                    showDistanceChips: _activeFilters
-                                        .sortByDistanceFromReference,
-                                    onTap: () {
-                                      Navigator.of(context).push<void>(
-                                        MaterialPageRoute<void>(
-                                          builder: (ctx) =>
-                                              ProductDetailScreen(part: p),
+                                  SliverPadding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      hPad,
+                                      0,
+                                      hPad,
+                                      _isLoadingMore ? 56 : 16,
+                                    ),
+                                    sliver: SliverGrid(
+                                      gridDelegate:
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: crossAxisCount,
+                                        mainAxisSpacing: gridSpacing,
+                                        crossAxisSpacing: gridSpacing,
+                                        childAspectRatio:
+                                            AliadoCatalogLayout
+                                                .childAspectRatio(
+                                          catalogWidth,
+                                          showDistance: _activeFilters
+                                              .sortByDistanceFromReference,
                                         ),
-                                      );
-                                    },
-                                    onImporterTap:
-                                        (p.ownerId?.trim().isNotEmpty ?? false)
-                                            ? () {
-                                                ImporterStoreProfileScreen.open(
-                                                  context,
-                                                  importerId: p.ownerId!.trim(),
-                                                  viewer: widget.profile,
-                                                );
-                                              }
-                                            : null,
-                                  );
-                                },
+                                      ),
+                                      delegate: SliverChildBuilderDelegate(
+                                        (context, index) {
+                                          final p = parts[index];
+                                          return _ProductGridCard(
+                                            part: p,
+                                            profile: widget.profile,
+                                            compact: true,
+                                            showDistanceChips: _activeFilters
+                                                .sortByDistanceFromReference,
+                                            onTap: () {
+                                              Navigator.of(context).push<void>(
+                                                MaterialPageRoute<void>(
+                                                  builder: (ctx) =>
+                                                      ProductDetailScreen(
+                                                    part: p,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            onImporterTap: (p.ownerId
+                                                        ?.trim()
+                                                        .isNotEmpty ??
+                                                    false)
+                                                ? () {
+                                                    ImporterStoreProfileScreen
+                                                        .open(
+                                                      context,
+                                                      importerId:
+                                                          p.ownerId!.trim(),
+                                                      viewer: widget.profile,
+                                                    );
+                                                  }
+                                                : null,
+                                          );
+                                        },
+                                        childCount: parts.length,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             if (_isLoadingMore)
@@ -1446,6 +1431,7 @@ class _ProductGridCard extends StatelessWidget {
                 listPriceUsd: part.precio,
                 salePriceUsd: part.salePriceUsd,
                 discountRules: part.discountRules,
+                campaignDiscountPercent: part.activeCampaignDiscountPercent,
                 catalogGrid: true,
                 compact: compact,
                 ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,

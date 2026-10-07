@@ -14,8 +14,8 @@ class CartLine {
   final PartModel part;
   int quantity;
 
-  /// Precio unitario REF acordado al añadir al carrito.
-  final double precioUnitarioAliadoRef;
+  /// Precio unitario REF (se recalcula al cambiar cantidad: volumen vs promo).
+  double precioUnitarioAliadoRef;
 }
 
 /// Carrito multi-importador (agrupa por importador en la UI).
@@ -125,14 +125,18 @@ class CartService extends ChangeNotifier {
       final next = existing.quantity + delta;
       existing.quantity = next > maxStock ? maxStock : next;
       if (existing.quantity < minQty) existing.quantity = minQty;
+      existing.precioUnitarioAliadoRef =
+          existing.part.precioUnitarioParaAliado(quantity: existing.quantity);
     } else {
       var q = delta < minQty ? minQty : delta;
       if (q > maxStock) q = maxStock;
+      final cascada = part.precioUnitarioParaAliado(quantity: q);
       _lines.add(
         CartLine(
           part: part,
           quantity: q,
-          precioUnitarioAliadoRef: precioUnitarioAliadoRef,
+          precioUnitarioAliadoRef:
+              cascada > 0 ? cascada : precioUnitarioAliadoRef,
         ),
       );
     }
@@ -157,6 +161,8 @@ class CartService extends ChangeNotifier {
     }
     var next = qty < minQty ? minQty : qty;
     line.quantity = next > maxStock ? maxStock : next;
+    line.precioUnitarioAliadoRef =
+        line.part.precioUnitarioParaAliado(quantity: line.quantity);
     notifyListeners();
   }
 

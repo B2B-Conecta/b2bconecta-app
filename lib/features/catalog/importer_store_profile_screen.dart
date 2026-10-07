@@ -708,6 +708,7 @@ class _StoreProductCard extends StatelessWidget {
                 listPriceUsd: part.precio,
                 salePriceUsd: part.salePriceUsd,
                 discountRules: part.discountRules,
+                campaignDiscountPercent: part.activeCampaignDiscountPercent,
                 catalogGrid: true,
                 compact: true,
                 ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,

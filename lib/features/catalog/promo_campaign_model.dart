@@ -10,6 +10,7 @@ class PromoCampaignModel {
     this.importadorId,
     this.productId,
     this.productIds = const [],
+    this.discountPercent,
     required this.actionType,
     required this.startsAt,
     required this.endsAt,
@@ -47,6 +48,8 @@ class PromoCampaignModel {
   /// Compat: primer producto de [productIds].
   final String? productId;
   final List<String> productIds;
+  /// % descuento de valla sobre lista (null = sin precio promo).
+  final double? discountPercent;
   final String actionType;
   final DateTime startsAt;
   final DateTime endsAt;
@@ -97,8 +100,20 @@ class PromoCampaignModel {
       importadorId!.trim().isNotEmpty &&
       resolvedProductIds.isNotEmpty;
 
+  bool get hasProductDiscount {
+    final pct = discountPercent;
+    return pct != null && pct > 0 && pct < 100 && resolvedProductIds.isNotEmpty;
+  }
+
   bool get isTappable =>
       filtersImporter || opensExternalUrl || opensStore || opensProduct;
+
+  static double? parseDiscountPercent(dynamic raw) {
+    if (raw == null) return null;
+    final n = raw is num ? raw.toDouble() : double.tryParse(raw.toString());
+    if (n == null || n <= 0 || n >= 100) return null;
+    return n;
+  }
 
   String get destinationCtaLabel {
     if (opensProduct) {
@@ -162,6 +177,7 @@ class PromoCampaignModel {
       importadorId: json['importador_id']?.toString(),
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
+      discountPercent: parseDiscountPercent(json['discount_percent']),
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.parse(json['starts_at'].toString()).toLocal(),
       endsAt: DateTime.parse(json['ends_at'].toString()).toLocal(),
@@ -190,6 +206,7 @@ class PromoCampaignModel {
       'importador_id': importadorId,
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
+      'discount_percent': hasProductDiscount ? discountPercent : null,
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -221,6 +238,7 @@ class PromoCampaignModel {
       'importador_id': importadorId,
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
+      'discount_percent': hasProductDiscount ? discountPercent : null,
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -252,6 +270,7 @@ class PromoCampaignModel {
       importadorId: json['importador_id']?.toString(),
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
+      discountPercent: parseDiscountPercent(json['discount_percent']),
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.now(),
       endsAt: DateTime.now(),

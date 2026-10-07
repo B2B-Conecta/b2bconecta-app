@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'catalog_product_price_display.dart';
+import 'part_model.dart';
 import 'promo_campaign_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'product_catalog_pricing.dart';
 
 Future<void> launchPromoCampaignExternalUrl(
   BuildContext context,
@@ -75,115 +78,131 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
-    // Creativos son panorámicos; contain evita recortar el mensaje del anuncio.
-    final bannerAspect = widget.compact ? (16 / 6) : (16 / 5);
+    // Tope bajo en desktop: creativo completo (contain) sin comerse el catálogo.
     final horizontalPadding = widget.compact ? 0.0 : 16.0;
+    final maxBannerHeight = widget.compact ? 96.0 : 128.0;
+    final minBannerHeight = widget.compact ? 72.0 : 100.0;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AspectRatio(
-            aspectRatio: bannerAspect,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: items.length,
-              onPageChanged: (i) => setState(() => _page = i),
-              itemBuilder: (context, index) {
-                final c = items[index];
-                return Material(
-                  color: AppColors.fieldFill,
-                  borderRadius: BorderRadius.circular(12),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: c.isTappable ? () => _onTap(c) : null,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          c.imagePublicUrl,
-                          fit: BoxFit.contain,
-                          alignment: Alignment.center,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: AppColors.fieldFill,
-                            alignment: Alignment.center,
-                            child: const Icon(Icons.broken_image_outlined),
-                          ),
-                        ),
-                        Positioned(
-                          left: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brand.withOpacity(0.92),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              c.badgeLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          // Preferencia panorámica (~3.5:1), limitada para no comerse el catálogo.
+          final idealHeight = width / 3.5;
+          final bannerHeight =
+              idealHeight.clamp(minBannerHeight, maxBannerHeight).toDouble();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: bannerHeight,
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: items.length,
+                  // Evita que el PageView “robe” el scroll vertical del catálogo.
+                  physics: items.length <= 1
+                      ? const NeverScrollableScrollPhysics()
+                      : const PageScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _page = i),
+                  itemBuilder: (context, index) {
+                    final c = items[index];
+                    return Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: c.isTappable ? () => _onTap(c) : null,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              c.imagePublicUrl,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: AppColors.fieldFill,
+                                alignment: Alignment.center,
+                                child:
+                                    const Icon(Icons.broken_image_outlined),
                               ),
                             ),
-                          ),
-                        ),
-                        if (c.isTappable)
-                          Positioned(
-                            right: 8,
-                            bottom: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.55),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                c.promoLabel,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                            Positioned(
+                              left: 8,
+                              top: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brand.withOpacity(0.92),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  c.badgeLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          if (items.length > 1) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                items.length,
-                (i) => Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i == _page
-                        ? AppColors.brand
-                        : Colors.grey.shade400,
-                  ),
+                            if (c.isTappable)
+                              Positioned(
+                                right: 8,
+                                bottom: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.55),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    c.promoLabel,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
-        ],
+              if (items.length > 1) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    items.length,
+                    (i) => Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i == _page
+                            ? AppColors.brand
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -499,4 +518,237 @@ Future<void> showAliadoActivePromotionsSheet({
       );
     },
   );
+}
+
+/// Sheet para elegir entre varios productos de una valla (imagen + precio promo).
+Future<PartModel?> showAliadoPromoProductsSheet({
+  required BuildContext context,
+  required PromoCampaignModel campaign,
+  required List<PartModel> parts,
+}) {
+  if (parts.isEmpty) return Future<PartModel?>.value(null);
+
+  return showModalBottomSheet<PartModel>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+    ),
+    builder: (ctx) {
+      final maxH = MediaQuery.sizeOf(ctx).height * 0.62;
+      final discountLabel = ProductCatalogPricing.campaignDiscountChipEs(
+        campaign.discountPercent,
+      );
+
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Productos de la promoción',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          campaign.promoLabel,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              if (discountLabel != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF6E5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFE8A317).withOpacity(0.45),
+                      ),
+                    ),
+                    child: Text(
+                      discountLabel,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF8A5A00),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxH),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: parts.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final p = parts[i];
+                    return _PromoProductPickTile(
+                      part: p,
+                      onTap: () => Navigator.pop(ctx, p),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _PromoProductPickTile extends StatelessWidget {
+  const _PromoProductPickTile({
+    required this.part,
+    required this.onTap,
+  });
+
+  final PartModel part;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final sku = (part.sku ?? '').trim();
+    final cover = part.coverImageUrl?.trim();
+
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: cover != null && cover.isNotEmpty
+                      ? Image.network(
+                          cover,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _thumbPlaceholder(),
+                        )
+                      : _thumbPlaceholder(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      part.nombre,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        height: 1.25,
+                      ),
+                    ),
+                    if (sku.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'SKU $sku',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    CatalogProductPriceDisplay(
+                      listPriceUsd: part.precio,
+                      salePriceUsd: part.salePriceUsd,
+                      discountRules: part.discountRules,
+                      campaignDiscountPercent:
+                          part.activeCampaignDiscountPercent,
+                      catalogGrid: true,
+                      compact: true,
+                      showPromotionChips: true,
+                      ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.brand,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _thumbPlaceholder() {
+    return ColoredBox(
+      color: AppColors.fieldFill,
+      child: Icon(
+        Icons.precision_manufacturing_outlined,
+        color: AppColors.textSecondary.withOpacity(0.55),
+        size: 28,
+      ),
+    );
+  }
 }

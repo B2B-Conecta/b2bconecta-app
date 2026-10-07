@@ -39,6 +39,8 @@ class PartModel {
     this.ownerCatalogVerifiedAt,
     this.salePriceUsd,
     this.discountRules,
+    this.activeCampaignDiscountPercent,
+    this.activePromoCampaignId,
     this.ownerPagoSoloDivisas = false,
     this.hasWarranty = false,
     this.customFields = const {},
@@ -127,6 +129,12 @@ class PartModel {
   /// E4: tramos por volumen (`volume_tiers` con `min_units`).
   final Map<String, dynamic>? discountRules;
 
+  /// % de valla activa (`promo_campaigns.discount_percent`) mientras dure la campaña.
+  final double? activeCampaignDiscountPercent;
+
+  /// Campaña de valla que aporta [activeCampaignDiscountPercent].
+  final String? activePromoCampaignId;
+
   /// Importador dueño: solo acepta pagos en divisas (sin descuento línea USD).
   final bool ownerPagoSoloDivisas;
 
@@ -151,6 +159,9 @@ class PartModel {
         salePriceUsd: salePriceUsd,
       );
 
+  bool get tieneDescuentoValla =>
+      ProductCatalogPricing.hasCampaignDiscount(activeCampaignDiscountPercent);
+
   List<ProductVolumeTier> get volumeTiers =>
       parseProductVolumeTiers(discountRules);
 
@@ -166,13 +177,14 @@ class PartModel {
   /// Precio unitario para aliado sin markup broker (legacy; preferir [precioUnitarioParaAliado]).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
 
-  /// Precio de venta al aliado (cascada E4; sin tramo volumen si [quantity] = 1 en grid).
+  /// Precio de venta al aliado (cascada E4 + valla; sin tramo volumen si [quantity] = 1 en grid).
   double precioUnitarioParaAliado({int quantity = 1}) =>
       ProductCatalogPricing.aliadoUnitUsd(
         listPriceUsd: precio,
         salePriceUsd: salePriceUsd,
         discountRules: discountRules,
         quantity: quantity,
+        campaignDiscountPercent: activeCampaignDiscountPercent,
       );
 
   factory PartModel.fromJson(Map<String, dynamic> json) {
@@ -280,6 +292,8 @@ class PartModel {
     DateTime? ownerCatalogVerifiedAt,
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
+    double? activeCampaignDiscountPercent,
+    String? activePromoCampaignId,
     bool? ownerPagoSoloDivisas,
     bool? hasWarranty,
     Map<String, dynamic>? customFields,
@@ -321,6 +335,10 @@ class PartModel {
           ownerCatalogVerifiedAt ?? this.ownerCatalogVerifiedAt,
       salePriceUsd: salePriceUsd ?? this.salePriceUsd,
       discountRules: discountRules ?? this.discountRules,
+      activeCampaignDiscountPercent: activeCampaignDiscountPercent ??
+          this.activeCampaignDiscountPercent,
+      activePromoCampaignId:
+          activePromoCampaignId ?? this.activePromoCampaignId,
       ownerPagoSoloDivisas:
           ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
       hasWarranty: hasWarranty ?? this.hasWarranty,

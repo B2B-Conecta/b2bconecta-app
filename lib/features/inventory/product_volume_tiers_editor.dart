@@ -56,7 +56,7 @@ class _ProductVolumeTiersEditorState extends State<ProductVolumeTiersEditor> {
               controller: pctCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: 'Descuento adicional (%)',
+                labelText: 'Descuento sobre precio base (%)',
               ),
             ),
           ],
@@ -107,8 +107,8 @@ class _ProductVolumeTiersEditorState extends State<ProductVolumeTiersEditor> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Ej.: desde 12 unidades, 5 % adicional sobre el precio mayorista. '
-          'Se suma en checkout antes de la comisión B2B Conecta.',
+          'Ej.: desde 12 unidades, 5 % sobre el precio base (lista). '
+          'Si hay valla promocional, el aliado aplica volumen o promo, no ambos.',
           style: TextStyle(fontSize: 11.5, height: 1.35, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),

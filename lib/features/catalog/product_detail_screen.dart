@@ -628,13 +628,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               salePriceUsd: part.salePriceUsd,
               discountRules: part.discountRules,
               campaignDiscountPercent: part.activeCampaignDiscountPercent,
+              quantity: quantity,
               showPromotionChips: true,
               ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
             ),
           ),
         ),
       ),
-      if (ProductCatalogPricing.volumeIncentiveBadgeEs(part.discountRules) !=
+      if (ProductCatalogPricing.volumeIncentiveBadgeEs(
+            part.discountRules,
+            currentQuantity: quantity,
+          ) !=
           null) ...[
         const SizedBox(height: 10),
         Container(
@@ -646,7 +650,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             border: Border.all(color: AppColors.borderSubtle),
           ),
           child: Text(
-            ProductCatalogPricing.volumeIncentiveBadgeEs(part.discountRules)!,
+            ProductCatalogPricing.volumeIncentiveBadgeEs(
+              part.discountRules,
+              currentQuantity: quantity,
+            )!,
             style: TextStyle(
               fontSize: 13,
               height: 1.35,

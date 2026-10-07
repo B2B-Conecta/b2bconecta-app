@@ -30,12 +30,16 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool showPromotionChips;
   final bool ownerPagoSoloDivisas;
 
-  bool get _onSale =>
-      ProductCatalogPricing.hasDirectSale(
-        listPriceUsd: listPriceUsd,
-        salePriceUsd: salePriceUsd,
-      ) ||
-      ProductCatalogPricing.hasCampaignDiscount(campaignDiscountPercent);
+  bool get _onSale {
+    final unit = ProductCatalogPricing.aliadoUnitUsd(
+      listPriceUsd: listPriceUsd,
+      salePriceUsd: salePriceUsd,
+      discountRules: discountRules,
+      quantity: quantity,
+      campaignDiscountPercent: campaignDiscountPercent,
+    );
+    return unit < listPriceUsd - 0.0001;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +79,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             salePriceUsd: salePriceUsd,
             discountRules: discountRules,
             campaignDiscountPercent: campaignDiscountPercent,
+            quantity: quantity,
             refUnitUsd: refUnit,
             compact: compact,
             ownerPagoSoloDivisas: ownerPagoSoloDivisas,
@@ -183,6 +188,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             salePriceUsd: salePriceUsd,
             discountRules: discountRules,
             campaignDiscountPercent: campaignDiscountPercent,
+            quantity: quantity,
             refUnitUsd: refUnit,
             compact: false,
             ownerPagoSoloDivisas: ownerPagoSoloDivisas,
@@ -237,6 +243,7 @@ class CatalogProductOfferChips extends StatelessWidget {
     this.salePriceUsd,
     this.discountRules,
     this.campaignDiscountPercent,
+    this.quantity = 1,
     required this.refUnitUsd,
     this.compact = false,
     this.ownerPagoSoloDivisas = false,
@@ -246,6 +253,7 @@ class CatalogProductOfferChips extends StatelessWidget {
   final double? salePriceUsd;
   final Map<String, dynamic>? discountRules;
   final double? campaignDiscountPercent;
+  final int quantity;
   final double refUnitUsd;
   final bool compact;
   final bool ownerPagoSoloDivisas;
@@ -253,6 +261,10 @@ class CatalogProductOfferChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chips = <_OfferChipData>[];
+    final volumeActive = ProductCatalogPricing.volumePathActive(
+      discountRules,
+      quantity,
+    );
 
     if (ProductCatalogPricing.hasDirectSale(
       listPriceUsd: listPriceUsd,
@@ -268,8 +280,11 @@ class CatalogProductOfferChips extends StatelessWidget {
       );
     }
 
-    final promoChip =
-        ProductCatalogPricing.campaignDiscountChipEs(campaignDiscountPercent);
+    final promoChip = ProductCatalogPricing.campaignDiscountChipEs(
+      campaignDiscountPercent,
+      discountRules: discountRules,
+      quantity: quantity,
+    );
     if (promoChip != null) {
       chips.add(
         _OfferChipData(
@@ -281,7 +296,30 @@ class CatalogProductOfferChips extends StatelessWidget {
       );
     }
 
-    final vol = ProductCatalogPricing.volumeIncentiveChipEs(discountRules);
+    if (volumeActive) {
+      final applied = ProductCatalogPricing.volumeDiscountPercent(
+        discountRules,
+        quantity,
+      );
+      final pctLabel = applied == applied.roundToDouble()
+          ? applied.toStringAsFixed(0)
+          : applied.toStringAsFixed(1);
+      chips.add(
+        _OfferChipData(
+          label: 'Volumen −$pctLabel%',
+          bg: AppColors.brandBlueContainer,
+          fg: AppColors.textPrimary,
+          border: AppColors.borderSubtle,
+        ),
+      );
+    }
+
+    final vol = volumeActive
+        ? null
+        : ProductCatalogPricing.volumeIncentiveChipEs(
+            discountRules,
+            currentQuantity: quantity,
+          );
     if (vol != null) {
       chips.add(
         _OfferChipData(

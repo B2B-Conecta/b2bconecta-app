@@ -178,6 +178,48 @@ class CatalogService {
         .toList();
   }
 
+  /// Mapa product_id → {campaign_id, discount_percent} de vallas vigentes.
+  static Future<Map<String, ({String campaignId, double percent})>>
+      fetchActivePromoProductDiscounts() async {
+    try {
+      final res = await SupabaseAccess.client
+          .rpc('get_active_promo_product_discounts');
+      if (res is! Map) return const {};
+      final out = <String, ({String campaignId, double percent})>{};
+      res.forEach((key, value) {
+        if (value is! Map) return;
+        final id = key.toString().trim();
+        if (id.isEmpty) return;
+        final pct = PromoCampaignModel.parseDiscountPercent(
+          value['discount_percent'],
+        );
+        final camp = value['campaign_id']?.toString().trim() ?? '';
+        if (pct == null || camp.isEmpty) return;
+        out[id] = (campaignId: camp, percent: pct);
+      });
+      return out;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static List<PartModel> applyPromoDiscountsToParts(
+    List<PartModel> parts,
+    Map<String, ({String campaignId, double percent})> discounts,
+  ) {
+    if (discounts.isEmpty || parts.isEmpty) return parts;
+    return parts
+        .map((p) {
+          final hit = discounts[p.id];
+          if (hit == null) return p;
+          return p.copyWith(
+            activeCampaignDiscountPercent: hit.percent,
+            activePromoCampaignId: hit.campaignId,
+          );
+        })
+        .toList();
+  }
+
   static Future<List<PromoCampaignModel>>
       fetchActivePromoCampaignsForImportador() async {
     final res = await SupabaseAccess.client
@@ -388,6 +430,7 @@ class CatalogService {
       searchPlan: searchPlan,
       rowCap: cap,
     );
+    final promoDiscounts = await fetchActivePromoProductDiscounts();
 
     if (f.sortByDistanceFromReference) {
       final refLat = f.sortReferenceLat!;
@@ -408,7 +451,10 @@ class CatalogService {
       )..sort(distanceCompare);
       if (offset >= withDist.length) return [];
       final end = (offset + limit).clamp(0, withDist.length);
-      return withDist.sublist(offset, end);
+      return applyPromoDiscountsToParts(
+        withDist.sublist(offset, end),
+        promoDiscounts,
+      );
     }
 
     final parts = constrainCatalogPartsToFilters(
@@ -429,7 +475,10 @@ class CatalogService {
     }
     if (offset >= parts.length) return [];
     final end = (offset + limit).clamp(0, parts.length);
-    return parts.sublist(offset, end);
+    return applyPromoDiscountsToParts(
+      parts.sublist(offset, end),
+      promoDiscounts,
+    );
   }
 
   /// Carga filas del catálogo; parte `id.in` en lotes para no saturar la URL.
@@ -778,7 +827,9 @@ class CatalogService {
       )) {
         return null;
       }
-      return part;
+      final discounts = await fetchActivePromoProductDiscounts();
+      final enriched = applyPromoDiscountsToParts([part], discounts);
+      return enriched.isEmpty ? part : enriched.first;
     });
   }
 }

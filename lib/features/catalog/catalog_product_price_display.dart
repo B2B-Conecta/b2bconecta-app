@@ -10,6 +10,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     required this.listPriceUsd,
     this.salePriceUsd,
     this.discountRules,
+    this.campaignDiscountPercent,
     this.quantity = 1,
     this.compact = false,
     this.catalogGrid = false,
@@ -21,6 +22,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final double listPriceUsd;
   final double? salePriceUsd;
   final Map<String, dynamic>? discountRules;
+  final double? campaignDiscountPercent;
   final int quantity;
   final bool compact;
   final bool catalogGrid;
@@ -28,10 +30,12 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool showPromotionChips;
   final bool ownerPagoSoloDivisas;
 
-  bool get _onSale => ProductCatalogPricing.hasDirectSale(
+  bool get _onSale =>
+      ProductCatalogPricing.hasDirectSale(
         listPriceUsd: listPriceUsd,
         salePriceUsd: salePriceUsd,
-      );
+      ) ||
+      ProductCatalogPricing.hasCampaignDiscount(campaignDiscountPercent);
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +49,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
       salePriceUsd: salePriceUsd,
       discountRules: discountRules,
       quantity: quantity,
+      campaignDiscountPercent: campaignDiscountPercent,
     );
     final strikeRef = _onSale
         ? ProductCatalogPricing.aliadoUnitRegularListUsd(
@@ -69,6 +74,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             listPriceUsd: listPriceUsd,
             salePriceUsd: salePriceUsd,
             discountRules: discountRules,
+            campaignDiscountPercent: campaignDiscountPercent,
             refUnitUsd: refUnit,
             compact: compact,
             ownerPagoSoloDivisas: ownerPagoSoloDivisas,
@@ -83,6 +89,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
       salePriceUsd: salePriceUsd,
       discountRules: discountRules,
       quantity: quantity,
+      campaignDiscountPercent: campaignDiscountPercent,
     );
     final strikeRef = _onSale
         ? ProductCatalogPricing.aliadoUnitRegularListUsd(
@@ -175,6 +182,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             listPriceUsd: listPriceUsd,
             salePriceUsd: salePriceUsd,
             discountRules: discountRules,
+            campaignDiscountPercent: campaignDiscountPercent,
             refUnitUsd: refUnit,
             compact: false,
             ownerPagoSoloDivisas: ownerPagoSoloDivisas,
@@ -228,6 +236,7 @@ class CatalogProductOfferChips extends StatelessWidget {
     required this.listPriceUsd,
     this.salePriceUsd,
     this.discountRules,
+    this.campaignDiscountPercent,
     required this.refUnitUsd,
     this.compact = false,
     this.ownerPagoSoloDivisas = false,
@@ -236,6 +245,7 @@ class CatalogProductOfferChips extends StatelessWidget {
   final double listPriceUsd;
   final double? salePriceUsd;
   final Map<String, dynamic>? discountRules;
+  final double? campaignDiscountPercent;
   final double refUnitUsd;
   final bool compact;
   final bool ownerPagoSoloDivisas;
@@ -254,6 +264,19 @@ class CatalogProductOfferChips extends StatelessWidget {
           bg: AppColors.brandBlueContainer,
           fg: AppColors.brandAccent,
           border: AppColors.brandAccent.withOpacity(0.35),
+        ),
+      );
+    }
+
+    final promoChip =
+        ProductCatalogPricing.campaignDiscountChipEs(campaignDiscountPercent);
+    if (promoChip != null) {
+      chips.add(
+        _OfferChipData(
+          label: promoChip,
+          bg: const Color(0xFFFFF6E5),
+          fg: const Color(0xFF8A5A00),
+          border: const Color(0xFFE8A317).withOpacity(0.45),
         ),
       );
     }

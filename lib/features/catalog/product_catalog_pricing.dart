@@ -45,8 +45,10 @@ abstract final class ProductCatalogPricing {
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     bool ownerPagoSoloDivisas = false,
+    double? campaignDiscountPercent,
   }) =>
       hasDirectSale(listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd) ||
+      hasCampaignDiscount(campaignDiscountPercent) ||
       volumeDiscountPercent(discountRules, 1) > 0 ||
       hasUsdPaymentDiscount(
         discountRules,
@@ -61,13 +63,39 @@ abstract final class ProductCatalogPricing {
     return sale != null && sale > 0 && sale < listPriceUsd;
   }
 
+  static bool hasCampaignDiscount(double? campaignDiscountPercent) {
+    final pct = campaignDiscountPercent;
+    return pct != null && pct > 0 && pct < 100;
+  }
+
+  /// Precio de lista con % de valla (sin oferta directa).
+  static double? campaignUnitUsd({
+    required double listPriceUsd,
+    double? campaignDiscountPercent,
+  }) {
+    if (!hasCampaignDiscount(campaignDiscountPercent)) return null;
+    final price = listPriceUsd * (1 - campaignDiscountPercent! / 100.0);
+    if (price <= 0 || price >= listPriceUsd) return null;
+    return price;
+  }
+
+  /// Mayorista: el menor entre oferta directa y precio de campaña, o lista.
   static double wholesaleUnitUsd({
     required double listPriceUsd,
     double? salePriceUsd,
+    double? campaignDiscountPercent,
   }) {
-    final sale = salePriceUsd;
-    if (sale != null && sale > 0) return sale;
-    return listPriceUsd;
+    final candidates = <double>[];
+    if (hasDirectSale(listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd)) {
+      candidates.add(salePriceUsd!);
+    }
+    final camp = campaignUnitUsd(
+      listPriceUsd: listPriceUsd,
+      campaignDiscountPercent: campaignDiscountPercent,
+    );
+    if (camp != null) candidates.add(camp);
+    if (candidates.isEmpty) return listPriceUsd;
+    return candidates.reduce((a, b) => a < b ? a : b);
   }
 
   static double volumeDiscountPercent(
@@ -87,16 +115,18 @@ abstract final class ProductCatalogPricing {
     double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     int quantity = 1,
+    double? campaignDiscountPercent,
   }) {
     final wholesale = wholesaleUnitUsd(
       listPriceUsd: listPriceUsd,
       salePriceUsd: salePriceUsd,
+      campaignDiscountPercent: campaignDiscountPercent,
     );
     final pct = volumeDiscountPercent(discountRules, quantity);
     return wholesale * (1 - pct / 100.0);
   }
 
-  /// Precio tachado: lista regular sin oferta directa (sin tramo volumen en grid).
+  /// Precio tachado: lista regular sin oferta/valla (sin tramo volumen en grid).
   static double aliadoUnitRegularListUsd({
     required double listPriceUsd,
     Map<String, dynamic>? discountRules,
@@ -107,7 +137,17 @@ abstract final class ProductCatalogPricing {
         salePriceUsd: null,
         discountRules: discountRules,
         quantity: quantity,
+        campaignDiscountPercent: null,
       );
+
+  static String? campaignDiscountChipEs(double? campaignDiscountPercent) {
+    if (!hasCampaignDiscount(campaignDiscountPercent)) return null;
+    final pct = campaignDiscountPercent!;
+    final label = pct == pct.roundToDouble()
+        ? pct.toStringAsFixed(0)
+        : pct.toStringAsFixed(1);
+    return 'Promo −$label%';
+  }
 
   static String? volumeIncentiveBadgeEs(
     Map<String, dynamic>? discountRules, {

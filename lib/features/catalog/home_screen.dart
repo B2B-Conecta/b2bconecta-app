@@ -265,6 +265,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (!campaign.opensProduct) return;
     final importerId = campaign.importadorId!.trim();
+    CartService.instance.setPromoAttribution(
+      importadorId: importerId,
+      campaignId: campaign.id,
+    );
     final ids = campaign.resolvedProductIds;
     if (ids.isEmpty) return;
 
@@ -1490,6 +1494,7 @@ class _ProductGridCard extends StatelessWidget {
                 listPriceUsd: part.precio,
                 salePriceUsd: part.salePriceUsd,
                 discountRules: part.discountRules,
+                campaignDiscountPercent: part.activeCampaignDiscountPercent,
                 catalogGrid: true,
                 compact: compact,
                 ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,

@@ -627,6 +627,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               listPriceUsd: part.precio,
               salePriceUsd: part.salePriceUsd,
               discountRules: part.discountRules,
+              campaignDiscountPercent: part.activeCampaignDiscountPercent,
               showPromotionChips: true,
               ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
             ),

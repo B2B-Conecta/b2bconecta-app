@@ -109,6 +109,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           importadorId: c.importadorId,
           productId: c.productId,
           productIds: c.productIds,
+          discountPercent: c.discountPercent,
           actionType: c.actionType,
           startsAt: c.startsAt,
           endsAt: c.endsAt,
@@ -336,6 +337,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late final TextEditingController _internalTitleCtrl;
   late final TextEditingController _displayTitleCtrl;
   late final TextEditingController _priorityCtrl;
+  late final TextEditingController _discountPctCtrl;
   late final TextEditingController _advertiserNameCtrl;
   late final TextEditingController _externalUrlCtrl;
   late String _type;
@@ -403,6 +405,14 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _externalUrlCtrl = TextEditingController(text: e?.externalUrl ?? '');
     _priorityCtrl = TextEditingController(
       text: '${e?.priority ?? 0}',
+    );
+    final pct = e?.discountPercent;
+    _discountPctCtrl = TextEditingController(
+      text: pct == null
+          ? ''
+          : (pct == pct.roundToDouble()
+              ? pct.toStringAsFixed(0)
+              : pct.toStringAsFixed(1)),
     );
     _type = e?.campaignType ?? PromoCampaignModel.typeBanner;
     _sponsorType = e?.sponsorType ?? PromoCampaignModel.sponsorImportador;
@@ -475,6 +485,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _internalTitleCtrl.dispose();
     _displayTitleCtrl.dispose();
     _priorityCtrl.dispose();
+    _discountPctCtrl.dispose();
     _advertiserNameCtrl.dispose();
     _externalUrlCtrl.dispose();
     super.dispose();
@@ -546,6 +557,11 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   PromoCampaignModel _buildDraft() {
     final priority = int.tryParse(_priorityCtrl.text.trim()) ?? 0;
     final thirdParty = _isThirdParty;
+    final openProduct = !thirdParty &&
+        _actionType == PromoCampaignModel.actionOpenProduct;
+    final discountPct = openProduct
+        ? PromoCampaignModel.parseDiscountPercent(_discountPctCtrl.text.trim())
+        : null;
     return PromoCampaignModel(
       id: widget.existing?.id ?? '',
       internalTitle: _internalTitleCtrl.text,
@@ -554,15 +570,11 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       imageStoragePath: _imagePath ?? '',
       imagePublicUrl: _imageUrl ?? '',
       importadorId: _needsImporter ? _importadorId : null,
-      productId: !thirdParty &&
-              _actionType == PromoCampaignModel.actionOpenProduct &&
-              _selectedProductIds.isNotEmpty
+      productId: openProduct && _selectedProductIds.isNotEmpty
           ? _selectedProductIds.first
           : null,
-      productIds: !thirdParty &&
-              _actionType == PromoCampaignModel.actionOpenProduct
-          ? _selectedProductIds.toList()
-          : const [],
+      productIds: openProduct ? _selectedProductIds.toList() : const [],
+      discountPercent: discountPct,
       actionType: _actionType,
       startsAt: _startsAt,
       endsAt: _endsAt,
@@ -946,6 +958,20 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                         ),
                 ),
               ],
+              const SizedBox(height: 10),
+              TextField(
+                controller: _discountPctCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Descuento % en productos (opcional)',
+                  hintText: 'Ej. 5',
+                  helperText:
+                      'Se aplica a los SKU marcados mientras la campaña esté vigente.',
+                  border: OutlineInputBorder(),
+                ),
+              ),
             ],
             if (_isThirdParty &&
                 _actionType == PromoCampaignModel.actionExternalUrl) ...[

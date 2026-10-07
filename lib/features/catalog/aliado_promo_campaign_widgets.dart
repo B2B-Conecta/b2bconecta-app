@@ -75,11 +75,10 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
-    // En web/desktop el ancho es grande: un AspectRatio 16:5 deja la valla
-    // enorme y el grid (Expanded) casi sin alto. Tope de altura + contain.
+    // Tope bajo en desktop: creativo completo (contain) sin comerse el catálogo.
     final horizontalPadding = widget.compact ? 0.0 : 16.0;
-    final maxBannerHeight = widget.compact ? 128.0 : 152.0;
-    final minBannerHeight = widget.compact ? 96.0 : 112.0;
+    final maxBannerHeight = widget.compact ? 96.0 : 128.0;
+    final minBannerHeight = widget.compact ? 72.0 : 100.0;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
@@ -99,11 +98,15 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: items.length,
+                  // Evita que el PageView “robe” el scroll vertical del catálogo.
+                  physics: items.length <= 1
+                      ? const NeverScrollableScrollPhysics()
+                      : const PageScrollPhysics(),
                   onPageChanged: (i) => setState(() => _page = i),
                   itemBuilder: (context, index) {
                     final c = items[index];
                     return Material(
-                      color: AppColors.fieldFill,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(

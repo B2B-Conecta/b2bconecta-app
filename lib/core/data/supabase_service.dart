@@ -247,6 +247,9 @@ class SupabaseService {
   static Future<List<ImporterOption>> fetchImporterOptions() =>
       CatalogService.fetchImporterOptions();
 
+  static Future<Set<String>> fetchPublishedCatalogOwnerIds() =>
+      CatalogService.fetchPublishedCatalogOwnerIds();
+
   static Future<List<PartModel>> fetchAdminPublishedCatalog({
     required String importerId,
     int limit = 40,

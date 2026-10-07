@@ -12,6 +12,8 @@ class AdminPublishedCatalogsSection extends StatefulWidget {
     super.key,
     this.loadImporters,
     this.loadProducts,
+    this.focusImporter,
+    this.onCloseFocus,
   });
 
   final Future<List<ImporterOption>> Function()? loadImporters;
@@ -20,6 +22,10 @@ class AdminPublishedCatalogsSection extends StatefulWidget {
     required int limit,
     required int offset,
   })? loadProducts;
+
+  /// Abre directo el catálogo de un mayorista, sin el buscador de todos.
+  final ImporterOption? focusImporter;
+  final VoidCallback? onCloseFocus;
 
   static const pageSize = 40;
 
@@ -47,7 +53,16 @@ class _AdminPublishedCatalogsSectionState
     _searchCtrl.addListener(() {
       if (mounted) setState(() {});
     });
-    _loadImporters();
+    final focus = widget.focusImporter;
+    if (focus != null) {
+      _selected = focus;
+      _loadingImporters = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadProducts(reset: true);
+      });
+    } else {
+      _loadImporters();
+    }
   }
 
   @override
@@ -256,12 +271,18 @@ class _AdminPublishedCatalogsSectionState
                 ),
               ),
               TextButton(
-                onPressed: () => setState(() {
-                  _selected = null;
-                  _products.clear();
-                  _productsError = null;
-                }),
-                child: const Text('Cambiar'),
+                onPressed: () {
+                  if (widget.onCloseFocus != null) {
+                    widget.onCloseFocus!();
+                    return;
+                  }
+                  setState(() {
+                    _selected = null;
+                    _products.clear();
+                    _productsError = null;
+                  });
+                },
+                child: Text(widget.onCloseFocus != null ? 'Volver' : 'Cambiar'),
               ),
             ],
           ),

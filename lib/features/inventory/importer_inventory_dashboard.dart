@@ -93,24 +93,52 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     super.dispose();
   }
 
-  void _reload() {
+  void _reload() => _reloadInventory();
+
+  double? _keptInventoryOffset;
+
+  void _reloadInventory({bool preserveScroll = false}) {
+    final kept = preserveScroll && _inventoryScrollController.hasClients
+        ? _inventoryScrollController.offset
+        : null;
     setState(() {
-      _loadedParts.clear();
+      if (!preserveScroll) _loadedParts.clear();
       _hasMoreInventory = true;
       _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
       _salesSnapshotFuture =
           SupabaseService.fetchMySalesSnapshot(days: _salesSnapshotDays);
-      _partsFuture = _fetchInventoryPage(reset: true);
+      _partsFuture = _fetchInventoryPage(
+        reset: true,
+        preserveScroll: preserveScroll,
+      );
+    });
+    _keptInventoryOffset = kept;
+  }
+
+  void _restoreInventoryOffset() {
+    final kept = _keptInventoryOffset;
+    if (kept == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_inventoryScrollController.hasClients) return;
+      final max = _inventoryScrollController.position.maxScrollExtent;
+      _inventoryScrollController.jumpTo(kept.clamp(0.0, max));
+      _keptInventoryOffset = null;
     });
   }
 
-  Future<List<PartModel>> _fetchInventoryPage({required bool reset}) async {
-    if (reset) {
+  Future<List<PartModel>> _fetchInventoryPage({
+    required bool reset,
+    bool preserveScroll = false,
+  }) async {
+    if (reset && !preserveScroll) {
       _loadedParts.clear();
       _hasMoreInventory = true;
       if (_inventoryScrollController.hasClients) {
         _inventoryScrollController.jumpTo(0);
       }
+    }
+    if (reset && preserveScroll) {
+      _hasMoreInventory = true;
     }
     if (!_hasMoreInventory) {
       return List<PartModel>.unmodifiable(_loadedParts);
@@ -118,7 +146,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
 
     final batch = await SupabaseService.fetchMyInventory(
       limit: ImporterInventoryLayout.pageSize,
-      offset: _loadedParts.length,
+      offset: reset ? 0 : _loadedParts.length,
       searchQuery: _searchController.text,
       category: _categoryFilter,
       onlyLowStock: _filterLowStock,
@@ -129,8 +157,15 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     if (batch.length < ImporterInventoryLayout.pageSize) {
       _hasMoreInventory = false;
     }
-    _loadedParts.addAll(batch);
+    if (reset) {
+      _loadedParts
+        ..clear()
+        ..addAll(batch);
+    } else {
+      _loadedParts.addAll(batch);
+    }
     _visibleParts = List<PartModel>.unmodifiable(_loadedParts);
+    if (preserveScroll) _restoreInventoryOffset();
     _scheduleInventoryFill();
     return List<PartModel>.unmodifiable(_loadedParts);
   }
@@ -1189,14 +1224,19 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     );
   }
 
-  String _photoFilterLabel(ProductPhotoListFilter filter) {
+  String _photoFilterLabel(
+    ProductPhotoListFilter filter,
+    InventoryMetrics? metrics,
+  ) {
     switch (filter) {
       case ProductPhotoListFilter.all:
         return 'Todos';
       case ProductPhotoListFilter.withPhotos:
-        return 'Con fotos';
+        if (metrics == null) return 'Con fotos';
+        return 'Con fotos (${metrics.withPhotos})';
       case ProductPhotoListFilter.withoutPhotos:
-        return 'Sin fotos';
+        if (metrics == null) return 'Sin fotos';
+        return 'Sin fotos (${metrics.withoutPhotos})';
     }
   }
 
@@ -1483,18 +1523,22 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Wrap(
+                  FutureBuilder<InventoryMetrics>(
+                    future: _metricsFuture,
+                    builder: (context, snap) {
+                      final metrics = snap.data;
+                      return Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       for (final option in ProductPhotoListFilter.values)
                         ChoiceChip(
-                          label: Text(_photoFilterLabel(option)),
+                          label: Text(_photoFilterLabel(option, metrics)),
                           selected: _photoFilter == option,
                           onSelected: (_) {
                             if (_photoFilter == option) return;
                             setState(() => _photoFilter = option);
-                            _reload();
+                            _reloadInventory(preserveScroll: true);
                           },
                           selectedColor: AppColors.brand.withOpacity(0.22),
                           labelStyle: TextStyle(
@@ -1510,6 +1554,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                           ),
                         ),
                     ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   Text(

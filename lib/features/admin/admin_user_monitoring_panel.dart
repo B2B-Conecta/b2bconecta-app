@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'admin_catalog_coverage.dart';
+import 'admin_published_catalogs_section.dart';
 import 'admin_user_activity_row_model.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -12,7 +15,17 @@ enum _ActivityRoleFilter { all, aliado, importador }
 
 /// Admin: monitoreo de ingresos y pedidos por aliado/importador.
 class AdminUserMonitoringPanel extends StatefulWidget {
-  const AdminUserMonitoringPanel({super.key});
+  const AdminUserMonitoringPanel({
+    super.key,
+    this.loadRows,
+    this.loadCatalogCoverage,
+  });
+
+  final Future<List<AdminUserActivityRowModel>> Function({
+    String? role,
+    required String period,
+  })? loadRows;
+  final Future<AdminCatalogCoverage> Function()? loadCatalogCoverage;
 
   @override
   State<AdminUserMonitoringPanel> createState() =>
@@ -26,12 +39,17 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   _ActivityPeriod _period = _ActivityPeriod.week;
   _ActivityRoleFilter _roleFilter = _ActivityRoleFilter.all;
   final _searchCtrl = TextEditingController();
+  AdminCatalogCoverage? _coverage;
+  bool _coverageLoading = true;
+  bool _showingCatalogs = false;
+  ImporterOption? _focusedCatalog;
 
   @override
   void initState() {
     super.initState();
     _searchCtrl.addListener(() => setState(() {}));
     _load();
+    _loadCoverage();
   }
 
   @override
@@ -52,10 +70,13 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
         _ActivityRoleFilter.aliado => 'aliado',
         _ActivityRoleFilter.importador => 'importador',
       };
-      final rows = await SupabaseService.listAdminUserActivityMonitoring(
-        role: role,
-        period: period,
-      );
+      final customRows = widget.loadRows;
+      final rows = customRows != null
+          ? await customRows(role: role, period: period)
+          : await SupabaseService.listAdminUserActivityMonitoring(
+              role: role,
+              period: period,
+            );
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -88,8 +109,47 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   String get _periodLabel =>
       _period == _ActivityPeriod.day ? 'hoy' : 'últimos 7 días';
 
+  Future<void> _loadCoverage() async {
+    setState(() => _coverageLoading = true);
+    try {
+      final custom = widget.loadCatalogCoverage;
+      final coverage = custom != null
+          ? await custom()
+          : await _fetchCatalogCoverage();
+      if (!mounted) return;
+      setState(() {
+        _coverage = coverage;
+        _coverageLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _coverageLoading = false);
+    }
+  }
+
+  Future<AdminCatalogCoverage> _fetchCatalogCoverage() async {
+    final results = await Future.wait<Object>([
+      SupabaseService.fetchImporterOptions(),
+      SupabaseService.fetchPublishedCatalogOwnerIds(),
+    ]);
+    return splitImportersByPublishedCatalog(
+      importers: results[0] as List<ImporterOption>,
+      publishedOwnerIds: results[1] as Set<String>,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final focused = _focusedCatalog;
+    if (focused != null) {
+      return AdminPublishedCatalogsSection(
+        focusImporter: focused,
+        onCloseFocus: () => setState(() => _focusedCatalog = null),
+      );
+    }
+    if (_showingCatalogs) {
+      return _catalogLists();
+    }
     if (_loading && _rows.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: AppColors.brand));
     }
@@ -289,7 +349,147 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
           value: '\$${volumeUsd.toStringAsFixed(0)}',
           icon: Icons.payments_outlined,
         ),
+        _CatalogStat(
+          loading: _coverageLoading,
+          count: _coverage?.published.length,
+          onTap: _coverage == null
+              ? _loadCoverage
+              : () => setState(() => _showingCatalogs = true),
+        ),
       ],
+    );
+  }
+
+  Widget _catalogLists() {
+    final coverage = _coverage ?? AdminCatalogCoverage.empty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Volver a usuarios',
+                onPressed: () => setState(() => _showingCatalogs = false),
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Expanded(
+                child: Text(
+                  'Catálogos de importadores',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              Text(
+                'Catálogos publicados · ${coverage.published.length}',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              if (coverage.published.isEmpty)
+                Text(
+                  'Ningún importador tiene productos publicados.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                )
+              else
+                ...coverage.published.map(
+                  (importer) => _ImporterCatalogTile(
+                    importer: importer,
+                    subtitle: 'Catálogo publicado',
+                    onTap: () => setState(() => _focusedCatalog = importer),
+                  ),
+                ),
+              const SizedBox(height: 18),
+              Text(
+                'Sin catálogo publicado · ${coverage.withoutCatalog.length}',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Importadores registrados que aún no publican productos.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              if (coverage.withoutCatalog.isEmpty)
+                Text(
+                  'Todos los importadores registrados tienen catálogo publicado.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                )
+              else
+                ...coverage.withoutCatalog.map(
+                  (importer) => _ImporterCatalogTile(
+                    importer: importer,
+                    subtitle: 'Sin catálogo publicado',
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CatalogStat extends StatelessWidget {
+  const _CatalogStat({
+    required this.loading,
+    required this.count,
+    required this.onTap,
+  });
+
+  final bool loading;
+  final int? count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const Key('admin-published-catalogs-stat'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: _MiniStat(
+        label: 'Catálogos publicados',
+        value: loading ? '…' : '${count ?? '—'}',
+        icon: Icons.storefront_outlined,
+      ),
+    );
+  }
+}
+
+class _ImporterCatalogTile extends StatelessWidget {
+  const _ImporterCatalogTile({
+    required this.importer,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  final ImporterOption importer;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.borderSubtle),
+      ),
+      child: ListTile(
+        title: Text(importer.businessName),
+        subtitle: Text(subtitle),
+        trailing: onTap == null ? null : const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
     );
   }
 }

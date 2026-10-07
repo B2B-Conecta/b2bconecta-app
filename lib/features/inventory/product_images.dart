@@ -46,6 +46,13 @@ List<String> normalizeProductImageUrls(Iterable<String> urls) {
   return out;
 }
 
+bool productRowHasPhotos({dynamic imageUrls, dynamic imageUrl}) {
+  return parseProductImageUrlsJson(
+    imageUrls,
+    legacyImageUrl: imageUrl?.toString(),
+  ).isNotEmpty;
+}
+
 String? productCoverImageUrl(List<String> urls, {String? legacy}) {
   if (urls.isNotEmpty) return urls.first;
   final l = legacy?.trim();

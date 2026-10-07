@@ -46,6 +46,26 @@ class StoreSupplierThread {
   }
 }
 
+class StoreSupplierProductContext {
+  const StoreSupplierProductContext({
+    required this.id,
+    required this.name,
+    this.sku,
+  });
+
+  final String id;
+  final String name;
+  final String? sku;
+
+  String get label {
+    final title = name.trim();
+    final code = sku?.trim();
+    if (title.isEmpty) return code ?? '';
+    if (code == null || code.isEmpty) return title;
+    return '$title · $code';
+  }
+}
+
 class StoreSupplierMessage {
   const StoreSupplierMessage({
     required this.id,
@@ -54,6 +74,9 @@ class StoreSupplierMessage {
     required this.authorRole,
     required this.body,
     this.createdAt,
+    this.productId,
+    this.productName,
+    this.productSku,
   });
 
   final String id;
@@ -62,6 +85,17 @@ class StoreSupplierMessage {
   final String authorRole;
   final String body;
   final DateTime? createdAt;
+  final String? productId;
+  final String? productName;
+  final String? productSku;
+
+  String get productLabel {
+    final title = productName?.trim() ?? '';
+    final code = productSku?.trim() ?? '';
+    if (title.isEmpty) return code;
+    if (code.isEmpty) return title;
+    return '$title · $code';
+  }
 
   factory StoreSupplierMessage.fromJson(Map<String, dynamic> json) {
     return StoreSupplierMessage(
@@ -73,6 +107,9 @@ class StoreSupplierMessage {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
+      productId: json['product_id']?.toString(),
+      productName: json['product_name']?.toString(),
+      productSku: json['product_sku']?.toString(),
     );
   }
 }
@@ -119,14 +156,16 @@ class StoreSupplierChatService {
     );
   }
 
+  static const _messageSelect =
+      'id, thread_id, author_id, author_role, body, created_at, '
+      'product_id, product_name, product_sku';
+  static const _messageSelectLegacy =
+      'id, thread_id, author_id, author_role, body, created_at';
+
   static Future<List<StoreSupplierMessage>> fetchMessages(String threadId) async {
     final id = threadId.trim();
     if (id.isEmpty) return const [];
-    final response = await SupabaseAccess.client
-        .from('store_supplier_messages')
-        .select('id, thread_id, author_id, author_role, body, created_at')
-        .eq('thread_id', id)
-        .order('created_at', ascending: true);
+    final response = await _selectMessages(id);
     final list = response as List<dynamic>;
     return list
         .map(
@@ -137,21 +176,54 @@ class StoreSupplierChatService {
         .toList();
   }
 
+  static Future<dynamic> _selectMessages(String threadId) async {
+    try {
+      return await SupabaseAccess.client
+          .from('store_supplier_messages')
+          .select(_messageSelect)
+          .eq('thread_id', threadId)
+          .order('created_at', ascending: true);
+    } on PostgrestException catch (e) {
+      if (!_missingProductColumn(e)) rethrow;
+      return SupabaseAccess.client
+          .from('store_supplier_messages')
+          .select(_messageSelectLegacy)
+          .eq('thread_id', threadId)
+          .order('created_at', ascending: true);
+    }
+  }
+
   static Future<void> send({
     required String threadId,
     required String authorRole,
     required String body,
+    StoreSupplierProductContext? aboutProduct,
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
     final text = body.trim();
     if (text.isEmpty) return;
-    await SupabaseAccess.client.from('store_supplier_messages').insert({
+    final productId = aboutProduct?.id.trim() ?? '';
+    final payload = <String, dynamic>{
       'thread_id': threadId,
       'author_id': uid,
       'author_role': authorRole,
       'body': text,
-    });
+    };
+    if (productId.isNotEmpty) payload['product_id'] = productId;
+    try {
+      await SupabaseAccess.client.from('store_supplier_messages').insert(payload);
+    } on PostgrestException catch (e) {
+      if (productId.isEmpty || !_missingProductColumn(e)) rethrow;
+      final label = aboutProduct?.label.trim() ?? '';
+      payload.remove('product_id');
+      payload['body'] = label.isEmpty ? text : 'Sobre $label\n$text';
+      await SupabaseAccess.client.from('store_supplier_messages').insert(payload);
+    }
+  }
+
+  static bool _missingProductColumn(PostgrestException error) {
+    return error.code == '42703' || error.message.contains('product_id');
   }
 
   static Future<void> markRead(String threadId) async {
@@ -213,9 +285,16 @@ void openStoreSupplierChat(String threadId) {
 }
 
 class StoreSupplierChatScreen extends StatefulWidget {
-  const StoreSupplierChatScreen({super.key, required this.threadId});
+  const StoreSupplierChatScreen({
+    super.key,
+    required this.threadId,
+    this.aboutProduct,
+  });
 
   final String threadId;
+
+  /// Si viene de la ficha, el próximo mensaje queda ligado a ese producto.
+  final StoreSupplierProductContext? aboutProduct;
 
   @override
   State<StoreSupplierChatScreen> createState() => _StoreSupplierChatScreenState();
@@ -228,6 +307,7 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   bool _loading = true;
   bool _sending = false;
   String? _error;
+  StoreSupplierProductContext? _aboutProduct;
   RealtimeChannel? _channel;
 
   String? get _myRole {
@@ -242,6 +322,10 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   @override
   void initState() {
     super.initState();
+    final about = widget.aboutProduct;
+    if (about != null && about.id.trim().isNotEmpty) {
+      _aboutProduct = about;
+    }
     _channel = StoreSupplierChatService.subscribe(
       threadId: widget.threadId,
       onInsert: () {
@@ -300,6 +384,7 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
         threadId: widget.threadId,
         authorRole: role,
         body: text,
+        aboutProduct: _aboutProduct,
       );
       _ctrl.clear();
       await _load();
@@ -366,6 +451,16 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
                                           color: AppColors.textSecondary,
                                         ),
                                       ),
+                                      if (m.productLabel.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Sobre ${m.productLabel}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 2),
                                       Text(m.body),
                                     ],
@@ -381,7 +476,37 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_aboutProduct != null &&
+                        _aboutProduct!.label.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color: AppColors.brand.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
+                            title: Text(
+                              'Pregunta sobre ${_aboutProduct!.label}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'Quitar el producto',
+                              onPressed: () =>
+                                  setState(() => _aboutProduct = null),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Row(
                   children: [
                     Expanded(
                       child: TextField(
@@ -389,10 +514,12 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
                         enabled: !_sending,
                         minLines: 1,
                         maxLines: 4,
-                        decoration: const InputDecoration(
-                          hintText: 'Escriba su mensaje…',
+                        decoration: InputDecoration(
+                          hintText: _aboutProduct == null
+                              ? 'Escriba su mensaje…'
+                              : 'Pregunte sobre este producto…',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -400,6 +527,8 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
                     FilledButton(
                       onPressed: _sending ? null : _send,
                       child: const Text('Enviar'),
+                    ),
+                  ],
                     ),
                   ],
                 ),

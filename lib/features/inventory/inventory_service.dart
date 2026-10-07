@@ -99,13 +99,15 @@ class InventoryService {
 
     final rows = await SupabaseAccess.client
         .from('products')
-        .select('stock, is_active')
+        .select('stock, is_active, image_url, image_urls')
         .eq('owner_id', uid);
 
     final list = rows as List<dynamic>;
     var total = 0;
     var outOfStock = 0;
     var paused = 0;
+    var withPhotos = 0;
+    var withoutPhotos = 0;
     for (final row in list) {
       final m = Map<String, dynamic>.from(row as Map);
       total++;
@@ -115,11 +117,21 @@ class InventoryService {
       final ia = m['is_active'];
       final active = ia is bool ? ia : ia?.toString() == 'true';
       if (!active) paused++;
+      if (productRowHasPhotos(
+        imageUrls: m['image_urls'],
+        imageUrl: m['image_url'],
+      )) {
+        withPhotos++;
+      } else {
+        withoutPhotos++;
+      }
     }
     return InventoryMetrics(
       totalProducts: total,
       outOfStock: outOfStock,
       paused: paused,
+      withPhotos: withPhotos,
+      withoutPhotos: withoutPhotos,
     );
   }
 
@@ -604,6 +616,8 @@ class InventoryMetrics {
     required this.totalProducts,
     required this.outOfStock,
     required this.paused,
+    this.withPhotos = 0,
+    this.withoutPhotos = 0,
   });
 
   static const InventoryMetrics zero = InventoryMetrics(
@@ -615,4 +629,6 @@ class InventoryMetrics {
   final int totalProducts;
   final int outOfStock;
   final int paused;
+  final int withPhotos;
+  final int withoutPhotos;
 }

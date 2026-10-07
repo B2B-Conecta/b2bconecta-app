@@ -27,6 +27,15 @@ void main() {
     expect(urls, ['http://x/a.jpg']);
   });
 
+  test('una fila con portada legada cuenta como con fotos', () {
+    expect(
+      productRowHasPhotos(imageUrls: const [], imageUrl: 'https://x/a.jpg'),
+      isTrue,
+    );
+    expect(productRowHasPhotos(imageUrls: const [], imageUrl: ''), isFalse);
+    expect(productRowHasPhotos(imageUrls: const ['https://x/b.jpg']), isTrue);
+  });
+
   test('producto sin image_urls ni portada queda sin fotos', () {
     final part = PartModel.fromJson({
       'id': 'p1',

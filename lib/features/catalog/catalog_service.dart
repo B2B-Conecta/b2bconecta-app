@@ -83,6 +83,30 @@ class CatalogService {
     });
   }
 
+  /// Dueños con al menos un producto publicado (`is_active`).
+  static Future<Set<String>> fetchPublishedCatalogOwnerIds() {
+    return retryOnJwtIssuedAtFuture(() async {
+      final ids = <String>{};
+      var start = 0;
+      const page = 1000;
+      while (start < 20000) {
+        final response = await SupabaseAccess.client
+            .from('products')
+            .select('owner_id')
+            .eq('is_active', true)
+            .range(start, start + page - 1);
+        final list = response as List<dynamic>;
+        for (final row in list) {
+          final id = (row as Map)['owner_id']?.toString().trim() ?? '';
+          if (id.isNotEmpty) ids.add(id);
+        }
+        if (list.length < page) break;
+        start += page;
+      }
+      return ids;
+    });
+  }
+
   /// Número total de filas que cumplen [filters] (respeta RLS).
   static Future<int> fetchProductsCount({CatalogFilters? filters}) {
     return retryOnJwtIssuedAtFuture(() => _fetchProductsCount(filters: filters));

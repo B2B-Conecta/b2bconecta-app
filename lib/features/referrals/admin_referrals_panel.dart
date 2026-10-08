@@ -8,6 +8,7 @@ import 'external_referrer_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 
 /// Admin: vendedores externos (código + QR) y usuarios referidos.
@@ -356,12 +357,10 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                                 ),
                               ),
                             )
-                          : ListView.separated(
-                              itemCount: users.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (_, i) {
-                                final u = users[i];
+                          : PagedItems(
+                              items: users,
+                              separator: 8,
+                              itemBuilder: (u) {
                                 return ListTile(
                                   contentPadding: EdgeInsets.zero,
                                   title: Text(
@@ -480,12 +479,11 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 )
-              : ListView.separated(
+              : PagedItems(
+                  items: rows,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) {
-                    final r = rows[i];
+                  separator: 8,
+                  itemBuilder: (r) {
                     return Material(
                       color: AppColors.card,
                       borderRadius: BorderRadius.circular(12),

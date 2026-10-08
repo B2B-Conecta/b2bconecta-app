@@ -46,16 +46,19 @@ void main() {
     });
   });
 
-  test('historyDatesToProbe cubre hoy y 3 días', () {
-    final dates = BcvReferenceRateService.historyDatesToProbe(
-      DateTime(2026, 8, 31, 22),
+  test('historyDatesToProbe pide hoy y, de tarde, el siguiente hábil', () {
+    expect(
+      BcvReferenceRateService.historyDatesToProbe(DateTime(2026, 8, 31, 10)),
+      ['2026-08-31'],
     );
-    expect(dates, [
-      '2026-08-31',
-      '2026-09-01',
-      '2026-09-02',
-      '2026-09-03',
-    ]);
+    expect(
+      BcvReferenceRateService.historyDatesToProbe(DateTime(2026, 8, 31, 22)),
+      ['2026-08-31', '2026-09-01'],
+    );
+    expect(
+      BcvReferenceRateService.historyDatesToProbe(DateTime(2026, 8, 28, 18)),
+      ['2026-08-28', '2026-08-31'],
+    );
   });
 
   test('formatFechaValorEs', () {

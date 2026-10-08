@@ -369,6 +369,10 @@ verify_jwt = false
 [functions.map-coverage]
 verify_jwt = false
 
+# Vista previa pública del enlace. Sin JWT: la leen los crawlers de WhatsApp.
+[functions.product-share-preview]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

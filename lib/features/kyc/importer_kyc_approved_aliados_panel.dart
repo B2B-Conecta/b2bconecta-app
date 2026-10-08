@@ -4,6 +4,7 @@ import 'kyc_approved_aliado_model.dart';
 import 'kyc_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_counterparty_profile_section.dart';
@@ -222,13 +223,18 @@ class _ImporterKycApprovedAliadosPanelState
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               )
             else
-              ...filtered.map((a) => _AliadoKycListTile(
+              PagedItems(
+                items: filtered,
+                embedded: true,
+                separator: 8,
+                itemBuilder: (a) => _AliadoKycListTile(
                     aliado: a,
                     onTap: () => showImporterAliadoKycDetailSheet(
                       context,
                       aliado: a,
                     ),
-                  )),
+                  ),
+              ),
           ],
         ],
       ),

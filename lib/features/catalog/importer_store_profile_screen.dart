@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
-import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
@@ -122,10 +122,9 @@ class _ImporterStoreProfileScreenState
   bool _loadingMore = false;
   bool _hasMore = true;
   String? _selectedCategory;
-  int _crossAxisCount = 2;
+  int _viewPage = 0;
+  int _viewPageSize = listPageSizeOptions.first;
   int _loadGen = 0;
-
-  int get _pageSize => AliadoCatalogLayout.pageSizeForCount(_crossAxisCount);
 
   CatalogFilters get _filters => CatalogFilters.importerStore(
         importerId: widget.importerId,
@@ -177,6 +176,7 @@ class _ImporterStoreProfileScreenState
         _loadingProfile = false;
         _parts.clear();
         _hasMore = true;
+        _viewPage = 0;
       });
       await _loadMore(reset: true);
     } catch (e) {
@@ -196,9 +196,10 @@ class _ImporterStoreProfileScreenState
       if (reset) {
         _parts.clear();
         _hasMore = true;
+        _viewPage = 0;
       }
       final page = await _source.fetchParts(
-        limit: _pageSize,
+        limit: _viewPageSize,
         offset: _parts.length,
         filters: _filters,
       );
@@ -210,15 +211,9 @@ class _ImporterStoreProfileScreenState
       );
       setState(() {
         _parts.addAll(kept);
-        _hasMore = page.length >= _pageSize;
+        _hasMore = page.length >= _viewPageSize;
         _loadingMore = false;
       });
-      scheduleLoadMoreIfViewportNotFilled(
-        controller: _scrollController,
-        hasMore: _hasMore,
-        isLoading: _loadingMore,
-        loadMore: () => _loadMore(),
-      );
     } catch (e) {
       if (!mounted || gen != _loadGen) return;
       setState(() {
@@ -228,11 +223,25 @@ class _ImporterStoreProfileScreenState
     }
   }
 
+  Future<void> _openViewPage(int index) async {
+    final need = (index + 1) * _viewPageSize;
+    while (mounted && _parts.length < need && _hasMore) {
+      final before = _parts.length;
+      await _loadMore();
+      if (!mounted || _parts.length == before) break;
+    }
+    if (!mounted) return;
+    setState(() => _viewPage = index);
+  }
+
   void _selectCategory(String? category) {
     final next = category?.trim();
     final normalized = (next == null || next.isEmpty) ? null : next;
     if (normalized == _selectedCategory) return;
-    setState(() => _selectedCategory = normalized);
+    setState(() {
+      _selectedCategory = normalized;
+      _viewPage = 0;
+    });
     _loadMore(reset: true);
   }
 
@@ -323,7 +332,6 @@ class _ImporterStoreProfileScreenState
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    _crossAxisCount = AliadoCatalogLayout.crossAxisCount(width);
     final hPad = AliadoCatalogLayout.horizontalPadding(width);
     const maxW = AppBreakpoints.adminContentMaxWidth;
 
@@ -396,14 +404,12 @@ class _ImporterStoreProfileScreenState
     }
 
     final profile = _profile!;
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (infiniteScrollShouldLoadMore(notification)) {
-          _loadMore();
-        }
-        return false;
-      },
-      child: CustomScrollView(
+    final visibleParts = sliceListPage(
+      items: _parts,
+      pageIndex: _viewPage,
+      pageSize: _viewPageSize,
+    );
+    return CustomScrollView(
         controller: _scrollController,
         slivers: [
           SliverPadding(
@@ -448,7 +454,31 @@ class _ImporterStoreProfileScreenState
                 ),
               ),
             )
-          else
+          else ...[
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
+              sliver: SliverToBoxAdapter(
+                child: ListPageBar(
+                  total: _parts.length,
+                  hasMore: _hasMore,
+                  pageIndex: _viewPage,
+                  pageSize: _viewPageSize,
+                  alwaysShow: true,
+                  onPageIndex: (index) {
+                    _openViewPage(index);
+                  },
+                  onPageSize: (size) {
+                    setState(() {
+                      _viewPageSize = size;
+                      _viewPage = 0;
+                    });
+                    if (_parts.length < size && _hasMore) {
+                      _openViewPage(0);
+                    }
+                  },
+                ),
+              ),
+            ),
             SliverPadding(
               padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
               sliver: SliverToBoxAdapter(
@@ -456,9 +486,9 @@ class _ImporterStoreProfileScreenState
                   builder: (context, gridConstraints) {
                     return AliadoCatalogCardWrap(
                       maxWidth: gridConstraints.maxWidth,
-                      itemCount: _parts.length,
+                      itemCount: visibleParts.length,
                       itemBuilder: (context, index) {
-                        final part = _parts[index];
+                        final part = visibleParts[index];
                         return _StoreProductCard(
                           part: part,
                           showHeart: widget.viewer.isAliado,
@@ -470,6 +500,7 @@ class _ImporterStoreProfileScreenState
                 ),
               ),
             ),
+          ],
           if (_loadingMore)
             const SliverToBoxAdapter(
               child: Padding(
@@ -487,7 +518,6 @@ class _ImporterStoreProfileScreenState
               ),
             ),
         ],
-      ),
     );
   }
 
@@ -499,6 +529,7 @@ class _ImporterStoreProfileScreenState
     final rif = profile.rif?.trim() ?? '';
     final phone = profile.phone?.trim() ?? '';
     final maps = profile.fiscalMapsUrl?.trim() ?? '';
+    final logo = profile.logoStoragePath?.trim() ?? '';
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -513,11 +544,13 @@ class _ImporterStoreProfileScreenState
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ImporterCatalogLogo(
-                  storagePath: profile.logoStoragePath,
-                  size: 64,
-                ),
-                const SizedBox(width: 12),
+                if (logo.isNotEmpty) ...[
+                  ImporterCatalogLogo(
+                    storagePath: logo,
+                    size: 64,
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

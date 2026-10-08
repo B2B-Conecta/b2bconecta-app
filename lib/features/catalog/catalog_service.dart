@@ -18,7 +18,9 @@ class CatalogService {
     return retryOnJwtIssuedAtFuture(() async {
     final response = await SupabaseAccess.client
         .from('profiles')
-        .select('id, business_name, estado, ciudad, catalog_featured_until')
+        .select(
+          'id, business_name, estado, ciudad, catalog_featured_until, logo_storage_path',
+        )
         .eq('role', 'importador')
         .order('business_name', ascending: true);
     final list = response as List<dynamic>;
@@ -35,6 +37,7 @@ class CatalogService {
             catalogFeaturedUntil: m['catalog_featured_until'] != null
                 ? DateTime.tryParse(m['catalog_featured_until'].toString())
                 : null,
+            logoStoragePath: m['logo_storage_path']?.toString(),
           );
         })
         .where((o) => o.id.isNotEmpty && o.businessName.isNotEmpty)
@@ -821,6 +824,27 @@ class CatalogService {
         if (c != null && c.isNotEmpty) out.add(c);
       }
       return out;
+    });
+  }
+
+  /// Ficha por id, con la sesión actual. `null` si no existe, está en pausa
+  /// o la política del catálogo no deja verlo.
+  static Future<PartModel?> fetchCatalogProductById(String productId) {
+    final id = productId.trim();
+    if (id.isEmpty) return Future<PartModel?>.value(null);
+    return retryOnJwtIssuedAtFuture(() async {
+      final embed = _catalogProfileSelect(CatalogFilters.empty);
+      final row = await SupabaseAccess.client
+          .from('products')
+          .select('*, $embed')
+          .eq('id', id)
+          .maybeSingle();
+      if (row == null) return null;
+      final part = PartModel.fromJson(Map<String, dynamic>.from(row));
+      if (part.isActive) return part;
+      final uid = SupabaseAccess.client.auth.currentUser?.id;
+      if (uid != null && part.ownerId == uid) return part;
+      return null;
     });
   }
 

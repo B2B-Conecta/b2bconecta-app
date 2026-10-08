@@ -73,6 +73,9 @@ class CommissionSettlementModel {
   bool get isPagado => status == 'pagado';
   bool get isAnulado => status == 'anulado';
 
+  /// Borrador o documento emitido que todavía no se cobró.
+  bool get canAnular => isBorrador || isEmitido;
+
   bool get tieneComprobantePago =>
       pagoComprobanteStoragePath != null &&
       pagoComprobanteStoragePath!.trim().isNotEmpty;

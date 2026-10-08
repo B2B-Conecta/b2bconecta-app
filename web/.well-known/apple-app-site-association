@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "X86DWL3NXK.ve.com.b2bconecta.app",
+        "paths": ["/producto/*"]
+      }
+    ]
+  }
+}

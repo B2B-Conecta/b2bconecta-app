@@ -5,6 +5,7 @@ import 'support_ticket_status.dart';
 import 'support_ticket_detail_screen.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 
@@ -169,10 +170,10 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                         ),
                       ),
                     )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: visible.isEmpty
-                          ? ListView(
+                  : visible.isEmpty
+                      ? RefreshIndicator(
+                          onRefresh: _load,
+                          child: ListView(
                               children: const [
                                 SizedBox(height: 80),
                                 Center(
@@ -182,15 +183,14 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                   ),
                                 ),
                               ],
-                            )
-                          : ListView.separated(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                              itemCount: visible.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (context, i) {
-                                final t = visible[i];
+                            ),
+                        )
+                      : PagedItems(
+                          items: visible,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          separator: 8,
+                          onRefresh: _load,
+                          itemBuilder: (t) {
                                 final expanded = _expandedTicketId == t.id;
                                 final color = t.isClosed
                                     ? AppColors.textSecondary
@@ -283,7 +283,6 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
                                 );
                               },
                             ),
-                    ),
         ),
       ],
     );

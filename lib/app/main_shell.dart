@@ -259,7 +259,7 @@ class _MainShellState extends State<MainShell> {
     AdminShellDestination(
       icon: Icons.verified_user_outlined,
       selectedIcon: Icons.verified_user,
-      label: 'KYC',
+      label: 'Verificación',
       title: 'Verificación',
       subtitle: 'Tiendas minoristas · mayoristas',
     ),

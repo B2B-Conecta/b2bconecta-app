@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 
 /// Panel de filtro por fecha (cierre o alta de pedidos activos).
@@ -63,10 +64,26 @@ class _ImporterPedidosFiltersSheetState
     );
   }
 
+  void _applyPresetDays(int days) {
+    final today = ImporterOrderDate.dateOnly(DateTime.now());
+    setState(() {
+      _dateTo = today;
+      _dateFrom = today.subtract(Duration(days: days - 1));
+    });
+  }
+
+  void _applyThisMonth() {
+    final now = DateTime.now();
+    setState(() {
+      _dateFrom = DateTime(now.year, now.month, 1);
+      _dateTo = ImporterOrderDate.dateOnly(now);
+    });
+  }
+
   Future<void> _pickDate({required bool isFrom}) async {
     final now = DateTime.now();
     final initial = isFrom ? (_dateFrom ?? now) : (_dateTo ?? _dateFrom ?? now);
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
@@ -141,7 +158,26 @@ class _ImporterPedidosFiltersSheetState
             controller: widget.scrollController,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             children: [
-              _DateField(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('7 días'),
+                    onPressed: () => _applyPresetDays(7),
+                  ),
+                  ActionChip(
+                    label: const Text('30 días'),
+                    onPressed: () => _applyPresetDays(30),
+                  ),
+                  ActionChip(
+                    label: const Text('Este mes'),
+                    onPressed: _applyThisMonth,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              FilterDateField(
                 label: 'Desde',
                 value: _dateFrom,
                 onTap: () => _pickDate(isFrom: true),
@@ -150,7 +186,7 @@ class _ImporterPedidosFiltersSheetState
                     : null,
               ),
               const SizedBox(height: 12),
-              _DateField(
+              FilterDateField(
                 label: 'Hasta',
                 value: _dateTo,
                 onTap: () => _pickDate(isFrom: false),
@@ -190,71 +226,3 @@ class _ImporterPedidosFiltersSheetState
   }
 }
 
-class _DateField extends StatelessWidget {
-  const _DateField({
-    required this.label,
-    required this.value,
-    required this.onTap,
-    this.onClear,
-  });
-
-  final String label;
-  final DateTime? value;
-  final VoidCallback onTap;
-  final VoidCallback? onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = value != null
-        ? ImporterOrderDate.formatFechaPedido(value!)
-        : 'Sin límite';
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderSubtle),
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.white,
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today_outlined,
-                size: 18, color: AppColors.textSecondary),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    text,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (onClear != null)
-              IconButton(
-                onPressed: onClear,
-                icon: const Icon(Icons.close, size: 18),
-                visualDensity: VisualDensity.compact,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

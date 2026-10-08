@@ -5,7 +5,26 @@
   "installCommand": "echo \"Flutter web: deps installed in buildCommand\"",
   "buildCommand": "bash scripts/build_web_vercel.sh",
   "outputDirectory": "build/web",
+  "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/producto/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|Instagram|Pinterest)"
+        }
+      ],
+      "destination": "https://fzugzjcwdzcwfxgviltw.supabase.co/functions/v1/product-share-preview?id=:id"
+    },
     {
       "source": "/registro",
       "destination": "/index.html"
@@ -15,7 +34,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!assets/|icons/|canvaskit/|flutter_service_worker\\.js).*)",
+      "source": "/((?!assets/|icons/|canvaskit/|\\.well-known/|flutter_service_worker\\.js).*)",
       "destination": "/index.html"
     }
   ]

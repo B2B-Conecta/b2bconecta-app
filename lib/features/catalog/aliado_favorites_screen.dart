@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
@@ -100,13 +101,11 @@ class _AliadoFavoritesScreenState extends State<AliadoFavoritesScreen> {
           if (parts.isEmpty) {
             return const _FavoritesEmpty();
           }
-          return ListView.separated(
+          return PagedItems(
+            items: parts,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            itemCount: parts.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              return _FavoriteRow(part: parts[index]);
-            },
+            separator: 10,
+            itemBuilder: (part) => _FavoriteRow(part: part),
           );
         },
       ),

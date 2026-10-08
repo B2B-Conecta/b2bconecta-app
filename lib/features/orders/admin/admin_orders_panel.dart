@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/admin_order_panel_utils.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
@@ -622,14 +623,11 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                           ),
                         ],
                       )
-                    : RefreshIndicator(
+                    : PagedItems(
+                        items: groups,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                         onRefresh: _load,
-                        child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: groups.length,
-                          itemBuilder: (context, i) {
-                            final g = groups[i];
+                        itemBuilder: (g) {
                             final primary = g.first;
                             final expandKey = checkoutGroupExpandKey(g);
                             return AdminExpandableOrderCard(
@@ -641,8 +639,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                               expandedFooter: _buildExpandedFooter(context, g),
                               onRequestMutated: _load,
                             );
-                          },
-                        ),
+                        },
                       ),
               ),
             ],

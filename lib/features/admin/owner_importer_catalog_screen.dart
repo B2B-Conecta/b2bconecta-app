@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/admin/owner_catalog_filter.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 
@@ -288,11 +289,11 @@ class _OwnerImporterCatalogScreenState
                           ),
                         ),
                       )
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        color: AppColors.brand,
-                        child: filtered.isEmpty
-                            ? ListView(
+                    : filtered.isEmpty
+                        ? RefreshIndicator(
+                            onRefresh: _load,
+                            color: AppColors.brand,
+                            child: ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 children: [
                                   const SizedBox(height: 80),
@@ -307,20 +308,19 @@ class _OwnerImporterCatalogScreenState
                                     ),
                                   ),
                                 ],
-                              )
-                            : ListView.separated(
-                                physics: const AlwaysScrollableScrollPhysics(),
+                              ),
+                          )
+                            : PagedItems(
                                 padding: const EdgeInsets.fromLTRB(
                                   16,
                                   0,
                                   16,
                                   24,
                                 ),
-                                itemCount: filtered.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, i) {
-                                  final part = filtered[i];
+                                separator: 8,
+                                onRefresh: _load,
+                                items: filtered,
+                                itemBuilder: (part) {
                                   return _CatalogRow(
                                     part: part,
                                     busy: _busyId == part.id,
@@ -332,7 +332,6 @@ class _OwnerImporterCatalogScreenState
                                   );
                                 },
                               ),
-                      ),
           ),
         ],
           ),

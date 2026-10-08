@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 
 import 'commission_collected_income_period.dart';
 import 'commission_collected_income_report.dart';
@@ -89,20 +91,20 @@ class _CommissionCollectedIncomeCardState
 
   Future<void> _pickCustomRange() async {
     final now = CommissionCollectedIncomePeriod.dateOnlyCaracas();
-    final from = await showDatePicker(
+    final from = await showAppDatePicker(
       context: context,
       initialDate: _customFrom ?? _period.from,
       firstDate: DateTime(now.year - 5),
       lastDate: now,
-      helpText: 'Fecha inicial',
+      helpText: 'Desde',
     );
     if (from == null || !mounted) return;
-    final to = await showDatePicker(
+    final to = await showAppDatePicker(
       context: context,
       initialDate: _customTo ?? from,
       firstDate: from,
       lastDate: now,
-      helpText: 'Fecha final',
+      helpText: 'Hasta',
     );
     if (to == null || !mounted) return;
     setState(() {
@@ -151,28 +153,20 @@ class _CommissionCollectedIncomeCardState
               ),
             ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _presetChip('Hoy', CommissionCollectedIncomePreset.today),
-                _presetChip(
-                  'Últimos 7 días',
-                  CommissionCollectedIncomePreset.last7Days,
-                ),
-                _presetChip(
-                  'Este mes',
-                  CommissionCollectedIncomePreset.thisMonth,
-                ),
-                _presetChip(
-                  'Mes anterior',
-                  CommissionCollectedIncomePreset.previousMonth,
-                ),
-                _presetChip(
-                  'Rango',
-                  CommissionCollectedIncomePreset.custom,
-                ),
+            SegmentedFilterBar(
+              labels: const [
+                'Hoy',
+                '7 días',
+                'Este mes',
+                'Mes anterior',
+                'Rango',
               ],
+              selectedIndex: CommissionCollectedIncomePreset.values.indexOf(
+                _preset,
+              ),
+              onSelected: (index) => _selectPreset(
+                CommissionCollectedIncomePreset.values[index],
+              ),
             ),
             const SizedBox(height: 12),
             if (_invalidRange)
@@ -202,17 +196,6 @@ class _CommissionCollectedIncomeCardState
           ],
         ),
       ),
-    );
-  }
-
-  Widget _presetChip(String label, CommissionCollectedIncomePreset preset) {
-    return FilterChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: _preset == preset,
-      onSelected: (_) => _selectPreset(preset),
-      visualDensity: VisualDensity.compact,
-      selectedColor: AppColors.brandBlue.withOpacity(0.2),
-      checkmarkColor: AppColors.brandBlue,
     );
   }
 

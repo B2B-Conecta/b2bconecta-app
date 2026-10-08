@@ -86,13 +86,19 @@ void navigateFromNotificationPayload({
         return;
     }
   }
+  if (t0 == 'catalogo' && homeRole == AppHomeRole.aliado) {
+    MainShellTabController.navigateToHomeTab();
+    return;
+  }
   if (t0 == 'promocion' || t0 == 'inventario') {
     switch (homeRole) {
       case AppHomeRole.importador:
         MainShellTabController.navigateToImporterInventoryForNotification();
         return;
-      case AppHomeRole.administrador:
       case AppHomeRole.aliado:
+        MainShellTabController.navigateToHomeTab();
+        return;
+      case AppHomeRole.administrador:
         return;
     }
   }

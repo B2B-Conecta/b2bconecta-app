@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'aliado_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 
 String formatAliadoPedidosFilterDate(DateTime d) {
@@ -91,12 +92,12 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
   Future<void> _pickDate({required bool isFrom}) async {
     final now = DateTime.now();
     final initial = isFrom ? (_dateFrom ?? now) : (_dateTo ?? _dateFrom ?? now);
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: now.add(const Duration(days: 1)),
-      helpText: isFrom ? 'Fecha desde' : 'Fecha hasta',
+      helpText: isFrom ? 'Desde' : 'Hasta',
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -289,36 +290,23 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.date_range_outlined),
-                  title: const Text('Desde'),
-                  subtitle: Text(
-                    _dateFrom == null
-                        ? 'Sin límite inferior'
-                        : formatAliadoPedidosFilterDate(_dateFrom!),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined, size: 20),
-                    onPressed: () => _pickDate(isFrom: true),
-                  ),
+                const SizedBox(height: 12),
+                FilterDateField(
+                  label: 'Desde',
+                  value: _dateFrom,
                   onTap: () => _pickDate(isFrom: true),
+                  onClear: _dateFrom != null
+                      ? () => setState(() => _dateFrom = null)
+                      : null,
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event_outlined),
-                  title: const Text('Hasta'),
-                  subtitle: Text(
-                    _dateTo == null
-                        ? 'Sin límite superior'
-                        : formatAliadoPedidosFilterDate(_dateTo!),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined, size: 20),
-                    onPressed: () => _pickDate(isFrom: false),
-                  ),
+                const SizedBox(height: 12),
+                FilterDateField(
+                  label: 'Hasta',
+                  value: _dateTo,
                   onTap: () => _pickDate(isFrom: false),
+                  onClear: _dateTo != null
+                      ? () => setState(() => _dateTo = null)
+                      : null,
                 ),
                 SizedBox(height: bottom + 8),
               ],

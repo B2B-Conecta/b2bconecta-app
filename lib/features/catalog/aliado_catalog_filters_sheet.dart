@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'aliado_catalog_categories.dart';
+import 'importer_catalog_logo.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'aliado_catalog_reputation_filter_presets.dart';
 import 'catalog_filters.dart';
 import 'catalog_sort_mode.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 
 /// Panel único de filtros del catálogo aliado.
 class AliadoCatalogFiltersSheet extends StatefulWidget {
@@ -72,6 +74,8 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
   int? _minRatingCount;
   late bool _onlyWithCommercialDiscount;
   String _importerQuery = '';
+  int _importerPage = 0;
+  static const _importerPageSize = 5;
 
   @override
   void initState() {
@@ -88,9 +92,10 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     _maxPriceController = TextEditingController(text: widget.initial.maxPrice);
     _importerSearchController = TextEditingController();
     _importerSearchController.addListener(() {
-      setState(
-        () => _importerQuery = _importerSearchController.text.trim().toLowerCase(),
-      );
+      setState(() {
+        _importerQuery = _importerSearchController.text.trim().toLowerCase();
+        _importerPage = 0;
+      });
     });
   }
 
@@ -322,6 +327,11 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewPadding.bottom;
     final visible = _visibleImporters;
+    final importerPage = sliceListPage(
+      items: visible,
+      pageIndex: _importerPage,
+      pageSize: _importerPageSize,
+    );
     final importerSummary = _importerIds.isEmpty
         ? 'Todos'
         : '${_importerIds.length} seleccionado${_importerIds.length == 1 ? '' : 's'}';
@@ -566,11 +576,11 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 Row(
                   children: [
                     TextButton(
-                      onPressed: visible.isEmpty
+                      onPressed: importerPage.isEmpty
                           ? null
                           : () {
                               setState(() {
-                                for (final o in visible) {
+                                for (final o in importerPage) {
                                   _importerIds.add(o.id);
                                 }
                               });
@@ -606,8 +616,17 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       ),
                     ),
                   )
-                else
-                  ...visible.map((o) {
+                else ...[
+                  ListPageBar(
+                    total: visible.length,
+                    pageIndex: _importerPage,
+                    pageSize: _importerPageSize,
+                    pageSizeOptions: const [_importerPageSize],
+                    onPageIndex: (index) =>
+                        setState(() => _importerPage = index),
+                    onPageSize: (_) {},
+                  ),
+                  ...importerPage.map((o) {
                     final checked = _importerIds.contains(o.id);
                     return CheckboxListTile(
                       value: checked,
@@ -638,12 +657,17 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                           ? null
                           : IconButton(
                               tooltip: 'Ver perfil',
-                              icon: const Icon(Icons.storefront_outlined),
+                              icon: ImporterCatalogLogo(
+                                storagePath: o.logoStoragePath,
+                                size: 28,
+                                fallback: const Icon(Icons.storefront_outlined),
+                              ),
                               onPressed: () =>
                                   widget.onOpenImporterStore!(o.id),
                             ),
                     );
                   }),
+                ],
                 SizedBox(height: bottom + 8),
               ],
             ),

@@ -13,6 +13,8 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 
@@ -45,6 +47,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   _KycQueueFilter _filter = _KycQueueFilter.solicitudesIngreso;
   _KycRoleFilter _roleFilter = _KycRoleFilter.todos;
   final _searchCtrl = TextEditingController();
+  final _listScroll = ScrollController();
+  int _pageIndex = 0;
+  int _pageSize = listPageSizeOptions.first;
 
   @override
   void initState() {
@@ -59,6 +64,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   void dispose() {
     MainShellTabController.registerAdminKycNotificationDeepLink(null);
     _searchCtrl.dispose();
+    _listScroll.dispose();
     super.dispose();
   }
 
@@ -471,6 +477,11 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     }
 
     final filtered = _filtered;
+    final page = sliceListPage(
+      items: filtered,
+      pageIndex: _pageIndex,
+      pageSize: _pageSize,
+    );
 
     return Align(
       alignment: Alignment.topCenter,
@@ -485,7 +496,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
             controller: _searchCtrl,
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => setState(() => _pageIndex = 0),
             decoration: InputDecoration(
               hintText: widget.viewerIsOwner
                   ? 'Buscar por empresa, RIF, correo o teléfono…'
@@ -500,36 +511,50 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final f in _KycRoleFilter.values)
-                ChoiceChip(
-                  label: Text(_roleFilterLabel(f)),
-                  selected: _roleFilter == f,
-                  onSelected: (_) => setState(() => _roleFilter = f),
-                ),
+          child: SegmentedFilterBar(
+            labels: [
+              for (final f in _KycRoleFilter.values) _roleFilterLabel(f),
             ],
+            selectedIndex: _KycRoleFilter.values.indexOf(_roleFilter),
+            onSelected: (index) => setState(() {
+              _roleFilter = _KycRoleFilter.values[index];
+              _pageIndex = 0;
+            }),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SegmentedFilterBar(
+            labels: [
+              for (final f in _KycQueueFilter.values) _queueFilterLabel(f),
+            ],
+            selectedIndex: _KycQueueFilter.values.indexOf(_filter),
+            onSelected: (index) => setState(() {
+              _filter = _KycQueueFilter.values[index];
+              _pageIndex = 0;
+            }),
           ),
         ),
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final f in _KycQueueFilter.values)
-                ChoiceChip(
-                  label: Text(_queueFilterLabel(f)),
-                  selected: _filter == f,
-                  onSelected: (_) => setState(() => _filter = f),
-                ),
-            ],
+          child: ListPageBar(
+            total: filtered.length,
+            pageIndex: _pageIndex,
+            pageSize: _pageSize,
+            onPageIndex: (index) {
+              setState(() => _pageIndex = index);
+              if (_listScroll.hasClients) _listScroll.jumpTo(0);
+            },
+            onPageSize: (size) {
+              setState(() {
+                _pageSize = size;
+                _pageIndex = 0;
+              });
+              if (_listScroll.hasClients) _listScroll.jumpTo(0);
+            },
           ),
         ),
-        const SizedBox(height: 8),
         Expanded(
           child: _loading
               ? const Center(
@@ -554,11 +579,12 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                           ],
                         )
                       : ListView.builder(
+                          controller: _listScroll,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: filtered.length,
+                          itemCount: page.length,
                           itemBuilder: (context, i) {
-                            final p = filtered[i];
+                            final p = page[i];
                             final expanded = _expandedProfileId == p.id;
                             final role = p.role?.trim() ?? '';
                             final docs = _docsByProfile[p.id] ?? [];

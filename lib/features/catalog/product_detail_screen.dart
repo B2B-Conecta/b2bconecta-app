@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'aliado_catalog_categories.dart';
 import 'catalog_filters.dart';
 import 'catalog_service.dart';
 import 'favorite_heart_button.dart';
@@ -278,9 +279,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceTinted,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+        leadingWidth: 112,
+        leading: TextButton.icon(
           onPressed: () => Navigator.of(context).maybePop(),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textPrimary,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          icon: const Icon(Icons.arrow_back_rounded, size: 24),
+          label: const Text(
+            'Atrás',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
         ),
         title: const Text('Detalle del producto'),
       ),
@@ -338,23 +348,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         if (_profile?.isAliado == true)
           Positioned(
-            top: MediaQuery.paddingOf(context).top + 8,
+            top: MediaQuery.paddingOf(context).top + 10,
             left: 12,
-            child: FavoriteHeartButton(productId: part.id),
+            child: FavoriteHeartButton(
+              productId: part.id,
+              prominent: true,
+            ),
           ),
         Positioned(
-          top: MediaQuery.paddingOf(context).top + 4,
-          right: 8,
-          child: Material(
-            color: AppColors.card.withOpacity(0.92),
-            shape: CircleBorder(
-              side: BorderSide(color: AppColors.borderSubtle),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.close),
-              color: AppColors.textPrimary,
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
+          top: MediaQuery.paddingOf(context).top + 10,
+          right: 12,
+          child: _ProductBackButton(
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
       ],
@@ -383,7 +388,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Positioned(
                 top: 12,
                 right: 12,
-                child: FavoriteHeartButton(productId: part.id),
+                child: FavoriteHeartButton(
+                  productId: part.id,
+                  prominent: true,
+                ),
               ),
           ],
         ),
@@ -468,7 +476,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Categoría: ${part.category!.trim()}',
+            'Categoría: ${formatCatalogCategoryLabel(part.category!)}',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -920,6 +928,50 @@ class _SpecBlock extends StatelessWidget {
           const SizedBox(height: 8),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class _ProductBackButton extends StatelessWidget {
+  const _ProductBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card.withOpacity(0.94),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onPressed,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.arrow_back_rounded,
+                size: 24,
+                color: AppColors.textPrimary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Atrás',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

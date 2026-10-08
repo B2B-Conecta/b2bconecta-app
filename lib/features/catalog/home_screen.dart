@@ -4,6 +4,7 @@ import 'aliado_catalog_categories.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'catalog_filters.dart';
+import 'catalog_route_lock.dart';
 import 'catalog_sort_mode.dart';
 import 'promo_campaign_model.dart';
 import 'part_model.dart';
@@ -15,7 +16,6 @@ import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
-import 'promo_popup_frequency.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
 import 'catalog_product_price_display.dart';
@@ -82,7 +82,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _catalogCrossAxisCount = 5;
   final _catalogScrollController = ScrollController();
 
@@ -108,6 +108,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late final Future<List<ImporterOption>> _importersFuture;
   late final Future<List<PromoCampaignModel>> _promoFuture;
   bool _promoPopupCheckScheduled = false;
+  bool _promoPopupOpen = false;
+  bool _leftApp = false;
+  List<PromoCampaignModel> _popupPromos = const [];
 
 
   CatalogSortMode _catalogSortMode = CatalogSortMode.defaultMode;
@@ -120,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController = TextEditingController();
     _minPriceController = TextEditingController();
     _maxPriceController = TextEditingController();
@@ -151,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _minPriceController.dispose();
     _maxPriceController.dispose();
@@ -253,34 +258,48 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _onPromoCampaignSelected(PromoCampaignModel campaign) async {
+    if (!CatalogRouteLock.tryHold()) return;
+    var handedOff = false;
+    try {
+      handedOff = await _openPromoCampaign(campaign);
+    } finally {
+      if (!handedOff) CatalogRouteLock.release();
+    }
+  }
+
+  Future<bool> _openPromoCampaign(PromoCampaignModel campaign) async {
     if (campaign.filtersImporter) {
       final importadorId = campaign.importadorId?.trim();
-      if (importadorId == null || importadorId.isEmpty) return;
+      if (importadorId == null || importadorId.isEmpty) return false;
       CartService.instance.setPromoAttribution(
         importadorId: importadorId,
         campaignId: campaign.id,
       );
       _applyImporterFilterFromPromo(importadorId);
-      return;
+      return false;
     }
     if (campaign.opensStore) {
       final importadorId = campaign.importadorId!.trim();
-      if (!mounted) return;
-      await ImporterStoreProfileScreen.open(
+      if (!mounted) return false;
+      await CatalogRouteLock.pushHeld(
         context,
-        importerId: importadorId,
-        viewer: widget.profile,
+        MaterialPageRoute<void>(
+          builder: (_) => ImporterStoreProfileScreen(
+            importerId: importadorId,
+            viewer: widget.profile,
+          ),
+        ),
       );
-      return;
+      return true;
     }
-    if (!campaign.opensProduct) return;
+    if (!campaign.opensProduct) return false;
     final importerId = campaign.importadorId!.trim();
     CartService.instance.setPromoAttribution(
       importadorId: importerId,
       campaignId: campaign.id,
     );
     final ids = campaign.resolvedProductIds;
-    if (ids.isEmpty) return;
+    if (ids.isEmpty) return false;
 
     final byId = <String, PartModel>{};
     final missing = <String>[];
@@ -330,19 +349,20 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    if (!mounted) return;
+    if (!mounted) return false;
     final parts = <PartModel>[
       for (final id in ids)
         if (byId[id] != null) byId[id]!,
     ];
-    if (parts.isEmpty) return;
+    if (parts.isEmpty) return false;
     if (parts.length == 1) {
-      await Navigator.of(context).push<void>(
+      await CatalogRouteLock.pushHeld(
+        context,
         MaterialPageRoute<void>(
           builder: (_) => ProductDetailScreen(part: parts.first),
         ),
       );
-      return;
+      return true;
     }
 
     final chosen = await showAliadoPromoProductsSheet(
@@ -350,12 +370,14 @@ class _HomeScreenState extends State<HomeScreen> {
       campaign: campaign,
       parts: parts,
     );
-    if (!mounted || chosen == null) return;
-    await Navigator.of(context).push<void>(
+    if (!mounted || chosen == null) return false;
+    await CatalogRouteLock.pushHeld(
+      context,
       MaterialPageRoute<void>(
         builder: (_) => ProductDetailScreen(part: chosen),
       ),
     );
+    return true;
   }
 
   Future<void> _openActivePromotionsSheet(
@@ -368,22 +390,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _leftApp = true;
+      return;
+    }
+    if (state == AppLifecycleState.resumed && _leftApp) {
+      _leftApp = false;
+      _maybeShowPromoPopup(_popupPromos);
+    }
+  }
+
   Future<void> _maybeShowPromoPopup(List<PromoCampaignModel> popups) async {
-    if (!mounted || popups.isEmpty) return;
-    final sorted = List<PromoCampaignModel>.from(popups)
-      ..sort((a, b) => b.priority.compareTo(a.priority));
-    for (final c in sorted) {
-      if (!await PromoPopupFrequency.shouldShow(c.id)) continue;
+    if (!mounted || popups.isEmpty || _promoPopupOpen) return;
+    _promoPopupOpen = true;
+    try {
+      final sorted = List<PromoCampaignModel>.from(popups)
+        ..sort((a, b) => b.priority.compareTo(a.priority));
+      final campaign = sorted.first;
       if (!mounted) return;
       await showAliadoPromoPopupIfDue(
         context: context,
-        campaign: c,
-        onDismissed: () => PromoPopupFrequency.markShown(c.id),
-        onFilterImporter: c.filtersImporter || c.opensStore || c.opensProduct
-            ? () => _onPromoCampaignSelected(c)
-            : null,
+        campaign: campaign,
+        onDismissed: () {},
+        onFilterImporter:
+            campaign.filtersImporter || campaign.opensStore || campaign.opensProduct
+                ? () => _onPromoCampaignSelected(campaign)
+                : null,
       );
-      return;
+    } finally {
+      _promoPopupOpen = false;
     }
   }
 
@@ -509,10 +548,14 @@ class _HomeScreenState extends State<HomeScreen> {
       importers: importers,
       categories: _catalogCategories,
       onOpenImporterStore: (id) {
-        ImporterStoreProfileScreen.open(
+        CatalogRouteLock.push(
           context,
-          importerId: id,
-          viewer: widget.profile,
+          MaterialPageRoute<void>(
+            builder: (_) => ImporterStoreProfileScreen(
+              importerId: id,
+              viewer: widget.profile,
+            ),
+          ),
         );
       },
     );
@@ -909,6 +952,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final popupPromos =
               promos.where((p) => p.isPopup).toList(growable: false);
 
+          if (bootstrapSnapshot.hasData) {
+            _popupPromos = popupPromos;
+          }
           if (!_promoPopupCheckScheduled && bootstrapSnapshot.hasData) {
             _promoPopupCheckScheduled = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1211,7 +1257,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                             compact: true,
                                             showDistanceChips: showDistance,
                                             onTap: () {
-                                              Navigator.of(context).push<void>(
+                                              CatalogRouteLock.push(
+                                                context,
                                                 MaterialPageRoute<void>(
                                                   builder: (ctx) =>
                                                       ProductDetailScreen(
@@ -1225,12 +1272,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         .isNotEmpty ??
                                                     false)
                                                 ? () {
-                                                    ImporterStoreProfileScreen
-                                                        .open(
+                                                    CatalogRouteLock.push(
                                                       context,
-                                                      importerId:
-                                                          p.ownerId!.trim(),
-                                                      viewer: widget.profile,
+                                                      MaterialPageRoute<void>(
+                                                        builder: (_) =>
+                                                            ImporterStoreProfileScreen(
+                                                          importerId:
+                                                              p.ownerId!.trim(),
+                                                          viewer: widget.profile,
+                                                        ),
+                                                      ),
                                                     );
                                                   }
                                                 : null,
@@ -1405,7 +1456,7 @@ class _ProductGridCard extends StatelessWidget {
                       : Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            category,
+                            formatCatalogCategoryLabel(category),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

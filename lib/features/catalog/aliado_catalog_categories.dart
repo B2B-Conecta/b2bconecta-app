@@ -153,7 +153,68 @@ String _pickCategoryLabel(List<String> variants) {
       if (byScore != 0) return byScore;
       return a.toLowerCase().compareTo(b.toLowerCase());
     });
-  return ranked.first;
+  return formatCatalogCategoryLabel(ranked.first);
+}
+
+/// Etiqueta visible: primera letra en mayúscula y en plural, aunque en la base
+/// solo exista «casco» o «ACCESORIO UNIVERSAL».
+String formatCatalogCategoryLabel(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return trimmed;
+  final tokens = trimmed.split(RegExp(r'\s+'));
+  final formatted = [for (final token in tokens) _formatCategoryToken(token)];
+  return _capitalizeFirst(formatted.join(' '));
+}
+
+const _categoryStopwords = {
+  'a',
+  'al',
+  'con',
+  'de',
+  'del',
+  'e',
+  'el',
+  'en',
+  'la',
+  'las',
+  'los',
+  'o',
+  'para',
+  'por',
+  'y',
+};
+
+String _formatCategoryToken(String token) {
+  if (token == '-' || token == '–' || token == '/') return token;
+  final lower = token.toLowerCase();
+  if (_categoryStopwords.contains(lower)) return lower;
+  if (_isCategoryCode(token)) return token.toUpperCase();
+  return _pluralizeSpanish(lower);
+}
+
+bool _isCategoryCode(String token) {
+  if (RegExp(r'\d').hasMatch(token)) return true;
+  if (token.contains('-') && token == token.toUpperCase()) return true;
+  final letters = token.replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]'), '');
+  return letters.length >= 2 &&
+      letters.length <= 4 &&
+      token == token.toUpperCase();
+}
+
+String _pluralizeSpanish(String word) {
+  if (word.length <= 2 || word.endsWith('s')) return word;
+  if (word.endsWith('z')) return '${word.substring(0, word.length - 1)}ces';
+  if (RegExp(r'[aeiouáéíóúü]$').hasMatch(word)) return '${word}s';
+  // Préstamos como «scooter»: el plural suma s, no es.
+  if (RegExp(r'(oo|ee|ck|sh|ph)').hasMatch(word)) return '${word}s';
+  return '${_foldCategory(word)}es';
+}
+
+String _capitalizeFirst(String value) {
+  if (value.isEmpty) return value;
+  final first = value[0];
+  if (first.toUpperCase() == first) return value;
+  return first.toUpperCase() + value.substring(1);
 }
 
 int _categoryLabelScore(String value) {

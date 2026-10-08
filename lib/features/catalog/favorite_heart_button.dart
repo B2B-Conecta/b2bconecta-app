@@ -9,10 +9,12 @@ class FavoriteHeartButton extends StatelessWidget {
     super.key,
     required this.productId,
     this.compact = false,
+    this.prominent = false,
   });
 
   final String productId;
   final bool compact;
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +22,7 @@ class FavoriteHeartButton extends StatelessWidget {
       listenable: AliadoFavoritesService.instance,
       builder: (context, _) {
         final saved = AliadoFavoritesService.instance.contains(productId);
-        final size = compact ? 28.0 : 36.0;
+        final size = prominent ? 52.0 : (compact ? 36.0 : 44.0);
         return Material(
           color: AppColors.card.withOpacity(0.92),
           shape: const CircleBorder(),
@@ -32,7 +34,7 @@ class FavoriteHeartButton extends StatelessWidget {
               height: size,
               child: Icon(
                 saved ? Icons.favorite : Icons.favorite_border,
-                size: compact ? 16 : 20,
+                size: prominent ? 28 : (compact ? 20 : 24),
                 color: saved ? AppColors.brand : AppColors.textSecondary,
               ),
             ),

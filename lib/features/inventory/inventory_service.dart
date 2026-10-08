@@ -191,7 +191,7 @@ class InventoryService {
 
     dynamic query = SupabaseAccess.client
         .from('products')
-        .select('*, profiles(business_name)')
+        .select('*, profiles!products_owner_id_fkey(business_name)')
         .eq('owner_id', uid);
 
     final q = searchQuery?.trim();

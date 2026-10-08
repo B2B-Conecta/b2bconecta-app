@@ -50,7 +50,7 @@ void navigateFromNotificationPayload({
       MainShellTabController.navigateToProfileKycDocumentation();
       return;
     }
-    MainShellTabController.goTo(0);
+    MainShellTabController.navigateToHomeTab();
     return;
   }
   if (t0 == 'mensaje_directo') {

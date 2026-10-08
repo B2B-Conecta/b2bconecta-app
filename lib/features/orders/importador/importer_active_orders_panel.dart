@@ -25,12 +25,7 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
-
-enum _ImporterQuickFilter {
-  nuevos,
-  enProceso,
-  cerrados,
-}
+import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
 /// Pedidos del importador: ingreso directo, filtros rápidos y ciclo completo en una sola vista.
 class ImporterActiveOrdersPanel extends StatefulWidget {
@@ -48,7 +43,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String? _expandedRequestId;
   String? _cancelBusyKey;
   late final TextEditingController _searchCtrl;
-  _ImporterQuickFilter _quickFilter = _ImporterQuickFilter.nuevos;
+  PedidosListScope _scope = PedidosListScope.enCurso;
   bool _morosoOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -92,10 +87,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final explore = MainShellTabController.consumeImporterPedidosExploreFilter();
     if (explore != null) {
       setState(() {
-        _quickFilter = switch (explore) {
-          'nuevos' => _ImporterQuickFilter.nuevos,
-          'cerrados' => _ImporterQuickFilter.cerrados,
-          _ => _ImporterQuickFilter.enProceso,
+        _scope = switch (explore) {
+          'cerrados' => PedidosListScope.entregados,
+          _ => PedidosListScope.enCurso,
         };
         _morosoOnly = false;
       });
@@ -104,7 +98,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
     if (MainShellTabController.consumeImporterPedidosPreferCerradosFilter()) {
       setState(() {
-        _quickFilter = _ImporterQuickFilter.cerrados;
+        _scope = PedidosListScope.entregados;
         _morosoOnly = true;
       });
       return;
@@ -115,8 +109,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       final match = findTransactionForNotificationRelatedId(_rows, pending);
       if (match != null) {
         setState(() {
-          _quickFilter = _quickFilterForOrderStatus(match.status);
-          if (_quickFilter != _ImporterQuickFilter.cerrados) {
+          _scope = _scopeForOrderStatus(match.status);
+          if (_scope != PedidosListScope.entregados &&
+              _scope != PedidosListScope.cancelados) {
             _morosoOnly = false;
           }
         });
@@ -129,7 +124,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       final hint = importerPedidosQuickFilterForNotificationType(notifType);
       if (hint != null) {
         setState(() {
-          _quickFilter = _quickFilterFromHint(hint);
+          _scope = _scopeFromHint(hint);
           _morosoOnly = hint == ImporterPedidosQuickFilterHint.cerrados &&
               notifType == 'morosidad';
         });
@@ -139,7 +134,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
     if (MainShellTabController.consumeImporterPedidosPreferEnProcesoFilter()) {
       setState(() {
-        _quickFilter = _ImporterQuickFilter.enProceso;
+        _scope = PedidosListScope.enCurso;
         _morosoOnly = false;
       });
       return;
@@ -147,27 +142,29 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
     if (MainShellTabController.consumeImporterPedidosPreferNuevosFilter()) {
       setState(() {
-        _quickFilter = _ImporterQuickFilter.nuevos;
+        _scope = PedidosListScope.enCurso;
         _morosoOnly = false;
       });
     }
   }
 
-  _ImporterQuickFilter _quickFilterForOrderStatus(String status) {
-    final hint = importerPedidosQuickFilterForOrderStatus(status);
-    return _quickFilterFromHint(
-      hint ?? ImporterPedidosQuickFilterHint.enProceso,
-    );
+  PedidosListScope _scopeForOrderStatus(String status) {
+    if (status == TransactionRequestStatus.entregado) {
+      return PedidosListScope.entregados;
+    }
+    if (status == TransactionRequestStatus.rechazado) {
+      return PedidosListScope.cancelados;
+    }
+    return PedidosListScope.enCurso;
   }
 
-  _ImporterQuickFilter _quickFilterFromHint(ImporterPedidosQuickFilterHint hint) {
+  PedidosListScope _scopeFromHint(ImporterPedidosQuickFilterHint hint) {
     switch (hint) {
       case ImporterPedidosQuickFilterHint.nuevos:
-        return _ImporterQuickFilter.nuevos;
       case ImporterPedidosQuickFilterHint.enProceso:
-        return _ImporterQuickFilter.enProceso;
+        return PedidosListScope.enCurso;
       case ImporterPedidosQuickFilterHint.cerrados:
-        return _ImporterQuickFilter.cerrados;
+        return PedidosListScope.entregados;
     }
   }
 
@@ -221,7 +218,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   void _clearFilters() {
     _searchCtrl.clear();
     setState(() {
-      _quickFilter = _ImporterQuickFilter.nuevos;
+      _scope = PedidosListScope.enCurso;
       _morosoOnly = false;
       _dateFrom = null;
       _dateTo = null;
@@ -245,19 +242,16 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
   bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
-  bool _matchesQuickFilter(TransactionRequestModel r) {
-    final s = r.status;
-    switch (_quickFilter) {
-      case _ImporterQuickFilter.nuevos:
-        return s == TransactionRequestStatus.pendiente;
-      case _ImporterQuickFilter.enProceso:
-        return s == TransactionRequestStatus.enPreparacion ||
-            s == TransactionRequestStatus.pedidoListo ||
-            s == TransactionRequestStatus.enTransito ||
-            s == TransactionRequestStatus.enviado;
-      case _ImporterQuickFilter.cerrados:
-        return s == TransactionRequestStatus.entregado ||
-            s == TransactionRequestStatus.rechazado;
+  bool _matchesScope(TransactionRequestModel r) {
+    switch (_scope) {
+      case PedidosListScope.todos:
+        return true;
+      case PedidosListScope.enCurso:
+        return TransactionRequestStatus.aliadoPedidosEnCurso.contains(r.status);
+      case PedidosListScope.entregados:
+        return r.status == TransactionRequestStatus.entregado;
+      case PedidosListScope.cancelados:
+        return r.status == TransactionRequestStatus.rechazado;
     }
   }
 
@@ -271,7 +265,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       dateTo: _dateTo,
       useOrderPanelDate: true,
     );
-    final list = searched.where(_matchesQuickFilter).toList()
+    final list = searched.where(_matchesScope).toList()
       ..sort(ImporterOrderDate.compareByFechaReciente);
     return list;
   }
@@ -279,71 +273,68 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String _rowKey(TransactionRequestModel r) => r.id;
 
   Widget _quickFilterBar() {
-    Widget chip(String label, _ImporterQuickFilter value) {
-      final sel = _quickFilter == value;
-      return FilterChip(
-        label: Text(label),
-        selected: sel,
-        onSelected: (_) => setState(() => _quickFilter = value),
-        selectedColor: AppColors.brand.withOpacity(0.18),
-        checkmarkColor: AppColors.brand,
-        labelStyle: TextStyle(
-          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-          color: sel ? AppColors.brand : AppColors.textPrimary,
-          fontSize: 12.5,
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          chip(
-            'Pendientes · nuevos',
-            _ImporterQuickFilter.nuevos,
+          PedidosScopeBar(
+            selected: _scope,
+            onSelected: (scope) => setState(() {
+              _scope = scope;
+              if (scope != PedidosListScope.entregados) _morosoOnly = false;
+            }),
           ),
-          chip('En proceso', _ImporterQuickFilter.enProceso),
-          chip('Despachados · cerrados', _ImporterQuickFilter.cerrados),
-          FilterChip(
-            label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-            selected: _hasDateFilter,
-            onSelected: (_) => _openDateFilters(),
-            selectedColor: AppColors.brandBlue.withOpacity(0.18),
-            checkmarkColor: AppColors.brandBlue,
-            avatar: Icon(
-              Icons.calendar_month_outlined,
-              size: 16,
-              color: _hasDateFilter ? AppColors.brandBlue : AppColors.textSecondary,
-            ),
-            labelStyle: TextStyle(
-              fontWeight: _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 12.5,
-              color: _hasDateFilter ? AppColors.brandBlue : AppColors.textPrimary,
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              FilterChip(
+                label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
+                selected: _hasDateFilter,
+                onSelected: (_) => _openDateFilters(),
+                selectedColor: AppColors.brandBlue.withOpacity(0.18),
+                checkmarkColor: AppColors.brandBlue,
+                avatar: Icon(
+                  Icons.calendar_month_outlined,
+                  size: 16,
+                  color: _hasDateFilter
+                      ? AppColors.brandBlue
+                      : AppColors.textSecondary,
+                ),
+                labelStyle: TextStyle(
+                  fontWeight: _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12.5,
+                  color: _hasDateFilter
+                      ? AppColors.brandBlue
+                      : AppColors.textPrimary,
+                ),
+              ),
+              if (_scope == PedidosListScope.entregados ||
+                  _scope == PedidosListScope.todos)
+                FilterChip(
+                  label: const Text('Pago pendiente'),
+                  selected: _morosoOnly,
+                  onSelected: (v) => setState(() => _morosoOnly = v),
+                  selectedColor: Colors.red.shade100,
+                  checkmarkColor: Colors.red.shade800,
+                  labelStyle: TextStyle(
+                    fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 12.5,
+                    color: _morosoOnly
+                        ? Colors.red.shade900
+                        : AppColors.textPrimary,
+                  ),
+                  avatar: Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: _morosoOnly
+                        ? Colors.red.shade800
+                        : AppColors.textSecondary,
+                  ),
+                ),
+            ],
           ),
-          if (_quickFilter == _ImporterQuickFilter.cerrados)
-            FilterChip(
-              label: const Text('Morosos'),
-              selected: _morosoOnly,
-              onSelected: (v) => setState(() => _morosoOnly = v),
-              selectedColor: Colors.red.shade100,
-              checkmarkColor: Colors.red.shade800,
-              labelStyle: TextStyle(
-                fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 12.5,
-                color:
-                    _morosoOnly ? Colors.red.shade900 : AppColors.textPrimary,
-              ),
-              avatar: Icon(
-                Icons.warning_amber_rounded,
-                size: 16,
-                color: _morosoOnly ? Colors.red.shade800 : AppColors.textSecondary,
-              ),
-            ),
         ],
       ),
     );
@@ -389,10 +380,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     String next,
   ) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    final groupKey = _displayGroupKey(g);
-    final switchToEnProceso =
-        _quickFilter == _ImporterQuickFilter.nuevos &&
-        next == TransactionRequestStatus.enPreparacion;
     final ok = await advanceImporterOrderGroup(
       context,
       lines: g,
@@ -412,12 +399,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     );
     await _load(silent: true);
     if (!mounted) return;
-    if (switchToEnProceso) {
-      setState(() {
-        _quickFilter = _ImporterQuickFilter.enProceso;
-        _expandedRequestId = groupKey;
-      });
-    }
   }
 
   bool _canCancelGroup(List<TransactionRequestModel> g) {
@@ -672,8 +653,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,
-                                  child: const Text(
-                                      'Limpiar búsqueda y volver a Nuevos'),
+                                  child: const Text('Limpiar filtros'),
                                 ),
                               ],
                             ),

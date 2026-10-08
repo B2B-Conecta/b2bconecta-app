@@ -10,7 +10,7 @@ import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 export 'order_flow_copy/order_section_help.dart';
 
 /// Espaciado estándar entre bloques colapsables dentro de una ficha expandida.
-const double kOrderCardSectionGap = 8;
+const double kOrderCardSectionGap = 16;
 
 /// Subtítulo de una línea para nombre + ubicación de contraparte.
 String orderCardPartySubtitle({

@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
@@ -258,19 +259,17 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                       relatedOrderIds: lines.map((e) => e.id).toList(),
                       onOpen: () => _openChat(context, lines, isCheckoutGroup),
                     ),
-                    InkWell(
-                      onTap: onToggle,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 2, left: 2),
-                        child: Icon(
-                          expanded ? Icons.expand_less : Icons.expand_more,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
+          ),
+          OrderCardGuidance(
+            hint: isCheckoutGroup &&
+                    !lines.every((x) => x.status == lines.first.status)
+                ? 'Hay líneas en distinto estado. Abra el detalle para ver cada una.'
+                : TransactionRequestStatus.importerCollapsedHint(lines.first.status),
+            expanded: expanded,
+            onToggle: onToggle,
           ),
           if (ratingBar != null) ratingBar!,
           if (nextStatus != null &&

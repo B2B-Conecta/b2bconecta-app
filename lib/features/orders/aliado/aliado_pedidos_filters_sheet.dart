@@ -185,8 +185,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Estado, morosidad y rango de fechas. Cerrados: fecha de cierre; '
-                  'activos: fecha de alta.',
+                  'Puede acotar por un paso, por fechas o por pagos pendientes.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -200,7 +199,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
               controller: widget.scrollController,
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               children: [
-                _sectionTitle('ESTADO'),
+                _sectionTitle('PASO DEL PEDIDO'),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -238,21 +237,21 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                     }),
                   ],
                 ),
-                _sectionTitle('MOROSIDAD'),
+                _sectionTitle('PAGO PENDIENTE'),
                 SwitchListTile(
                   value: _morosoOnly,
                   onChanged: (v) => setState(() => _morosoOnly = v),
                   contentPadding: EdgeInsets.zero,
                   activeColor: Colors.red.shade800,
                   title: const Text(
-                    'Solo pedidos morosos',
+                    'Solo con pago por confirmar',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
                   ),
                   subtitle: const Text(
-                    'Muestra pedidos con alerta de morosidad activa.',
+                    'Pedidos entregados que aún no tienen el pago aprobado.',
                     style: TextStyle(fontSize: 12),
                   ),
                   secondary: Icon(
@@ -262,7 +261,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                         : AppColors.textSecondary,
                   ),
                 ),
-                _sectionTitle('FECHA DEL PEDIDO'),
+                _sectionTitle('FECHA'),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,

@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
+import 'package:motolink_pro_app/features/catalog/favorite_heart_button.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
@@ -434,29 +435,22 @@ class _ImporterStoreProfileScreenState
           else
             SliverPadding(
               padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _crossAxisCount,
-                  mainAxisSpacing: AliadoCatalogLayout.gridSpacing(
-                    MediaQuery.sizeOf(context).width,
-                  ),
-                  crossAxisSpacing: AliadoCatalogLayout.gridSpacing(
-                    MediaQuery.sizeOf(context).width,
-                  ),
-                  childAspectRatio: AliadoCatalogLayout.childAspectRatio(
-                    MediaQuery.sizeOf(context).width,
-                    showDistance: false,
-                  ),
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final part = _parts[index];
-                    return _StoreProductCard(
-                      part: part,
-                      onTap: () => _openProduct(part),
+              sliver: SliverToBoxAdapter(
+                child: LayoutBuilder(
+                  builder: (context, gridConstraints) {
+                    return AliadoCatalogCardWrap(
+                      maxWidth: gridConstraints.maxWidth,
+                      itemCount: _parts.length,
+                      itemBuilder: (context, index) {
+                        final part = _parts[index];
+                        return _StoreProductCard(
+                          part: part,
+                          showHeart: widget.viewer.isAliado,
+                          onTap: () => _openProduct(part),
+                        );
+                      },
                     );
                   },
-                  childCount: _parts.length,
                 ),
               ),
             ),
@@ -485,14 +479,18 @@ class _ImporterStoreProfileScreenState
     final rating = profile.ratingAvg;
     final count = profile.ratingCount ?? 0;
     final metodos = profile.pagoMetodoLabelsEs;
+    final address = profile.direccion?.trim() ?? '';
+    final rif = profile.rif?.trim() ?? '';
+    final phone = profile.phone?.trim() ?? '';
+    final maps = profile.fiscalMapsUrl?.trim() ?? '';
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -501,7 +499,7 @@ class _ImporterStoreProfileScreenState
               children: [
                 ImporterCatalogLogo(
                   storagePath: profile.logoStoragePath,
-                  size: 56,
+                  size: 64,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -513,35 +511,27 @@ class _ImporterStoreProfileScreenState
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
+                          height: 1.2,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      if (profile.isCatalogVerified ||
-                          profile.isCatalogFeatured) ...[
-                        const SizedBox(height: 6),
-                        ImporterCatalogSealsRow(
-                          verified: profile.isCatalogVerified,
-                          featured: profile.isCatalogFeatured,
-                        ),
-                      ],
                       if (profile.locationLine.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           profile.locationLine,
                           style: TextStyle(
                             fontSize: 13,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
                           ),
                         ),
                       ],
-                      if (profile.direccion?.trim().isNotEmpty == true) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          profile.direccion!.trim(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
+                      if (profile.isCatalogVerified ||
+                          profile.isCatalogFeatured) ...[
+                        const SizedBox(height: 8),
+                        ImporterCatalogSealsRow(
+                          verified: profile.isCatalogVerified,
+                          featured: profile.isCatalogFeatured,
                         ),
                       ],
                     ],
@@ -549,85 +539,214 @@ class _ImporterStoreProfileScreenState
                 ),
               ],
             ),
-            if (rating != null && count > 0) ...[
-              const SizedBox(height: 10),
+            if ((rating != null && count > 0) || profile.hasMinOrder) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (rating != null && count > 0)
+                    _StoreFactChip(
+                      icon: Icons.star_rounded,
+                      iconColor: Colors.amber.shade800,
+                      label:
+                          '${rating.toStringAsFixed(1)} · $count valoración${count == 1 ? '' : 'es'}',
+                    ),
+                  if (profile.hasMinOrder)
+                    _StoreFactChip(
+                      icon: Icons.inventory_2_outlined,
+                      label: profile.minOrderLabelEs,
+                    ),
+                ],
+              ),
+            ],
+            if (address.isNotEmpty || rif.isNotEmpty || phone.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              if (address.isNotEmpty)
+                _StoreDetailRow(icon: Icons.place_outlined, text: address),
+              if (rif.isNotEmpty)
+                _StoreDetailRow(icon: Icons.badge_outlined, text: 'RIF $rif'),
+              if (phone.isNotEmpty)
+                _StoreDetailRow(
+                  icon: Icons.phone_outlined,
+                  text: phone,
+                  onTap: () => _openPhone(phone),
+                ),
+            ],
+            if (metodos.isNotEmpty) ...[
+              const SizedBox(height: 12),
               Text(
-                '${rating.toStringAsFixed(1)} ★ · $count valoración${count == 1 ? '' : 'es'}',
+                profile.pagoSoloDivisas ? 'Pago en divisas' : 'Métodos de pago',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
                 ),
               ),
-            ],
-            if (profile.hasMinOrder) ...[
               const SizedBox(height: 6),
-              Text(
-                profile.minOrderLabelEs,
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final metodo in metodos)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandBlueContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        metodo,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.brand,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
-            if (profile.rif?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 6),
-              Text(
-                'RIF ${profile.rif!.trim()}',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            if (maps.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _openMaps(maps),
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: const Text('Ver ubicación'),
+                ),
               ),
-            ],
-            if (profile.phone?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 6),
-              Text(
-                profile.phone!.trim(),
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-            ],
-            if (metodos.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                profile.pagoSoloDivisas
-                    ? 'Pago en divisas: ${metodos.join(', ')}'
-                    : 'Métodos de pago: ${metodos.join(', ')}',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-            ],
-            if (profile.fiscalMapsUrl?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 10),
-              OutlinedButton(
-                onPressed: () => _openMaps(profile.fiscalMapsUrl!),
-                child: const Text('Ver ubicación'),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
 
+  Future<void> _openPhone(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    await launchUrl(uri);
+  }
+
   Widget _categoryChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Catálogo',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: const Text('Todos'),
+                  selected: _selectedCategory == null,
+                  onSelected: (_) => _selectCategory(null),
+                ),
+              ),
+              for (final c in _categories)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(c.trim()),
+                    selected: _selectedCategory == c,
+                    onSelected: (_) => _selectCategory(c),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StoreFactChip extends StatelessWidget {
+  const _StoreFactChip({
+    required this.icon,
+    required this.label,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceTinted,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: const Text('Todos'),
-              selected: _selectedCategory == null,
-              onSelected: (_) => _selectCategory(null),
+          Icon(icon, size: 14, color: iconColor ?? AppColors.brand),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
           ),
-          for (final c in _categories)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(c.trim()),
-                selected: _selectedCategory == c,
-                onSelected: (_) => _selectCategory(c),
-              ),
-            ),
         ],
       ),
     );
+  }
+}
+
+class _StoreDetailRow extends StatelessWidget {
+  const _StoreDetailRow({
+    required this.icon,
+    required this.text,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.brand),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+                color: onTap == null ? AppColors.textSecondary : AppColors.brand,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 }
 
@@ -635,92 +754,149 @@ class _StoreProductCard extends StatelessWidget {
   const _StoreProductCard({
     required this.part,
     required this.onTap,
+    required this.showHeart,
   });
 
   final PartModel part;
   final VoidCallback onTap;
+  final bool showHeart;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderSubtle),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: part.coverImageUrl != null &&
-                          part.coverImageUrl!.isNotEmpty
-                      ? Image.network(
-                          part.coverImageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => ColoredBox(
-                            color: AppColors.surfaceTinted,
-                            child: Icon(
-                              Icons.image_outlined,
-                              color: AppColors.textMuted,
+    final cover = part.coverImageUrl;
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1.7,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        cover != null && cover.isNotEmpty
+                            ? Image.network(
+                                cover,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const _StoreImagePlaceholder(),
+                              )
+                            : const _StoreImagePlaceholder(),
+                        if (part.hasWarranty)
+                          const Positioned(
+                            top: 6,
+                            left: 6,
+                            child: ProductWarrantySeal(compact: true),
+                          ),
+                        if (showHeart)
+                          Positioned(
+                            right: 6,
+                            bottom: 6,
+                            child: FavoriteHeartButton(
+                              productId: part.id,
+                              compact: true,
                             ),
                           ),
-                        )
-                      : ColoredBox(
-                          color: AppColors.surfaceTinted,
-                          child: Icon(
-                            Icons.image_outlined,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                part.nombre,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              if ((part.category ?? '').trim().isNotEmpty)
-                Text(
-                  part.category!.trim(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.brandBlue,
+                      ],
+                    ),
                   ),
                 ),
-              const SizedBox(height: 2),
-              CatalogProductPriceDisplay(
-                listPriceUsd: part.precio,
-                salePriceUsd: part.salePriceUsd,
-                discountRules: part.discountRules,
-                campaignDiscountPercent: part.activeCampaignDiscountPercent,
-                catalogGrid: true,
-                compact: true,
-                ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
-              ),
-              if (part.hasWarranty)
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: ProductWarrantySeal(compact: true),
+                const SizedBox(height: 8),
+                Text(
+                  part.nombre,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-            ],
+                if ((part.category ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    part.category!.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brand,
+                      height: 1.1,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                CatalogProductPriceDisplay(
+                  listPriceUsd: part.precio,
+                  salePriceUsd: part.salePriceUsd,
+                  discountRules: part.discountRules,
+                  campaignDiscountPercent: part.activeCampaignDiscountPercent,
+                  catalogGrid: true,
+                  compact: true,
+                  showPromotionChips: false,
+                  ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                ),
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${part.stock} en stock',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.successGreen,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' · ${part.minOrderQtyLabelEs}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StoreImagePlaceholder extends StatelessWidget {
+  const _StoreImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColors.surfaceTinted,
+      child: Icon(
+        Icons.image_outlined,
+        size: 32,
+        color: AppColors.textMuted,
       ),
     );
   }

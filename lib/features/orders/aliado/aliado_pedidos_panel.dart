@@ -36,8 +36,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dar
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
-/// Pedidos en curso y cerrados del aliado (pestaña Pedidos).
 class AliadoPedidosPanel extends StatefulWidget {
   const AliadoPedidosPanel({super.key});
 
@@ -53,6 +53,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
+  PedidosListScope _scope = PedidosListScope.todos;
   bool _morosoOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -188,6 +189,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     _searchCtrl.clear();
     setState(() {
       _statusFilter = null;
+      _scope = PedidosListScope.todos;
       _morosoOnly = false;
       _dateFrom = null;
       _dateTo = null;
@@ -265,7 +267,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               onPressed: () => _searchCtrl.clear(),
             ),
           IconButton(
-            tooltip: 'Filtros',
+            tooltip: 'Más filtros',
             onPressed: _openPedidosFiltersSheet,
             icon: Badge(
               isLabelVisible: filterBadge > 0,
@@ -319,7 +321,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     }
     if (draft.morosoOnly) {
       chips.add(_activeFilterChip(
-        label: 'Morosos',
+        label: 'Pago pendiente',
         accent: Colors.red.shade800,
         onDeleted: () => setState(() => _morosoOnly = false),
       ));
@@ -703,7 +705,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AliadoImportadorFacturaSection(lines: [r], compact: true),
-                const SizedBox(height: 10),
+                SizedBox(height: sectionGap + 4),
                 _PasarelaPagoMotoLinkCard(
                   lineCount: 1,
                   importerName: r.ownerBusinessName,
@@ -840,7 +842,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AliadoImportadorFacturaSection(lines: chunk, compact: true),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               _PasarelaPagoMotoLinkCard(
           lineCount: chunk.length,
           singleComprobantePorProveedor: usePagoUnificado,
@@ -1127,6 +1129,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   bool _esEnCurso(String status) =>
       TransactionRequestStatus.aliadoPedidosEnCurso.contains(status);
 
+  void _selectScope(PedidosListScope scope) {
+    setState(() {
+      _scope = scope;
+      if (scope != PedidosListScope.todos) _statusFilter = null;
+    });
+  }
+
   Widget _sectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 8),
@@ -1192,9 +1201,37 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final enCursoGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => _esEnCurso(r.status)).toList(),
     );
+    final entregadosGroups = groupAliadoOrdersByCheckout(
+      filtered
+          .where((r) => r.status == TransactionRequestStatus.entregado)
+          .toList(),
+    );
+    final canceladosGroups = groupAliadoOrdersByCheckout(
+      filtered
+          .where((r) => r.status == TransactionRequestStatus.rechazado)
+          .toList(),
+    );
+    final showEnCurso = _scope == PedidosListScope.todos ||
+        _scope == PedidosListScope.enCurso;
+    final showEntregados = _scope == PedidosListScope.entregados;
+    final showCancelados = _scope == PedidosListScope.cancelados;
+    final showCerradosJuntos = _scope == PedidosListScope.todos;
     final cerradosGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => !_esEnCurso(r.status)).toList(),
     );
+    final scopeEmpty = switch (_scope) {
+      PedidosListScope.todos =>
+        enCursoGroups.isEmpty && cerradosGroups.isEmpty,
+      PedidosListScope.enCurso => enCursoGroups.isEmpty,
+      PedidosListScope.entregados => entregadosGroups.isEmpty,
+      PedidosListScope.cancelados => canceladosGroups.isEmpty,
+    };
+    final scopeEmptyLabel = switch (_scope) {
+      PedidosListScope.enCurso => 'No hay pedidos en curso.',
+      PedidosListScope.entregados => 'No hay pedidos entregados.',
+      PedidosListScope.cancelados => 'No hay pedidos cancelados.',
+      PedidosListScope.todos => 'Ningún pedido coincide con los filtros.',
+    };
 
     return Stack(
       children: [
@@ -1213,6 +1250,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     decoration:
                         _pedidosSearchDecoration(filterBadge: filterBadge),
                   ),
+                ),
+              ),
+              B2bOrdersPanelLayout.listColumn(
+                context,
+                PedidosScopeBar(
+                  selected: _scope,
+                  onSelected: _selectScope,
                 ),
               ),
               if (activeFilterChips != null)
@@ -1266,15 +1310,41 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                               ),
                             ),
                             children: [
-                              if (enCursoGroups.isNotEmpty) ...[
-                                _sectionTitle('En curso'),
+                              if (scopeEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 48),
+                                  child: Center(
+                                    child: Text(
+                                      scopeEmptyLabel,
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (showEnCurso && enCursoGroups.isNotEmpty) ...[
+                                if (_scope == PedidosListScope.todos)
+                                  _sectionTitle('En curso'),
                                 ...enCursoGroups.map(
                                   (g) => _buildOrderCard(context, g),
                                 ),
                               ],
-                              if (cerradosGroups.isNotEmpty) ...[
+                              if (showCerradosJuntos &&
+                                  cerradosGroups.isNotEmpty) ...[
                                 _sectionTitle('Cerrados'),
                                 ...cerradosGroups.map(
+                                  (g) => _buildOrderCard(context, g),
+                                ),
+                              ],
+                              if (showEntregados &&
+                                  entregadosGroups.isNotEmpty) ...[
+                                ...entregadosGroups.map(
+                                  (g) => _buildOrderCard(context, g),
+                                ),
+                              ],
+                              if (showCancelados &&
+                                  canceladosGroups.isNotEmpty) ...[
+                                ...canceladosGroups.map(
                                   (g) => _buildOrderCard(context, g),
                                 ),
                               ],
@@ -1489,7 +1559,7 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 20),
             body,
           ],
         ),

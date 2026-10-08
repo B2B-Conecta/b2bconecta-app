@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
@@ -31,24 +32,14 @@ class AdminOrderPreTransitSection extends StatefulWidget {
 class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSection> {
   Future<void> _openUrl(
     BuildContext context,
-    Future<String> Function() signed,
-  ) async {
-    try {
-      final url = await signed();
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir el enlace.')),
-        );
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    Future<String> Function() signed, {
+    String? fileName,
+  }) {
+    return openStoredFile(
+      context,
+      signedUrl: signed,
+      fileName: fileName,
+    );
   }
 
   @override
@@ -131,6 +122,7 @@ class _AdminOrderPreTransitSectionState extends State<AdminOrderPreTransitSectio
               () => SupabaseService.createSignedUrlForOrderInvoice(
                 r.proveedorFacturaStoragePath!.trim(),
               ),
+              fileName: r.proveedorFacturaFileName,
             ),
             icon: const Icon(Icons.open_in_new, size: 18),
             label: Text(r.proveedorFacturaFileName ?? 'Abrir factura'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
@@ -69,24 +70,14 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
 
   Future<void> _openUrl(
     BuildContext context,
-    Future<String> Function() signed,
-  ) async {
-    try {
-      final url = await signed();
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir el enlace.')),
-        );
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    Future<String> Function() signed, {
+    String? fileName,
+  }) {
+    return openStoredFile(
+      context,
+      signedUrl: signed,
+      fileName: fileName,
+    );
   }
 
   Future<void> _aprobarPago(BuildContext context) async {
@@ -250,6 +241,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
               () => SupabaseService.createSignedUrlForComprobantePago(
                 r.comprobantePagoStoragePath!.trim(),
               ),
+              fileName: r.comprobantePagoFileName,
             ),
             icon: const Icon(Icons.receipt_long_outlined, size: 18),
             label: const Text('Ver comprobante'),

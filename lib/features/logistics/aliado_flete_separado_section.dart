@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
@@ -114,32 +115,20 @@ class _AliadoFleteSeparadoSectionState extends State<AliadoFleteSeparadoSection>
   String? _instruccionesFor(String? metodo) =>
       PagoMetodoInstrucciones.forMetodo(_instrucciones, metodo);
 
-  Future<void> _abrirFactura(BuildContext context, String path) async {
-    try {
-      final url = await SupabaseService.createSignedUrlForOrderInvoice(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo abrir la factura: $e')),
-      );
-    }
+  Future<void> _abrirFactura(BuildContext context, String path) {
+    return openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForOrderInvoice(path),
+      fileName: widget.request.fleteFacturaFileName,
+    );
   }
 
-  Future<void> _abrirComprobante(BuildContext context, String path) async {
-    try {
-      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+  Future<void> _abrirComprobante(BuildContext context, String path) {
+    return openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForComprobantePago(path),
+      fileName: widget.request.fleteComprobantePagoFileName,
+    );
   }
 
   Future<void> _subirComprobante(

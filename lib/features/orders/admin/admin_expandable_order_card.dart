@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/orders/importador/importer_order_date_
 import 'admin_checkout_group_master_header.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
@@ -189,20 +190,15 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         );
                       },
                     ),
-                    InkWell(
-                      onTap: onToggle,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6, left: 2),
-                        child: Icon(
-                          expanded ? Icons.expand_less : Icons.expand_more,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
+          OrderCardGuidance(
+            hint: '',
+            expanded: expanded,
+            onToggle: onToggle,
+          ),
           if (expanded) ...[
             const Divider(height: 1),
             Padding(
@@ -223,6 +219,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: kOrderCardSectionGap),
                   if (isCheckoutGroup)
                     AdminCheckoutGroupMasterHeader(
                       lines: lines,

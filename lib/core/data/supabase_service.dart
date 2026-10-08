@@ -272,6 +272,9 @@ class SupabaseService {
   static Future<List<String>> fetchImporterStoreCategories(String importerId) =>
       CatalogService.fetchImporterStoreCategories(importerId);
 
+  static Future<List<String>> fetchAliadoCatalogCategories() =>
+      CatalogService.fetchAliadoCatalogCategories();
+
   static Future<PartModel?> fetchVisibleImporterStoreProduct({
     required String importerId,
     required String productId,
@@ -279,6 +282,15 @@ class SupabaseService {
       CatalogService.fetchVisibleImporterStoreProduct(
         importerId: importerId,
         productId: productId,
+      );
+
+  static Future<List<PartModel>> fetchVisibleImporterStoreProducts({
+    required String importerId,
+    required List<String> productIds,
+  }) =>
+      CatalogService.fetchVisibleImporterStoreProducts(
+        importerId: importerId,
+        productIds: productIds,
       );
 
   static Future<InventoryMetrics> fetchMyInventoryMetrics() =>

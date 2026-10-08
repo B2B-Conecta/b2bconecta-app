@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
@@ -49,17 +50,11 @@ class _ImporterOrderPagoVerificationSectionState
     final ref = _comprobanteRefParaAbrir();
     final path = ref.comprobantePagoStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForComprobantePago(path),
+      fileName: ref.comprobantePagoFileName,
+    );
   }
 
   /// Línea de referencia para método, archivo y fechas (tras comprobante unificado debería alinearse).

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'commission_collected_income_card.dart';
 import 'commission_settlement_document_type.dart';
@@ -688,18 +689,12 @@ class _AdminCommissionSettlementsPanelState
   Future<void> _abrirFacturaPdf(CommissionSettlementModel s) async {
     final path = s.invoicePdfStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url =
-          await SupabaseService.createSignedUrlForCommissionInvoicePdf(path);
-      final uri = Uri.parse(url);
-      if (!mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () =>
+          SupabaseService.createSignedUrlForCommissionInvoicePdf(path),
+      fileName: 'factura-comision.pdf',
+    );
   }
 
   Future<void> _generarFacturaPdf(CommissionSettlementModel s) async {
@@ -726,17 +721,11 @@ class _AdminCommissionSettlementsPanelState
   Future<void> _abrirComprobante(CommissionSettlementModel s) async {
     final path = s.pagoComprobanteStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
-      final uri = Uri.parse(url);
-      if (!mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForComprobantePago(path),
+      fileName: s.pagoComprobanteFileName,
+    );
   }
 
   Future<void> _approvePago(CommissionSettlementModel s) async {

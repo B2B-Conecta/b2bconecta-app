@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
 
@@ -43,57 +44,22 @@ class DesktopShellTopBar extends StatelessWidget {
             children: [
               const Spacer(),
               ...trailingActions,
-              const SizedBox(width: 4),
-              const ThemeModeBubble(),
-              const SizedBox(width: 4),
               if (onMessagesTap != null)
                 MessagesIconButton(
                   onPressed: onMessagesTap!,
                   unreadCount: unreadMessages,
                 ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    tooltip: 'Notificaciones',
-                    onPressed: onNotificationTap,
-                    icon: Icon(
-                      Icons.notifications_outlined,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  if (unreadNotifications > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.brand,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        child: Text(
-                          unreadNotifications > 99
-                              ? '99+'
-                              : '$unreadNotifications',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+              HeaderIconButton(
+                tooltip: 'Notificaciones',
+                onPressed: onNotificationTap,
+                count: unreadNotifications,
+                badgeColor: Colors.red,
+                icon: unreadNotifications > 0
+                    ? Icons.notifications
+                    : Icons.notifications_none_outlined,
               ),
+              const SizedBox(width: 4),
+              const ThemeModeBubble(),
             ],
           ),
         ),

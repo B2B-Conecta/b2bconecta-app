@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'aliado_catalog_categories.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'catalog_filters.dart';
@@ -18,21 +19,22 @@ import 'promo_popup_frequency.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
 import 'catalog_product_price_display.dart';
+import 'product_catalog_pricing.dart';
 import 'product_warranty_seal.dart';
 import 'importer_catalog_logo.dart';
 import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
+import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
+import 'favorite_heart_button.dart';
 import 'product_detail_screen.dart';
 
-const _kCategorySearchTokens = <String, String?>{
-  'Todos': null,
-  'Frenos': 'freno',
-  'Transmisión': 'transmis',
-  'Motor': 'motor',
-  'Eléctrico': 'eléctric',
-};
+String _aliadoGreeting(String? businessName) {
+  final name = businessName?.trim();
+  if (name == null || name.isEmpty) return 'Hola';
+  return 'Hola, $name';
+}
 
 String _distanceChipLabel(PartModel part) {
   final km = part.distanceKmFromReference;
@@ -94,7 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _catalogTotal;
   CatalogFilters _activeFilters = CatalogFilters.empty;
   Set<String> _selectedImporterIds = {};
-  String _selectedCategoryLabel = 'Todos';
+  String _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel;
+  List<String> _catalogCategories = const [];
+  List<AliadoCatalogCategoryGroup> _categoryGroups = const [];
 
   late final TextEditingController _searchController;
   late final TextEditingController _minPriceController;
@@ -133,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _searchController.addListener(_onAliadoSearchTextChanged);
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
+      _loadCatalogCategories();
     } else if (widget.homeRole == AppHomeRole.administrador) {
       _importersFuture = Future.value(const []);
       _promoFuture = Future.value(const []);
@@ -178,15 +183,14 @@ class _HomeScreenState extends State<HomeScreen> {
       maxP = t;
     }
     final userQ = _searchController.text.trim();
-    final catToken = _kCategorySearchTokens[_selectedCategoryLabel];
-    final combined = [userQ, if (catToken != null && catToken.isNotEmpty) catToken]
-        .where((e) => e.isNotEmpty)
-        .join(' ');
+    final categoryValues = _categoryValuesFor(_selectedCategoryLabel);
     final oe = _ownerEstadoFilterController.text.trim();
     final oc = _ownerCiudadFilterController.text.trim();
     final useNearest = _catalogSortMode == CatalogSortMode.nearest;
     return CatalogFilters(
-      searchQuery: combined.isEmpty ? null : combined,
+      searchQuery: userQ.isEmpty ? null : userQ,
+      category: categoryValues.length == 1 ? categoryValues.first : null,
+      categoryAnyOf: categoryValues.length > 1 ? categoryValues : const [],
       ownerIds: _selectedImporterIds.toList(),
       ownerEstado: oe.isEmpty ? null : oe,
       ownerCiudad: oc.isEmpty ? null : oc,
@@ -218,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _ownerCiudadFilterController.clear();
     setState(() {
       _selectedImporterIds = {};
-      _selectedCategoryLabel = 'Todos';
+      _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel;
       _catalogSortMode = CatalogSortMode.defaultMode;
       _minOwnerRatingAvg = null;
       _minOwnerRatingCount = null;
@@ -240,6 +244,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _applyFiltersFromUi();
   }
 
+  PartModel _withCampaignDiscount(PartModel part, PromoCampaignModel campaign) {
+    if (!campaign.hasProductDiscount) return part;
+    return part.copyWith(
+      activeCampaignDiscountPercent: campaign.discountPercent,
+      activePromoCampaignId: campaign.id,
+    );
+  }
+
   Future<void> _onPromoCampaignSelected(PromoCampaignModel campaign) async {
     if (campaign.filtersImporter) {
       final importadorId = campaign.importadorId?.trim();
@@ -253,9 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (campaign.opensStore) {
       final importadorId = campaign.importadorId!.trim();
-      final profile =
-          await SupabaseService.fetchImporterStoreProfile(importadorId);
-      if (!mounted || profile == null) return;
+      if (!mounted) return;
       await ImporterStoreProfileScreen.open(
         context,
         importerId: importadorId,
@@ -272,32 +282,60 @@ class _HomeScreenState extends State<HomeScreen> {
     final ids = campaign.resolvedProductIds;
     if (ids.isEmpty) return;
 
-    if (ids.length == 1) {
-      await _openPromoProductDetail(
-        importerId: importerId,
-        productId: ids.first,
-      );
-      return;
+    final byId = <String, PartModel>{};
+    final missing = <String>[];
+    for (final id in ids) {
+      PartModel? cached;
+      for (final part in _loadedParts) {
+        if (part.id == id && (part.ownerId?.trim() ?? '') == importerId) {
+          cached = part;
+          break;
+        }
+      }
+      if (cached != null) {
+        byId[id] = _withCampaignDiscount(cached, campaign);
+      } else {
+        missing.add(id);
+      }
     }
 
-    final parts = <PartModel>[];
-    for (final id in ids) {
-      final part = await SupabaseService.fetchVisibleImporterStoreProduct(
-        importerId: importerId,
-        productId: id,
+    if (missing.isNotEmpty && mounted) {
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final route = DialogRoute<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
-      if (part == null) continue;
-      // Asegura precio/chip de valla en el sheet aunque el mapa RPC falle.
-      parts.add(
-        campaign.hasProductDiscount
-            ? part.copyWith(
-                activeCampaignDiscountPercent: campaign.discountPercent,
-                activePromoCampaignId: campaign.id,
-              )
-            : part,
-      );
+      navigator.push(route);
+      try {
+        final fetched = await SupabaseService.fetchVisibleImporterStoreProducts(
+          importerId: importerId,
+          productIds: missing,
+        );
+        for (final part in fetched) {
+          byId[part.id] = _withCampaignDiscount(part, campaign);
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No se pudieron cargar los productos de la promoción.',
+              ),
+            ),
+          );
+        }
+      } finally {
+        if (route.isActive) navigator.removeRoute(route);
+      }
     }
-    if (!mounted || parts.isEmpty) return;
+
+    if (!mounted) return;
+    final parts = <PartModel>[
+      for (final id in ids)
+        if (byId[id] != null) byId[id]!,
+    ];
+    if (parts.isEmpty) return;
     if (parts.length == 1) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -316,22 +354,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => ProductDetailScreen(part: chosen),
-      ),
-    );
-  }
-
-  Future<void> _openPromoProductDetail({
-    required String importerId,
-    required String productId,
-  }) async {
-    final part = await SupabaseService.fetchVisibleImporterStoreProduct(
-      importerId: importerId,
-      productId: productId,
-    );
-    if (!mounted || part == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ProductDetailScreen(part: part),
       ),
     );
   }
@@ -453,11 +475,39 @@ class _HomeScreenState extends State<HomeScreen> {
     _applyFiltersFromUi();
   }
 
+  Future<void> _loadCatalogCategories() async {
+    try {
+      final rows = await SupabaseService.fetchAliadoCatalogCategories();
+      if (!mounted) return;
+      final groups = groupAliadoCatalogCategories(rows);
+      setState(() {
+        _categoryGroups = groups;
+        _catalogCategories = [for (final group in groups) group.label];
+      });
+    } catch (_) {}
+  }
+
+  List<String> _categoryValuesFor(String label) {
+    final wanted = label.trim();
+    if (wanted.isEmpty || wanted == kAliadoCatalogAllCategoriesLabel) {
+      return const [];
+    }
+    for (final group in _categoryGroups) {
+      if (group.label == wanted || group.values.contains(wanted)) {
+        return group.values;
+      }
+    }
+    return [wanted];
+  }
+
   Future<void> _openCatalogFiltersSheet(List<ImporterOption> importers) async {
+    await _loadCatalogCategories();
+    if (!mounted) return;
     final result = await AliadoCatalogFiltersSheet.show(
       context,
       initial: _currentFiltersDraft(),
       importers: importers,
+      categories: _catalogCategories,
       onOpenImporterStore: (id) {
         ImporterStoreProfileScreen.open(
           context,
@@ -627,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
       chips.add(_activeFilterChip(
         label: draft.categoryLabel,
         onDeleted: () {
-          setState(() => _selectedCategoryLabel = 'Todos');
+          setState(() => _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel);
           _applyFiltersFromUi();
         },
       ));
@@ -765,47 +815,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 listenable: CartService.instance,
                 builder: (context, _) {
                   final n = CartService.instance.itemCount;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.shopping_cart_outlined),
-                        color: AppColors.textSecondary,
-                        onPressed: () {
-                          Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (_) => CartScreen(
-                                profile: widget.profile,
-                                liveTasaBcv: null,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      if (n > 0)
-                        Positioned(
-                          right: 4,
-                          top: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brand,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              n > 99 ? '99+' : '$n',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                  return HeaderIconButton(
+                    tooltip: 'Carrito',
+                    count: n,
+                    icon: n > 0
+                        ? Icons.shopping_cart
+                        : Icons.shopping_cart_outlined,
+                    onPressed: () {
+                      Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => CartScreen(
+                            profile: widget.profile,
+                            liveTasaBcv: null,
                           ),
                         ),
-                    ],
+                      );
+                    },
                   );
                 },
               ),
@@ -900,13 +925,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   AliadoCatalogLayout.crossAxisCount(catalogWidth);
               final hPad =
                   AliadoCatalogLayout.horizontalPadding(catalogWidth);
-              final gridSpacing =
-                  AliadoCatalogLayout.gridSpacing(catalogWidth);
               _catalogCrossAxisCount = crossAxisCount;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (widget.homeRole == AppHomeRole.aliado)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+                      child: Text(
+                        _aliadoGreeting(widget.profile.businessName),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: EdgeInsets.fromLTRB(hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
                     child: isDesktopCatalog
@@ -1142,29 +1177,39 @@ class _HomeScreenState extends State<HomeScreen> {
                                       hPad,
                                       _isLoadingMore ? 56 : 16,
                                     ),
-                                    sliver: SliverGrid(
-                                      gridDelegate:
-                                          SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                        mainAxisSpacing: gridSpacing,
-                                        crossAxisSpacing: gridSpacing,
-                                        childAspectRatio:
-                                            AliadoCatalogLayout
-                                                .childAspectRatio(
+                                    sliver: SliverLayoutBuilder(
+                                      builder: (context, sliverConstraints) {
+                                        final spacing =
+                                            AliadoCatalogLayout.gridSpacing(
                                           catalogWidth,
-                                          showDistance: _activeFilters
-                                              .sortByDistanceFromReference,
-                                        ),
-                                      ),
-                                      delegate: SliverChildBuilderDelegate(
-                                        (context, index) {
-                                          final p = parts[index];
-                                          return _ProductGridCard(
+                                        );
+                                        final extent =
+                                            sliverConstraints.crossAxisExtent;
+                                        final tile = (extent -
+                                                spacing * (crossAxisCount - 1)) /
+                                            crossAxisCount;
+                                        final showDistance = _activeFilters
+                                            .sortByDistanceFromReference;
+                                        return SliverGrid(
+                                          gridDelegate:
+                                              SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: crossAxisCount,
+                                            mainAxisSpacing: spacing,
+                                            crossAxisSpacing: spacing,
+                                            childAspectRatio: AliadoCatalogLayout
+                                                .childAspectRatio(
+                                              tileWidth: tile,
+                                              showDistance: showDistance,
+                                            ),
+                                          ),
+                                          delegate: SliverChildBuilderDelegate(
+                                            (context, index) {
+                                              final p = parts[index];
+                                              return _ProductGridCard(
                                             part: p,
                                             profile: widget.profile,
                                             compact: true,
-                                            showDistanceChips: _activeFilters
-                                                .sortByDistanceFromReference,
+                                            showDistanceChips: showDistance,
                                             onTap: () {
                                               Navigator.of(context).push<void>(
                                                 MaterialPageRoute<void>(
@@ -1189,10 +1234,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     );
                                                   }
                                                 : null,
-                                          );
-                                        },
-                                        childCount: parts.length,
-                                      ),
+                                              );
+                                            },
+                                            childCount: parts.length,
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                                 ],
@@ -1249,222 +1296,266 @@ class _ProductGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final importer = (part.ownerBusinessName ?? '').trim();
-    final importerLine =
-        importer.isNotEmpty ? importer.toUpperCase() : 'SIN IMPORTADOR';
+    final importerLine = importer.isNotEmpty ? importer : 'Sin proveedor';
+    final category = (part.category ?? '').trim();
     final locLine = _ownerLocationLine(part);
-    final cardPadding = compact
-        ? const EdgeInsets.fromLTRB(8, 8, 8, 6)
-        : const EdgeInsets.fromLTRB(10, 10, 10, 8);
+    final hasRating =
+        part.ownerRatingAvg != null && (part.ownerRatingCount ?? 0) > 0;
+    final stockDetail = part.hasOwnerMinOrderAmount
+        ? '${part.minOrderQtyLabelEs} · ${part.ownerMinOrderAmountLabelEs}'
+        : part.minOrderQtyLabelEs;
+    final refUnit = ProductCatalogPricing.aliadoUnitUsd(
+      listPriceUsd: part.precio,
+      salePriceUsd: part.salePriceUsd,
+      discountRules: part.discountRules,
+      campaignDiscountPercent: part.activeCampaignDiscountPercent,
+    );
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(compact ? 12 : 14),
-          border: Border.all(color: AppColors.borderSubtle),
-          boxShadow: AppDecorations.cardShadow,
-        ),
-        child: Padding(
-          padding: cardPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Hero(
-                        tag: ProductDetailScreen.heroImageTag(part),
-                        child: part.coverImageUrl != null &&
-                                part.coverImageUrl!.isNotEmpty
-                            ? Image.network(
-                                part.coverImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    _placeholder(compact),
-                              )
-                            : _placeholder(compact),
-                      ),
-                      if (part.isCatalogVerified || part.isCatalogFeatured)
-                        Positioned(
-                          top: compact ? 4 : 6,
-                          left: compact ? 4 : 6,
-                          child: ImporterCatalogSealsRow(
-                            verified: part.isCatalogVerified,
-                            featured: part.isCatalogFeatured,
-                            compact: compact,
-                            spacing: 4,
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
+            boxShadow: AppDecorations.cardShadow,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AliadoCatalogLayout.cardPadH,
+              AliadoCatalogLayout.cardPadTop,
+              AliadoCatalogLayout.cardPadH,
+              AliadoCatalogLayout.cardPadBottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AspectRatio(
+                  aspectRatio: AliadoCatalogLayout.cardImageAspect,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Hero(
+                          tag: ProductDetailScreen.heroImageTag(part),
+                          child: part.coverImageUrl != null &&
+                                  part.coverImageUrl!.isNotEmpty
+                              ? Image.network(
+                                  part.coverImageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _placeholder(compact),
+                                )
+                              : _placeholder(compact),
+                        ),
+                        if (part.isCatalogVerified || part.isCatalogFeatured)
+                          Positioned(
+                            top: 6,
+                            left: 6,
+                            child: ImporterCatalogSealsRow(
+                              verified: part.isCatalogVerified,
+                              featured: part.isCatalogFeatured,
+                              compact: true,
+                              spacing: 4,
+                            ),
+                          ),
+                        if (part.hasWarranty)
+                          const Positioned(
+                            top: 6,
+                            right: 6,
+                            child: ProductWarrantySeal(compact: true),
+                          ),
+                        if (profile.isAliado)
+                          Positioned(
+                            right: 6,
+                            bottom: 6,
+                            child: FavoriteHeartButton(
+                              productId: part.id,
+                              compact: true,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapImage),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardTitleHeight,
+                  child: Text(
+                    part.nombre,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardCategoryHeight,
+                  child: category.isEmpty
+                      ? const SizedBox.shrink()
+                      : Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            category,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brand,
+                              height: 1.1,
+                            ),
                           ),
                         ),
-                      if (part.hasWarranty)
-                        Positioned(
-                          top: compact ? 4 : 6,
-                          right: compact ? 4 : 6,
-                          child: const ProductWarrantySeal(compact: true),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardSupplierHeight,
+                  child: InkWell(
+                  onTap: onImporterTap,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      ImporterCatalogLogo(
+                        storagePath: part.ownerLogoStoragePath,
+                        size: 16,
+                      ),
+                      if (part.ownerLogoStoragePath?.trim().isNotEmpty == true)
+                        const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          importerLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: onImporterTap != null
+                                ? AppColors.brand
+                                : AppColors.textSecondary,
+                            height: 1.15,
+                          ),
                         ),
+                      ),
+                      if (hasRating) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.star_rounded,
+                          size: 13,
+                          color: Colors.amber.shade800,
+                        ),
+                        Text(
+                          part.ownerRatingAvg!.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-              SizedBox(height: compact ? 4 : 6),
-              Text(
-                part.nombre,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: compact ? 12 : 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  height: 1.15,
                 ),
-              ),
-              if ((part.category ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 1),
-                Text(
-                  part.category!.trim(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: compact ? 9 : 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.brandBlue,
-                    height: 1.1,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 2),
-              InkWell(
-                onTap: onImporterTap,
-                borderRadius: BorderRadius.circular(6),
-                child: Row(
-                  children: [
-                    ImporterCatalogLogo(
-                      storagePath: part.ownerLogoStoragePath,
-                      size: compact ? 14 : 16,
+                if (!compact && locLine.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    locLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      height: 1.1,
                     ),
-                    if (part.ownerLogoStoragePath?.trim().isNotEmpty == true)
-                      SizedBox(width: compact ? 4 : 5),
-                    Expanded(
+                  ),
+                ],
+                if (showDistanceChips) ...[
+                  const SizedBox(height: AliadoCatalogLayout.cardGapTight),
+                  SizedBox(
+                    height: AliadoCatalogLayout.cardDistanceHeight,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
                       child: Text(
-                        importerLine,
+                        _distanceChipLabel(part),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: compact ? 9 : 9.5,
-                          fontWeight: FontWeight.w600,
-                          color: onImporterTap != null
-                              ? AppColors.brandBlue
-                              : AppColors.textSecondary,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!compact && locLine.isNotEmpty)
-                Text(
-                  locLine,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                    height: 1.1,
-                  ),
-                ),
-              if (part.ownerRatingAvg != null &&
-                  (part.ownerRatingCount ?? 0) > 0) ...[
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.star,
-                      size: compact ? 10 : 11,
-                      color: Colors.amber.shade800,
-                    ),
-                    const SizedBox(width: 2),
-                    Flexible(
-                      child: Text(
-                        '${part.ownerRatingAvg!.toStringAsFixed(1)} (${part.ownerRatingCount})',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: compact ? 9 : 9.5,
+                        style: const TextStyle(
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: AppColors.brand,
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if (showDistanceChips) ...[
-                const SizedBox(height: 2),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Chip(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: Text(
-                      _distanceChipLabel(part),
-                      style: TextStyle(
-                        fontSize: compact ? 9 : 9.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    backgroundColor: AppColors.brandBlue.withOpacity(0.1),
-                    side: BorderSide(
-                      color: AppColors.brandBlue.withOpacity(0.35),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 4),
-              CatalogProductPriceDisplay(
-                listPriceUsd: part.precio,
-                salePriceUsd: part.salePriceUsd,
-                discountRules: part.discountRules,
-                campaignDiscountPercent: part.activeCampaignDiscountPercent,
-                catalogGrid: true,
-                compact: compact,
-                ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
-              ),
-              Divider(height: 8, color: AppColors.borderSubtle),
-              Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: AppColors.successGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      part.hasOwnerMinOrderAmount
-                          ? '${part.stock} en stock · ${part.minOrderQtyLabelEs} · ${part.ownerMinOrderAmountLabelEs}'
-                          : '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: compact ? 10 : 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.green.shade700,
                       ),
                     ),
                   ),
                 ],
-              ),
-            ],
+                const SizedBox(height: AliadoCatalogLayout.cardGapSection),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardPriceHeight,
+                  child: CatalogProductPriceDisplay(
+                    listPriceUsd: part.precio,
+                    salePriceUsd: part.salePriceUsd,
+                    discountRules: part.discountRules,
+                    campaignDiscountPercent: part.activeCampaignDiscountPercent,
+                    catalogGrid: true,
+                    compact: true,
+                    showPromotionChips: false,
+                    ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                  ),
+                ),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardOfferHeight,
+                  child: CatalogProductOfferChips(
+                    listPriceUsd: part.precio,
+                    salePriceUsd: part.salePriceUsd,
+                    discountRules: part.discountRules,
+                    campaignDiscountPercent:
+                        part.activeCampaignDiscountPercent,
+                    refUnitUsd: refUnit,
+                    compact: true,
+                    ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                  ),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapSection),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardStockHeight,
+                  child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${part.stock} en stock',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.successGreen,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' · $stockDetail',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1473,10 +1564,10 @@ class _ProductGridCard extends StatelessWidget {
 
   Widget _placeholder(bool compact) {
     return ColoredBox(
-      color: AppColors.borderSubtle,
+      color: AppColors.surfaceTinted,
       child: Icon(
-        Icons.precision_manufacturing_outlined,
-        size: compact ? 32 : 40,
+        Icons.image_outlined,
+        size: compact ? 28 : 34,
         color: AppColors.textMuted,
       ),
     );

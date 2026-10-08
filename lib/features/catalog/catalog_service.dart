@@ -157,12 +157,16 @@ class CatalogService {
         filters.hasReputationThreshold;
   }
 
+  /// Favoritos también une `products` con `profiles`. Hay que nombrar la FK del dueño.
+  static const _ownerProfileEmbed = 'profiles!products_owner_id_fkey';
+
   static String _catalogProfileSelect(CatalogFilters filters) {
     const rep =
         'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d, min_order_amount_ref, min_order_currency, catalog_featured_until, catalog_verified_at';
-    return _catalogNeedsProfileInner(filters)
-        ? 'profiles!inner(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)'
-        : 'profiles(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
+    final embed = _catalogNeedsProfileInner(filters)
+        ? '$_ownerProfileEmbed!inner'
+        : _ownerProfileEmbed;
+    return '$embed(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
   }
 
   static Future<List<PromoCampaignModel>>
@@ -698,14 +702,14 @@ class CatalogService {
     if (est != null && est.isNotEmpty) {
       final s = SupabaseAccess.sanitizeIlike(est);
       if (s.isNotEmpty) {
-        q = q.filter('profiles.estado', 'ilike', '%$s%');
+        q = q.filter('$_ownerProfileEmbed.estado', 'ilike', '%$s%');
       }
     }
     final ciu = filters.ownerCiudad?.trim();
     if (ciu != null && ciu.isNotEmpty) {
       final s = SupabaseAccess.sanitizeIlike(ciu);
       if (s.isNotEmpty) {
-        q = q.filter('profiles.ciudad', 'ilike', '%$s%');
+        q = q.filter('$_ownerProfileEmbed.ciudad', 'ilike', '%$s%');
       }
     }
     final ownerIds = filters.effectiveOwnerIds;
@@ -723,14 +727,22 @@ class CatalogService {
     if (filters.onlyActiveProducts) {
       q = q.eq('is_active', true);
     }
-    final cat = filters.category?.trim();
-    if (cat != null && cat.isNotEmpty) {
-      q = q.eq('category', cat);
+    final anyOf = [
+      for (final value in filters.categoryAnyOf)
+        if (value.trim().isNotEmpty) value.trim(),
+    ];
+    if (anyOf.length > 1) {
+      q = q.inFilter('category', anyOf);
+    } else {
+      final cat = (anyOf.length == 1 ? anyOf.first : filters.category)?.trim();
+      if (cat != null && cat.isNotEmpty) {
+        q = q.eq('category', cat);
+      }
     }
     final minAvg = filters.minOwnerRatingAvg;
     if (minAvg != null && minAvg > 0) {
       q = q.filter(
-        'profiles.rating_avg_received_rolling100',
+        '$_ownerProfileEmbed.rating_avg_received_rolling100',
         'gte',
         minAvg,
       );
@@ -738,7 +750,7 @@ class CatalogService {
     final minCnt = filters.minOwnerRatingCount;
     if (minCnt != null && minCnt > 0) {
       q = q.filter(
-        'profiles.rating_count_received_rolling100',
+        '$_ownerProfileEmbed.rating_count_received_rolling100',
         'gte',
         minCnt,
       );
@@ -776,6 +788,22 @@ class CatalogService {
     });
   }
 
+  /// Categorías distintas del catálogo visible para la tienda minorista.
+  static Future<List<String>> fetchAliadoCatalogCategories() {
+    return retryOnJwtIssuedAtFuture(() async {
+      final res =
+          await SupabaseAccess.client.rpc('aliado_catalog_categories');
+      final list = SupabaseAccess.decodeRpcJsonArray(res);
+      final out = <String>[];
+      for (final row in list) {
+        if (row is! Map) continue;
+        final c = row['category']?.toString().trim();
+        if (c != null && c.isNotEmpty && !out.contains(c)) out.add(c);
+      }
+      return out;
+    });
+  }
+
   /// Categorías de `products.category` de ese mayorista (catálogo activo).
   static Future<List<String>> fetchImporterStoreCategories(String importerId) {
     final id = importerId.trim();
@@ -807,29 +835,71 @@ class CatalogService {
       return Future<PartModel?>.value(null);
     }
     return retryOnJwtIssuedAtFuture(() async {
-      final store = await fetchImporterStoreProfile(owner);
-      if (store == null) return null;
+      final partsFuture = fetchVisibleImporterStoreProducts(
+        importerId: owner,
+        productIds: [pid],
+      );
+      final discountsFuture = fetchActivePromoProductDiscounts();
+      late final List<PartModel> parts;
+      try {
+        parts = await partsFuture;
+      } catch (_) {
+        await discountsFuture;
+        rethrow;
+      }
+      final discounts = await discountsFuture;
+      if (parts.isEmpty) return null;
+      final enriched = applyPromoDiscountsToParts(parts, discounts);
+      return enriched.isEmpty ? parts.first : enriched.first;
+    });
+  }
+
+  /// Varios productos de una valla, en una sola lectura.
+  ///
+  /// El perfil del mayorista y las filas salen en paralelo. No pide el mapa
+  /// global de descuentos: quien llama ya tiene el % de la campaña.
+  static Future<List<PartModel>> fetchVisibleImporterStoreProducts({
+    required String importerId,
+    required List<String> productIds,
+  }) {
+    final owner = importerId.trim();
+    final ids = <String>[];
+    for (final raw in productIds) {
+      final id = raw.trim();
+      if (id.isNotEmpty && !ids.contains(id)) ids.add(id);
+    }
+    if (owner.isEmpty || ids.isEmpty) {
+      return Future<List<PartModel>>.value(const []);
+    }
+    return retryOnJwtIssuedAtFuture(() async {
       final embed = _catalogProfileSelect(CatalogFilters.empty);
-      final row = await SupabaseAccess.client
+      final profileFuture = fetchImporterStoreProfile(owner);
+      final rowsFuture = SupabaseAccess.client
           .from('products')
           .select('*, $embed')
-          .eq('id', pid)
+          .inFilter('id', ids)
           .eq('owner_id', owner)
           .eq('is_active', true)
-          .eq('stock_covers_min_order', true)
-          .maybeSingle();
-      if (row == null) return null;
-      final part = PartModel.fromJson(Map<String, dynamic>.from(row));
-      if (!catalogPartBelongsToImporterStore(
-        importerId: owner,
-        ownerId: part.ownerId,
-        isActive: part.isActive,
-      )) {
-        return null;
+          .eq('stock_covers_min_order', true);
+      final profile = await profileFuture;
+      final rows = await rowsFuture;
+      if (profile == null) return const <PartModel>[];
+      final byId = <String, PartModel>{};
+      for (final row in rows) {
+        final part = PartModel.fromJson(Map<String, dynamic>.from(row));
+        if (!catalogPartBelongsToImporterStore(
+          importerId: owner,
+          ownerId: part.ownerId,
+          isActive: part.isActive,
+        )) {
+          continue;
+        }
+        byId[part.id] = part;
       }
-      final discounts = await fetchActivePromoProductDiscounts();
-      final enriched = applyPromoDiscountsToParts([part], discounts);
-      return enriched.isEmpty ? part : enriched.first;
+      return [
+        for (final id in ids)
+          if (byId.containsKey(id)) byId[id]!,
+      ];
     });
   }
 }

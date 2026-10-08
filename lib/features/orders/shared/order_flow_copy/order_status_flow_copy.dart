@@ -85,4 +85,40 @@ abstract final class OrderStatusFlowCopy {
 
   /// Sufijo en listas cuando hay pago pendiente tras entrega.
   static const morosoListSuffix = ' · ${OrderVocab.chipPagoPendiente}';
+
+  /// Qué puede hacer ahora la tienda, visible sin abrir la ficha.
+  static String aliadoCollapsedHint(String status) => switch (status) {
+        TransactionRequestStatus.pendiente =>
+          'El proveedor confirma el stock. Abra el detalle para ver el pedido o cancelarlo.',
+        TransactionRequestStatus.enPreparacion =>
+          'El proveedor prepara los productos. Abra el detalle para ver el avance.',
+        TransactionRequestStatus.pedidoListo =>
+          'La mercancía está lista. Abra el detalle para elegir el transporte.',
+        TransactionRequestStatus.enTransito ||
+        TransactionRequestStatus.enviado =>
+          'Va en camino. Abra el detalle y confirme cuando lo reciba en el taller.',
+        TransactionRequestStatus.entregado =>
+          'Pedido recibido. En el detalle puede pagar, valorar o pedir una devolución.',
+        TransactionRequestStatus.rechazado =>
+          'Este pedido no sigue. Abra el detalle para ver el motivo.',
+        _ => 'Abra el detalle para ver el seguimiento.',
+      };
+
+  /// Qué puede hacer ahora el proveedor, visible sin abrir la ficha.
+  static String importerCollapsedHint(String status) => switch (status) {
+        TransactionRequestStatus.pendiente =>
+          'Revise el pedido y use el botón azul para pasarlo a preparación.',
+        TransactionRequestStatus.enPreparacion =>
+          'Cuando termine de alistar, use el botón azul para marcarlo listo.',
+        TransactionRequestStatus.pedidoListo =>
+          'En el detalle defina el retiro y luego márquelo en tránsito.',
+        TransactionRequestStatus.enTransito ||
+        TransactionRequestStatus.enviado =>
+          'La tienda confirma la recepción. El detalle muestra la guía.',
+        TransactionRequestStatus.entregado =>
+          'Pedido cerrado. El detalle guarda la factura y el pago.',
+        TransactionRequestStatus.rechazado =>
+          'Este pedido no sigue. Abra el detalle para ver el motivo.',
+        _ => 'Abra el detalle para continuar el pedido.',
+      };
 }

@@ -2,7 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'commission_settlement_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -34,34 +34,22 @@ class _ImporterCommissionPagoSectionState
   Future<void> _abrirFacturaPdf() async {
     final path = s.invoicePdfStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url =
-          await SupabaseService.createSignedUrlForCommissionInvoicePdf(path);
-      final uri = Uri.parse(url);
-      if (!mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () =>
+          SupabaseService.createSignedUrlForCommissionInvoicePdf(path),
+      fileName: 'factura-comision.pdf',
+    );
   }
 
   Future<void> _abrirComprobante() async {
     final path = s.pagoComprobanteStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
-      final uri = Uri.parse(url);
-      if (!mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForComprobantePago(path),
+      fileName: s.pagoComprobanteFileName,
+    );
   }
 
   Future<void> _subirComprobante() async {

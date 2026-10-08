@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'carrier_flete_pago_modo.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -43,17 +44,11 @@ class _ImporterOrderFleteInvoiceSectionState
   Future<void> _abrir(BuildContext context) async {
     final path = widget.request.fleteFacturaStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForOrderInvoice(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForOrderInvoice(path),
+      fileName: widget.request.fleteFacturaFileName,
+    );
   }
 
   Future<void> _upload(BuildContext context) async {

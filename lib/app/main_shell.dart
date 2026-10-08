@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -10,9 +11,11 @@ import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/aliado_bottom_nav.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/commissions/admin_commission_settlements_panel.dart';
 import 'package:motolink_pro_app/core/layout/admin_desktop_shell.dart';
+import 'package:motolink_pro_app/core/layout/admin_mobile_nav.dart';
 import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
 import 'package:motolink_pro_app/features/admin/admin_encomiendas_report_panel.dart';
 import 'package:motolink_pro_app/features/kyc/admin_kyc_review_panel.dart';
@@ -25,6 +28,7 @@ import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
 import 'main_shell_tab.dart';
+import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/core/layout/shell/shell_destination.dart';
 import 'package:motolink_pro_app/core/notifications/notification_center_sheet.dart';
@@ -32,6 +36,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.d
 import 'package:motolink_pro_app/features/profile/profile_b2b_form.dart';
 import 'package:motolink_pro_app/features/profile/account_settings_screen.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
+import 'package:motolink_pro_app/features/catalog/aliado_favorites_screen.dart';
+import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
 import 'package:motolink_pro_app/features/catalog/home_screen.dart';
 import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
 import 'package:motolink_pro_app/features/reputation/reputation_tab.dart';
@@ -81,14 +87,33 @@ class _MainShellState extends State<MainShell> {
       if (!mounted) return;
       _notifications.reload();
     });
-    if (widget.homeRole == AppHomeRole.importador ||
-        widget.homeRole == AppHomeRole.aliado) {
-      MainShellTabController.registerB2BProfileTabIndex(3);
+    if (widget.homeRole == AppHomeRole.aliado) {
+      _tabIndex = AliadoShellTabs.catalogo;
+      MainShellTabController.registerB2BNavigation(
+        home: AliadoShellTabs.catalogo,
+        pedidos: AliadoShellTabs.pedidos,
+        reputation: AliadoShellTabs.reputacion,
+        profile: AliadoShellTabs.perfil,
+      );
+      unawaited(_loadAliadoFavorites());
+    } else if (widget.homeRole == AppHomeRole.importador) {
+      MainShellTabController.registerB2BNavigation(
+        home: 0,
+        pedidos: 1,
+        reputation: 2,
+        profile: 3,
+      );
     }
     if (widget.homeRole == AppHomeRole.administrador) {
       MainShellTabController.registerAdminProfileTabIndex(7);
     }
     unawaited(_ensureDailyTasaBcvNotification());
+  }
+
+  Future<void> _loadAliadoFavorites() async {
+    try {
+      await AliadoFavoritesService.instance.refresh();
+    } catch (_) {}
   }
 
   Future<void> _ensureDailyTasaBcvNotification() async {
@@ -273,13 +298,6 @@ class _MainShellState extends State<MainShell> {
 
   static const _aliadoDestinations = <ShellDestination>[
     ShellDestination(
-      icon: Icons.grid_view_outlined,
-      selectedIcon: Icons.grid_view,
-      label: 'Catálogo',
-      title: 'Catálogo',
-      subtitle: 'Repuestos · filtros · carrito',
-    ),
-    ShellDestination(
       icon: Icons.shopping_cart_outlined,
       selectedIcon: Icons.shopping_cart,
       label: 'Pedidos',
@@ -292,6 +310,20 @@ class _MainShellState extends State<MainShell> {
       label: 'Reputación',
       title: 'Reputación',
       subtitle: 'Valoraciones · resumen',
+    ),
+    ShellDestination(
+      icon: Icons.grid_view_outlined,
+      selectedIcon: Icons.grid_view,
+      label: 'Catálogo',
+      title: 'Catálogo',
+      subtitle: 'Inicio · repuestos · carrito',
+    ),
+    ShellDestination(
+      icon: Icons.favorite_border,
+      selectedIcon: Icons.favorite,
+      label: 'Favoritos',
+      title: 'Favoritos',
+      subtitle: 'Repuestos guardados',
     ),
     ShellDestination(
       icon: Icons.person_outline,
@@ -458,30 +490,10 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceTinted,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: index,
-          type: BottomNavigationBarType.fixed,
-          onTap: (i) => setState(() => _tabIndex = i),
-          items: [
-            for (final d in dest)
-              BottomNavigationBarItem(
-                icon: Icon(d.icon),
-                activeIcon: Icon(d.selectedIcon),
-                label: d.label,
-              ),
-          ],
-        ),
+      bottomNavigationBar: AdminMobileNav(
+        currentIndex: index,
+        destinations: dest,
+        onSelect: (i) => setState(() => _tabIndex = i),
       ),
     );
   }
@@ -502,37 +514,11 @@ class _MainShellState extends State<MainShell> {
       listenable: CartService.instance,
       builder: (context, _) {
         final n = CartService.instance.itemCount;
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              tooltip: 'Carrito',
-              onPressed: _openAliadoCart,
-              icon: Icon(Icons.shopping_cart_outlined, color: AppColors.textSecondary),
-            ),
-            if (n > 0)
-              Positioned(
-                right: 6,
-                top: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.brand,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                  child: Text(
-                    n > 99 ? '99+' : '$n',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        return HeaderIconButton(
+          tooltip: 'Carrito',
+          onPressed: _openAliadoCart,
+          count: n,
+          icon: n > 0 ? Icons.shopping_cart : Icons.shopping_cart_outlined,
         );
       },
     );
@@ -540,11 +526,22 @@ class _MainShellState extends State<MainShell> {
 
   void _onB2bTabSelected(int i, AppHomeRole role) {
     setState(() => _tabIndex = i);
-    if (i == 1 &&
-        (role == AppHomeRole.importador || role == AppHomeRole.aliado)) {
+    if (role == AppHomeRole.aliado) {
+      if (i == AliadoShellTabs.pedidos) {
+        MainShellTabController.notifyPedidosReload();
+      }
+      if (i == AliadoShellTabs.favoritos) {
+        unawaited(_loadAliadoFavorites());
+      }
+      if (i == AliadoShellTabs.reputacion || i == AliadoShellTabs.perfil) {
+        unawaited(_refreshProfile());
+      }
+      return;
+    }
+    if (i == 1 && role == AppHomeRole.importador) {
       MainShellTabController.notifyPedidosReload();
     }
-    if (i == 2 || (role == AppHomeRole.aliado && i == 3)) {
+    if (i == 2 || i == 3) {
       unawaited(_refreshProfile());
     }
   }
@@ -553,6 +550,9 @@ class _MainShellState extends State<MainShell> {
     required AppHomeRole role,
     required bool desktop,
   }) {
+    if (role == AppHomeRole.aliado) {
+      return _aliadoPages(desktop: desktop);
+    }
     final embedded = desktop;
     return [
       HomeScreen(
@@ -586,6 +586,58 @@ class _MainShellState extends State<MainShell> {
       _ProfileTab(
         profile: _profile,
         homeRole: role,
+        onProfileSaved: _refreshProfile,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        embedInDesktopShell: embedded,
+      ),
+    ];
+  }
+
+  List<Widget> _aliadoPages({required bool desktop}) {
+    final embedded = desktop;
+    return [
+      _OrdersTab(
+        profile: _profile,
+        homeRole: AppHomeRole.aliado,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        embedInDesktopShell: embedded,
+      ),
+      ReputationTab(
+        profile: _profile,
+        homeRole: AppHomeRole.aliado,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        onProfileRefresh: _refreshProfile,
+        embedInDesktopShell: embedded,
+      ),
+      HomeScreen(
+        profile: _profile,
+        homeRole: AppHomeRole.aliado,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        embedInDesktopShell: embedded,
+      ),
+      AliadoFavoritesScreen(
+        profile: _profile,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        embedInDesktopShell: embedded,
+      ),
+      _ProfileTab(
+        profile: _profile,
+        homeRole: AppHomeRole.aliado,
         onProfileSaved: _refreshProfile,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
@@ -653,24 +705,29 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceTinted,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
+      bottomNavigationBar: role == AppHomeRole.aliado
+          ? AliadoBottomNav(
+              currentIndex: _tabIndex,
+              onTap: (i) => _onB2bTabSelected(i, role),
+            )
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceTinted,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: BottomNavigationBar(
+                currentIndex: _tabIndex,
+                type: BottomNavigationBarType.fixed,
+                onTap: (i) => _onB2bTabSelected(i, role),
+                items: navItems,
+              ),
             ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _tabIndex,
-          type: BottomNavigationBarType.fixed,
-          onTap: (i) => _onB2bTabSelected(i, role),
-          items: navItems,
-        ),
-      ),
     );
   }
 
@@ -1022,9 +1079,9 @@ class _ProfileTabState extends State<_ProfileTab> {
         onMessagesTap: widget.onMessagesTap,
         unreadMessages: widget.unreadMessages,
         extraActions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            color: AppColors.textSecondary,
+          HeaderIconButton(
+            tooltip: 'Ajustes',
+            icon: Icons.settings_outlined,
             onPressed: () {
               Navigator.of(context).push<void>(
                 MaterialPageRoute<void>(

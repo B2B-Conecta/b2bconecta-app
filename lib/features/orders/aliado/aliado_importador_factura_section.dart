@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -26,18 +27,12 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
     return null;
   }
 
-  Future<void> _abrir(BuildContext context, String path) async {
-    try {
-      final url = await SupabaseService.createSignedUrlForOrderInvoice(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo abrir la factura: $e')),
-      );
-    }
+  Future<void> _abrir(BuildContext context, String path) {
+    return openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForOrderInvoice(path),
+      fileName: _ref?.proveedorFacturaFileName,
+    );
   }
 
   @override

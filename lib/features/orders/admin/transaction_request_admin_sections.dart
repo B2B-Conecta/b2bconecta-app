@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'package:motolink_pro_app/features/payments/document_type_preference.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
@@ -22,24 +23,14 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_coun
 
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
-  Future<String> Function() signed,
-) async {
-  try {
-    final url = await signed();
-    final uri = Uri.parse(url);
-    if (!context.mounted) return;
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir el enlace.')),
-      );
-    }
-  } catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: $e')),
-    );
-  }
+  Future<String> Function() signed, {
+  String? fileName,
+}) {
+  return openStoredFile(
+    context,
+    signedUrl: signed,
+    fileName: fileName,
+  );
 }
 
 /// Contacto B2B del aliado y del importador en un pedido.
@@ -727,6 +718,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
           onPressed: () => _launchSignedOrderDoc(
             context,
             () => SupabaseService.createSignedUrlForOrderInvoice(path),
+            fileName: r.proveedorFacturaFileName,
           ),
           icon: const Icon(Icons.receipt_long_outlined, size: 18),
           label: Text(
@@ -746,6 +738,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
           onPressed: () => _launchSignedOrderDoc(
             context,
             () => SupabaseService.createSignedUrlForComprobantePago(path),
+            fileName: r.comprobantePagoFileName,
           ),
           icon: const Icon(Icons.account_balance_outlined, size: 18),
           label: Text(
@@ -765,6 +758,7 @@ class TransactionRequestEvidenceDocumentsSection extends StatelessWidget {
           onPressed: () => _launchSignedOrderDoc(
             context,
             () => SupabaseService.createSignedUrlForEfectivoRespaldo(path),
+            fileName: r.efectivoRespaldoFileName,
           ),
           icon: const Icon(Icons.payments_outlined, size: 18),
           label: Text(

@@ -26,7 +26,7 @@ abstract final class B2bOrdersPanelLayout {
   static double orderCardMaxWidth(double width) =>
       isDesktop(width) ? AppBreakpoints.formMaxWidth : double.infinity;
 
-  static double sectionGap(double width) => isDesktop(width) ? 8 : 8;
+  static double sectionGap(double width) => isDesktop(width) ? 16 : 16;
 
   /// Centra y limita el ancho de fichas, títulos y controles de lista en escritorio.
   static Widget listColumn(BuildContext context, Widget child) {
@@ -107,8 +107,8 @@ class B2bOrderCardDensity {
       : const EdgeInsets.fromLTRB(12, 10, 8, 10);
 
   EdgeInsets get cardExpandedPadding => isDesktop
-      ? const EdgeInsets.fromLTRB(10, 0, 10, 10)
-      : const EdgeInsets.fromLTRB(12, 0, 12, 12);
+      ? const EdgeInsets.fromLTRB(10, 8, 10, 12)
+      : const EdgeInsets.fromLTRB(12, 8, 12, 16);
 
   EdgeInsets get sectionHeaderPadding => isDesktop
       ? const EdgeInsets.fromLTRB(10, 8, 6, 8)

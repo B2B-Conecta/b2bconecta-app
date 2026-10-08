@@ -212,6 +212,12 @@ abstract final class TransactionRequestStatus {
   static String importerOperationalHeadline(String status) =>
       OrderStatusFlowCopy.importerOperationalHeadline(status);
 
+  static String aliadoCollapsedHint(String status) =>
+      OrderStatusFlowCopy.aliadoCollapsedHint(status);
+
+  static String importerCollapsedHint(String status) =>
+      OrderStatusFlowCopy.importerCollapsedHint(status);
+
   static String aliadoTrackingHeadline(
     String status, {
     bool canceladoPorAliado = false,

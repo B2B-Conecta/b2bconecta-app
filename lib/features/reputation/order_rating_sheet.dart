@@ -659,7 +659,7 @@ class OrderRatingPendingBar extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       child: pending
           ? Material(
               color: Colors.amber.shade50,

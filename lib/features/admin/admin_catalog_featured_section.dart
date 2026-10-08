@@ -253,11 +253,9 @@ class _AdminCatalogFeaturedSectionState
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
-              'Verificado (azul): registro completo y oficial. '
-              'Destacado (dorado): alto volumen — máx. 3. '
-              'Ambos los activa admin; no controlan la vitrina.',
+              'El admin activa estos sellos. No cambian la vitrina.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,

@@ -28,6 +28,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
 /// Bandeja admin unificada: pedidos en curso, cerrados o todos, con filtros por estado.
 class AdminOrdersPanel extends StatefulWidget {
@@ -35,12 +36,6 @@ class AdminOrdersPanel extends StatefulWidget {
 
   @override
   State<AdminOrdersPanel> createState() => _AdminOrdersPanelState();
-}
-
-enum _AdminOrdersScope {
-  enCurso,
-  cerrados,
-  todos,
 }
 
 class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
@@ -53,36 +48,26 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   String? _anularMotolinkBusyId;
   bool _morosoOnly = false;
   Map<String, AdminAliadoMorosidadFlag> _morosidadFlags = {};
-  _AdminOrdersScope _scope = _AdminOrdersScope.enCurso;
+  PedidosListScope _scope = PedidosListScope.enCurso;
+  String? _loadedKind;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
-  List<OrderStatusFilterOption> get _statusChipOptions {
-    final statuses = switch (_scope) {
-      _AdminOrdersScope.enCurso =>
-        TransactionRequestStatus.motoconectaAdminOperationalActive,
-      _AdminOrdersScope.cerrados => TransactionRequestStatus.adminClosedOrders,
-      _AdminOrdersScope.todos =>
-        TransactionRequestStatus.adminBandejaUnifiedStatuses,
-    };
-    return TransactionRequestStatus.distinctFilterStatuses(statuses)
-        .map(
-          (s) => OrderStatusFilterOption(
-            status: s,
-            label: TransactionRequestStatus.labelEs(s),
-          ),
-        )
-        .toList();
-  }
+  String get _fetchKind => switch (_scope) {
+        PedidosListScope.todos => 'todos',
+        PedidosListScope.enCurso => 'curso',
+        PedidosListScope.entregados || PedidosListScope.cancelados => 'cerrados',
+      };
 
   String get _emptyMessage => switch (_scope) {
-        _AdminOrdersScope.enCurso => 'No hay pedidos en curso.',
-        _AdminOrdersScope.cerrados => 'No hay pedidos cerrados.',
-        _AdminOrdersScope.todos => 'No hay pedidos.',
+        PedidosListScope.enCurso => 'No hay pedidos en curso.',
+        PedidosListScope.entregados => 'No hay pedidos entregados.',
+        PedidosListScope.cancelados => 'No hay pedidos cancelados.',
+        PedidosListScope.todos => 'No hay pedidos.',
       };
 
   bool get _showMorosoChip =>
-      _scope == _AdminOrdersScope.cerrados || _scope == _AdminOrdersScope.todos;
+      _scope == PedidosListScope.entregados || _scope == PedidosListScope.todos;
 
   @override
   void initState() {
@@ -106,8 +91,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     if (pending != null) {
       setState(() {
         _scope = switch (pending) {
-          AdminPedidosNotificationScope.enCurso => _AdminOrdersScope.enCurso,
-          AdminPedidosNotificationScope.cerrados => _AdminOrdersScope.cerrados,
+          AdminPedidosNotificationScope.enCurso => PedidosListScope.enCurso,
+          AdminPedidosNotificationScope.cerrados => PedidosListScope.entregados,
         };
         _statusFilter = null;
         _morosoOnly = false;
@@ -127,6 +112,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   }
 
   Future<void> _load() async {
+    final kind = _fetchKind;
     setState(() {
       _loading = true;
       _error = null;
@@ -135,15 +121,15 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       final List<TransactionRequestModel> rows;
       Map<String, AdminAliadoMorosidadFlag> flags = {};
 
-      switch (_scope) {
-        case _AdminOrdersScope.enCurso:
+      switch (kind) {
+        case 'curso':
           rows = await SupabaseService.fetchActiveTransactionRequestsForAdmin();
           break;
-        case _AdminOrdersScope.cerrados:
+        case 'cerrados':
           rows = await SupabaseService.fetchClosedTransactionRequestsForAdmin();
           flags = await SupabaseService.adminAliadosPedidosMorososFlags();
           break;
-        case _AdminOrdersScope.todos:
+        default:
           rows =
               await SupabaseService.fetchUnifiedTransactionRequestsForAdmin();
           flags = await SupabaseService.adminAliadosPedidosMorososFlags();
@@ -151,16 +137,24 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       }
 
       if (!mounted) return;
+      final pending = MainShellTabController.peekPendingNotificationRelatedId();
+      var scope = _scope;
+      if (pending != null && scope == PedidosListScope.entregados) {
+        final match = findTransactionForNotificationRelatedId(rows, pending);
+        if (match?.status == TransactionRequestStatus.rechazado) {
+          scope = PedidosListScope.cancelados;
+        }
+      }
       final prevExpanded = _expandedRequestId;
       setState(() {
         _rows = rows;
         _morosidadFlags = flags;
+        _scope = scope;
+        _loadedKind = kind;
         _loading = false;
         _expandedRequestId = prevExpanded;
       });
       _tryExpandFromPendingNotification();
-      if (_scope == _AdminOrdersScope.enCurso) {
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -197,16 +191,17 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
 
   bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
-  void _onScopeChanged(_AdminOrdersScope next) {
+  void _onScopeChanged(PedidosListScope next) {
     if (next == _scope) return;
     setState(() {
       _scope = next;
       _statusFilter = null;
-      _morosoOnly = false;
-      _dateFrom = null;
-      _dateTo = null;
+      if (next != PedidosListScope.entregados &&
+          next != PedidosListScope.todos) {
+        _morosoOnly = false;
+      }
     });
-    _load();
+    if (_fetchKind != _loadedKind) _load();
   }
 
   List<TransactionRequestModel> get _filteredFlat {
@@ -218,8 +213,17 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       dateTo: _dateTo,
       useOrderPanelDate: true,
     );
-    list.sort(ImporterOrderDate.compareByFechaReciente);
-    return list;
+    final scoped = switch (_scope) {
+      PedidosListScope.entregados => list
+          .where((r) => r.status == TransactionRequestStatus.entregado)
+          .toList(),
+      PedidosListScope.cancelados => list
+          .where((r) => r.status == TransactionRequestStatus.rechazado)
+          .toList(),
+      _ => list,
+    };
+    scoped.sort(ImporterOrderDate.compareByFechaReciente);
+    return scoped;
   }
 
   List<List<TransactionRequestModel>> get _displayGroups {
@@ -521,7 +525,10 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           children: [
-            _buildScopeBar(context),
+            PedidosScopeBar(
+              selected: _scope,
+              onSelected: _onScopeChanged,
+            ),
             const SizedBox(height: 16),
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.35,
@@ -539,37 +546,56 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildScopeBar(context),
               OrderListFilterBar(
                 searchController: _searchCtrl,
                 onSearchChanged: (_) => setState(() {}),
                 hintText: 'Buscar por producto, SKU o empresa',
-                statusOptions: _statusChipOptions,
-                selectedStatus: _statusFilter,
-                onStatusChanged: (s) => setState(() => _statusFilter = s),
-                morosoOnly: _showMorosoChip ? _morosoOnly : false,
-                onMorosoOnlyChanged: _showMorosoChip
-                    ? (v) => setState(() => _morosoOnly = v)
-                    : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: PedidosScopeBar(
+                  selected: _scope,
+                  onSelected: _onScopeChanged,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilterChip(
-                    label: Text(_hasDateFilter ? 'Fecha ✓' : 'Filtrar por fecha'),
-                    selected: _hasDateFilter,
-                    onSelected: (_) => _openDateFilters(),
-                    selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                    checkmarkColor: AppColors.brandBlue,
-                    avatar: Icon(
-                      Icons.calendar_month_outlined,
-                      size: 16,
-                      color: _hasDateFilter
-                          ? AppColors.brandBlue
-                          : AppColors.textSecondary,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilterChip(
+                      label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
+                      selected: _hasDateFilter,
+                      onSelected: (_) => _openDateFilters(),
+                      visualDensity: VisualDensity.compact,
+                      selectedColor: AppColors.brandBlue.withOpacity(0.18),
+                      checkmarkColor: AppColors.brandBlue,
+                      avatar: Icon(
+                        Icons.calendar_month_outlined,
+                        size: 16,
+                        color: _hasDateFilter
+                            ? AppColors.brandBlue
+                            : AppColors.textSecondary,
+                      ),
                     ),
-                  ),
+                    if (_showMorosoChip)
+                      FilterChip(
+                        label: const Text('Pago pendiente'),
+                        selected: _morosoOnly,
+                        onSelected: (v) => setState(() => _morosoOnly = v),
+                        visualDensity: VisualDensity.compact,
+                        selectedColor: Colors.red.shade100,
+                        checkmarkColor: Colors.red.shade800,
+                        avatar: Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: _morosoOnly
+                              ? Colors.red.shade800
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               Expanded(
@@ -638,37 +664,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildScopeBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      child: SegmentedButton<_AdminOrdersScope>(
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment(
-            value: _AdminOrdersScope.enCurso,
-            label: Text('En curso'),
-            icon: Icon(Icons.local_shipping_outlined, size: 18),
-          ),
-          ButtonSegment(
-            value: _AdminOrdersScope.cerrados,
-            label: Text('Cerrados'),
-            icon: Icon(Icons.archive_outlined, size: 18),
-          ),
-          ButtonSegment(
-            value: _AdminOrdersScope.todos,
-            label: Text('Todos'),
-            icon: Icon(Icons.dashboard_outlined, size: 18),
-          ),
-        ],
-        selected: {_scope},
-        onSelectionChanged: (next) {
-          if (next.isEmpty) return;
-          _onScopeChanged(next.first);
-        },
-      ),
     );
   }
 }

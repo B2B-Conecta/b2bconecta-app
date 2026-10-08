@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
 import 'pago_metodo.dart';
 import 'pago_revision_estado.dart';
@@ -115,17 +116,11 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
   Future<void> _abrirComprobante(BuildContext context) async {
     final path = widget.request.comprobantePagoStoragePath?.trim();
     if (path == null || path.isEmpty) return;
-    try {
-      final url = await SupabaseService.createSignedUrlForComprobantePago(path);
-      final uri = Uri.parse(url);
-      if (!context.mounted) return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
+    await openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForComprobantePago(path),
+      fileName: widget.request.comprobantePagoFileName,
+    );
   }
 
   Future<void> _subirComprobante(
@@ -336,6 +331,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
         if (!referenciaHistorica && r.aliadoPagoEstadoResumenEs != null)
           const SizedBox(height: 8),
         if (referenciaHistorica) ...[
+          const SizedBox(height: 4),
           Text(
             'Estado del pago: ${_etiquetaEstadoPago(pe)}',
             style: TextStyle(
@@ -344,20 +340,19 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
         ],
         if (referenciaHistorica && r.hasComprobantePago) ...[
-          const SizedBox(height: 10),
           if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty) ...[
             Text(
               'Método: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
               style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
           ],
           if (discountPreview.applies) ...[
             AliadoUsdPaymentDiscountFichaBanner(preview: discountPreview),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
           ],
           OutlinedButton.icon(
             onPressed: () => _abrirComprobante(context),

@@ -18,6 +18,7 @@ class CatalogFilters {
     this.minOwnerRatingCount,
     this.onlyWithCommercialDiscount = false,
     this.category,
+    this.categoryAnyOf = const [],
   });
 
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
@@ -64,6 +65,9 @@ class CatalogFilters {
   /// Categoría exacta de `products.category` (vitrina de un mayorista).
   final String? category;
 
+  /// Varias escrituras de la misma categoría (singular, plural o typo).
+  final List<String> categoryAnyOf;
+
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
 
   /// Vitrina de un mayorista: solo su catálogo activo, opcionalmente una categoría.
@@ -102,6 +106,7 @@ class CatalogFilters {
         hasReputationThreshold ||
         onlyWithCommercialDiscount ||
         (category != null && category!.trim().isNotEmpty) ||
+        categoryAnyOf.isNotEmpty ||
         sortMode != CatalogSortMode.defaultMode;
   }
 
@@ -130,6 +135,7 @@ class CatalogFilters {
     int? minOwnerRatingCount,
     bool? onlyWithCommercialDiscount,
     String? category,
+    List<String>? categoryAnyOf,
     bool clearSortReference = false,
     bool clearMinOwnerRatingAvg = false,
     bool clearMinOwnerRatingCount = false,
@@ -158,6 +164,8 @@ class CatalogFilters {
       onlyWithCommercialDiscount:
           onlyWithCommercialDiscount ?? this.onlyWithCommercialDiscount,
       category: clearCategory ? null : (category ?? this.category),
+      categoryAnyOf:
+          clearCategory ? const [] : (categoryAnyOf ?? this.categoryAnyOf),
     );
   }
 }

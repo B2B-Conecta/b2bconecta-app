@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
+
 /// Permite cambiar la pestaña del [MainShell] desde hijos o rutas apiladas
 /// (p. ej. importador → tab Pedidos tras marcar en preparación).
 class MainShellTabController {
@@ -14,6 +16,9 @@ class MainShellTabController {
   static VoidCallback? _importadorValidadosNotificationDeepLink;
   static VoidCallback? _adminPedidosBandejaNotificationHandler;
   static AdminPedidosNotificationScope? _pendingAdminPedidosScope;
+  static int _homeTabIndex = 0;
+  static int _b2bPedidosTabIndex = 1;
+  static int _b2bReputationTabIndex = 2;
   static int? _b2bProfileTabIndex;
   static bool _importerPedidosPreferNuevosFilter = false;
   static bool _importerPedidosPreferEnProcesoFilter = false;
@@ -42,6 +47,9 @@ class MainShellTabController {
     _importadorValidadosNotificationDeepLink = null;
     _adminPedidosBandejaNotificationHandler = null;
     _pendingAdminPedidosScope = null;
+    _homeTabIndex = 0;
+    _b2bPedidosTabIndex = 1;
+    _b2bReputationTabIndex = 2;
     _b2bProfileTabIndex = null;
     _importerPedidosPreferNuevosFilter = false;
     _importerPedidosPreferEnProcesoFilter = false;
@@ -82,15 +90,34 @@ class MainShellTabController {
 
   static void notifyPedidosReload() => notifyImporterPedidosReload();
 
-  /// Importador y aliado (4 pestañas): Perfil = 3, Reputación = 2.
+  /// Índices de la barra B2B activa. La tienda minorista no usa el orden del proveedor.
+  static void registerB2BNavigation({
+    required int home,
+    required int pedidos,
+    required int reputation,
+    required int profile,
+  }) {
+    _homeTabIndex = home;
+    _b2bPedidosTabIndex = pedidos;
+    _b2bReputationTabIndex = reputation;
+    _b2bProfileTabIndex = profile;
+  }
+
   static void registerB2BProfileTabIndex(int index) =>
       _b2bProfileTabIndex = index;
 
   static int get _resolvedB2BProfileTabIndex => _b2bProfileTabIndex ?? 3;
 
-  /// Pestaña Reputación (índice 2) — E2 panel dedicado.
+  static void navigateToHomeTab() => _goTo?.call(_homeTabIndex);
+
+  static void navigateToPedidosTab() => _goTo?.call(_b2bPedidosTabIndex);
+
+  static void navigateToAliadoFavorites() =>
+      _goTo?.call(AliadoShellTabs.favoritos);
+
+  /// Pestaña Reputación del rol que tiene el shell abierto.
   static void navigateToReputationTab() {
-    _goTo?.call(2);
+    _goTo?.call(_b2bReputationTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       requestNotificationsReload();
     });
@@ -138,7 +165,7 @@ class MainShellTabController {
   /// Desde Desempeño de ventas: `nuevos`, `en_proceso` o `cerrados` (sin filtro moroso).
   static void navigateToImporterPedidosExplore(String filter) {
     _pendingImporterPedidosExploreFilter = filter;
-    _goTo?.call(1);
+    _goTo?.call(_b2bPedidosTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _pedidosNotificationDeepLink?.call();
     });
@@ -168,7 +195,6 @@ class MainShellTabController {
     return (s == null || s.isEmpty) ? null : s;
   }
 
-  /// Índices: 0 Inventario/Catálogo, 1 Pedidos, 2 Reputación, 3 Perfil.
   static void goTo(int index) => _goTo?.call(index);
 
   /// [AliadoPedidosPanel] / [ImporterActiveOrdersPanel] registran el expand tras deep link.
@@ -193,7 +219,7 @@ class MainShellTabController {
   /// Importador: pestaña Pedidos (índice 1), filtro Nuevos + expande fila.
   static void navigateToImportadorValidadosForNotification() {
     _importerPedidosPreferNuevosFilter = true;
-    _goTo?.call(1);
+    _goTo?.call(_b2bPedidosTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _importadorValidadosNotificationDeepLink?.call();
     });
@@ -223,9 +249,9 @@ class MainShellTabController {
     });
   }
 
-  /// Pestaña Pedidos (índice 1) + expande pedido vinculado a la notificación [mensaje].
+  /// Pestaña Pedidos del rol activo + expande el pedido de la notificación.
   static void navigateToPedidosForNotification() {
-    _goTo?.call(1);
+    _goTo?.call(_b2bPedidosTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _pedidosNotificationDeepLink?.call();
     });

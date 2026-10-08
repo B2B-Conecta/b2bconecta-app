@@ -16,6 +16,7 @@ import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
@@ -318,21 +319,18 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                         );
                       },
                     ),
-                    InkWell(
-                      onTap: onToggle,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 8, left: 2),
-                        child: Icon(
-                          expanded ? Icons.expand_less : Icons.expand_more,
-                          size: density.isDesktop ? 20 : 24,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
+          OrderCardGuidance(
+            hint: isCheckoutGroup &&
+                    !lines.every((x) => x.status == lines.first.status)
+                ? 'Hay líneas en distinto estado. Abra el detalle para ver cada proveedor.'
+                : TransactionRequestStatus.aliadoCollapsedHint(lines.first.status),
+            expanded: expanded,
+            onToggle: onToggle,
+          ),
           if (ratingBar != null) ratingBar!,
           if (collapsedAccessory != null) ...[
             Padding(
@@ -443,6 +441,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        SizedBox(height: sectionGap),
                         if (expandedLeading != null) expandedLeading!,
                         if (isCheckoutGroup &&
                             lines.any((x) => x.esPedidoMoroso)) ...[

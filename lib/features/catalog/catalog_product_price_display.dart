@@ -349,12 +349,30 @@ class CatalogProductOfferChips extends StatelessWidget {
 
     if (chips.isEmpty) return const SizedBox.shrink();
 
+    final offerChips =
+        chips.map((c) => _OfferChip(data: c, compact: compact)).toList();
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: SizedBox(
+          height: 22,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: offerChips.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 5),
+            itemBuilder: (_, index) => offerChips[index],
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Wrap(
         spacing: 5,
         runSpacing: 5,
-        children: chips.map((c) => _OfferChip(data: c, compact: compact)).toList(),
+        children: offerChips,
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'header_icon_button.dart';
 import 'messages_icon_button.dart';
 import 'motolink_pro_logo.dart';
 import 'theme_mode_bubble.dart';
@@ -16,7 +17,8 @@ abstract final class MotolinkAppBarLogoSizes {
   static const double aliado = 44;
 }
 
-/// Barra superior: marca del usuario a la izquierda; tema, mensajes y campana a la derecha.
+/// Barra superior: marca a la izquierda.
+/// A la derecha, en este orden: acciones extra, mensajes, notificaciones y tema.
 class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   const MotolinkAppBar({
     super.key,
@@ -187,58 +189,23 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
       ),
       actions: [
         ...?widget.extraActions,
-        const Padding(
-          padding: EdgeInsets.only(right: 2),
-          child: ThemeModeBubble(compact: true),
-        ),
         if (widget.onMessagesTap != null)
-          Padding(
-            padding: const EdgeInsets.only(right: 2),
-            child: MessagesIconButton(
-              onPressed: widget.onMessagesTap!,
-              unreadCount: widget.unreadMessages,
-            ),
+          MessagesIconButton(
+            onPressed: widget.onMessagesTap!,
+            unreadCount: widget.unreadMessages,
           ),
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_outlined),
-                color: AppColors.textSecondary,
-                onPressed: widget.onNotificationTap,
-              ),
-              if (widget.unreadNotifications > 0)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    constraints:
-                        const BoxConstraints(minWidth: 16, minHeight: 16),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.rectangle,
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
-                    ),
-                    child: Text(
-                      widget.unreadNotifications > 99
-                          ? '99+'
-                          : widget.unreadNotifications.toString(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        height: 1.1,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+        HeaderIconButton(
+          tooltip: 'Notificaciones',
+          onPressed: widget.onNotificationTap,
+          count: widget.unreadNotifications,
+          badgeColor: Colors.red,
+          icon: widget.unreadNotifications > 0
+              ? Icons.notifications
+              : Icons.notifications_none_outlined,
+        ),
+        const Padding(
+          padding: EdgeInsets.only(left: 2, right: 8),
+          child: ThemeModeBubble(compact: true),
         ),
       ],
       bottom: PreferredSize(

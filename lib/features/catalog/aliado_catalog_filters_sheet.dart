@@ -1,19 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'aliado_catalog_categories.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'aliado_catalog_reputation_filter_presets.dart';
 import 'catalog_filters.dart';
 import 'catalog_sort_mode.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-
-/// Categorías rápidas del catálogo (tokens de búsqueda en [home_screen]).
-const kAliadoCatalogCategoryLabels = <String>[
-  'Todos',
-  'Frenos',
-  'Transmisión',
-  'Motor',
-  'Eléctrico',
-];
 
 /// Panel único de filtros del catálogo aliado.
 class AliadoCatalogFiltersSheet extends StatefulWidget {
@@ -22,18 +14,21 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     required this.initial,
     required this.importers,
     required this.scrollController,
+    this.categories = const [],
     this.onOpenImporterStore,
   });
 
   final AliadoCatalogFiltersDraft initial;
   final List<ImporterOption> importers;
   final ScrollController scrollController;
+  final List<String> categories;
   final ValueChanged<String>? onOpenImporterStore;
 
   static Future<AliadoCatalogFiltersDraft?> show(
     BuildContext context, {
     required AliadoCatalogFiltersDraft initial,
     required List<ImporterOption> importers,
+    List<String> categories = const [],
     ValueChanged<String>? onOpenImporterStore,
   }) {
     return showModalBottomSheet<AliadoCatalogFiltersDraft>(
@@ -52,6 +47,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
           initial: initial,
           importers: importers,
           scrollController: scrollController,
+          categories: categories,
           onOpenImporterStore: onOpenImporterStore,
         ),
       ),
@@ -125,7 +121,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
 
   void _resetPanel() {
     setState(() {
-      _category = 'Todos';
+      _category = kAliadoCatalogAllCategoriesLabel;
       _importerIds.clear();
       _sortMode = CatalogSortMode.defaultMode;
       _minRatingAvg = null;
@@ -399,19 +395,33 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 _sectionHeader(
                   'Categoría',
                   icon: Icons.category_outlined,
-                  hint: 'Elige un rubro o mira todos los productos.',
+                  hint: 'Rubros de los productos publicados en el catálogo.',
                 ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: kAliadoCatalogCategoryLabels.map((label) {
-                    return _choiceChip(
-                      label: label,
-                      selected: _category == label,
-                      onTap: () => setState(() => _category = label),
-                    );
-                  }).toList(),
-                ),
+                if (widget.categories.isEmpty &&
+                    _category == kAliadoCatalogAllCategoriesLabel)
+                  Text(
+                    'Todavía no hay categorías publicadas.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: aliadoCatalogCategoryChoices(
+                      categories: widget.categories,
+                      selected: _category,
+                    ).map((label) {
+                      return _choiceChip(
+                        label: label,
+                        selected: _category == label,
+                        onTap: () => setState(() => _category = label),
+                      );
+                    }).toList(),
+                  ),
                 _sectionHeader(
                   'Orden',
                   icon: Icons.swap_vert_rounded,

@@ -164,7 +164,7 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                     if (_hasStatusFilter) const SizedBox(width: 6),
                     FilterChip(
                       label: Text(
-                        'Morosos',
+                        'Pago pendiente',
                         style: TextStyle(color: AppColors.textPrimary),
                       ),
                       selected: widget.morosoOnly,

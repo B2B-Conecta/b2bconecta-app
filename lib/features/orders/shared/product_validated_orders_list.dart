@@ -135,7 +135,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
     if (!mounted) return;
     if (!ok) return;
     if (next == TransactionRequestStatus.enPreparacion) {
-      MainShellTabController.goTo(1);
+      MainShellTabController.navigateToPedidosTab();
       MainShellTabController.notifyImporterPedidosReload();
     }
     messenger?.showSnackBar(

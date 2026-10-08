@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'catalog_filters.dart';
+import 'catalog_service.dart';
+import 'favorite_heart_button.dart';
 import 'part_model.dart';
+import 'product_detail_extras.dart';
+import 'related_products.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -29,6 +34,7 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ProfileModel? _profile;
+  List<PartModel> _related = const [];
   final PageController _imagePageController = PageController();
   int _imagePageIndex = 0;
 
@@ -45,6 +51,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadRelated();
+  }
+
+  Future<void> _loadRelated() async {
+    final category = part.category?.trim();
+    final owner = part.ownerId?.trim();
+    final CatalogFilters filters;
+    if (category != null && category.isNotEmpty) {
+      filters = CatalogFilters(category: category);
+    } else if (owner != null && owner.isNotEmpty) {
+      filters = CatalogFilters(ownerId: owner);
+    } else {
+      return;
+    }
+    try {
+      final rows = await CatalogService.fetchParts(limit: 24, filters: filters);
+      if (!mounted) return;
+      setState(() {
+        _related = pickRelatedProducts(current: part, candidates: rows);
+      });
+    } catch (_) {}
   }
 
   @override
@@ -147,7 +174,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   bool get _cartActionsDisabled =>
-      !part.stockCoversMinOrder || _pedidosSuspendidosMorosidad;
+      !part.isActive ||
+      !part.stockCoversMinOrder ||
+      _pedidosSuspendidosMorosidad;
 
   String? _cartBlockReason() {
     final ownerId = part.ownerId?.trim();
@@ -157,6 +186,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_pedidosSuspendidosMorosidad) {
       return 'B2B Conecta suspendió nuevos pedidos en su cuenta por morosidad.';
     }
+    if (!part.isActive) return 'Este producto está pausado por el proveedor.';
     if (part.stock < 1) return 'Sin stock disponible.';
     if (!part.stockCoversMinOrder) {
       return 'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).';
@@ -173,141 +203,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Future<void> _addToCart() async {
+  void _addToCart() {
     final block = _cartBlockReason();
     if (block != null) {
       _showCartBlock(block);
       return;
     }
 
-    final maxQty = part.stock;
     final minQty = part.minOrderQtyEffective;
-    var q = minQty;
-
-    final qtyCtrl = TextEditingController(text: '$minQty');
-    bool? ok;
-    var qtyRaw = '$minQty';
-    try {
-      ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) {
-          return AlertDialog(
-            title: const Text('Agregar al carrito'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Cantidad mínima: $minQty. Disponibles: $maxQty.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qtyCtrl,
-                    keyboardType: TextInputType.number,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Cantidad',
-                      hintText: '$minQty',
-                      filled: true,
-                      fillColor: AppColors.fieldFill,
-                      border: OutlineInputBorder(
-                        borderRadius: AppDecorations.radius12,
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Agregar'),
-              ),
-            ],
-          );
-        },
+    final alreadyInCart =
+        CartService.instance.lines.any((line) => line.part.id == part.id);
+    if (!alreadyInCart) {
+      CartService.instance.addOrIncrement(
+        part,
+        precioUnitarioAliadoRef: _precioVentaUnit(quantity: minQty),
+        delta: minQty,
       );
-      qtyRaw = qtyCtrl.text.trim();
-    } finally {
-      qtyCtrl.dispose();
     }
-
-    if (ok != true || !mounted) return;
-
-    var requested = int.tryParse(qtyRaw) ?? minQty;
-    if (requested < minQty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'La cantidad mínima de este producto es $minQty unidades.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    q = requested;
-    if (requested > maxQty) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Stock limitado'),
-          content: Text(
-            'Actualmente hay $maxQty unidad(es) disponible(s). '
-            'Indicó $requested. ¿Desea agregar $maxQty al carrito?',
-            style: const TextStyle(height: 1.35),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Volver'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Agregar $maxQty'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
-      q = maxQty;
-    }
-
-    _putInCart(quantity: q);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          q == 1
-              ? '1 unidad añadida al carrito.'
-              : '$q unidades añadidas al carrito.',
+          alreadyInCart
+              ? 'Ya está en el carrito. Ajusta la cantidad allí.'
+              : '$minQty unidades añadidas al carrito.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  void _putInCart({required int quantity}) {
-    CartService.instance.addOrIncrement(
-      part,
-      precioUnitarioAliadoRef: _precioVentaUnit(quantity: quantity),
-      delta: quantity,
-    );
-    CartService.instance.setQuantity(part.id, quantity    );
   }
 
   @override
@@ -332,6 +256,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       ..._buildInfoSections(),
+                      _buildCommerceExtras(),
                       SizedBox(
                         height: MediaQuery.paddingOf(context).bottom + 100,
                       ),
@@ -386,6 +311,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         _buildActionAlerts(),
                         const SizedBox(height: 16),
                         _buildActionButtons(),
+                        const SizedBox(height: 20),
+                        _buildCommerceExtras(),
                       ],
                     ),
                   ),
@@ -409,6 +336,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: _buildHeroImageContent(),
           ),
         ),
+        if (_profile?.isAliado == true)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 12,
+            child: FavoriteHeartButton(productId: part.id),
+          ),
         Positioned(
           top: MediaQuery.paddingOf(context).top + 4,
           right: 8,
@@ -440,9 +373,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           border: Border.all(color: AppColors.borderSubtle),
           boxShadow: AppDecorations.cardShadow,
         ),
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: _buildHeroImageContent(),
+        child: Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: _buildHeroImageContent(),
+            ),
+            if (_profile?.isAliado == true)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: FavoriteHeartButton(productId: part.id),
+              ),
+          ],
         ),
       ),
     );
@@ -729,6 +672,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         const Center(child: ProductWarrantySeal()),
       ],
     ];
+  }
+
+  Widget _buildCommerceExtras() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 20),
+        SupplierRatingBlock(
+          part: part,
+          onOpenStore: _canOpenImporterStore ? _openImporterStore : null,
+        ),
+        if (_related.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          RelatedProductsSection(
+            current: part,
+            products: _related,
+            profile: _profile,
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildStockBadge({bool desktop = false}) {

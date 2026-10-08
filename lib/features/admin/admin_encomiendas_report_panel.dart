@@ -552,6 +552,7 @@ class _AdminEncomiendasReportPanelState
             Wrap(
               spacing: 6,
               runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 for (final days in const [30, 90, 365])
                   ActionChip(
@@ -564,6 +565,15 @@ class _AdminEncomiendasReportPanelState
                             _load();
                           },
                   ),
+                TextButton.icon(
+                  onPressed: _showAdvancedFiltersSheet,
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: Text(
+                    _activeFilterCount == 0
+                        ? 'Filtros'
+                        : 'Filtros ($_activeFilterCount)',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -591,34 +601,16 @@ class _AdminEncomiendasReportPanelState
                 setState(() {});
               },
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _showAdvancedFiltersSheet,
-                    icon: const Icon(Icons.tune, size: 18),
-                    label: Text(
-                      _activeFilterCount == 0
-                          ? 'Filtros'
-                          : 'Filtros ($_activeFilterCount)',
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-                if (_activeFilterCount > 0) ...[
-                  const SizedBox(width: 8),
+            if (_activeFilterCount > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
                   TextButton(
                     onPressed: _clearAllFilters,
                     child: const Text('Limpiar'),
                   ),
                 ],
-              ],
-            ),
-            if (_activeFilterCount > 0) ...[
-              const SizedBox(height: 8),
+              ),
               _activeFilterChips(),
             ],
           ],
@@ -1015,41 +1007,52 @@ class _AdminEncomiendasReportPanelState
   }
 
   Widget _sectionSwitcher() {
-    final mobile = MediaQuery.sizeOf(context).width < 600;
-    return SegmentedButton<int>(
-      showSelectedIcon: false,
-      style: mobile
-          ? ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              textStyle: WidgetStatePropertyAll(
-                TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+    const labels = ['Pedidos', 'Promos', 'Usuarios', 'Referidos'];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Material(
+                    color: _sectionIndex == i
+                        ? AppColors.brand
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: () => setState(() => _sectionIndex = i),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          labels[i],
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: _sectionIndex == i
+                                ? Colors.white
+                                : AppColors.brand,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            )
-          : null,
-      segments: [
-        ButtonSegment(
-          value: 0,
-          label: Text(mobile ? 'Pedidos' : 'Encomiendas'),
-          icon: const Icon(Icons.receipt_long_outlined, size: 18),
+          ],
         ),
-        ButtonSegment(
-          value: 1,
-          label: Text(mobile ? 'Promos' : 'Promociones'),
-          icon: const Icon(Icons.campaign_outlined, size: 18),
-        ),
-        const ButtonSegment(
-          value: 2,
-          label: Text('Usuarios'),
-          icon: Icon(Icons.people_outline, size: 18),
-        ),
-        const ButtonSegment(
-          value: 3,
-          label: Text('Referidos'),
-          icon: Icon(Icons.share_outlined, size: 18),
-        ),
-      ],
-      selected: {_sectionIndex},
-      onSelectionChanged: (s) => setState(() => _sectionIndex = s.first),
+      ),
     );
   }
 

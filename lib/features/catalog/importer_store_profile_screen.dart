@@ -5,7 +5,9 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
+import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/favorite_heart_button.dart';
@@ -90,7 +92,8 @@ class ImporterStoreProfileScreen extends StatefulWidget {
   }) {
     final id = importerId.trim();
     if (id.isEmpty) return Future<void>.value();
-    return Navigator.of(context).push<void>(
+    return CatalogRouteLock.push<void>(
+      context,
       MaterialPageRoute<void>(
         builder: (_) => ImporterStoreProfileScreen(
           importerId: id,
@@ -234,6 +237,16 @@ class _ImporterStoreProfileScreenState
   }
 
   Future<void> _openProduct(PartModel part) async {
+    if (!CatalogRouteLock.tryHold()) return;
+    var handedOff = false;
+    try {
+      handedOff = await _pushProduct(part);
+    } finally {
+      if (!handedOff) CatalogRouteLock.release();
+    }
+  }
+
+  Future<bool> _pushProduct(PartModel part) async {
     if (!catalogPartBelongsToImporterStore(
       importerId: widget.importerId,
       ownerId: part.ownerId,
@@ -244,7 +257,7 @@ class _ImporterStoreProfileScreenState
         importerId: widget.importerId,
         productId: part.id,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       if (checked == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -252,20 +265,23 @@ class _ImporterStoreProfileScreenState
             behavior: SnackBarBehavior.floating,
           ),
         );
-        return;
+        return false;
       }
-      await Navigator.of(context).push<void>(
+      await CatalogRouteLock.pushHeld(
+        context,
         MaterialPageRoute<void>(
           builder: (_) => ProductDetailScreen(part: checked),
         ),
       );
-      return;
+      return true;
     }
-    await Navigator.of(context).push<void>(
+    await CatalogRouteLock.pushHeld(
+      context,
       MaterialPageRoute<void>(
         builder: (_) => ProductDetailScreen(part: part),
       ),
     );
+    return true;
   }
 
   bool get _canMessageSupplier => showStoreSupplierChatButton(
@@ -830,7 +846,7 @@ class _StoreProductCard extends StatelessWidget {
                 if ((part.category ?? '').trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    part.category!.trim(),
+                    formatCatalogCategoryLabel(part.category!),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

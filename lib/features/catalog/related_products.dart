@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 
 /// Hasta [limit] repuestos de la misma categoría.
@@ -27,5 +28,5 @@ List<PartModel> pickRelatedProducts({
 String relatedProductsTitle(PartModel part) {
   final category = part.category?.trim();
   if (category == null || category.isEmpty) return 'Más de este proveedor';
-  return 'Más en ${category.toLowerCase()}';
+  return 'Más en ${formatCatalogCategoryLabel(category).toLowerCase()}';
 }

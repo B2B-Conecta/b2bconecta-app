@@ -4,6 +4,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
 import 'package:motolink_pro_app/features/catalog/favorite_heart_button.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
@@ -179,7 +180,8 @@ class _FavoriteRow extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            Navigator.of(context).push<void>(
+            CatalogRouteLock.push(
+              context,
               MaterialPageRoute<void>(
                 builder: (_) => ProductDetailScreen(part: part),
               ),

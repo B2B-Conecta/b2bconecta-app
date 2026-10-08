@@ -64,8 +64,21 @@ void main() {
     expect(labelOf('Motor'), isNot(labelOf('Moto')));
     expect(
       groups.map((group) => group.label).toList(),
-      ['Accesorios', 'Freno', 'Moto', 'Motor', 'Transmisión'],
+      ['Accesorios', 'Frenos', 'Motores', 'Motos', 'Transmisiones'],
     );
+    expect(formatCatalogCategoryLabel('casco'), 'Cascos');
+    expect(formatCatalogCategoryLabel('repuesto'), 'Repuestos');
+    expect(
+      formatCatalogCategoryLabel('ACCESORIO UNIVERSAL'),
+      'Accesorios universales',
+    );
+    expect(
+      formatCatalogCategoryLabel('BOMBILLOS Y LUCES LEDS'),
+      'Bombillos y luces LEDS',
+    );
+    expect(formatCatalogCategoryLabel('RKV'), 'RKV');
+    expect(formatCatalogCategoryLabel('SBR-HORSE-CG'), 'SBR-HORSE-CG');
+    expect(formatCatalogCategoryLabel('BWS - SCOOTER'), 'BWS - scooters');
   });
 
   test('catalog category chips come from published categories', () {

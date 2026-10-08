@@ -78,10 +78,10 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
-    // Tope bajo en desktop: creativo completo (contain) sin comerse el catálogo.
+    // En web el carrusel es más alto para que el creativo se lea.
     final horizontalPadding = widget.compact ? 0.0 : 16.0;
-    final maxBannerHeight = widget.compact ? 96.0 : 128.0;
-    final minBannerHeight = widget.compact ? 72.0 : 100.0;
+    final maxBannerHeight = widget.compact ? 240.0 : 168.0;
+    final minBannerHeight = widget.compact ? 150.0 : 112.0;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
@@ -89,7 +89,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
         builder: (context, constraints) {
           final width = constraints.maxWidth;
           // Preferencia panorámica (~3.5:1), limitada para no comerse el catálogo.
-          final idealHeight = width / 3.5;
+          final idealHeight = width / (widget.compact ? 3.2 : 3.5);
           final bannerHeight =
               idealHeight.clamp(minBannerHeight, maxBannerHeight).toDouble();
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
@@ -31,11 +33,14 @@ class _AdminCatalogFeaturedSectionState
   int _windowDays = 30;
   String? _busyId;
   _FeaturedSort _sort = _FeaturedSort.units;
+  int _pageIndex = 0;
+  int _pageSize = listPageSizeOptions.first;
+  static const _windowOptions = <int>[7, 30];
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
     _load();
   }
 
@@ -263,16 +268,16 @@ class _AdminCatalogFeaturedSectionState
               ),
             ),
             const SizedBox(height: 10),
-            SegmentedButton<int>(
-              showSelectedIcon: false,
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              segments: const [
-                ButtonSegment(value: 7, label: Text('7 días')),
-                ButtonSegment(value: 30, label: Text('30 días')),
-              ],
-              selected: {_windowDays},
-              onSelectionChanged: (s) {
-                setState(() => _windowDays = s.first);
+            SegmentedFilterBar(
+              labels: const ['7 días', '30 días'],
+              selectedIndex: _windowOptions.contains(_windowDays)
+                  ? _windowOptions.indexOf(_windowDays)
+                  : 1,
+              onSelected: (index) {
+                setState(() {
+                  _windowDays = _windowOptions[index];
+                  _pageIndex = 0;
+                });
                 _load();
               },
             ),
@@ -312,17 +317,15 @@ class _AdminCatalogFeaturedSectionState
                 ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                children: [
-                  for (final s in _FeaturedSort.values)
-                    ChoiceChip(
-                      label: Text(s.label, style: const TextStyle(fontSize: 11.5)),
-                      selected: _sort == s,
-                      visualDensity: VisualDensity.compact,
-                      onSelected: (_) => setState(() => _sort = s),
-                    ),
+              SegmentedFilterBar(
+                labels: [
+                  for (final s in _FeaturedSort.values) s.label,
                 ],
+                selectedIndex: _FeaturedSort.values.indexOf(_sort),
+                onSelected: (index) => setState(() {
+                  _sort = _FeaturedSort.values[index];
+                  _pageIndex = 0;
+                }),
               ),
               const SizedBox(height: 8),
               if (_candidates.isEmpty)
@@ -332,8 +335,22 @@ class _AdminCatalogFeaturedSectionState
                       : 'Ningún mayorista coincide con la búsqueda.',
                   style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                 )
-              else
-                for (final row in _candidates)
+              else ...[
+                ListPageBar(
+                  total: _candidates.length,
+                  pageIndex: _pageIndex,
+                  pageSize: _pageSize,
+                  onPageIndex: (index) => setState(() => _pageIndex = index),
+                  onPageSize: (size) => setState(() {
+                    _pageSize = size;
+                    _pageIndex = 0;
+                  }),
+                ),
+                for (final row in sliceListPage(
+                  items: _candidates,
+                  pageIndex: _pageIndex,
+                  pageSize: _pageSize,
+                ))
                   _FeaturedImporterCard(
                     row: row,
                     busy: _busyId == row.importadorId,
@@ -344,6 +361,7 @@ class _AdminCatalogFeaturedSectionState
                         ? () => _setFeaturedDays(row, 0)
                         : null,
                   ),
+              ],
             ],
           ],
         ),

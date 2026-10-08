@@ -78,6 +78,11 @@
 	</array>
 	<key>FlutterDeepLinkingEnabled</key>
 	<true/>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:app.b2bconecta.com.ve</string>
+		<string>applinks:www.b2bconecta.com.ve</string>
+	</array>
 	<key>FacebookAppID</key>
 	<string>1396611732004188</string>
 	<key>FacebookClientToken</key>

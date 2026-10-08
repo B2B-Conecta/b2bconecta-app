@@ -7,6 +7,8 @@ import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 
 enum _ActivityPeriod { day, week }
@@ -39,6 +41,13 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   _ActivityPeriod _period = _ActivityPeriod.week;
   _ActivityRoleFilter _roleFilter = _ActivityRoleFilter.all;
   final _searchCtrl = TextEditingController();
+  final _listScroll = ScrollController();
+  int _pageIndex = 0;
+  int _pageSize = listPageSizeOptions.first;
+  int _publishedPageIndex = 0;
+  int _publishedPageSize = listPageSizeOptions.first;
+  int _missingPageIndex = 0;
+  int _missingPageSize = listPageSizeOptions.first;
   AdminCatalogCoverage? _coverage;
   bool _coverageLoading = true;
   bool _showingCatalogs = false;
@@ -47,7 +56,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
     _load();
     _loadCoverage();
   }
@@ -55,6 +64,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _listScroll.dispose();
     super.dispose();
   }
 
@@ -171,6 +181,11 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     }
 
     final filtered = _filtered;
+    final page = sliceListPage(
+      items: filtered,
+      pageIndex: _pageIndex,
+      pageSize: _pageSize,
+    );
     final totalLogins =
         filtered.fold<int>(0, (s, r) => s + r.loginCountPeriod);
     final totalOrders =
@@ -186,6 +201,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
       onRefresh: _load,
       color: AppColors.brand,
       child: ListView(
+        controller: _listScroll,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           _toolbar(),
@@ -235,13 +251,30 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                 ),
               ),
             )
-          else
-            ...filtered.map(
+          else ...[
+            ListPageBar(
+              total: filtered.length,
+              pageIndex: _pageIndex,
+              pageSize: _pageSize,
+              onPageIndex: (index) {
+                setState(() => _pageIndex = index);
+                if (_listScroll.hasClients) _listScroll.jumpTo(0);
+              },
+              onPageSize: (size) {
+                setState(() {
+                  _pageSize = size;
+                  _pageIndex = 0;
+                });
+                if (_listScroll.hasClients) _listScroll.jumpTo(0);
+              },
+            ),
+            ...page.map(
               (r) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _UserActivityCard(row: r, periodLabel: _periodLabel),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -269,43 +302,25 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
           ],
         ),
         const SizedBox(height: 8),
-        SegmentedButton<_ActivityPeriod>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(
-              value: _ActivityPeriod.day,
-              label: Text('Hoy'),
-              icon: Icon(Icons.today_outlined, size: 18),
-            ),
-            ButtonSegment(
-              value: _ActivityPeriod.week,
-              label: Text('Semana'),
-              icon: Icon(Icons.date_range_outlined, size: 18),
-            ),
-          ],
-          selected: {_period},
-          onSelectionChanged: (s) {
-            setState(() => _period = s.first);
+        SegmentedFilterBar(
+          labels: const ['Hoy', 'Semana'],
+          selectedIndex: _ActivityPeriod.values.indexOf(_period),
+          onSelected: (index) {
+            setState(() {
+              _period = _ActivityPeriod.values[index];
+              _pageIndex = 0;
+            });
             _load();
           },
         ),
-        const SizedBox(height: 8),
-        SegmentedButton<_ActivityRoleFilter>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(value: _ActivityRoleFilter.all, label: Text('Todos')),
-            ButtonSegment(
-              value: _ActivityRoleFilter.aliado,
-              label: Text('Tiendas minoristas'),
-            ),
-            ButtonSegment(
-              value: _ActivityRoleFilter.importador,
-              label: Text('Importadores'),
-            ),
-          ],
-          selected: {_roleFilter},
-          onSelectionChanged: (s) {
-            setState(() => _roleFilter = s.first);
+        SegmentedFilterBar(
+          labels: const ['Todos', 'Tiendas minoristas', 'Importadores'],
+          selectedIndex: _ActivityRoleFilter.values.indexOf(_roleFilter),
+          onSelected: (index) {
+            setState(() {
+              _roleFilter = _ActivityRoleFilter.values[index];
+              _pageIndex = 0;
+            });
             _load();
           },
         ),
@@ -320,43 +335,62 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     required int delivered,
     required double volumeUsd,
   }) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _MiniStat(
-          label: 'Usuarios',
-          value: '$users',
-          icon: Icons.people_outline,
-        ),
-        _MiniStat(
-          label: 'Ingresos ($_periodLabel)',
-          value: '$logins',
-          icon: Icons.login_outlined,
-        ),
-        _MiniStat(
-          label: 'Pedidos ($_periodLabel)',
-          value: '$orders',
-          icon: Icons.shopping_cart_outlined,
-        ),
-        _MiniStat(
-          label: 'Entregados',
-          value: '$delivered',
-          icon: Icons.check_circle_outline,
-        ),
-        _MiniStat(
-          label: 'Vol. USD entregado',
-          value: '\$${volumeUsd.toStringAsFixed(0)}',
-          icon: Icons.payments_outlined,
-        ),
-        _CatalogStat(
-          loading: _coverageLoading,
-          count: _coverage?.published.length,
-          onTap: _coverage == null
-              ? _loadCoverage
-              : () => setState(() => _showingCatalogs = true),
-        ),
-      ],
+    final tiles = <Widget>[
+      _MiniStat(
+        label: 'Usuarios',
+        value: '$users',
+        icon: Icons.people_outline,
+      ),
+      _MiniStat(
+        label: 'Ingresos ($_periodLabel)',
+        value: '$logins',
+        icon: Icons.login_outlined,
+      ),
+      _MiniStat(
+        label: 'Pedidos ($_periodLabel)',
+        value: '$orders',
+        icon: Icons.shopping_cart_outlined,
+      ),
+      _MiniStat(
+        label: 'Entregados',
+        value: '$delivered',
+        icon: Icons.check_circle_outline,
+      ),
+      _MiniStat(
+        label: 'Vol. USD entregado',
+        value: '\$${volumeUsd.toStringAsFixed(0)}',
+        icon: Icons.payments_outlined,
+      ),
+      _CatalogStat(
+        loading: _coverageLoading,
+        count: _coverage?.published.length,
+        onTap: _coverage == null
+            ? _loadCoverage
+            : () => setState(() {
+                  _showingCatalogs = true;
+                  _publishedPageIndex = 0;
+                  _missingPageIndex = 0;
+                }),
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth >= 980
+            ? 6
+            : constraints.maxWidth >= 640
+                ? 3
+                : 2;
+        const gap = 8.0;
+        final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final tile in tiles)
+              SizedBox(width: width, height: 92, child: tile),
+          ],
+        );
+      },
     );
   }
 
@@ -399,14 +433,30 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                   'Ningún importador tiene productos publicados.',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 )
-              else
-                ...coverage.published.map(
+              else ...[
+                ListPageBar(
+                  total: coverage.published.length,
+                  pageIndex: _publishedPageIndex,
+                  pageSize: _publishedPageSize,
+                  onPageIndex: (index) =>
+                      setState(() => _publishedPageIndex = index),
+                  onPageSize: (size) => setState(() {
+                    _publishedPageSize = size;
+                    _publishedPageIndex = 0;
+                  }),
+                ),
+                ...sliceListPage(
+                  items: coverage.published,
+                  pageIndex: _publishedPageIndex,
+                  pageSize: _publishedPageSize,
+                ).map(
                   (importer) => _ImporterCatalogTile(
                     importer: importer,
                     subtitle: 'Catálogo publicado',
                     onTap: () => setState(() => _focusedCatalog = importer),
                   ),
                 ),
+              ],
               const SizedBox(height: 18),
               Text(
                 'Sin catálogo publicado · ${coverage.withoutCatalog.length}',
@@ -423,13 +473,29 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                   'Todos los importadores registrados tienen catálogo publicado.',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 )
-              else
-                ...coverage.withoutCatalog.map(
+              else ...[
+                ListPageBar(
+                  total: coverage.withoutCatalog.length,
+                  pageIndex: _missingPageIndex,
+                  pageSize: _missingPageSize,
+                  onPageIndex: (index) =>
+                      setState(() => _missingPageIndex = index),
+                  onPageSize: (size) => setState(() {
+                    _missingPageSize = size;
+                    _missingPageIndex = 0;
+                  }),
+                ),
+                ...sliceListPage(
+                  items: coverage.withoutCatalog,
+                  pageIndex: _missingPageIndex,
+                  pageSize: _missingPageSize,
+                ).map(
                   (importer) => _ImporterCatalogTile(
                     importer: importer,
                     subtitle: 'Sin catálogo publicado',
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -459,6 +525,7 @@ class _CatalogStat extends StatelessWidget {
         label: 'Catálogos publicados',
         value: loading ? '…' : '${count ?? '—'}',
         icon: Icons.storefront_outlined,
+        hint: 'Ver lista',
       ),
     );
   }
@@ -499,46 +566,72 @@ class _MiniStat extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
+    this.hint,
   });
 
   final String label;
   final String value;
   final IconData icon;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 150,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(
+          color: hint == null ? AppColors.borderSubtle : AppColors.brand,
+        ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.brand),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            children: [
+              Icon(icon, size: 16, color: AppColors.brand),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
                   label,
-                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
             ),
           ),
+          if (hint != null)
+            Row(
+              children: [
+                Text(
+                  hint!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.brand,
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: AppColors.brand,
+                ),
+              ],
+            )
+          else
+            const SizedBox(height: 16),
         ],
       ),
     );

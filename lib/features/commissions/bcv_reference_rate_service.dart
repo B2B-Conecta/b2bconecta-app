@@ -40,16 +40,33 @@ class BcvReferenceRateService {
     return utc.subtract(const Duration(hours: 4));
   }
 
-  /// Hoy (Caracas) y los 3 días siguientes: boletín de la tarde y viernes→lunes.
+  static String _isoDate(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
+  }
+
+  /// Siguiente día hábil. El viernes de tarde el boletín vale para el lunes.
+  static DateTime nextBusinessDay(DateTime day) {
+    var next = DateTime(day.year, day.month, day.day).add(const Duration(days: 1));
+    while (next.weekday == DateTime.saturday || next.weekday == DateTime.sunday) {
+      next = next.add(const Duration(days: 1));
+    }
+    return next;
+  }
+
+  /// Hoy, y después de las 16:30 solo el siguiente día hábil.
+  /// No se consultan fechas más lejanas: el navegador las marca como error 404.
   static List<String> historyDatesToProbe(DateTime caracasNow) {
     final start = DateTime(caracasNow.year, caracasNow.month, caracasNow.day);
-    return List<String>.generate(4, (i) {
-      final d = start.add(Duration(days: i));
-      final y = d.year.toString().padLeft(4, '0');
-      final m = d.month.toString().padLeft(2, '0');
-      final day = d.day.toString().padLeft(2, '0');
-      return '$y-$m-$day';
-    });
+    final dates = <String>[_isoDate(start)];
+    final afterBulletin = caracasNow.hour > 16 ||
+        (caracasNow.hour == 16 && caracasNow.minute >= 30);
+    if (afterBulletin) {
+      dates.add(_isoDate(nextBusinessDay(start)));
+    }
+    return dates;
   }
 
   static BcvReferenceQuote? quoteFromMap(Map<String, dynamic>? data) {

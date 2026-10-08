@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
@@ -230,12 +231,11 @@ class _AdminPublishedCatalogsSectionState
         Expanded(
           child: rows.isEmpty
               ? const Center(child: Text('Ningún mayorista coincide.'))
-              : ListView.separated(
+              : PagedItems(
+                  items: rows,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) {
-                    final o = rows[i];
+                  separator: 8,
+                  itemBuilder: (o) {
                     return Material(
                       color: AppColors.card,
                       shape: RoundedRectangleBorder(
@@ -318,21 +318,13 @@ class _AdminPublishedCatalogsSectionState
         ),
       );
     }
-    return ListView.separated(
+    return PagedItems(
+      items: _products,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      itemCount: _products.length + (_hasMore ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        if (i >= _products.length) {
-          return Align(
-            child: TextButton(
-              onPressed: _loadingMore ? null : () => _loadProducts(reset: false),
-              child: Text(_loadingMore ? 'Cargando…' : 'Ver más'),
-            ),
-          );
-        }
-        return _PublishedProductTile(part: _products[i]);
-      },
+      separator: 8,
+      hasMore: _hasMore,
+      onNeedMore: _loadingMore ? null : () => _loadProducts(reset: false),
+      itemBuilder: (part) => _PublishedProductTile(part: part),
     );
   }
 

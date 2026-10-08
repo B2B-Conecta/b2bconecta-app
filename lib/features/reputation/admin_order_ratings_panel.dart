@@ -4,7 +4,7 @@ import 'admin_order_rating_row_model.dart';
 import 'rating_questionnaire_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'rating_scale_labels.dart';
 import 'aliado_order_experience_display.dart';
@@ -26,7 +26,6 @@ class AdminOrderRatingsPanel extends StatefulWidget {
 }
 
 class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
-  final _scrollController = ScrollController();
   bool _loading = true;
   String? _error;
   List<AdminOrderRatingRowModel> _rows = const [];
@@ -51,17 +50,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
     super.dispose();
-  }
-
-  void _scheduleRatingsFill() {
-    scheduleLoadMoreIfViewportNotFilled(
-      controller: _scrollController,
-      hasMore: !_end,
-      isLoading: _loading,
-      loadMore: _loadMore,
-    );
   }
 
   List<AdminOrderRatingRowModel> get _filteredRows {
@@ -211,7 +200,6 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         _loading = false;
         _error = null;
       });
-      _scheduleRatingsFill();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -236,7 +224,6 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         _end = batch.length < _pageSize;
         _loading = false;
       });
-      _scheduleRatingsFill();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -288,15 +275,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (infiniteScrollShouldLoadMore(notification)) {
-            _loadMore();
-          }
-          return false;
-        },
-        child: ListView(
-          controller: _scrollController,
+      child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           children: [
             _AdminRatingsToolbar(
@@ -319,10 +298,14 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
                 ),
               )
             else
-              ...filtered.map(
-                (r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _AdminOrderRatingCard(
+              PagedItems(
+                items: filtered,
+                embedded: true,
+                hasMore: !_end,
+                onNeedMore: _loadMore,
+                separator: 10,
+                itemBuilder: (r) {
+                  return _AdminOrderRatingCard(
                     row: r,
                     questionnaire: _questionnaireFor(r),
                     onHideComment: (!r.commentHidden &&
@@ -332,8 +315,8 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
                     onRestoreComment: r.commentHidden
                         ? () => _setCommentHidden(r, hidden: false)
                         : null,
-                  ),
-                ),
+                  );
+                },
               ),
             if (_loading && _rows.isNotEmpty)
               const Padding(
@@ -348,7 +331,6 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
               ),
           ],
         ),
-      ),
     );
   }
 }

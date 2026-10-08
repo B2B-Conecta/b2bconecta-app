@@ -13,9 +13,11 @@ import 'encomiendas_report_excel_service.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'admin_product_sales_ranking.dart';
 import 'admin_catalog_featured_section.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 
 /// Reportes de encomiendas: facturación (preferencia de documento) y métricas gerenciales.
@@ -620,21 +622,23 @@ class _AdminEncomiendasReportPanelState
   }
 
   Future<void> _pickDesde() async {
-    final d = await showDatePicker(
+    final d = await showAppDatePicker(
       context: context,
       initialDate: _desde,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Desde',
     );
     if (d != null) setState(() => _desde = d);
   }
 
   Future<void> _pickHasta() async {
-    final d = await showDatePicker(
+    final d = await showAppDatePicker(
       context: context,
       initialDate: _hasta,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Hasta',
     );
     if (d != null) setState(() => _hasta = d);
   }
@@ -1303,7 +1307,12 @@ class _AdminEncomiendasReportPanelState
                         ),
                       )
                     else
-                      ..._filtered.map(_detailTile),
+                      PagedItems(
+                        items: _filtered,
+                        embedded: true,
+                        separator: 8,
+                        itemBuilder: _detailTile,
+                      ),
                   ],
                 );
               },

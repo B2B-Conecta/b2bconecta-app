@@ -5,6 +5,7 @@ import 'transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'importer_order_advance.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
 import 'importer_order_date.dart';
 import 'transaction_request_filter_utils.dart';
@@ -261,14 +262,11 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
                           ),
                         ],
                       )
-                    : RefreshIndicator(
+                    : PagedItems(
+                        items: filtered,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         onRefresh: _load,
-                        child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final r = filtered[i];
+                        itemBuilder: (r) {
                             final next =
                                 TransactionRequestStatus.nextForImporter(
                               r.status,
@@ -292,8 +290,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
                                   ? () => _advance(context, r, next)
                                   : null,
                             );
-                          },
-                        ),
+                        },
                       ),
               ),
             ],

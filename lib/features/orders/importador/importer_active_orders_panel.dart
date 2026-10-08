@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_stat
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_advance.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
@@ -660,19 +661,24 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                           ),
                         ],
                       )
-                    : RefreshIndicator(
+                    : PagedItems(
+                        items: groups,
+                        alwaysShow: true,
+                        resetKey: Object.hash(
+                          _scope,
+                          _morosoOnly,
+                          _dateFrom,
+                          _dateTo,
+                          _searchCtrl.text,
+                        ),
+                        padding: EdgeInsets.fromLTRB(
+                          listPad,
+                          0,
+                          listPad,
+                          B2bOrdersPanelLayout.listBottomPadding(screenWidth),
+                        ),
                         onRefresh: _load,
-                        child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: EdgeInsets.fromLTRB(
-                            listPad,
-                            0,
-                            listPad,
-                            B2bOrdersPanelLayout.listBottomPadding(screenWidth),
-                          ),
-                          itemCount: groups.length,
-                          itemBuilder: (context, i) {
-                            final g = groups[i];
+                        itemBuilder: (g) {
                             final primary = g.first;
                             final isBundle = g.length > 1;
                             final nextBase =
@@ -808,8 +814,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                 ],
                               ),
                             );
-                          },
-                        ),
+                        },
                       ),
               ),
             ],

@@ -8,10 +8,14 @@ class ImporterCatalogLogo extends StatefulWidget {
     super.key,
     required this.storagePath,
     this.size = 18,
+    this.fallback,
   });
 
   final String? storagePath;
   final double size;
+
+  /// Se muestra si no hay foto o no se puede cargar.
+  final Widget? fallback;
 
   static final Map<String, String> _urlCache = {};
 
@@ -63,7 +67,7 @@ class _ImporterCatalogLogoState extends State<ImporterCatalogLogo> {
   Widget build(BuildContext context) {
     final path = widget.storagePath?.trim();
     if (path == null || path.isEmpty || _failed) {
-      return const SizedBox.shrink();
+      return widget.fallback ?? const SizedBox.shrink();
     }
 
     final url = _url;
@@ -88,7 +92,8 @@ class _ImporterCatalogLogoState extends State<ImporterCatalogLogo> {
         width: widget.size,
         height: widget.size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        errorBuilder: (_, __, ___) =>
+            widget.fallback ?? const SizedBox.shrink(),
       ),
     );
   }

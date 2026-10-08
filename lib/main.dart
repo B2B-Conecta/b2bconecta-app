@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/core/notifications/push_notification_service.da
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
+import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 import 'package:motolink_pro_app/features/ads/marketing_consent_host.dart';
 
 void main() async {
@@ -22,6 +23,7 @@ void main() async {
   // Antes de cualquier await: en web, /registro o ?registro=1.
   final launchUri = Uri.base;
   unawaited(AdAttributionStorage.captureFromUri(launchUri));
+  unawaited(ProductShareLink.capture(launchUri));
   if (kIsWeb) {
     usePathUrlStrategy();
   }
@@ -154,6 +156,14 @@ class MyApp extends StatelessWidget {
                 ),
           },
           onGenerateRoute: (settings) {
+            final routeName = settings.name ?? '';
+            final routePath =
+                routeName.startsWith('/') ? routeName : '/$routeName';
+            unawaited(
+              ProductShareLink.capture(
+                Uri.parse('https://app.b2bconecta.com.ve$routePath'),
+              ),
+            );
             final register = PublicAuthRoute.shouldOpenRegister(
               launchUri: launchUri,
               routeName: settings.name,

@@ -12,10 +12,11 @@ import 'importer_flexible_import_screen.dart';
 import 'product_custom_fields_section.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'importer_inventory_layout.dart';
-import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'product_volume_tiers.dart';
 import 'importer_bulk_usd_discount_dialog.dart';
@@ -54,6 +55,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   int _salesSnapshotDays = 30;
   Future<List<PartModel>>? _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
+  int _productPageIndex = 0;
+  int _productPageSize = listPageSizeOptions.first;
   bool _hasMoreInventory = true;
   bool _loadingMoreInventory = false;
   String _categoryFilter = 'Todas';
@@ -65,7 +68,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   bool _pagoSoloDivisas = false;
   final Set<String> _selectedIds = <String>{};
   final Set<String> _togglingProductIds = <String>{};
-  List<PartModel> _visibleParts = const [];
 
   bool get _inSelectionMode => _selectionMode != _InventorySelectionMode.none;
 
@@ -101,8 +103,12 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     final kept = preserveScroll && _inventoryScrollController.hasClients
         ? _inventoryScrollController.offset
         : null;
+    _keptInventoryOffset = kept;
     setState(() {
-      if (!preserveScroll) _loadedParts.clear();
+      if (!preserveScroll) {
+        _loadedParts.clear();
+      }
+      _productPageIndex = 0;
       _hasMoreInventory = true;
       _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
       _salesSnapshotFuture =
@@ -112,7 +118,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         preserveScroll: preserveScroll,
       );
     });
-    _keptInventoryOffset = kept;
   }
 
   void _restoreInventoryOffset() {
@@ -164,19 +169,34 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     } else {
       _loadedParts.addAll(batch);
     }
-    _visibleParts = List<PartModel>.unmodifiable(_loadedParts);
     if (preserveScroll) _restoreInventoryOffset();
-    _scheduleInventoryFill();
     return List<PartModel>.unmodifiable(_loadedParts);
   }
 
-  void _scheduleInventoryFill() {
-    scheduleLoadMoreIfViewportNotFilled(
-      controller: _inventoryScrollController,
-      hasMore: _hasMoreInventory,
-      isLoading: _loadingMoreInventory,
-      loadMore: _loadMoreInventory,
-    );
+  List<PartModel> get _pageParts => sliceListPage(
+        items: _loadedParts,
+        pageIndex: _productPageIndex,
+        pageSize: _productPageSize,
+      );
+
+  Future<void> _openProductPage(int index) async {
+    final needed = (index + 1) * _productPageSize;
+    while (mounted && _hasMoreInventory && _loadedParts.length < needed) {
+      final before = _loadedParts.length;
+      await _loadMoreInventory();
+      if (_loadedParts.length == before) break;
+    }
+    if (!mounted) return;
+    setState(() {
+      _productPageIndex = clampListPageIndex(
+        pageIndex: index,
+        total: _loadedParts.length,
+        pageSize: _productPageSize,
+      );
+    });
+    if (_inventoryScrollController.hasClients) {
+      _inventoryScrollController.jumpTo(0);
+    }
   }
 
   Future<void> _loadMoreInventory() async {
@@ -197,7 +217,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     } finally {
       if (mounted) {
         setState(() => _loadingMoreInventory = false);
-        _scheduleInventoryFill();
       } else {
         _loadingMoreInventory = false;
       }
@@ -356,7 +375,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       children: [
         if (isDesktop)
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: _bulkCatalogCard(isDesktop: true)),
               const SizedBox(width: 12),
@@ -381,12 +400,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         onTap: _startBulkImport,
         child: Container(
           width: double.infinity,
+          alignment: isDesktop ? Alignment.topCenter : null,
           padding: EdgeInsets.all(isDesktop ? 16 : 14),
           decoration: BoxDecoration(
             borderRadius: AppDecorations.radius12,
             border: Border.all(color: AppColors.successGreen.withOpacity(0.35)),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
@@ -441,12 +462,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         onTap: _startBulkPhotos,
         child: Container(
           width: double.infinity,
+          alignment: isDesktop ? Alignment.topCenter : null,
           padding: EdgeInsets.all(isDesktop ? 16 : 14),
           decoration: BoxDecoration(
             borderRadius: AppDecorations.radius12,
             border: Border.all(color: AppColors.brandBlue.withOpacity(0.3)),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
@@ -943,13 +966,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   }
 
   void _toggleSelectAllVisible() {
-    if (_visibleParts.isEmpty) return;
+    final page = _pageParts;
+    if (page.isEmpty) return;
     setState(() {
-      final allSelected = _visibleParts.every((p) => _selectedIds.contains(p.id));
+      final allSelected = page.every((p) => _selectedIds.contains(p.id));
       if (allSelected) {
-        _selectedIds.clear();
+        _selectedIds.removeAll(page.map((p) => p.id));
       } else {
-        _selectedIds.addAll(_visibleParts.map((p) => p.id));
+        _selectedIds.addAll(page.map((p) => p.id));
       }
     });
   }
@@ -1425,7 +1449,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                                 borderSide: BorderSide(color: AppColors.borderSubtle),
                               ),
                             ),
-                            onSubmitted: (_) => _reload(),
+                            onSubmitted: (_) =>
+                                _reloadInventory(preserveScroll: true),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1456,7 +1481,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                               borderSide: BorderSide.none,
                             ),
                           ),
-                          onSubmitted: (_) => _reload(),
+                          onSubmitted: (_) =>
+                              _reloadInventory(preserveScroll: true),
                         ),
                         const SizedBox(height: 8),
                         Wrap(
@@ -1509,7 +1535,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     onChanged: (v) {
                       if (v == null) return;
                       setState(() => _categoryFilter = v);
-                      _reload();
+                      _reloadInventory(preserveScroll: true);
                     },
                   ),
                   const SizedBox(height: 12),
@@ -1527,39 +1553,24 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     future: _metricsFuture,
                     builder: (context, snap) {
                       final metrics = snap.data;
-                      return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final option in ProductPhotoListFilter.values)
-                        ChoiceChip(
-                          label: Text(_photoFilterLabel(option, metrics)),
-                          selected: _photoFilter == option,
-                          onSelected: (_) {
-                            if (_photoFilter == option) return;
-                            setState(() => _photoFilter = option);
-                            _reloadInventory(preserveScroll: true);
-                          },
-                          selectedColor: AppColors.brand.withOpacity(0.22),
-                          labelStyle: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: _photoFilter == option
-                                ? AppColors.brand
-                                : AppColors.textPrimary,
-                          ),
-                          side: BorderSide(
-                            color: _photoFilter == option
-                                ? AppColors.brand
-                                : AppColors.borderSubtle,
-                          ),
-                        ),
-                    ],
+                      const options = ProductPhotoListFilter.values;
+                      return SegmentedFilterBar(
+                        labels: [
+                          for (final option in options)
+                            _photoFilterLabel(option, metrics),
+                        ],
+                        selectedIndex: options.indexOf(_photoFilter),
+                        onSelected: (index) {
+                          final option = options[index];
+                          if (_photoFilter == option) return;
+                          setState(() => _photoFilter = option);
+                          _reloadInventory(preserveScroll: true);
+                        },
                       );
                     },
                   ),
-                  const SizedBox(height: 12),
                   Text(
-                    'Filtros rápidos',
+                    'Vista',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -1568,82 +1579,28 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilterChip(
-                        label: const Text('Ocultos (stock < mínimo)'),
-                        selected: _filterLowStock,
-                        onSelected: (v) {
-                          setState(() => _filterLowStock = v);
-                          _reload();
-                        },
-                        selectedColor:
-                            AppColors.brand.withOpacity(0.22),
-                        checkmarkColor: AppColors.brand,
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _filterLowStock
-                              ? AppColors.brand
-                              : AppColors.textPrimary,
-                        ),
-                        side: BorderSide(
-                          color: _filterLowStock
-                              ? AppColors.brand
-                              : AppColors.borderSubtle,
-                        ),
-                      ),
-                      FilterChip(
-                        label: const Text('Solo activos (visibles)'),
-                        selected: _filterActiveOnly,
-                        onSelected: (v) {
-                          setState(() {
-                            _filterActiveOnly = v;
-                            if (v) _filterHidden = false;
-                          });
-                          _reload();
-                        },
-                        selectedColor:
-                            AppColors.successGreen.withOpacity(0.28),
-                        checkmarkColor: AppColors.successGreen,
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _filterActiveOnly
-                              ? AppColors.successGreen
-                              : AppColors.textPrimary,
-                        ),
-                        side: BorderSide(
-                          color: _filterActiveOnly
-                              ? AppColors.successGreen
-                              : AppColors.borderSubtle,
-                        ),
-                      ),
-                      FilterChip(
-                        label: const Text('Solo ocultos (pausa)'),
-                        selected: _filterHidden,
-                        onSelected: (v) {
-                          setState(() {
-                            _filterHidden = v;
-                            if (v) _filterActiveOnly = false;
-                          });
-                          _reload();
-                        },
-                        selectedColor: AppColors.brandBlueContainer,
-                        checkmarkColor: AppColors.brandBlue,
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _filterHidden
-                              ? AppColors.brandBlue
-                              : AppColors.textPrimary,
-                        ),
-                        side: BorderSide(
-                          color: _filterHidden
-                              ? AppColors.brandAccent
-                              : AppColors.borderSubtle,
-                        ),
-                      ),
+                  SegmentedFilterBar(
+                    labels: const [
+                      'Todos',
+                      'Stock bajo',
+                      'Activos',
+                      'Ocultos',
                     ],
+                    selectedIndex: _filterLowStock
+                        ? 1
+                        : _filterActiveOnly
+                            ? 2
+                            : _filterHidden
+                                ? 3
+                                : 0,
+                    onSelected: (index) {
+                      setState(() {
+                        _filterLowStock = index == 1;
+                        _filterActiveOnly = index == 2;
+                        _filterHidden = index == 3;
+                      });
+                      _reloadInventory(preserveScroll: true);
+                    },
                   ),
                 ],
               ),
@@ -1742,7 +1699,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       ];
     }
 
-    final parts = _loadedParts;
+    final parts = _pageParts;
 
     if (parts.isEmpty) {
       final hasFilters = _filterLowStock ||
@@ -1805,6 +1762,27 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
 
     return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
+          child: ListPageBar(
+            total: _loadedParts.length,
+            hasMore: _hasMoreInventory,
+            pageIndex: _productPageIndex,
+            pageSize: _productPageSize,
+            onPageIndex: _openProductPage,
+            onPageSize: (size) {
+              setState(() {
+                _productPageSize = size;
+                _productPageIndex = 0;
+              });
+              if (_inventoryScrollController.hasClients) {
+                _inventoryScrollController.jumpTo(0);
+              }
+            },
+          ),
+        ),
+      ),
       SliverPadding(
         padding: EdgeInsets.fromLTRB(hPad, 0, hPad, listBottomPadding),
         sliver: SliverList.separated(
@@ -1834,8 +1812,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   }
 
   Widget _buildSelectionBottomBar({required bool isDesktop}) {
-    final allSelected = _visibleParts.isNotEmpty &&
-        _visibleParts.every((p) => _selectedIds.contains(p.id));
+    final allSelected = _pageParts.isNotEmpty &&
+        _pageParts.every((p) => _selectedIds.contains(p.id));
     final isDelete = _selectionMode == _InventorySelectionMode.delete;
     final hint = isDelete
         ? 'Toca filas o mantén pulsado para elegir productos a eliminar.'
@@ -1880,7 +1858,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                           ),
                         ),
                       ),
-                      if (_visibleParts.isNotEmpty)
+                      if (_pageParts.isNotEmpty)
                         TextButton(
                           onPressed: _toggleSelectAllVisible,
                           child: Text(allSelected ? 'Quitar todo' : 'Seleccionar todo'),
@@ -1964,14 +1942,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                       return RefreshIndicator(
                         onRefresh: _pullToRefresh,
                         color: AppColors.brand,
-                        child: NotificationListener<ScrollNotification>(
-                          onNotification: (notification) {
-                            if (infiniteScrollShouldLoadMore(notification)) {
-                              _loadMoreInventory();
-                            }
-                            return false;
-                          },
-                          child: CustomScrollView(
+                        child: CustomScrollView(
                             controller: _inventoryScrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             slivers: [
@@ -1989,7 +1960,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                               ),
                             ],
                           ),
-                        ),
                       );
                     },
                   ),

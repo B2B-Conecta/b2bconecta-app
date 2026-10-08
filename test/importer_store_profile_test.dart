@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -235,6 +236,7 @@ void main() {
     await _pumpStore(tester, source: _source());
     await tester.pumpAndSettle();
     expect(find.text('Mayorista Andino'), findsWidgets);
+    expect(find.byType(ImporterCatalogLogo), findsNothing);
     expect(find.byKey(const Key('importer-store-empty')), findsOneWidget);
     expect(
       find.text('Este mayorista aún no tiene productos en vitrina.'),
@@ -333,10 +335,7 @@ void main() {
   testWidgets('paginación pide la siguiente página con el mismo mayorista',
       (tester) async {
     final offsets = <int>[];
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    final limits = <int>[];
 
     await _pumpStore(
       tester,
@@ -348,6 +347,7 @@ void main() {
         }) async {
           expect(filters.ownerId, _importerA);
           offsets.add(offset);
+          limits.add(limit);
           if (offset > 0) return const [];
           return List<PartModel>.generate(
             limit,
@@ -362,10 +362,15 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(offsets, isNotEmpty);
-    expect(offsets.first, 0);
-    expect(offsets.length, greaterThan(1));
-    expect(offsets[1], greaterThan(0));
+    expect(offsets, [0]);
+    expect(limits, [10]);
+    expect(find.text('Repuesto 0'), findsOneWidget);
+    expect(find.text('Repuesto 9'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Siguiente'));
+    await tester.pumpAndSettle();
+    expect(offsets, [0, 10]);
+    expect(limits, [10, 10]);
   });
 
   testWidgets(

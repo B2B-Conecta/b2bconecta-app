@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
 import 'package:motolink_pro_app/features/payments/motolink_volume_discount.dart';
@@ -35,6 +36,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
+import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
+import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
@@ -200,6 +203,23 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     setState(() {
       _statusFilter = draft.statusFilter;
       _morosoOnly = draft.morosoOnly;
+      _dateFrom = draft.dateFrom;
+      _dateTo = draft.dateTo;
+    });
+  }
+
+  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
+
+  Future<void> _openDateFilters() async {
+    final draft = await ImporterPedidosFiltersSheet.show(
+      context,
+      initial: ImporterPedidosFiltersDraft(
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      ),
+    );
+    if (draft == null || !mounted) return;
+    setState(() {
       _dateFrom = draft.dateFrom;
       _dateTo = draft.dateTo;
     });
@@ -1211,14 +1231,15 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           .where((r) => r.status == TransactionRequestStatus.rechazado)
           .toList(),
     );
-    final showEnCurso = _scope == PedidosListScope.todos ||
-        _scope == PedidosListScope.enCurso;
-    final showEntregados = _scope == PedidosListScope.entregados;
-    final showCancelados = _scope == PedidosListScope.cancelados;
-    final showCerradosJuntos = _scope == PedidosListScope.todos;
     final cerradosGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => !_esEnCurso(r.status)).toList(),
     );
+    final visibleGroups = switch (_scope) {
+      PedidosListScope.todos => [...enCursoGroups, ...cerradosGroups],
+      PedidosListScope.enCurso => enCursoGroups,
+      PedidosListScope.entregados => entregadosGroups,
+      PedidosListScope.cancelados => canceladosGroups,
+    };
     final scopeEmpty = switch (_scope) {
       PedidosListScope.todos =>
         enCursoGroups.isEmpty && cerradosGroups.isEmpty,
@@ -1257,6 +1278,38 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 PedidosScopeBar(
                   selected: _scope,
                   onSelected: _selectScope,
+                ),
+              ),
+              B2bOrdersPanelLayout.listColumn(
+                context,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilterChip(
+                      label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
+                      selected: _hasDateFilter,
+                      onSelected: (_) => _openDateFilters(),
+                      visualDensity: VisualDensity.compact,
+                      selectedColor: AppColors.brandBlue.withOpacity(0.18),
+                      checkmarkColor: AppColors.brandBlue,
+                      avatar: Icon(
+                        Icons.calendar_month_outlined,
+                        size: 16,
+                        color: _hasDateFilter
+                            ? AppColors.brandBlue
+                            : AppColors.textSecondary,
+                      ),
+                      labelStyle: TextStyle(
+                        fontWeight:
+                            _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 12.5,
+                        color: _hasDateFilter
+                            ? AppColors.brandBlue
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               if (activeFilterChips != null)
@@ -1298,22 +1351,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                           ),
                         ],
                       )
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        child: B2bOrdersPanelLayout.listColumn(
-                          context,
-                          ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: EdgeInsets.only(
-                              bottom: B2bOrdersPanelLayout.listBottomPadding(
-                                screenWidth,
-                              ),
-                            ),
-                            children: [
-                              if (scopeEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 48),
-                                  child: Center(
+                    : B2bOrdersPanelLayout.listColumn(
+                        context,
+                        scopeEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  const SizedBox(height: 48),
+                                  Center(
                                     child: Text(
                                       scopeEmptyLabel,
                                       style: TextStyle(
@@ -1321,36 +1366,47 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                       ),
                                     ),
                                   ),
+                                ],
+                              )
+                            : PagedItems(
+                                items: visibleGroups,
+                                alwaysShow: true,
+                                resetKey: Object.hash(
+                                  _scope,
+                                  _statusFilter,
+                                  _morosoOnly,
+                                  _dateFrom,
+                                  _dateTo,
+                                  _searchCtrl.text,
                                 ),
-                              if (showEnCurso && enCursoGroups.isNotEmpty) ...[
-                                if (_scope == PedidosListScope.todos)
-                                  _sectionTitle('En curso'),
-                                ...enCursoGroups.map(
-                                  (g) => _buildOrderCard(context, g),
+                                padding: EdgeInsets.only(
+                                  bottom: B2bOrdersPanelLayout
+                                      .listBottomPadding(screenWidth),
                                 ),
-                              ],
-                              if (showCerradosJuntos &&
-                                  cerradosGroups.isNotEmpty) ...[
-                                _sectionTitle('Cerrados'),
-                                ...cerradosGroups.map(
-                                  (g) => _buildOrderCard(context, g),
-                                ),
-                              ],
-                              if (showEntregados &&
-                                  entregadosGroups.isNotEmpty) ...[
-                                ...entregadosGroups.map(
-                                  (g) => _buildOrderCard(context, g),
-                                ),
-                              ],
-                              if (showCancelados &&
-                                  canceladosGroups.isNotEmpty) ...[
-                                ...canceladosGroups.map(
-                                  (g) => _buildOrderCard(context, g),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                                onRefresh: _load,
+                                itemBuilder: (g) {
+                                  String? header;
+                                  if (_scope == PedidosListScope.todos) {
+                                    final enCurso = _esEnCurso(g.first.status);
+                                    final section = enCurso
+                                        ? enCursoGroups
+                                        : cerradosGroups;
+                                    if (section.isNotEmpty &&
+                                        identical(section.first, g)) {
+                                      header =
+                                          enCurso ? 'En curso' : 'Cerrados';
+                                    }
+                                  }
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (header != null) _sectionTitle(header),
+                                      _buildOrderCard(context, g),
+                                    ],
+                                  );
+                                },
+                              ),
                       ),
               ),
             ],

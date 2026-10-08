@@ -6,7 +6,9 @@ import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 
 String _formatPromoDate(DateTime d) {
   final local = d.toLocal();
@@ -223,10 +225,10 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           ),
         ),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: _bootstrap,
-            child: _rows.isEmpty
-                ? ListView(
+          child: _rows.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: _bootstrap,
+                  child: ListView(
                     children: const [
                       SizedBox(height: 80),
                       Center(
@@ -236,13 +238,14 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                         ),
                       ),
                     ],
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: _rows.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) {
-                      final c = _rows[i];
+                  ),
+                )
+              : PagedItems(
+                  items: _rows,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  separator: 8,
+                  onRefresh: _bootstrap,
+                  itemBuilder: (c) {
                       final imp = _importers
                           .where((o) => o.id == c.importadorId)
                           .map((o) => o.businessName)
@@ -312,7 +315,6 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                       );
                     },
                   ),
-          ),
         ),
       ],
     );
@@ -535,11 +537,12 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
 
   Future<void> _pickDate({required bool isStart}) async {
     final initial = isStart ? _startsAt : _endsAt;
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 730)),
+      helpText: isStart ? 'Desde' : 'Hasta',
     );
     if (picked == null) return;
     setState(() {
@@ -922,13 +925,11 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                             ),
                           ),
                         )
-                      : ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 220),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: _products.length,
-                            itemBuilder: (context, i) {
-                              final p = _products[i];
+                      : SizedBox(
+                          height: 280,
+                          child: PagedItems(
+                            items: _products,
+                            itemBuilder: (p) {
                               final selected =
                                   _selectedProductIds.contains(p.id);
                               return CheckboxListTile(

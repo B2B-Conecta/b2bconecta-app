@@ -178,6 +178,7 @@ class ImporterOption {
     this.estado,
     this.ciudad,
     this.catalogFeaturedUntil,
+    this.logoStoragePath,
   });
 
   final String id;
@@ -185,6 +186,7 @@ class ImporterOption {
   final String? estado;
   final String? ciudad;
   final DateTime? catalogFeaturedUntil;
+  final String? logoStoragePath;
 
   bool get isCatalogFeatured {
     final until = catalogFeaturedUntil;

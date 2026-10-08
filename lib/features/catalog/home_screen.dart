@@ -15,7 +15,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'aliado_catalog_layout.dart';
-import 'package:motolink_pro_app/core/layout/infinite_scroll.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
 import 'catalog_product_price_display.dart';
@@ -94,6 +94,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _hasMoreProducts = true;
   bool _isLoadingMore = false;
   int? _catalogTotal;
+  int _catalogViewPage = 0;
+  static const _catalogVisibleSize = 10;
   CatalogFilters _activeFilters = CatalogFilters.empty;
   Set<String> _selectedImporterIds = {};
   String _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel;
@@ -567,57 +569,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (reset) {
       _loadedParts.clear();
       _hasMoreProducts = true;
+      _catalogViewPage = 0;
       if (_catalogScrollController.hasClients) {
         _catalogScrollController.jumpTo(0);
       }
     }
     if (!_hasMoreProducts) return List<PartModel>.unmodifiable(_loadedParts);
 
+    final batch = _catalogPageSize < _catalogVisibleSize
+        ? _catalogVisibleSize
+        : _catalogPageSize;
     final nextBatch = await SupabaseService.fetchParts(
-      limit: _catalogPageSize,
+      limit: batch,
       offset: _loadedParts.length,
       filters: _activeFilters,
     );
 
-    if (nextBatch.length < _catalogPageSize) {
+    if (nextBatch.length < batch) {
       _hasMoreProducts = false;
     }
     _loadedParts.addAll(nextBatch);
-    _scheduleCatalogFill();
     return List<PartModel>.unmodifiable(_loadedParts);
   }
 
-  void _scheduleCatalogFill() {
-    scheduleLoadMoreIfViewportNotFilled(
-      controller: _catalogScrollController,
-      hasMore: _hasMoreProducts,
-      isLoading: _isLoadingMore,
-      loadMore: _loadMoreProducts,
-    );
-  }
-
-  Future<void> _loadMoreProducts() async {
-    if (_isLoadingMore || !_hasMoreProducts) return;
-    setState(() => _isLoadingMore = true);
-    try {
-      await _fetchProducts(reset: false);
-      if (!mounted) return;
-      setState(() {});
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudieron cargar más productos.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingMore = false);
-        _scheduleCatalogFill();
-      } else {
-        _isLoadingMore = false;
+  Future<void> _openCatalogViewPage(int index) async {
+    final need = (index + 1) * _catalogVisibleSize;
+    while (mounted && _loadedParts.length < need && _hasMoreProducts) {
+      if (_isLoadingMore) return;
+      setState(() => _isLoadingMore = true);
+      try {
+        await _fetchProducts(reset: false);
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudieron cargar más productos.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        break;
+      } finally {
+        if (mounted) setState(() => _isLoadingMore = false);
       }
+    }
+    if (!mounted) return;
+    setState(() => _catalogViewPage = index);
+    if (_catalogScrollController.hasClients) {
+      _catalogScrollController.jumpTo(0);
     }
   }
 
@@ -1179,18 +1177,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                         // Un solo scroll: la valla va arriba del contenido y
                         // se desplaza con el catálogo (deja de quedar fija).
+                        final visibleParts = sliceListPage(
+                          items: parts,
+                          pageIndex: _catalogViewPage,
+                          pageSize: _catalogVisibleSize,
+                        );
                         return Stack(
                           children: [
-                            NotificationListener<ScrollNotification>(
-                              onNotification: (notification) {
-                                if (infiniteScrollShouldLoadMore(
-                                  notification,
-                                )) {
-                                  _loadMoreProducts();
-                                }
-                                return false;
-                              },
-                              child: CustomScrollView(
+                            CustomScrollView(
                                 controller: _catalogScrollController,
                                 slivers: [
                                   if (bannerPromos.isNotEmpty)
@@ -1208,11 +1202,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         hPad,
                                         4,
                                         hPad,
-                                        8,
+                                        0,
                                       ),
                                       child: Text(
                                         resultsLabel,
                                         style: resultsStyle,
+                                      ),
+                                    ),
+                                  ),
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        hPad,
+                                        8,
+                                        hPad,
+                                        0,
+                                      ),
+                                      child: ListPageBar(
+                                        total: _catalogTotal ?? parts.length,
+                                        hasMore: _catalogTotal == null &&
+                                            _hasMoreProducts,
+                                        pageIndex: _catalogViewPage,
+                                        pageSize: _catalogVisibleSize,
+                                        pageSizeOptions: const [
+                                          _catalogVisibleSize,
+                                        ],
+                                        onPageIndex: (index) {
+                                          _openCatalogViewPage(index);
+                                        },
+                                        onPageSize: (_) {},
                                       ),
                                     ),
                                   ),
@@ -1250,7 +1268,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                           ),
                                           delegate: SliverChildBuilderDelegate(
                                             (context, index) {
-                                              final p = parts[index];
+                                              final p = visibleParts[index];
                                               return _ProductGridCard(
                                             part: p,
                                             profile: widget.profile,
@@ -1287,7 +1305,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                                 : null,
                                               );
                                             },
-                                            childCount: parts.length,
+                                            childCount: visibleParts.length,
                                           ),
                                         );
                                       },
@@ -1295,7 +1313,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   ),
                                 ],
                               ),
-                            ),
                             if (_isLoadingMore)
                               const Positioned(
                                 left: 0,

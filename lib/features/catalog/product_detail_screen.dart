@@ -19,6 +19,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields_sectio
 import 'product_warranty_seal.dart';
 import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
+import 'product_share_sheet.dart';
 import 'store_supplier_chat.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
@@ -101,6 +102,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   String get _importerLine => (part.ownerBusinessName ?? '').trim().toUpperCase();
+
+  bool get _canShareProduct {
+    final viewer = _profile;
+    if (viewer == null) return false;
+    return viewer.isImportador || viewer.isAdministrador;
+  }
 
   bool get _canOpenImporterStore {
     final owner = part.ownerId?.trim();
@@ -293,6 +300,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
         title: const Text('Detalle del producto'),
+        actions: [
+          if (_canShareProduct)
+            IconButton(
+              tooltip: 'Compartir producto',
+              onPressed: () => showProductShareSheet(context, part),
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
+        ],
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -353,6 +368,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: FavoriteHeartButton(
               productId: part.id,
               prominent: true,
+            ),
+          ),
+        if (_canShareProduct)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 10,
+            left: 12,
+            child: _ProductBackButton(
+              label: 'Compartir',
+              icon: Icons.ios_share_rounded,
+              onPressed: () => showProductShareSheet(context, part),
             ),
           ),
         Positioned(
@@ -551,6 +576,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
         ),
         const SizedBox(height: 8),
+      ],
+      if (_canShareProduct) ...[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () => showProductShareSheet(context, part),
+            icon: const Icon(Icons.ios_share_rounded, size: 18),
+            label: const Text('Compartir producto'),
+          ),
+        ),
+        const SizedBox(height: 12),
       ],
       Text(
         part.nombre,
@@ -934,9 +970,15 @@ class _SpecBlock extends StatelessWidget {
 }
 
 class _ProductBackButton extends StatelessWidget {
-  const _ProductBackButton({required this.onPressed});
+  const _ProductBackButton({
+    required this.onPressed,
+    this.label = 'Atrás',
+    this.icon = Icons.arrow_back_rounded,
+  });
 
   final VoidCallback onPressed;
+  final String label;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -956,13 +998,13 @@ class _ProductBackButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.arrow_back_rounded,
+                icon,
                 size: 24,
                 color: AppColors.textPrimary,
               ),
               const SizedBox(width: 6),
               Text(
-                'Atrás',
+                label,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,

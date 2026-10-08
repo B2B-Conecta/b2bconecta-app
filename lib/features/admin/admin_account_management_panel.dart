@@ -11,6 +11,8 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 
 enum _AccountRoleFilter { todos, aliados, importadores, administracion }
 
@@ -40,17 +42,21 @@ class _AdminAccountManagementPanelState
   _AccountRoleFilter _roleFilter = _AccountRoleFilter.todos;
   _AccountStateFilter _stateFilter = _AccountStateFilter.todos;
   final _searchCtrl = TextEditingController();
+  final _listScroll = ScrollController();
+  int _pageIndex = 0;
+  int _pageSize = listPageSizeOptions.first;
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
     _load();
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _listScroll.dispose();
     super.dispose();
   }
 
@@ -402,10 +408,16 @@ class _AdminAccountManagementPanelState
     }
 
     final filtered = _filtered;
+    final page = sliceListPage(
+      items: filtered,
+      pageIndex: _pageIndex,
+      pageSize: _pageSize,
+    );
     return RefreshIndicator(
       onRefresh: _load,
       color: AppColors.brand,
       child: ListView(
+        controller: _listScroll,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(
@@ -431,30 +443,25 @@ class _AdminAccountManagementPanelState
             label: const Text('Nueva cuenta'),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final f in _AccountRoleFilter.values)
-                ChoiceChip(
-                  label: Text(_roleFilterLabel(f)),
-                  selected: _roleFilter == f,
-                  onSelected: (_) => setState(() => _roleFilter = f),
-                ),
+          SegmentedFilterBar(
+            labels: [
+              for (final f in _AccountRoleFilter.values) _roleFilterLabel(f),
             ],
+            selectedIndex: _AccountRoleFilter.values.indexOf(_roleFilter),
+            onSelected: (index) => setState(() {
+              _roleFilter = _AccountRoleFilter.values[index];
+              _pageIndex = 0;
+            }),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final f in _AccountStateFilter.values)
-                ChoiceChip(
-                  label: Text(_stateFilterLabel(f)),
-                  selected: _stateFilter == f,
-                  onSelected: (_) => setState(() => _stateFilter = f),
-                ),
+          SegmentedFilterBar(
+            labels: [
+              for (final f in _AccountStateFilter.values) _stateFilterLabel(f),
             ],
+            selectedIndex: _AccountStateFilter.values.indexOf(_stateFilter),
+            onSelected: (index) => setState(() {
+              _stateFilter = _AccountStateFilter.values[index];
+              _pageIndex = 0;
+            }),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -495,8 +502,24 @@ class _AdminAccountManagementPanelState
                 ),
               ),
             )
-          else
-            ...filtered.map(
+          else ...[
+            ListPageBar(
+              total: filtered.length,
+              pageIndex: _pageIndex,
+              pageSize: _pageSize,
+              onPageIndex: (index) {
+                setState(() => _pageIndex = index);
+                if (_listScroll.hasClients) _listScroll.jumpTo(0);
+              },
+              onPageSize: (size) {
+                setState(() {
+                  _pageSize = size;
+                  _pageIndex = 0;
+                });
+                if (_listScroll.hasClients) _listScroll.jumpTo(0);
+              },
+            ),
+            ...page.map(
               (p) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _AccountCard(
@@ -523,6 +546,7 @@ class _AdminAccountManagementPanelState
                 ),
               ),
             ),
+          ],
         ],
       ),
     );

@@ -37,7 +37,12 @@ class AdminMobileNav extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxHeight < 48 || constraints.maxWidth < 48) {
+              return const SizedBox.shrink();
+            }
+            return SizedBox(
           height: 60,
           child: Row(
             children: [
@@ -63,6 +68,8 @@ class AdminMobileNav extends StatelessWidget {
                 ),
             ],
           ),
+        );
+          },
         ),
       ),
     );
@@ -76,12 +83,12 @@ class AdminMobileNav extends StatelessWidget {
       context: context,
       backgroundColor: AppColors.background,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,44 +97,104 @@ class AdminMobileNav extends StatelessWidget {
                   child: Container(
                     width: 40,
                     height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: AppColors.borderSubtle,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text(
-                    'Más',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
+                const SizedBox(height: 14),
+                Text(
+                  'Más secciones',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                for (var i = 0; i < more.length; i++)
-                  ListTile(
-                    leading: Icon(
-                      currentIndex == primaryCount + i
-                          ? more[i].selectedIcon
-                          : more[i].icon,
-                      color: currentIndex == primaryCount + i
-                          ? AppColors.brand
-                          : AppColors.textSecondary,
-                    ),
-                    title: Text(
-                      more[i].title,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: more[i].subtitle == null
-                        ? null
-                        : Text(more[i].subtitle!),
-                    selected: currentIndex == primaryCount + i,
-                    onTap: () => Navigator.of(ctx).pop(primaryCount + i),
+                const SizedBox(height: 4),
+                Text(
+                  'Verificación, soporte, cuentas y perfil',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
                   ),
+                ),
+                const SizedBox(height: 14),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: more.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.55,
+                  ),
+                  itemBuilder: (context, i) {
+                    final selected = currentIndex == primaryCount + i;
+                    final destination = more[i];
+                    return Material(
+                      color: selected
+                          ? AppColors.brandBlueContainer
+                          : AppColors.card,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        onTap: () => Navigator.of(ctx).pop(primaryCount + i),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: selected
+                                  ? AppColors.brand
+                                  : AppColors.borderSubtle,
+                              width: selected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                selected
+                                    ? destination.selectedIcon
+                                    : destination.icon,
+                                size: 22,
+                                color: selected
+                                    ? AppColors.brand
+                                    : AppColors.textSecondary,
+                              ),
+                              const Spacer(),
+                              Text(
+                                destination.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: selected
+                                      ? AppColors.brand
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                              if (destination.subtitle != null)
+                                Text(
+                                  destination.subtitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -156,22 +223,29 @@ class _NavButton extends StatelessWidget {
     final color = selected ? AppColors.brand : AppColors.textSecondary;
     return InkWell(
       onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 22, color: color),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxHeight < 28 || constraints.maxWidth < 8) {
+            return const SizedBox.expand();
+          }
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 22, color: color),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -13,6 +13,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'commission_settlement_filter_utils.dart';
 import 'commission_volume_tiers.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'commission_settlement_fiscal.dart';
 import 'admin_tasa_bcv_card.dart';
@@ -841,9 +842,14 @@ class _AdminCommissionSettlementsPanelState
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Anular corte'),
-        content: const Text(
-          'Las líneas de pedido quedarán disponibles para un nuevo corte. '
-          'Solo aplica a cortes en borrador.',
+        content: Text(
+          s.isEmitido
+              ? 'Este corte ya tiene documento'
+                  '${s.invoiceReference == null || s.invoiceReference!.trim().isEmpty ? '' : ' (${s.invoiceReference})'}. '
+                  'Al anularlo, los pedidos vuelven a quedar libres para un corte nuevo. '
+                  'El número de factura se conserva y no se reutiliza. '
+                  'Un corte ya cobrado no se puede anular.'
+              : 'Las líneas de pedido quedarán disponibles para un nuevo corte.',
         ),
         actions: [
           TextButton(
@@ -862,6 +868,9 @@ class _AdminCommissionSettlementsPanelState
     try {
       await SupabaseService.adminCancelCommissionSettlement(s.id);
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Corte anulado. Los pedidos quedaron libres.')),
+      );
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -909,19 +918,6 @@ class _AdminCommissionSettlementsPanelState
     }
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'pagado':
-        return Colors.green.shade700;
-      case 'emitido':
-        return AppColors.brandAccent;
-      case 'anulado':
-        return Colors.grey;
-      default:
-        return AppColors.brandBlue;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -952,42 +948,21 @@ class _AdminCommissionSettlementsPanelState
             children: [
               const AdminTasaBcvCard(),
               const SizedBox(height: 12),
-              CommissionCollectedIncomeCard(
-                key: ValueKey('admin-income-$_incomeCardEpoch'),
-                isAdmin: true,
-                onOpenSettlement: _openSettlementFromReport,
-                onFilterImportador: _filterImportadorFromReport,
-                onFilterDocumentType: _filterDocumentTypeFromReport,
-              ),
-              if (_rows.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _CommissionSummaryCard(rows: _rows),
-              ],
-              const SizedBox(height: 12),
-              _ConfigCard(
-                defaultRatePct: _defaultRate * 100,
-                volumeTiersSummary:
-                    commissionVolumeTiersSummaryEs(_volumeTiers),
-                onEditRate: _busy ? null : _editDefaultRate,
-                onEditImportadorRate: _busy ? null : _editImportadorRate,
-                onEditVolumeTiers: _busy ? null : _editVolumeTiers,
-                onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
-                onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
-              ),
+              _CommissionAmountsStrip(rows: _rows),
               const SizedBox(height: 12),
               Text(
                 _filters.hasActiveFilters
-                    ? 'Cortes registrados (${_filteredRows.length} de ${_rows.length})'
-                    : 'Cortes registrados (${_rows.length})',
+                    ? 'Cortes y liquidaciones (${_filteredRows.length} de ${_rows.length})'
+                    : 'Cortes y liquidaciones (${_rows.length})',
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: 14,
+                  fontSize: 15,
                 ),
               ),
               if (_rows.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
-                  onPressed: _rows.isEmpty ? null : _openCommissionSettlementFiltersSheet,
+                  onPressed: _openCommissionSettlementFiltersSheet,
                   icon: Badge(
                     isLabelVisible: _activeFilterCount > 0,
                     label: Text('$_activeFilterCount'),
@@ -1000,16 +975,16 @@ class _AdminCommissionSettlementsPanelState
               const SizedBox(height: 8),
               if (_rows.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    'Sin cortes · genere semana anterior',
+                    'Sin cobros registrados. Genere un corte en borrador abajo.',
                     style: TextStyle(color: AppColors.textSecondary, height: 1.35),
                     textAlign: TextAlign.center,
                   ),
                 )
               else if (_filteredRows.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Column(
                     children: [
                       Text(
@@ -1028,7 +1003,30 @@ class _AdminCommissionSettlementsPanelState
                   ),
                 )
               else
-                ..._filteredRows.map(_settlementTile),
+                PagedItems(
+                  items: _filteredRows,
+                  embedded: true,
+                  itemBuilder: _settlementTile,
+                ),
+              const SizedBox(height: 12),
+              CommissionCollectedIncomeCard(
+                key: ValueKey('admin-income-$_incomeCardEpoch'),
+                isAdmin: true,
+                onOpenSettlement: _openSettlementFromReport,
+                onFilterImportador: _filterImportadorFromReport,
+                onFilterDocumentType: _filterDocumentTypeFromReport,
+              ),
+              const SizedBox(height: 12),
+              _ConfigCard(
+                defaultRatePct: _defaultRate * 100,
+                volumeTiersSummary:
+                    commissionVolumeTiersSummaryEs(_volumeTiers),
+                onEditRate: _busy ? null : _editDefaultRate,
+                onEditImportadorRate: _busy ? null : _editImportadorRate,
+                onEditVolumeTiers: _busy ? null : _editVolumeTiers,
+                onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
+                onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
+              ),
             ],
           ),
         ),
@@ -1045,6 +1043,10 @@ class _AdminCommissionSettlementsPanelState
 
   Widget _settlementTile(CommissionSettlementModel s) {
     final expanded = _expandedSettlementIds.contains(s.id);
+    final ref = s.invoiceReference?.trim() ?? '';
+    final name = s.importadorBusinessName ?? 'Importador';
+    final status = CommissionSettlementModel.statusLabelEs(s.status);
+    final amount = 'USD ${s.totalCobroUsd.toStringAsFixed(2)}';
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
@@ -1059,13 +1061,36 @@ class _AdminCommissionSettlementsPanelState
           });
         },
         title: Text(
-          s.importadorBusinessName ?? 'Importador',
+          ref.isNotEmpty ? ref : name,
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(s.periodLabelEs, style: const TextStyle(fontSize: 12)),
+            Text(
+              ref.isNotEmpty
+                  ? '$name · $status · $amount'
+                  : '$status · $amount',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '${s.periodLabelEs} · ${s.lineCount} pedido(s) · Consultar detalle',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            if (s.canAnular)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _busy ? null : () => _cancelSettlement(s),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red.shade800,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Anular corte'),
+                ),
+              ),
             if (s.isBorrador && _volumeByImportador[s.importadorId] != null) ...[
               const SizedBox(height: 6),
               CommissionVolumeTierBanner(
@@ -1074,83 +1099,6 @@ class _AdminCommissionSettlementsPanelState
                 title: 'Volumen mes (referencia al emitir)',
               ),
             ],
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _statusColor(s.status).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    CommissionSettlementModel.statusLabelEs(s.status),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _statusColor(s.status),
-                    ),
-                  ),
-                ),
-                if (!s.isBorrador) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: s.isDeliveryNote
-                          ? AppColors.surfaceTinted
-                          : AppColors.brandBlueContainer,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: s.isDeliveryNote
-                            ? AppColors.borderSubtle
-                            : AppColors.brandAccent.withOpacity(0.45),
-                      ),
-                    ),
-                    child: Text(
-                      s.documentTypeEffective.labelEs,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: s.isDeliveryNote
-                            ? AppColors.textPrimary
-                            : AppColors.brandAccent,
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    '${s.totalCobroLabelEs}: USD ${s.totalCobroUsd.toStringAsFixed(2)} · '
-                    '${s.lineCount} pedido(s)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                s.isDeliveryNote
-                    ? 'Base comisión (neta, sin IVA): USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
-                    : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
-                        'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
-                        'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
-            ),
-            if (s.invoiceReference != null && s.invoiceReference!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'Ref.: ${s.invoiceReference}',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                ),
-              ),
           ],
         ),
         children: [
@@ -1159,6 +1107,19 @@ class _AdminCommissionSettlementsPanelState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(
+                  s.isDeliveryNote
+                      ? 'Base comisión (neta, sin IVA): USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
+                      : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
+                          'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
+                          'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                if (!s.isBorrador)
+                  Text(
+                    s.documentTypeEffective.labelEs,
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 if (s.importadorRif != null && s.importadorRif!.isNotEmpty)
                   Text('RIF: ${s.importadorRif}', style: const TextStyle(fontSize: 12)),
                 if (s.issuedAt != null)
@@ -1228,10 +1189,6 @@ class _AdminCommissionSettlementsPanelState
                           ),
                         ),
                       ),
-                      TextButton(
-                        onPressed: _busy ? null : () => _cancelSettlement(s),
-                        child: const Text('Anular'),
-                      ),
                     ],
                     if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
                       OutlinedButton.icon(
@@ -1286,86 +1243,77 @@ class _AdminCommissionSettlementsPanelState
   }
 }
 
-class _CommissionSummaryCard extends StatelessWidget {
-  const _CommissionSummaryCard({required this.rows});
+class _CommissionAmountsStrip extends StatelessWidget {
+  const _CommissionAmountsStrip({required this.rows});
 
   final List<CommissionSettlementModel> rows;
 
   @override
   Widget build(BuildContext context) {
-    var borrador = 0;
-    var emitido = 0;
-    var enRevision = 0;
-    var pagado = 0;
-    double usdEmitido = 0;
-    double usdPagado = 0;
-
+    var cobrado = 0.0;
+    var pendiente = 0.0;
     for (final s in rows) {
-      if (s.isBorrador) borrador++;
-      if (s.isEmitido) {
-        emitido++;
-        usdEmitido += s.totalCobroUsd;
-        if (s.pagoEnRevision) enRevision++;
-      }
-      if (s.isPagado) {
-        pagado++;
-        usdPagado += s.totalCobroUsd;
-      }
+      if (s.isPagado) cobrado += s.totalCobroUsd;
+      if (s.isEmitido) pendiente += s.totalCobroUsd;
     }
 
+    return Row(
+      children: [
+        Expanded(
+          child: _amount(
+            label: 'Cobrado',
+            value: cobrado,
+            color: AppColors.successGreen,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _amount(
+            label: 'Pendiente',
+            value: pendiente,
+            color: AppColors.brand,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _amount({
+    required String label,
+    required double value,
+    required Color color,
+  }) {
     return Material(
-      color: AppColors.surfaceTinted,
+      color: AppColors.card,
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Resumen de cortes',
+              label,
               style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              runSpacing: 6,
-              children: [
-                _chip('Borrador', borrador, AppColors.brandBlue),
-                _chip('Emitido', emitido, AppColors.brandAccent),
-                _chip('Pago en revisión', enRevision, AppColors.brandAccent),
-                _chip('Pagado', pagado, AppColors.successGreen),
-              ],
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
-              'USD pendiente de cobro (emitido): ${usdEmitido.toStringAsFixed(2)} · '
-              'USD cobrado (pagado): ${usdPagado.toStringAsFixed(2)}',
-              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              'USD ${value.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: color,
+                height: 1.1,
+              ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _chip(String label, int count, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.35)),
-      ),
-      child: Text(
-        '$label: $count',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
         ),
       ),
     );

@@ -156,19 +156,34 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
     }
   }
 
+  String? get _metaLine {
+    final parts = <String>[
+      if (BcvReferenceRateService.formatFechaValorEs(_effectiveDate) != null)
+        'Fecha valor ${BcvReferenceRateService.formatFechaValorEs(_effectiveDate)}',
+      if (_updatedAt != null) 'actualizada ${formatEsShortDateTime(_updatedAt)}',
+    ];
+    if (parts.isEmpty) return null;
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
         child: _loading
-            ? const Padding(
-                padding: EdgeInsets.all(16),
+            ? const SizedBox(
+                height: 52,
                 child: Center(
                   child: SizedBox(
-                    width: 24,
-                    height: 24,
+                    width: 22,
+                    height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: AppColors.brand,
@@ -176,80 +191,53 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                   ),
                 ),
               )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final sideBySide = constraints.maxWidth >= 560;
+                  final value = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.currency_exchange,
-                        color: AppColors.brandBlue,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Tasa BCV del día',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _rate != null && _rate! > 0
-                                  ? '${formatTasaBcvDisplay(_rate!, fractionDigits: 4)} VES/REF'
-                                  : 'Sin tasa',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 20,
-                                height: 1.1,
-                              ),
-                            ),
-                            if (_updatedAt != null || _effectiveDate != null)
-                              Text(
-                                [
-                                  if (BcvReferenceRateService.formatFechaValorEs(
-                                        _effectiveDate,
-                                      ) !=
-                                      null)
-                                    'Fecha valor ${BcvReferenceRateService.formatFechaValorEs(_effectiveDate)}',
-                                  if (_updatedAt != null)
-                                    'actualizada ${formatEsShortDateTime(_updatedAt)}',
-                                  'notificación diaria a usuarios',
-                                ].join(' · '),
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: AppColors.textSecondary,
-                                  height: 1.25,
-                                ),
-                              ),
-                          ],
+                      Text(
+                        'Tasa BCV del día',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                    ],
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      _error!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.red.shade800,
+                      const SizedBox(height: 4),
+                      Text(
+                        _rate != null && _rate! > 0
+                            ? '${formatTasaBcvDisplay(_rate!, fractionDigits: 4)} VES/REF'
+                            : 'Sin tasa',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.brand,
+                          height: 1.1,
+                        ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                      if (_metaLine != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _metaLine!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.25,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                  final actions = Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    alignment: sideBySide
+                        ? WrapAlignment.end
+                        : WrapAlignment.start,
                     children: [
-                      FilledButton.tonalIcon(
+                      _action(
                         onPressed: _busy ? null : _refreshFromBcv,
                         icon: _busy
                             ? const SizedBox(
@@ -258,69 +246,100 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.sync, size: 16),
-                        label: const Text('Sincronizar'),
-                        style: FilledButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                        ),
+                        label: 'Sincronizar',
                       ),
-                      OutlinedButton.icon(
+                      _action(
                         onPressed: _openBcvOfficial,
                         icon: const Icon(Icons.open_in_new, size: 16),
-                        label: const Text('BCV oficial'),
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                        ),
+                        label: 'BCV oficial',
                       ),
-                      TextButton.icon(
+                      _action(
                         onPressed: _busy
                             ? null
                             : () => setState(() => _editing = !_editing),
                         icon: Icon(
-                          _editing ? Icons.expand_less : Icons.edit_outlined,
+                          _editing ? Icons.close : Icons.edit_outlined,
                           size: 16,
                         ),
-                        label: Text(_editing ? 'Ocultar' : 'Manual'),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
+                        label: _editing ? 'Cerrar' : 'Manual',
                       ),
                     ],
-                  ),
-                  if (_editing) ...[
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _ctrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  );
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (sideBySide)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(child: value),
+                            const SizedBox(width: 12),
+                            actions,
+                          ],
+                        )
+                      else ...[
+                        value,
+                        const SizedBox(height: 8),
+                        actions,
                       ],
-                      decoration: const InputDecoration(
-                        labelText: 'VES por 1 REF',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton(
-                        onPressed: _busy ? null : _saveManual,
-                        child: const Text('Guardar'),
-                      ),
-                    ),
-                  ],
-                ],
+                      if (_error != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _error!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.red.shade800,
+                          ),
+                        ),
+                      ],
+                      if (_editing) ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _ctrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9.,]'),
+                            ),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'VES por 1 REF',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton(
+                            onPressed: _busy ? null : _saveManual,
+                            child: const Text('Guardar'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
+      ),
+    );
+  }
+
+  Widget _action({
+    required VoidCallback? onPressed,
+    required Widget icon,
+    required String label,
+  }) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: icon,
+      label: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.brand,
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
       ),
     );
   }

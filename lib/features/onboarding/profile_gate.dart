@@ -4,6 +4,7 @@ import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'aliado_pending_review_screen.dart';
 import 'package:motolink_pro_app/app/main_shell.dart';
+import 'package:motolink_pro_app/features/catalog/product_share_host.dart';
 import 'profile_setup_screen.dart';
 import 'account_locked_screen.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
@@ -157,7 +158,9 @@ class _ProfileGateState extends State<ProfileGate> {
         }
 
         if (profile.isReadyForMainApp) {
-          return MainShell(homeRole: _homeRoleFor(profile), profile: profile);
+          return ProductShareLinkHost(
+            child: MainShell(homeRole: _homeRoleFor(profile), profile: profile),
+          );
         }
 
         return ProfileSetupScreen(

@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
+import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 
 void main() {
   test('formatProductCustomFieldLabel humaniza claves', () {
@@ -36,5 +38,25 @@ void main() {
     expect(all.length, 2);
     expect(aliado.length, 1);
     expect(aliado.first.key, 'marca');
+  });
+
+  testWidgets('la tarjeta muestra el campo publicado y oculta el interno', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductCustomFieldsAliadoChips(
+            customFields: buildCustomFieldsPayload(
+              values: {'precio_bs': '55', 'costo': '10'},
+              aliadoVisibleKeys: {'precio_bs'},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Precio Bs: 55'), findsOneWidget);
+    expect(find.textContaining('Costo'), findsNothing);
   });
 }

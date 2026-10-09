@@ -30,6 +30,7 @@ import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'favorite_heart_button.dart';
 import 'product_detail_screen.dart';
+import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 
 String _aliadoGreeting(String? businessName) {
   final name = businessName?.trim();
@@ -1634,6 +1635,13 @@ class _ProductGridCard extends StatelessWidget {
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardCustomFieldsHeight,
+                  child: ProductCustomFieldsAliadoChips(
+                    customFields: part.customFields,
                   ),
                 ),
               ],

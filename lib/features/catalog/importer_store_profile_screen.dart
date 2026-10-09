@@ -17,6 +17,8 @@ import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 import 'package:motolink_pro_app/features/catalog/product_warranty_seal.dart';
+import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
+import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
@@ -926,6 +928,15 @@ class _StoreProductCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (productCustomFieldsDisplayEntries(
+                  part.customFields,
+                  aliadoView: true,
+                ).isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  ProductCustomFieldsAliadoChips(
+                    customFields: part.customFields,
+                  ),
+                ],
               ],
             ),
           ),

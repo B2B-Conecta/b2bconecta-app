@@ -51,6 +51,57 @@ class ProductCustomFieldsChips extends StatelessWidget {
   }
 }
 
+/// Campos ERP publicados, en una línea, para la tarjeta del catálogo.
+class ProductCustomFieldsAliadoChips extends StatelessWidget {
+  const ProductCustomFieldsAliadoChips({
+    super.key,
+    required this.customFields,
+    this.limit = 2,
+  });
+
+  final Map<String, dynamic>? customFields;
+  final int limit;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = productCustomFieldsDisplayEntries(
+      customFields,
+      aliadoView: true,
+      limit: limit,
+    );
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      children: [
+        for (var i = 0; i < entries.length; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade100),
+              ),
+              child: Text(
+                '${entries[i].label}: ${entries[i].value}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  height: 1.15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.green.shade900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// Bloque de campos ERP visibles para el aliado en ficha de producto.
 class ProductCustomFieldsAliadoSpecs extends StatelessWidget {
   const ProductCustomFieldsAliadoSpecs({
@@ -261,7 +312,7 @@ class _ProductCustomFieldsEditorState extends State<ProductCustomFieldsEditor> {
         const SizedBox(height: 4),
         Text(
           'Información de tu sistema interno. Usa el botón del ojo para decidir '
-          'qué campos puede ver la tienda minorista en la ficha del repuesto.',
+          'qué campos ve la tienda minorista en la tarjeta del catálogo y en la ficha.',
           style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,

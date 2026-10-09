@@ -762,8 +762,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     showOrderChatSheet(
                       context: context,
                       transactionRequestId: r.id,
-                      allowReplyAsAliado: _esEnCurso(r.status),
+                      allowReplyAsAliado: orderLinesAllowChatReply([r]),
                       allowReplyAsAdmin: false,
+                      deliveryGrace: orderLinesChatDeliveryGrace([r]),
                       title: (counterpart != null && counterpart.isNotEmpty)
                           ? 'Chat · $counterpart'
                           : 'Chat del pedido',
@@ -943,8 +944,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     mergedThreadRequestIds: chunk.length > 1
                         ? chunk.map((e) => e.id).toList()
                         : null,
-                    allowReplyAsAliado: chunk.any((l) => _esEnCurso(l.status)),
+                    allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                     allowReplyAsAdmin: false,
+                    deliveryGrace: orderLinesChatDeliveryGrace(chunk),
                     title: (counterpart != null && counterpart.isNotEmpty)
                         ? 'Chat · $counterpart'
                         : 'Chat del pedido',

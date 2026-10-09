@@ -22,6 +22,7 @@ import 'auth_uri_callback_clear_stub.dart'
 import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
+import 'package:motolink_pro_app/features/catalog/guest_shared_catalog.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
@@ -52,6 +53,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   /// Tras recovery sigue activo hasta [signedOut] o cambio de contraseña.
   bool _awaitingPasswordRecovery = false;
+  bool _guestLeftForAuth = false;
+  bool _registerAfterGuest = false;
 
   /// Resolviendo `?code=` / fragmento Auth al abrir la app (PKCE / implicit).
   bool _resolvingAuthCallback = false;
@@ -181,6 +184,20 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void _clearAuthCallbackTimeout() {
     _authCallbackTimeoutTimer?.cancel();
     _authCallbackTimeoutTimer = null;
+  }
+
+  /// Sale de la ficha pública hacia `/registro` sin dejar la ruta del producto encima.
+  void _openRegisterFromGuest() {
+    ProductShareLink.suppressGuestPreview = true;
+    _guestLeftForAuth = true;
+    _registerAfterGuest = true;
+    final nav = Navigator.of(context);
+    nav.popUntil((route) => route.isFirst);
+    if (ModalRoute.of(context)?.settings.name == PublicAuthRoute.path) {
+      if (mounted) setState(() {});
+      return;
+    }
+    nav.pushReplacementNamed(PublicAuthRoute.path);
   }
 
   void _onIncomingDeepLink(Uri uri) {
@@ -483,13 +500,32 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
 
     if (session != null) {
+      ProductShareLink.suppressGuestPreview = false;
       return const ProfileGate(key: ValueKey('profile_gate'));
     }
 
+    final skipGuest = _guestLeftForAuth ||
+        widget.startInRegister ||
+        ProductShareLink.suppressGuestPreview;
+    final sharedProductId = skipGuest
+        ? null
+        : ProductShareLink.idFromUri(widget.launchUri) ??
+            ProductShareLink.idFromUri(Uri.base) ??
+            ProductShareLink.pending.value;
+    if (sharedProductId != null) {
+      return GuestSharedProductScreen(
+        key: ValueKey('guest_product_$sharedProductId'),
+        productId: sharedProductId,
+        onRegister: _openRegisterFromGuest,
+      );
+    }
+
     return LoginScreen(
-      key: ValueKey(_startInRegister ? 'register' : 'login'),
+      key: ValueKey(
+        (_startInRegister || _registerAfterGuest) ? 'register' : 'login',
+      ),
       initialErrorMessage: _initialLinkError,
-      startInRegister: _startInRegister,
+      startInRegister: _startInRegister || _registerAfterGuest,
     );
   }
 }

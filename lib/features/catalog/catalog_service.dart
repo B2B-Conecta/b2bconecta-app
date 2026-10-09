@@ -827,6 +827,57 @@ class CatalogService {
     });
   }
 
+  /// Ficha pública de un producto activo. No requiere sesión.
+  static Future<PartModel?> fetchPublicSharedProduct(String productId) async {
+    final id = productId.trim();
+    if (id.isEmpty) return null;
+    final res = await SupabaseAccess.client.rpc(
+      'public_shared_product',
+      params: <String, dynamic>{'p_id': id},
+    );
+    if (res is! Map) return null;
+    final part = PartModel.fromJson(Map<String, dynamic>.from(res));
+    if (!part.isActive || part.id.isEmpty) return null;
+    return part;
+  }
+
+  /// Vitrina pública: nombre del proveedor y hasta 40 productos activos.
+  static Future<
+      ({
+        String name,
+        String? estado,
+        String? ciudad,
+        String? logoStoragePath,
+        List<PartModel> products,
+      })?> fetchPublicSharedStore(String importerId) async {
+    final id = importerId.trim();
+    if (id.isEmpty) return null;
+    final res = await SupabaseAccess.client.rpc(
+      'public_shared_store',
+      params: <String, dynamic>{'p_importador_id': id},
+    );
+    if (res is! Map) return null;
+    final map = Map<String, dynamic>.from(res);
+    final raw = map['products'];
+    final products = <PartModel>[];
+    if (raw is List) {
+      for (final row in raw) {
+        if (row is! Map) continue;
+        final part = PartModel.fromJson(Map<String, dynamic>.from(row));
+        if (part.isActive && part.id.isNotEmpty) products.add(part);
+      }
+    }
+    final name = map['business_name']?.toString().trim() ?? '';
+    final logo = map['logo_storage_path']?.toString().trim();
+    return (
+      name: name.isEmpty ? 'Proveedor' : name,
+      estado: map['estado']?.toString(),
+      ciudad: map['ciudad']?.toString(),
+      logoStoragePath: (logo == null || logo.isEmpty) ? null : logo,
+      products: products,
+    );
+  }
+
   /// Ficha por id, con la sesión actual. `null` si no existe, está en pausa
   /// o la política del catálogo no deja verlo.
   static Future<PartModel?> fetchCatalogProductById(String productId) {

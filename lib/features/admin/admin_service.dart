@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/admin/owner_related_orders.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 class AdminService {
@@ -163,6 +164,16 @@ class AdminService {
         'p_note': note.trim(),
       },
     );
+  }
+
+  static Future<OwnerRelatedOrders> ownerProfileRelatedOrders(
+    String profileId,
+  ) async {
+    final res = await SupabaseAccess.client.rpc(
+      'owner_profile_related_orders',
+      params: <String, dynamic>{'p_profile_id': profileId},
+    );
+    return OwnerRelatedOrders.fromRpc(res);
   }
 
   static Future<void> ownerHardDeleteProfile({

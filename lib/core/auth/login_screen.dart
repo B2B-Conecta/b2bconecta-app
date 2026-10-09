@@ -68,14 +68,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _syncBrowserPath(_AuthMode mode) {
+    final target = mode == _AuthMode.register ? PublicAuthRoute.path : '/';
+    final current = Uri.base.path;
+    final normalized = current.length > 1 && current.endsWith('/')
+        ? current.substring(0, current.length - 1)
+        : current;
+    if (normalized == target) return;
     final params = Map<String, String>.from(Uri.base.queryParameters)
       ..remove('registro');
     final query = params.isEmpty ? '' : Uri(queryParameters: params).query;
-    if (mode == _AuthMode.register) {
-      replaceBrowserPath(PublicAuthRoute.path, query: query);
-    } else {
-      replaceBrowserPath('/', query: query);
-    }
+    replaceBrowserPath(target, query: query);
   }
 
   /// Flutter web pisa `history` con el nombre de la ruta del Navigator.
@@ -475,12 +477,19 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Text(
-            'Continuar con Google',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _GoogleMark(),
+              SizedBox(width: 10),
+              Text(
+                'Continuar con Google',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -835,4 +844,64 @@ class _BrandingBullet extends StatelessWidget {
       ],
     );
   }
+}
+
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 18,
+      height: 18,
+      child: CustomPaint(painter: _GoogleMarkPainter()),
+    );
+  }
+}
+
+class _GoogleMarkPainter extends CustomPainter {
+  const _GoogleMarkPainter();
+
+  static const _blue = Color(0xFF4285F4);
+  static const _red = Color(0xFFEA4335);
+  static const _yellow = Color(0xFFFBBC05);
+  static const _green = Color(0xFF34A853);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = size.width * 0.18;
+    final rect = Rect.fromLTWH(
+      stroke / 2,
+      stroke / 2,
+      size.width - stroke,
+      size.height - stroke,
+    );
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    paint.color = _blue;
+    canvas.drawArc(rect, -0.45, 1.7, false, paint);
+    paint.color = _green;
+    canvas.drawArc(rect, 1.25, 1.15, false, paint);
+    paint.color = _yellow;
+    canvas.drawArc(rect, 2.4, 0.95, false, paint);
+    paint.color = _red;
+    canvas.drawArc(rect, 3.35, 1.15, false, paint);
+
+    paint
+      ..color = _blue
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.46, size.height * 0.40, size.width * 0.50, stroke),
+        Radius.circular(stroke / 4),
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

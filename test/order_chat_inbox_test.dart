@@ -21,6 +21,7 @@ TransactionRequestModel _order({
   String? importerName,
   String? aliadoName,
   DateTime? updatedAt,
+  DateTime? atEntregado,
 }) {
   return TransactionRequestModel(
     id: id,
@@ -39,6 +40,7 @@ TransactionRequestModel _order({
     ownerBusinessName: importerName,
     aliadoBusinessName: aliadoName,
     updatedAt: updatedAt,
+    atEntregado: atEntregado,
   );
 }
 
@@ -160,6 +162,22 @@ void main() {
     );
     expect(threads.single.canReply, isFalse);
     expect(orderChatReplyOpen(TransactionRequestStatus.entregado), isFalse);
+  });
+
+  test('recibido hace menos de 7 días sigue abierto para el proveedor', () {
+    final threads = orderChatThreadsFromOrders(
+      [
+        _order(
+          id: 'z',
+          status: TransactionRequestStatus.entregado,
+          productName: 'Kit',
+          atEntregado: DateTime.now().toUtc().subtract(const Duration(days: 2)),
+        ),
+      ],
+      role: AppHomeRole.importador,
+    );
+    expect(threads.single.canReply, isTrue);
+    expect(threads.single.inDeliveryGrace, isTrue);
   });
 
   testWidgets('messages button is visible for authenticated header action',

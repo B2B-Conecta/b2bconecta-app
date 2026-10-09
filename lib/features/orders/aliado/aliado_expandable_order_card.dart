@@ -307,11 +307,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           mergedThreadRequestIds: isCheckoutGroup
                               ? lines.map((e) => e.id).toList()
                               : null,
-                          allowReplyAsAliado: lines.any(
-                            (l) => TransactionRequestStatus.aliadoPedidosEnCurso
-                                .contains(l.status),
-                          ),
+                          allowReplyAsAliado: orderLinesAllowChatReply(lines),
                           allowReplyAsAdmin: false,
+                          deliveryGrace: orderLinesChatDeliveryGrace(lines),
                           title: (counterpart != null && counterpart.isNotEmpty)
                               ? 'Chat · $counterpart'
                               : 'Chat del pedido',

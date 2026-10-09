@@ -24,9 +24,21 @@ import 'store_supplier_chat.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key, required this.part});
+  const ProductDetailScreen({
+    super.key,
+    required this.part,
+    this.guestPreview = false,
+    this.onRegisterToOrder,
+    this.onOpenStore,
+  });
 
   final PartModel part;
+
+  /// Enlace abierto sin sesión: se ve la ficha y la vitrina, sin pedido.
+  final bool guestPreview;
+
+  final VoidCallback? onRegisterToOrder;
+  final VoidCallback? onOpenStore;
 
   static String heroImageTag(PartModel p) => 'product-image-${p.id}';
 
@@ -83,8 +95,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final p = await SupabaseService.fetchMyProfile();
-    if (mounted) setState(() => _profile = p);
+    if (widget.guestPreview) return;
+    try {
+      final p = await SupabaseService.fetchMyProfile();
+      if (mounted) setState(() => _profile = p);
+    } catch (_) {}
   }
 
   bool get _pedidosSuspendidosMorosidad =>
@@ -109,12 +124,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return viewer.isImportador || viewer.isAdministrador;
   }
 
+  void _shareProduct() {
+    showProductShareSheet(
+      context,
+      part,
+      includeDevLink: _profile?.isAdministrador == true,
+    );
+  }
+
   bool get _canOpenImporterStore {
     final owner = part.ownerId?.trim();
     if (owner == null || owner.isEmpty) return false;
+    if (widget.onOpenStore != null) return true;
     final viewer = _profile;
     if (viewer == null) return false;
     return viewer.isAliado || viewer.isAdministrador;
+  }
+
+  bool get _canOrder {
+    if (widget.guestPreview) return false;
+    return _profile?.isAliado == true;
   }
 
   bool get _canAskAboutProduct {
@@ -159,6 +188,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _openImporterStore() {
+    if (widget.onOpenStore != null) {
+      widget.onOpenStore!();
+      return;
+    }
     if (!_canOpenImporterStore) return;
     final owner = part.ownerId?.trim();
     if (owner == null || owner.isEmpty) return;
@@ -274,7 +307,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ),
           ),
-          _buildBottomActionBar(context),
+          if (_showsOrderBar) _buildBottomActionBar(context),
         ],
       ),
     );
@@ -304,7 +337,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (_canShareProduct)
             IconButton(
               tooltip: 'Compartir producto',
-              onPressed: () => showProductShareSheet(context, part),
+              onPressed: _shareProduct,
               icon: const Icon(Icons.ios_share_rounded),
             ),
         ],
@@ -377,7 +410,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: _ProductBackButton(
               label: 'Compartir',
               icon: Icons.ios_share_rounded,
-              onPressed: () => showProductShareSheet(context, part),
+              onPressed: _shareProduct,
             ),
           ),
         Positioned(
@@ -581,11 +614,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
-            onPressed: () => showProductShareSheet(context, part),
-            icon: const Icon(Icons.ios_share_rounded, size: 18),
+              onPressed: _shareProduct,
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
             label: const Text('Compartir producto'),
           ),
         ),
+        if (_profile?.isAdministrador == true) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Solo lectura. Comparte el enlace para que el proveedor promocione este producto.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
       ],
       Text(
@@ -814,7 +858,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  bool get _showsOrderBar => widget.guestPreview || _profile == null || _canOrder;
+
   Widget _buildActionButtons() {
+    if (widget.guestPreview) {
+      return FilledButton(
+        onPressed: widget.onRegisterToOrder,
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        child: const Text('Regístrate para pedir'),
+      );
+    }
+    if (_profile == null) {
+      return const SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (!_canOrder) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

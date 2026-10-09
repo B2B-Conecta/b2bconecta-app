@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'order_chat_access.dart';
 import 'order_message_attachment.dart';
 import 'order_message_media.dart';
 import 'order_message_pick.dart';
@@ -24,6 +25,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     required this.allowReplyAsAliado,
     required this.allowReplyAsAdmin,
     this.allowReplyAsImportador = false,
+    this.deliveryGrace = false,
     this.onThreadChanged,
     this.suppressBuiltinTitle = false,
     this.suppressInlineHelp = false,
@@ -35,6 +37,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   final bool allowReplyAsAliado;
   final bool allowReplyAsAdmin;
   final bool allowReplyAsImportador;
+
+  /// Pedido ya recibido: el composer sigue abierto dentro de los 7 días.
+  final bool deliveryGrace;
 
   /// Varios ids de `transaction_requests` (mismo importador en un carrito): se listan mensajes juntos.
   final List<String>? mergedThreadRequestIds;
@@ -409,6 +414,17 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             },
           ),
         if (canReply) ...[
+          if (widget.deliveryGrace) ...[
+            const SizedBox(height: 10),
+            Text(
+              orderChatDeliveryGraceHint,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           TextField(
             controller: _ctrl,

@@ -9,6 +9,10 @@ void main() {
       ProductShareLink.urlFor(id),
       'https://app.b2bconecta.com.ve/producto/$id',
     );
+    expect(
+      ProductShareLink.devUrlFor(id),
+      'https://b2bconecta-app-git-dev-b2bconecta.vercel.app/producto/$id',
+    );
   });
 
   test('lee el id en la ruta, el host de la app y www', () {

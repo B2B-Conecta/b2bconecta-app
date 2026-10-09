@@ -52,4 +52,32 @@ void main() {
     expect(orderChatReplyOpen(TransactionRequestStatus.entregado), isFalse);
     expect(orderChatReplyOpen(TransactionRequestStatus.rechazado), isFalse);
   });
+
+  test('recibido mantiene el chat 7 días para tienda y proveedor', () {
+    final now = DateTime.utc(2026, 10, 9, 12);
+    expect(
+      orderChatReplyOpen(
+        TransactionRequestStatus.entregado,
+        deliveredAt: now.subtract(const Duration(days: 6)),
+        now: now,
+      ),
+      isTrue,
+    );
+    expect(
+      orderChatReplyOpen(
+        TransactionRequestStatus.entregado,
+        deliveredAt: now.subtract(const Duration(days: 8)),
+        now: now,
+      ),
+      isFalse,
+    );
+    expect(
+      orderChatReplyOpen(
+        TransactionRequestStatus.rechazado,
+        deliveredAt: now,
+        now: now,
+      ),
+      isFalse,
+    );
+  });
 }

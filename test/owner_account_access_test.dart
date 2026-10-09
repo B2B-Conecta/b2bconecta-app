@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_create_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
+import 'package:motolink_pro_app/features/admin/owner_related_orders.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 import 'package:motolink_pro_app/features/admin/owner_catalog_filter.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -417,5 +418,25 @@ void main() {
         '2',
       );
     });
+  });
+
+  test('pedidos asociados del borrado definitivo', () {
+    final parsed = OwnerRelatedOrders.fromRpc({
+      'count': 2,
+      'orders': [
+        {
+          'id': 'o1',
+          'status': 'en_preparacion',
+          'product_name': 'Espejo',
+          'counterparty_name': 'Taller Sur',
+          'side': 'Como proveedor',
+          'created_at': '2026-10-01T12:00:00Z',
+        },
+      ],
+    });
+    expect(parsed.count, 2);
+    expect(parsed.orders.single.productName, 'Espejo');
+    expect(parsed.orders.single.side, 'Como proveedor');
+    expect(OwnerRelatedOrders.fromRpc(null).count, 0);
   });
 }

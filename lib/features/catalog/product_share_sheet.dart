@@ -9,8 +9,15 @@ import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 
 /// Compartir enlace, copiarlo, o enviar y descargar la foto por separado.
-Future<void> showProductShareSheet(BuildContext context, PartModel part) {
+///
+/// [includeDevLink] solo para el administrador: el proveedor comparte producción.
+Future<void> showProductShareSheet(
+  BuildContext context,
+  PartModel part, {
+  bool includeDevLink = false,
+}) {
   final url = ProductShareLink.urlFor(part.id);
+  final devUrl = ProductShareLink.devUrlFor(part.id);
   final name = part.nombre.trim().isEmpty ? 'Producto' : part.nombre.trim();
   final image = part.coverImageUrl?.trim();
   return showModalBottomSheet<void>(
@@ -51,8 +58,14 @@ Future<void> showProductShareSheet(BuildContext context, PartModel part) {
               ),
               ListTile(
                 leading: const Icon(Icons.ios_share_rounded, color: AppColors.brand),
-                title: const Text('Compartir enlace'),
-                subtitle: const Text('Texto y enlace para WhatsApp u otras apps'),
+                title: Text(
+                  includeDevLink ? 'Compartir enlace real' : 'Compartir enlace',
+                ),
+                subtitle: Text(
+                  includeDevLink
+                      ? 'El de la aplicación publicada. Sirve para WhatsApp u otras aplicaciones.'
+                      : 'Para enviarlo por WhatsApp u otra aplicación.',
+                ),
                 onTap: () async {
                   Navigator.of(ctx).pop();
                   await _shareText(context, name: name, url: url);
@@ -60,13 +73,36 @@ Future<void> showProductShareSheet(BuildContext context, PartModel part) {
               ),
               ListTile(
                 leading: const Icon(Icons.link, color: AppColors.brand),
-                title: const Text('Copiar enlace'),
+                title: Text(
+                  includeDevLink ? 'Copiar enlace real' : 'Copiar enlace',
+                ),
+                subtitle: Text(
+                  includeDevLink
+                      ? 'Este es el principal. Es el que deben abrir los clientes.'
+                      : 'Para pegarlo donde quiera enviarlo.',
+                ),
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: url));
                   if (ctx.mounted) Navigator.of(ctx).pop();
-                  _toast(context, 'Enlace copiado.');
+                  _toast(
+                    context,
+                    includeDevLink ? 'Enlace real copiado.' : 'Enlace copiado.',
+                  );
                 },
               ),
+              if (includeDevLink)
+                ListTile(
+                  leading: const Icon(Icons.science_outlined, color: AppColors.brand),
+                  title: const Text('Copiar enlace de prueba'),
+                  subtitle: const Text(
+                    'Solo para revisar en el sitio de pruebas. No se lo envíe a un cliente.',
+                  ),
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: devUrl));
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    _toast(context, 'Enlace de prueba copiado.');
+                  },
+                ),
               if (image != null && image.isNotEmpty) ...[
                 ListTile(
                   leading: const Icon(Icons.image_outlined, color: AppColors.brand),

@@ -377,7 +377,7 @@ class _AdminAccountManagementPanelState
     if (!mounted || !done) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cuenta borrada de Auth. El correo quedó libre.'),
+        content: Text('Cuenta borrada. El correo quedó libre.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -423,8 +423,9 @@ class _AdminAccountManagementPanelState
           Text(
             'Ficha completa (correo, teléfono y datos fiscales). '
             'Puede crear cuentas y cargarles el expediente. '
-            'Eliminar es baja lógica. Borrar definitiva quita Auth y libera '
-            'el correo; no se puede si hay pedidos.',
+            'Eliminar desactiva la cuenta y conserva el historial. '
+            'Borrar definitivo quita la cuenta y libera el correo. '
+            'Si tiene pedidos, se avisa antes y puede revisarlos.',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -855,7 +856,7 @@ class _AccountActions extends StatelessWidget {
               ),
             ),
             onPressed: onHardDelete,
-            child: const Text('Borrar definitiva'),
+            child: const Text('Borrar definitivo'),
           ),
         ],
       ],

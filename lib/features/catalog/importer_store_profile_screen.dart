@@ -458,6 +458,27 @@ class _ImporterStoreProfileScreenState
             SliverPadding(
               padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
               sliver: SliverToBoxAdapter(
+                child: LayoutBuilder(
+                  builder: (context, gridConstraints) {
+                    return AliadoCatalogCardWrap(
+                      maxWidth: gridConstraints.maxWidth,
+                      itemCount: visibleParts.length,
+                      itemBuilder: (context, index) {
+                        final part = visibleParts[index];
+                        return _StoreProductCard(
+                          part: part,
+                          showHeart: widget.viewer.isAliado,
+                          onTap: () => _openProduct(part),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 24),
+              sliver: SliverToBoxAdapter(
                 child: ListPageBar(
                   total: _parts.length,
                   hasMore: _hasMore,
@@ -475,27 +496,6 @@ class _ImporterStoreProfileScreenState
                     if (_parts.length < size && _hasMore) {
                       _openViewPage(0);
                     }
-                  },
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
-              sliver: SliverToBoxAdapter(
-                child: LayoutBuilder(
-                  builder: (context, gridConstraints) {
-                    return AliadoCatalogCardWrap(
-                      maxWidth: gridConstraints.maxWidth,
-                      itemCount: visibleParts.length,
-                      itemBuilder: (context, index) {
-                        final part = visibleParts[index];
-                        return _StoreProductCard(
-                          part: part,
-                          showHeart: widget.viewer.isAliado,
-                          onTap: () => _openProduct(part),
-                        );
-                      },
-                    );
                   },
                 ),
               ),

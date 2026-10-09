@@ -31,8 +31,8 @@ android {
 
     defaultConfig {
         applicationId = "ve.com.b2bconecta.app"
-        // androidx.camera 1.5 (via mobile_scanner) requires minSdk 23+
-        minSdk = 23
+        // Play automatic protection requires API 24+. Camera (mobile_scanner) needs 23+.
+        minSdk = 24
         // Play requires API 36+ for app updates from 31 Aug 2026
         // (flutter.targetSdkVersion can lag behind Play policy).
         targetSdk = 36

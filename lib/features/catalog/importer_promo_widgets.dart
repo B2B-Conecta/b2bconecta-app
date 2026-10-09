@@ -4,17 +4,10 @@ import 'promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'aliado_promo_campaign_widgets.dart';
 
 String _formatPromoRange(DateTime start, DateTime end) {
-  final a = formatEsShortDateTime(
-    DateTime(start.year, start.month, start.day),
-  ).split(' ').first;
-  final b = formatEsShortDateTime(
-    DateTime(end.year, end.month, end.day),
-  ).split(' ').first;
-  return '$a – $b';
+  return promoActivePeriodLabel(start, end);
 }
 
 /// Badge en pedido importador: solicitado bajo campaña promocional.

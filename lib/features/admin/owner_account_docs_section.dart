@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_doc_type.dart';
 import 'package:motolink_pro_app/features/kyc/document_review_status.dart';
 import 'package:motolink_pro_app/features/kyc/profile_document_model.dart';
@@ -68,6 +69,19 @@ class _OwnerAccountDocsSectionState extends State<OwnerAccountDocsSection> {
     return null;
   }
 
+  Future<void> _open(ProfileDocumentModel doc) {
+    final name = doc.fileName?.trim();
+    return openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForProfileDocument(
+        doc.storagePath,
+      ),
+      fileName: (name == null || name.isEmpty)
+          ? AliadoDocType.labelEs(doc.docType)
+          : name,
+    );
+  }
+
   Future<void> _pick(String docType, DocumentPickChannel channel) async {
     final picked = await pickKycDocument(channel: channel);
     if (picked == null || !mounted) return;
@@ -117,7 +131,7 @@ class _OwnerAccountDocsSectionState extends State<OwnerAccountDocsSection> {
         const SizedBox(height: 4),
         Text(
           widget.markApproved
-              ? 'Quedan marcados como aprobados en el expediente.'
+              ? 'Los aprobados se pueden abrir aquí. También puede reemplazarlos.'
               : 'Quedan pendientes para la revisión habitual.',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
@@ -148,6 +162,10 @@ class _OwnerAccountDocsSectionState extends State<OwnerAccountDocsSection> {
                     ),
               effectiveStatus: _docFor(type)?.reviewStatus,
               busy: _busyType == type,
+              compactActions: true,
+              onView: _docFor(type) == null
+                  ? null
+                  : () => _open(_docFor(type)!),
               onPickCamera: () => _pick(type, DocumentPickChannel.camera),
               onPickGallery: () => _pick(type, DocumentPickChannel.gallery),
               onPickFile: () => _pick(type, DocumentPickChannel.file),

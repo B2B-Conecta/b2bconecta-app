@@ -374,13 +374,15 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (isDesktop)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: _bulkCatalogCard(isDesktop: true)),
-              const SizedBox(width: 12),
-              Expanded(child: _bulkPhotosCard(isDesktop: true)),
-            ],
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _bulkCatalogCard(isDesktop: true)),
+                const SizedBox(width: 12),
+                Expanded(child: _bulkPhotosCard(isDesktop: true)),
+              ],
+            ),
           )
         else ...[
           _bulkCatalogCard(isDesktop: false),

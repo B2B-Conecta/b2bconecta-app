@@ -842,8 +842,14 @@ class CatalogService {
   }
 
   /// Vitrina pública: nombre del proveedor y hasta 40 productos activos.
-  static Future<({String name, String? estado, String? ciudad, List<PartModel> products})?>
-      fetchPublicSharedStore(String importerId) async {
+  static Future<
+      ({
+        String name,
+        String? estado,
+        String? ciudad,
+        String? logoStoragePath,
+        List<PartModel> products,
+      })?> fetchPublicSharedStore(String importerId) async {
     final id = importerId.trim();
     if (id.isEmpty) return null;
     final res = await SupabaseAccess.client.rpc(
@@ -862,10 +868,12 @@ class CatalogService {
       }
     }
     final name = map['business_name']?.toString().trim() ?? '';
+    final logo = map['logo_storage_path']?.toString().trim();
     return (
       name: name.isEmpty ? 'Proveedor' : name,
       estado: map['estado']?.toString(),
       ciudad: map['ciudad']?.toString(),
+      logoStoragePath: (logo == null || logo.isEmpty) ? null : logo,
       products: products,
     );
   }

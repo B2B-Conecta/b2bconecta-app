@@ -124,6 +124,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return viewer.isImportador || viewer.isAdministrador;
   }
 
+  void _shareProduct() {
+    showProductShareSheet(
+      context,
+      part,
+      includeDevLink: _profile?.isAdministrador == true,
+    );
+  }
+
   bool get _canOpenImporterStore {
     final owner = part.ownerId?.trim();
     if (owner == null || owner.isEmpty) return false;
@@ -329,7 +337,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (_canShareProduct)
             IconButton(
               tooltip: 'Compartir producto',
-              onPressed: () => showProductShareSheet(context, part),
+              onPressed: _shareProduct,
               icon: const Icon(Icons.ios_share_rounded),
             ),
         ],
@@ -402,7 +410,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: _ProductBackButton(
               label: 'Compartir',
               icon: Icons.ios_share_rounded,
-              onPressed: () => showProductShareSheet(context, part),
+              onPressed: _shareProduct,
             ),
           ),
         Positioned(
@@ -606,8 +614,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
-            onPressed: () => showProductShareSheet(context, part),
-            icon: const Icon(Icons.ios_share_rounded, size: 18),
+              onPressed: _shareProduct,
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
             label: const Text('Compartir producto'),
           ),
         ),

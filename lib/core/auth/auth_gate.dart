@@ -186,6 +186,20 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _authCallbackTimeoutTimer = null;
   }
 
+  /// Sale de la ficha pública hacia `/registro` sin dejar la ruta del producto encima.
+  void _openRegisterFromGuest() {
+    ProductShareLink.suppressGuestPreview = true;
+    _guestLeftForAuth = true;
+    _registerAfterGuest = true;
+    final nav = Navigator.of(context);
+    nav.popUntil((route) => route.isFirst);
+    if (ModalRoute.of(context)?.settings.name == PublicAuthRoute.path) {
+      if (mounted) setState(() {});
+      return;
+    }
+    nav.pushReplacementNamed(PublicAuthRoute.path);
+  }
+
   void _onIncomingDeepLink(Uri uri) {
     if (ProductShareLink.idFromUri(uri) != null) {
       unawaited(ProductShareLink.capture(uri));
@@ -486,20 +500,23 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
 
     if (session != null) {
+      ProductShareLink.suppressGuestPreview = false;
       return const ProfileGate(key: ValueKey('profile_gate'));
     }
 
-    final sharedProductId = ProductShareLink.idFromUri(widget.launchUri) ??
-        ProductShareLink.idFromUri(Uri.base) ??
-        ProductShareLink.pending.value;
-    if (sharedProductId != null && !_guestLeftForAuth) {
+    final skipGuest = _guestLeftForAuth ||
+        widget.startInRegister ||
+        ProductShareLink.suppressGuestPreview;
+    final sharedProductId = skipGuest
+        ? null
+        : ProductShareLink.idFromUri(widget.launchUri) ??
+            ProductShareLink.idFromUri(Uri.base) ??
+            ProductShareLink.pending.value;
+    if (sharedProductId != null) {
       return GuestSharedProductScreen(
         key: ValueKey('guest_product_$sharedProductId'),
         productId: sharedProductId,
-        onRegister: () => setState(() {
-          _guestLeftForAuth = true;
-          _registerAfterGuest = true;
-        }),
+        onRegister: _openRegisterFromGuest,
       );
     }
 

@@ -3,25 +3,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Enlace a la ficha: `{sitio}/producto/{id}`.
 ///
-/// El enlace público es el de producción. El de DEV sirve para probar la
-/// misma ficha en el sitio de pruebas. El id queda guardado hasta que el
-/// usuario entra, para que el registro o el inicio de sesión no lo pierdan.
+/// El enlace público es el de producción. El de DEV lo copia solo el
+/// administrador, para probar la misma ficha en el sitio de pruebas. El id
+/// queda guardado hasta que el usuario entra, para que el registro o el
+/// inicio de sesión no lo pierdan.
 abstract final class ProductShareLink {
   static const origin = 'https://app.b2bconecta.com.ve';
 
   static const devOrigin =
       'https://b2bconecta-app-git-dev-b2bconecta.vercel.app';
 
-  /// Sitio abierto en la web. En la app móvil, el de producción.
-  static String get shareOrigin {
-    if (kIsWeb) {
-      try {
-        final current = Uri.base.origin;
-        if (current.isNotEmpty) return current;
-      } catch (_) {}
-    }
-    return origin;
-  }
+  /// El visitante eligió registrarse: no volver a tapar el login con la ficha.
+  static bool suppressGuestPreview = false;
 
   static const _prefKey = 'pending_product_share_id';
 
@@ -36,13 +29,6 @@ abstract final class ProductShareLink {
 
   static String devUrlFor(String productId) =>
       '$devOrigin/producto/${productId.trim()}';
-
-  /// Enlace del sitio abierto, cuando no es ni producción ni DEV.
-  static String? localUrlFor(String productId) {
-    final current = shareOrigin;
-    if (current == origin || current == devOrigin) return null;
-    return '$current/producto/${productId.trim()}';
-  }
 
   static String? idFromUri(Uri? uri) {
     if (uri == null) return null;

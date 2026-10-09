@@ -96,11 +96,13 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
         }
       }
       if (!mounted) return;
+      final expanded = _expandedProfileId;
       setState(() {
         _profiles = rows;
         _loading = false;
         _docsByProfile.clear();
       });
+      if (expanded != null) await _reloadDocs(expanded);
       _onKycNotificationDeepLink();
     } catch (e) {
       if (!mounted) return;
@@ -111,8 +113,11 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     }
   }
 
-  Future<void> _ensureDocsLoaded(String profileId) async {
-    if (_docsByProfile.containsKey(profileId)) return;
+  Future<void> _ensureDocsLoaded(String profileId) => _reloadDocs(profileId);
+
+  /// Siempre vuelve a leer el servidor. Si no, un documento que ya estaba
+  /// aprobado sigue ocultando Aprobar después de un rechazo y un reenvío.
+  Future<void> _reloadDocs(String profileId) async {
     try {
       final docs =
           await SupabaseService.fetchProfileDocumentsForProfile(profileId);
@@ -120,7 +125,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       setState(() => _docsByProfile[profileId] = docs);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _docsByProfile[profileId] = []);
+      if (!_docsByProfile.containsKey(profileId)) {
+        setState(() => _docsByProfile[profileId] = []);
+      }
     }
   }
 
@@ -590,7 +597,15 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                             final docs = _docsByProfile[p.id] ?? [];
                             final currentByType = <String, ProfileDocumentModel>{};
                             for (final d in docs) {
-                              if (d.isCurrent) {
+                              if (!d.isCurrent) continue;
+                              final prev = currentByType[d.docType];
+                              if (prev == null ||
+                                  (d.createdAt ??
+                                          DateTime.fromMillisecondsSinceEpoch(0))
+                                      .isAfter(
+                                    prev.createdAt ??
+                                        DateTime.fromMillisecondsSinceEpoch(0),
+                                  )) {
                                 currentByType[d.docType] = d;
                               }
                             }

@@ -107,11 +107,8 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
     );
   }
 
-  Future<void> _replaceRejected(
-    String docType,
-    DocumentPickChannel channel,
-  ) async {
-    final picked = await pickKycDocument(channel: channel);
+  Future<void> _replaceRejected(String docType) async {
+    final picked = await pickKycDocumentBytes(context);
     if (picked == null || !mounted) return;
     setState(() => _busyDocType = docType);
     try {
@@ -381,7 +378,7 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Si uno se rechaza, puede volver a cargarlo. Los aprobados no se modifican.',
+              'Si uno se rechaza, use Reenviar documento. Los aprobados no se modifican.',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.35,
@@ -430,24 +427,49 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
     final doc = _docFor(type);
     final status = doc?.reviewStatus?.trim();
     final canReplace = doc != null && status == DocumentReviewStatus.rechazado;
+    final busy = _busyDocType == type;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: ProfileKycDocumentTile(
-        title: AliadoDocType.labelEs(type),
-        hasFile: doc != null,
-        statusLabel: doc == null
-            ? 'Sin archivo'
-            : DocumentReviewStatus.labelEs(status),
-        effectiveStatus: status,
-        reviewNote: doc?.reviewNote,
-        busy: _busyDocType == type,
-        showPickActions: canReplace,
-        onView: doc == null ? null : () => _openDoc(doc),
-        onPickCamera: () =>
-            _replaceRejected(type, DocumentPickChannel.camera),
-        onPickGallery: () =>
-            _replaceRejected(type, DocumentPickChannel.gallery),
-        onPickFile: () => _replaceRejected(type, DocumentPickChannel.file),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ProfileKycDocumentTile(
+            title: AliadoDocType.labelEs(type),
+            hasFile: doc != null,
+            statusLabel: doc == null
+                ? 'Sin archivo'
+                : DocumentReviewStatus.labelEs(status),
+            effectiveStatus: status,
+            reviewNote: doc?.reviewNote,
+            busy: busy,
+            showPickActions: false,
+            onView: doc == null ? null : () => _openDoc(doc),
+            onPickCamera: () {},
+            onPickGallery: () {},
+            onPickFile: () {},
+          ),
+          if (canReplace) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brand,
+                minimumSize: const Size.fromHeight(44),
+              ),
+              onPressed: busy ? null : () => _replaceRejected(type),
+              icon: busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.upload_outlined, size: 18),
+              label: Text(busy ? 'Reenviando…' : 'Reenviar documento'),
+            ),
+          ],
+        ],
       ),
     );
   }

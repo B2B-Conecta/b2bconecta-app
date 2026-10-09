@@ -47,6 +47,80 @@ void main() {
 
     expect(find.text('Ver archivo'), findsNothing);
   });
+
+  test('el dueño solo reemplaza documentos pendientes o rechazados', () {
+    expect(DocumentReviewStatus.ownerCanReplace(null), isTrue);
+    expect(
+      DocumentReviewStatus.ownerCanReplace(DocumentReviewStatus.pendiente),
+      isTrue,
+    );
+    expect(
+      DocumentReviewStatus.ownerCanReplace(DocumentReviewStatus.rechazado),
+      isTrue,
+    );
+    expect(
+      DocumentReviewStatus.ownerCanReplace(DocumentReviewStatus.enRevision),
+      isFalse,
+    );
+    expect(
+      DocumentReviewStatus.ownerCanReplace(DocumentReviewStatus.aprobado),
+      isFalse,
+    );
+  });
+
+  testWidgets('un documento aprobado se puede ver y no reemplazar', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProfileKycDocumentTile(
+            title: 'Foto de la tienda',
+            hasFile: true,
+            statusLabel: 'Aprobado',
+            effectiveStatus: DocumentReviewStatus.aprobado,
+            reviewNote: 'No debe mostrarse en aprobado',
+            showPickActions: false,
+            onView: () {},
+            onPickCamera: () {},
+            onPickGallery: () {},
+            onPickFile: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Ver archivo'), findsOneWidget);
+    expect(find.text('Cámara'), findsNothing);
+    expect(find.text('Galería'), findsNothing);
+    expect(find.text('Archivo'), findsNothing);
+  });
+
+  testWidgets('un documento rechazado muestra el motivo y permite reenviarlo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProfileKycDocumentTile(
+            title: 'Registro mercantil / cámara',
+            hasFile: true,
+            statusLabel: DocumentReviewStatus.labelEs(
+              DocumentReviewStatus.rechazado,
+            ),
+            effectiveStatus: DocumentReviewStatus.rechazado,
+            reviewNote: 'La imagen está cortada.',
+            onPickCamera: () {},
+            onPickGallery: () {},
+            onPickFile: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('La imagen está cortada.'), findsOneWidget);
+    expect(find.text('Cámara'), findsOneWidget);
+    expect(find.text('Galería'), findsOneWidget);
+    expect(find.text('Archivo'), findsOneWidget);
+  });
 }
 
 void _noop() {}

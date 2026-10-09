@@ -911,6 +911,25 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                                                                     .shade700,
                                                               ),
                                                             ),
+                                                            if ((doc?.reviewNote ??
+                                                                    '')
+                                                                .trim()
+                                                                .isNotEmpty) ...[
+                                                              const SizedBox(
+                                                                height: 6,
+                                                              ),
+                                                              Text(
+                                                                doc!.reviewNote!
+                                                                    .trim(),
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  height: 1.35,
+                                                                  color: Colors
+                                                                      .red
+                                                                      .shade800,
+                                                                ),
+                                                              ),
+                                                            ],
                                                             if (has) ...[
                                                               const SizedBox(
                                                                 height: 8,

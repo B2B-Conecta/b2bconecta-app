@@ -350,6 +350,7 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
         busy: busy,
         reviewedHint: reviewedHint,
         reviewNote: note,
+        showPickActions: DocumentReviewStatus.ownerCanReplace(effectiveStatus),
         requiredError: _showDocValidationErrors && !has,
         onPickCamera: () =>
             _pickAndUpload(type, channel: DocumentPickChannel.camera),

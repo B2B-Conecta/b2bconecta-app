@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 
 /// Reportes: catálogo publicado de un mayorista. Solo lectura.
 class AdminPublishedCatalogsSection extends StatefulWidget {
@@ -324,7 +325,10 @@ class _AdminPublishedCatalogsSectionState
       separator: 8,
       hasMore: _hasMore,
       onNeedMore: _loadingMore ? null : () => _loadProducts(reset: false),
-      itemBuilder: (part) => _PublishedProductTile(part: part),
+      itemBuilder: (part) => _PublishedProductTile(
+        part: part,
+        importerName: _selected?.businessName ?? '',
+      ),
     );
   }
 
@@ -354,17 +358,35 @@ class _AdminPublishedCatalogsSectionState
 }
 
 class _PublishedProductTile extends StatelessWidget {
-  const _PublishedProductTile({required this.part});
+  const _PublishedProductTile({
+    required this.part,
+    required this.importerName,
+  });
 
   final PartModel part;
+  final String importerName;
 
   @override
   Widget build(BuildContext context) {
     final sku = part.sku?.trim();
     final category = part.category?.trim();
-    return DecoratedBox(
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          final named = part.ownerBusinessName?.trim().isNotEmpty == true
+              ? part
+              : part.copyWith(ownerBusinessName: importerName);
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ProductDetailScreen(part: named),
+            ),
+          );
+        },
+        child: DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle),
       ),
@@ -431,7 +453,10 @@ class _PublishedProductTile extends StatelessWidget {
                 ],
               ),
             ),
+            const Icon(Icons.chevron_right, color: AppColors.brand),
           ],
+        ),
+      ),
         ),
       ),
     );

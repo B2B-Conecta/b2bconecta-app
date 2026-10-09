@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'importer_product_edit_screen.dart';
 import 'catalog_import_orchestrator.dart';
 import 'excel_catalog_service.dart';
@@ -1337,6 +1338,15 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 Padding(
                   padding: const EdgeInsets.only(right: 4, top: 4),
                   child: _visibilitySwitch(p),
+                ),
+                IconButton(
+                  tooltip: 'Compartir producto',
+                  onPressed: () => showProductShareSheet(context, p),
+                  icon: const Icon(
+                    Icons.ios_share_rounded,
+                    color: AppColors.brand,
+                    size: 22,
+                  ),
                 ),
                 IconButton(
                   tooltip: 'Eliminar producto',

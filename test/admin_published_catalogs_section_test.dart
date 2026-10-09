@@ -72,6 +72,13 @@ void main() {
     expect(find.text('Frenos'), findsOneWidget);
     expect(find.text('Editar'), findsNothing);
     expect(find.text('Pausar'), findsNothing);
+
+    await tester.tap(find.text('Pastilla de freno'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Pastilla de freno'), findsWidgets);
+    expect(find.text('Agregar al carrito'), findsNothing);
+    expect(find.text('Editar producto'), findsNothing);
   });
 
   testWidgets('mayorista sin publicados muestra el estado vacío', (tester) async {

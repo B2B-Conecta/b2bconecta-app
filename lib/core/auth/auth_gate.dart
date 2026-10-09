@@ -22,6 +22,7 @@ import 'auth_uri_callback_clear_stub.dart'
 import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
+import 'package:motolink_pro_app/features/catalog/guest_shared_catalog.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
@@ -52,6 +53,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   /// Tras recovery sigue activo hasta [signedOut] o cambio de contraseña.
   bool _awaitingPasswordRecovery = false;
+  bool _guestLeftForAuth = false;
+  bool _registerAfterGuest = false;
 
   /// Resolviendo `?code=` / fragmento Auth al abrir la app (PKCE / implicit).
   bool _resolvingAuthCallback = false;
@@ -486,10 +489,26 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return const ProfileGate(key: ValueKey('profile_gate'));
     }
 
+    final sharedProductId = ProductShareLink.idFromUri(
+      widget.launchUri ?? Uri.base,
+    );
+    if (sharedProductId != null && !_guestLeftForAuth) {
+      return GuestSharedProductScreen(
+        key: ValueKey('guest_product_$sharedProductId'),
+        productId: sharedProductId,
+        onRegister: () => setState(() {
+          _guestLeftForAuth = true;
+          _registerAfterGuest = true;
+        }),
+      );
+    }
+
     return LoginScreen(
-      key: ValueKey(_startInRegister ? 'register' : 'login'),
+      key: ValueKey(
+        (_startInRegister || _registerAfterGuest) ? 'register' : 'login',
+      ),
       initialErrorMessage: _initialLinkError,
-      startInRegister: _startInRegister,
+      startInRegister: _startInRegister || _registerAfterGuest,
     );
   }
 }

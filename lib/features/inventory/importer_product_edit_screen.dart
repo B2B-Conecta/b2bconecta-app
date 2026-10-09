@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
@@ -298,6 +299,19 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     );
   }
 
+  Widget _buildShareButton() {
+    final product = widget.initial;
+    if (product == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: OutlinedButton.icon(
+        onPressed: () => showProductShareSheet(context, product),
+        icon: const Icon(Icons.ios_share_rounded, size: 18),
+        label: const Text('Compartir producto'),
+      ),
+    );
+  }
+
   Widget _buildVisibilitySwitch() {
     return SwitchTheme(
       data: SwitchThemeData(
@@ -541,6 +555,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              _buildShareButton(),
                               _buildVisibilitySwitch(),
                               const SizedBox(height: 12),
                               SwitchListTile(
@@ -590,6 +605,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
+          _buildShareButton(),
           _buildVisibilitySwitch(),
           const SizedBox(height: 8),
           _buildMainFields(),
@@ -637,6 +653,15 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         surfaceTintColor: Colors.transparent,
         title: Text(_isEdit ? 'Editar producto' : 'Añadir producto'),
         actions: [
+          if (_isEdit)
+            IconButton(
+              tooltip: 'Compartir producto',
+              onPressed: () => showProductShareSheet(
+                context,
+                widget.initial!,
+              ),
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
           if (_isEdit && isDesktop)
             TextButton.icon(
               onPressed: _saving ? null : _deleteProduct,

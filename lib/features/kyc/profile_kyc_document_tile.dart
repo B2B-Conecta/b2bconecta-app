@@ -18,6 +18,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
     required this.onPickFile,
     this.onView,
     this.compactActions = false,
+    this.showPickActions = true,
     this.busy = false,
     this.actionsEnabled = true,
     this.reviewedHint,
@@ -38,6 +39,9 @@ class ProfileKycDocumentTile extends StatelessWidget {
 
   /// Cámara, galería y archivo en chips bajos. El expediente del admin lo usa.
   final bool compactActions;
+
+  /// Oculta cámara, galería y archivo. Un documento aprobado o en revisión no se reemplaza.
+  final bool showPickActions;
   final bool busy;
   final bool actionsEnabled;
   final String? reviewedHint;
@@ -85,47 +89,49 @@ class ProfileKycDocumentTile extends StatelessWidget {
               effectiveStatus: effectiveStatus,
               requiredError: showRequired,
             ),
-            const SizedBox(height: 8),
-            if (compactActions)
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (hasFile && onView != null)
-                    _CompactViewChip(
-                      onPressed: busy ? null : onView,
-                    ),
-                  MediaPickActionChips(
-                    compact: true,
-                    busy: busy,
-                    enabled: actionsEnabled,
-                    onCamera: onPickCamera,
-                    onGallery: onPickGallery,
-                    onFile: onPickFile,
-                  ),
-                ],
-              )
-            else ...[
-              if (hasFile && onView != null) ...[
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                    foregroundColor: AppColors.brand,
-                  ),
-                  onPressed: busy ? null : onView,
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                  label: const Text('Ver archivo'),
+            if (hasFile && onView != null && !compactActions) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(40),
+                  foregroundColor: AppColors.brand,
                 ),
-                const SizedBox(height: 8),
-              ],
-              MediaPickActionChips(
-                busy: busy,
-                enabled: actionsEnabled,
-                onCamera: onPickCamera,
-                onGallery: onPickGallery,
-                onFile: onPickFile,
+                onPressed: busy ? null : onView,
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('Ver archivo'),
               ),
+            ],
+            if (showPickActions || (compactActions && hasFile && onView != null)) ...[
+              const SizedBox(height: 8),
+              if (compactActions)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (hasFile && onView != null)
+                      _CompactViewChip(
+                        onPressed: busy ? null : onView,
+                      ),
+                    if (showPickActions)
+                      MediaPickActionChips(
+                        compact: true,
+                        busy: busy,
+                        enabled: actionsEnabled,
+                        onCamera: onPickCamera,
+                        onGallery: onPickGallery,
+                        onFile: onPickFile,
+                      ),
+                  ],
+                )
+              else
+                MediaPickActionChips(
+                  busy: busy,
+                  enabled: actionsEnabled,
+                  onCamera: onPickCamera,
+                  onGallery: onPickGallery,
+                  onFile: onPickFile,
+                ),
             ],
             if (reviewedHint != null) ...[
               const SizedBox(height: 6),

@@ -5,6 +5,17 @@ abstract final class DocumentReviewStatus {
   static const aprobado = 'aprobado';
   static const rechazado = 'rechazado';
 
+  /// El dueño puede sustituir un archivo que aún no está en revisión ni aprobado.
+  static bool ownerCanReplace(String? status) {
+    switch (status?.trim()) {
+      case enRevision:
+      case aprobado:
+        return false;
+      default:
+        return true;
+    }
+  }
+
   static String labelEs(String? status) {
     switch (status?.trim()) {
       case pendiente:

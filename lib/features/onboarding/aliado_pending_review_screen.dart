@@ -4,7 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/app/config/brand_copy.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
+import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
+import 'package:motolink_pro_app/features/kyc/aliado_doc_type.dart';
+import 'package:motolink_pro_app/features/kyc/document_review_status.dart';
+import 'package:motolink_pro_app/features/kyc/profile_document_model.dart';
+import 'package:motolink_pro_app/features/kyc/profile_kyc_document_tile.dart';
 import 'package:motolink_pro_app/core/notifications/in_app_notification_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/core/auth/auth_service.dart';
@@ -39,6 +45,10 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
   bool _approvedBannerVisible = false;
   String _approvedMessage =
       'Su acceso a B2B Conecta está habilitado. Ya puede operar en la plataforma.';
+  List<ProfileDocumentModel> _docs = const [];
+  bool _loadingDocs = false;
+  String? _busyDocType;
+  String? _docNotice;
 
   bool get _isRejected =>
       widget.profile.accountAccessStatus?.trim() ==
@@ -58,6 +68,72 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
         onAccessActive: _onAccessActive,
       );
     }
+    if (!_isImportador) unawaited(_loadDocs());
+  }
+
+  Future<void> _loadDocs() async {
+    if (!mounted) return;
+    setState(() => _loadingDocs = true);
+    try {
+      final list = await SupabaseService.fetchMyProfileDocuments();
+      if (!mounted) return;
+      setState(() {
+        _docs = list;
+        _loadingDocs = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingDocs = false);
+    }
+  }
+
+  ProfileDocumentModel? _docFor(String type) {
+    for (final doc in _docs) {
+      if (doc.docType == type) return doc;
+    }
+    return null;
+  }
+
+  Future<void> _openDoc(ProfileDocumentModel doc) {
+    final name = doc.fileName?.trim();
+    return openStoredFile(
+      context,
+      signedUrl: () => SupabaseService.createSignedUrlForProfileDocument(
+        doc.storagePath,
+      ),
+      fileName: (name == null || name.isEmpty)
+          ? AliadoDocType.labelEs(doc.docType)
+          : name,
+    );
+  }
+
+  Future<void> _replaceRejected(
+    String docType,
+    DocumentPickChannel channel,
+  ) async {
+    final picked = await pickKycDocument(channel: channel);
+    if (picked == null || !mounted) return;
+    setState(() => _busyDocType = docType);
+    try {
+      await SupabaseService.uploadMyProfileDocument(
+        docType: docType,
+        bytes: picked.bytes,
+        fileName: picked.fileName,
+      );
+      if (!mounted) return;
+      setState(() {
+        _docNotice =
+            '${AliadoDocType.labelEs(docType)} quedó otra vez en revisión.';
+      });
+      await _loadDocs();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo reenviar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyDocType = null);
+    }
   }
 
   @override
@@ -74,6 +150,20 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
   }
 
   Future<void> _onNotificationInsert(InAppNotificationModel notification) async {
+    if (notification.type.trim().toLowerCase() == 'kyc' &&
+        !isAliadoAccessApprovedNotification(
+          type: notification.type,
+          title: notification.title,
+        )) {
+      if (!mounted) return;
+      setState(() {
+        final body = notification.body.trim();
+        _docNotice = body.isEmpty ? notification.title.trim() : body;
+      });
+      if (!_isImportador) unawaited(_loadDocs());
+      return;
+    }
+
     if (!isAliadoAccessApprovedNotification(
       type: notification.type,
       title: notification.title,
@@ -214,6 +304,10 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
                         ),
                       ),
                     ],
+                    if (!_isImportador) ...[
+                      const SizedBox(height: 20),
+                      _documentsCard(),
+                    ],
                     const SizedBox(height: 28),
                     if (_isRejected)
                       FilledButton(
@@ -238,7 +332,10 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
                       ),
                     if (!_isRejected)
                       OutlinedButton(
-                        onPressed: widget.onRefresh,
+                        onPressed: () {
+                          widget.onRefresh();
+                          if (!_isImportador) unawaited(_loadDocs());
+                        },
                         child: const Text('Actualizar estado'),
                       ),
                     const SizedBox(height: 12),
@@ -254,6 +351,103 @@ class _AliadoPendingReviewScreenState extends State<AliadoPendingReviewScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _documentsCard() {
+    final types = [
+      ...AliadoDocType.kycRequiredAliado,
+      ...AliadoDocType.kycSupplementaryAliado,
+    ];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Documentos',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Si uno se rechaza, puede volver a cargarlo. Los aprobados no se modifican.',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (_docNotice != null && _docNotice!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                _docNotice!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.brand,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            if (_loadingDocs)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.brand,
+                    ),
+                  ),
+                ),
+              )
+            else
+              for (final type in types)
+                if (_docFor(type) != null ||
+                    AliadoDocType.kycRequiredAliado.contains(type))
+                  _docTile(type),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _docTile(String type) {
+    final doc = _docFor(type);
+    final status = doc?.reviewStatus?.trim();
+    final canReplace = doc != null && status == DocumentReviewStatus.rechazado;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ProfileKycDocumentTile(
+        title: AliadoDocType.labelEs(type),
+        hasFile: doc != null,
+        statusLabel: doc == null
+            ? 'Sin archivo'
+            : DocumentReviewStatus.labelEs(status),
+        effectiveStatus: status,
+        reviewNote: doc?.reviewNote,
+        busy: _busyDocType == type,
+        showPickActions: canReplace,
+        onView: doc == null ? null : () => _openDoc(doc),
+        onPickCamera: () =>
+            _replaceRejected(type, DocumentPickChannel.camera),
+        onPickGallery: () =>
+            _replaceRejected(type, DocumentPickChannel.gallery),
+        onPickFile: () => _replaceRejected(type, DocumentPickChannel.file),
       ),
     );
   }

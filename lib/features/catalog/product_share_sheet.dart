@@ -11,6 +11,8 @@ import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 /// Compartir enlace, copiarlo, o enviar y descargar la foto por separado.
 Future<void> showProductShareSheet(BuildContext context, PartModel part) {
   final url = ProductShareLink.urlFor(part.id);
+  final devUrl = ProductShareLink.devUrlFor(part.id);
+  final localUrl = ProductShareLink.localUrlFor(part.id);
   final name = part.nombre.trim().isEmpty ? 'Producto' : part.nombre.trim();
   final image = part.coverImageUrl?.trim();
   return showModalBottomSheet<void>(
@@ -60,13 +62,35 @@ Future<void> showProductShareSheet(BuildContext context, PartModel part) {
               ),
               ListTile(
                 leading: const Icon(Icons.link, color: AppColors.brand),
-                title: const Text('Copiar enlace'),
+                title: const Text('Copiar enlace de producción'),
+                subtitle: const Text(ProductShareLink.origin),
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: url));
                   if (ctx.mounted) Navigator.of(ctx).pop();
-                  _toast(context, 'Enlace copiado.');
+                  _toast(context, 'Enlace de producción copiado.');
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.link, color: AppColors.brand),
+                title: const Text('Copiar enlace de DEV'),
+                subtitle: const Text(ProductShareLink.devOrigin),
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: devUrl));
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  _toast(context, 'Enlace de DEV copiado.');
+                },
+              ),
+              if (localUrl != null)
+                ListTile(
+                  leading: const Icon(Icons.link, color: AppColors.brand),
+                  title: const Text('Copiar enlace local'),
+                  subtitle: Text(Uri.parse(localUrl).origin),
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: localUrl));
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    _toast(context, 'Enlace local copiado.');
+                  },
+                ),
               if (image != null && image.isNotEmpty) ...[
                 ListTile(
                   leading: const Icon(Icons.image_outlined, color: AppColors.brand),

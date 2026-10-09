@@ -1,12 +1,28 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Enlace estable a la ficha: `https://app.b2bconecta.com.ve/producto/{id}`.
+/// Enlace a la ficha: `{sitio}/producto/{id}`.
 ///
-/// El id queda guardado hasta que el usuario entra a la app. Así el registro
-/// o el inicio de sesión no pierden el producto.
+/// El enlace público es el de producción. El de DEV sirve para probar la
+/// misma ficha en el sitio de pruebas. El id queda guardado hasta que el
+/// usuario entra, para que el registro o el inicio de sesión no lo pierdan.
 abstract final class ProductShareLink {
   static const origin = 'https://app.b2bconecta.com.ve';
+
+  static const devOrigin =
+      'https://b2bconecta-app-git-dev-b2bconecta.vercel.app';
+
+  /// Sitio abierto en la web. En la app móvil, el de producción.
+  static String get shareOrigin {
+    if (kIsWeb) {
+      try {
+        final current = Uri.base.origin;
+        if (current.isNotEmpty) return current;
+      } catch (_) {}
+    }
+    return origin;
+  }
+
   static const _prefKey = 'pending_product_share_id';
 
   static final pending = ValueNotifier<String?>(null);
@@ -15,9 +31,21 @@ abstract final class ProductShareLink {
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
 
-  static String urlFor(String productId) => '$origin/producto/${productId.trim()}';
+  static String urlFor(String productId) =>
+      '$origin/producto/${productId.trim()}';
 
-  static String? idFromUri(Uri uri) {
+  static String devUrlFor(String productId) =>
+      '$devOrigin/producto/${productId.trim()}';
+
+  /// Enlace del sitio abierto, cuando no es ni producción ni DEV.
+  static String? localUrlFor(String productId) {
+    final current = shareOrigin;
+    if (current == origin || current == devOrigin) return null;
+    return '$current/producto/${productId.trim()}';
+  }
+
+  static String? idFromUri(Uri? uri) {
+    if (uri == null) return null;
     final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
     if (segments.length >= 2 && segments.first.toLowerCase() == 'producto') {
       final id = segments[1].trim();

@@ -489,9 +489,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return const ProfileGate(key: ValueKey('profile_gate'));
     }
 
-    final sharedProductId = ProductShareLink.idFromUri(
-      widget.launchUri ?? Uri.base,
-    );
+    final sharedProductId = ProductShareLink.idFromUri(widget.launchUri) ??
+        ProductShareLink.idFromUri(Uri.base) ??
+        ProductShareLink.pending.value;
     if (sharedProductId != null && !_guestLeftForAuth) {
       return GuestSharedProductScreen(
         key: ValueKey('guest_product_$sharedProductId'),

@@ -133,7 +133,11 @@ class MyApp extends StatelessWidget {
               launchUri: launchUri,
               routeName: pathOnly,
             );
-            final name = register ? PublicAuthRoute.path : '/';
+            final sharedId = ProductShareLink.idFromUri(launchUri) ??
+                ProductShareLink.idFromRouteName(pathOnly);
+            final name = register
+                ? PublicAuthRoute.path
+                : (sharedId != null ? '/producto/$sharedId' : '/');
             return [
               MaterialPageRoute<void>(
                 settings: RouteSettings(name: name),

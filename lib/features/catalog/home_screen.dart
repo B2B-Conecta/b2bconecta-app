@@ -12,6 +12,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/profile/geolocator_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/features/admin/admin_catalog_coverage.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'aliado_catalog_layout.dart';
@@ -138,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _allySortLat = la;
         _allySortLng = lo;
       }
-      _importersFuture = SupabaseService.fetchImporterOptions();
+      _importersFuture = _publishedCatalogImporters();
       _promoFuture = SupabaseService.fetchActivePromoCampaignsForAliado();
       _searchController.addListener(_onAliadoSearchTextChanged);
       _partsFuture = _fetchProducts(reset: true);
@@ -539,6 +540,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
     return [wanted];
+  }
+
+  /// Proveedores con al menos un producto publicado. El resto no aparece
+  /// en el filtro ni en el acceso a la vitrina del catálogo del aliado.
+  Future<List<ImporterOption>> _publishedCatalogImporters() async {
+    final results = await Future.wait<Object>([
+      SupabaseService.fetchImporterOptions(),
+      SupabaseService.fetchPublishedCatalogOwnerIds(),
+    ]);
+    return splitImportersByPublishedCatalog(
+      importers: results[0] as List<ImporterOption>,
+      publishedOwnerIds: results[1] as Set<String>,
+    ).published;
   }
 
   Future<void> _openCatalogFiltersSheet(List<ImporterOption> importers) async {
@@ -1210,30 +1224,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       ),
                                     ),
                                   ),
-                                  SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: EdgeInsets.fromLTRB(
-                                        hPad,
-                                        8,
-                                        hPad,
-                                        0,
-                                      ),
-                                      child: ListPageBar(
-                                        total: _catalogTotal ?? parts.length,
-                                        hasMore: _catalogTotal == null &&
-                                            _hasMoreProducts,
-                                        pageIndex: _catalogViewPage,
-                                        pageSize: _catalogVisibleSize,
-                                        pageSizeOptions: const [
-                                          _catalogVisibleSize,
-                                        ],
-                                        onPageIndex: (index) {
-                                          _openCatalogViewPage(index);
-                                        },
-                                        onPageSize: (_) {},
-                                      ),
-                                    ),
-                                  ),
                                   SliverPadding(
                                     padding: EdgeInsets.fromLTRB(
                                       hPad,
@@ -1309,6 +1299,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                           ),
                                         );
                                       },
+                                    ),
+                                  ),
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        hPad,
+                                        4,
+                                        hPad,
+                                        16,
+                                      ),
+                                      child: ListPageBar(
+                                        total: _catalogTotal ?? parts.length,
+                                        hasMore: _catalogTotal == null &&
+                                            _hasMoreProducts,
+                                        pageIndex: _catalogViewPage,
+                                        pageSize: _catalogVisibleSize,
+                                        pageSizeOptions: const [
+                                          _catalogVisibleSize,
+                                        ],
+                                        onPageIndex: (index) {
+                                          _openCatalogViewPage(index);
+                                        },
+                                        onPageSize: (_) {},
+                                      ),
                                     ),
                                   ),
                                 ],

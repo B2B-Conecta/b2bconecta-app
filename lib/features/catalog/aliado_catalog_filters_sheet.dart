@@ -562,7 +562,8 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 _sectionHeader(
                   'Proveedores · $importerSummary',
                   icon: Icons.storefront_outlined,
-                  hint: 'Filtra por mayorista o abre su vitrina.',
+                  hint:
+                      'Solo mayoristas con catálogo publicado. Filtra o abre su vitrina.',
                 ),
                 TextField(
                   controller: _importerSearchController,
@@ -607,7 +608,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text(
                       widget.importers.isEmpty
-                          ? 'No hay proveedores disponibles.'
+                          ? 'Ningún proveedor tiene catálogo publicado.'
                           : 'Ningún proveedor coincide con la búsqueda.',
                       textAlign: TextAlign.center,
                       style: TextStyle(

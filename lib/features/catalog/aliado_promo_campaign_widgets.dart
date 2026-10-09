@@ -7,6 +7,85 @@ import 'promo_campaign_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'product_catalog_pricing.dart';
 
+const _promoMonthShort = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
+/// Periodo en que la valla está vigente, en una frase corta.
+String promoActivePeriodLabel(DateTime start, DateTime end) {
+  final a = DateTime(start.year, start.month, start.day);
+  final b = DateTime(end.year, end.month, end.day);
+  String monthDay(DateTime d) => '${d.day} ${_promoMonthShort[d.month - 1]}';
+  if (a == b) return 'Solo el ${monthDay(a)}';
+  if (a.year == b.year && a.month == b.month) {
+    return 'Del ${a.day} al ${b.day} ${_promoMonthShort[a.month - 1]}';
+  }
+  if (a.year == b.year) return 'Del ${monthDay(a)} al ${monthDay(b)}';
+  return 'Del ${monthDay(a)} ${a.year} al ${monthDay(b)} ${b.year}';
+}
+
+/// Pastilla de vigencia para banners, pop-ups y la lista de promociones.
+class PromoActivePeriodChip extends StatelessWidget {
+  const PromoActivePeriodChip({
+    super.key,
+    required this.startsAt,
+    required this.endsAt,
+    this.onPhoto = false,
+  });
+
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final bool onPhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = onPhoto ? Colors.white : AppColors.brand;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: onPhoto
+            ? Colors.black.withOpacity(0.62)
+            : AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(20),
+        border: onPhoto
+            ? null
+            : Border.all(color: AppColors.brand.withOpacity(0.16)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_month_outlined, size: 13, color: fg),
+            const SizedBox(width: 4),
+            Text(
+              promoActivePeriodLabel(startsAt, endsAt),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: fg,
+                fontSize: 11,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> launchPromoCampaignExternalUrl(
   BuildContext context,
   PromoCampaignModel campaign,
@@ -147,6 +226,19 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                   ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 8,
+                              bottom: 8,
+                              right: c.isTappable ? 128 : 8,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: PromoActivePeriodChip(
+                                  startsAt: c.startsAt,
+                                  endsAt: c.endsAt,
+                                  onPhoto: true,
                                 ),
                               ),
                             ),
@@ -297,6 +389,11 @@ Future<void> showAliadoPromoPopupDialog({
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  PromoActivePeriodChip(
+                    startsAt: campaign.startsAt,
+                    endsAt: campaign.endsAt,
                   ),
                 ],
               ),
@@ -486,13 +583,10 @@ Future<void> showAliadoActivePromotionsSheet({
                                         fontSize: 14,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      c.isPopup ? 'Pop-up' : 'Banner',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
+                                    const SizedBox(height: 6),
+                                    PromoActivePeriodChip(
+                                      startsAt: c.startsAt,
+                                      endsAt: c.endsAt,
                                     ),
                                   ],
                                 ),
@@ -581,6 +675,11 @@ Future<PartModel?> showAliadoPromoProductsSheet({
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        PromoActivePeriodChip(
+                          startsAt: campaign.startsAt,
+                          endsAt: campaign.endsAt,
                         ),
                       ],
                     ),

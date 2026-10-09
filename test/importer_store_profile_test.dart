@@ -336,6 +336,10 @@ void main() {
       (tester) async {
     final offsets = <int>[];
     final limits = <int>[];
+    tester.view.physicalSize = const Size(800, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await _pumpStore(
       tester,

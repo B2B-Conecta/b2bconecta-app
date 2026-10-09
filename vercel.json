@@ -15,17 +15,6 @@
   ],
   "rewrites": [
     {
-      "source": "/producto/:id",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": "(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|Instagram|Pinterest)"
-        }
-      ],
-      "destination": "https://fzugzjcwdzcwfxgviltw.supabase.co/functions/v1/product-share-preview?id=:id"
-    },
-    {
       "source": "/registro",
       "destination": "/index.html"
     },

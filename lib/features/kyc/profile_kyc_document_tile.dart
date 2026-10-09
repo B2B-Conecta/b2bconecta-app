@@ -16,6 +16,8 @@ class ProfileKycDocumentTile extends StatelessWidget {
     required this.onPickCamera,
     required this.onPickGallery,
     required this.onPickFile,
+    this.onView,
+    this.compactActions = false,
     this.busy = false,
     this.actionsEnabled = true,
     this.reviewedHint,
@@ -30,6 +32,12 @@ class ProfileKycDocumentTile extends StatelessWidget {
   final VoidCallback onPickCamera;
   final VoidCallback onPickGallery;
   final VoidCallback onPickFile;
+
+  /// Abre el archivo ya cargado. Solo se muestra si hay documento.
+  final VoidCallback? onView;
+
+  /// Cámara, galería y archivo en chips bajos. El expediente del admin lo usa.
+  final bool compactActions;
   final bool busy;
   final bool actionsEnabled;
   final String? reviewedHint;
@@ -78,13 +86,47 @@ class ProfileKycDocumentTile extends StatelessWidget {
               requiredError: showRequired,
             ),
             const SizedBox(height: 8),
-            MediaPickActionChips(
-              busy: busy,
-              enabled: actionsEnabled,
-              onCamera: onPickCamera,
-              onGallery: onPickGallery,
-              onFile: onPickFile,
-            ),
+            if (compactActions)
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (hasFile && onView != null)
+                    _CompactViewChip(
+                      onPressed: busy ? null : onView,
+                    ),
+                  MediaPickActionChips(
+                    compact: true,
+                    busy: busy,
+                    enabled: actionsEnabled,
+                    onCamera: onPickCamera,
+                    onGallery: onPickGallery,
+                    onFile: onPickFile,
+                  ),
+                ],
+              )
+            else ...[
+              if (hasFile && onView != null) ...[
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(40),
+                    foregroundColor: AppColors.brand,
+                  ),
+                  onPressed: busy ? null : onView,
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: const Text('Ver archivo'),
+                ),
+                const SizedBox(height: 8),
+              ],
+              MediaPickActionChips(
+                busy: busy,
+                enabled: actionsEnabled,
+                onCamera: onPickCamera,
+                onGallery: onPickGallery,
+                onFile: onPickFile,
+              ),
+            ],
             if (reviewedHint != null) ...[
               const SizedBox(height: 6),
               Text(
@@ -105,6 +147,31 @@ class ProfileKycDocumentTile extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CompactViewChip extends StatelessWidget {
+  const _CompactViewChip({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: const Size(0, 28),
+        foregroundColor: AppColors.brand,
+      ),
+      onPressed: onPressed,
+      icon: const Icon(Icons.visibility_outlined, size: 14),
+      label: const Text(
+        'Ver archivo',
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
       ),
     );
   }

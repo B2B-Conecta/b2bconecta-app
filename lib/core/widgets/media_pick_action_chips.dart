@@ -19,6 +19,7 @@ class MediaPickActionChips extends StatelessWidget {
     this.fileLabel = 'Archivo',
     this.maxWidth = 280,
     this.iconOnly = false,
+    this.compact = false,
   });
 
   final VoidCallback? onCamera;
@@ -30,6 +31,9 @@ class MediaPickActionChips extends StatelessWidget {
   final String fileLabel;
   final double maxWidth;
   final bool iconOnly;
+
+  /// Chips bajos, icono y texto en una línea, sin estirarse al ancho.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +81,30 @@ class MediaPickActionChips extends StatelessWidget {
               destructive: true,
             ),
           ],
+        ],
+      );
+    }
+
+    if (compact) {
+      return Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          _InlinePickChip(
+            icon: Icons.photo_camera_outlined,
+            label: 'Cámara',
+            onTap: active ? onCamera : null,
+          ),
+          _InlinePickChip(
+            icon: Icons.photo_library_outlined,
+            label: 'Galería',
+            onTap: active ? onGallery : null,
+          ),
+          _InlinePickChip(
+            icon: Icons.upload_file_outlined,
+            label: fileLabel,
+            onTap: active ? onFile : null,
+          ),
         ],
       );
     }
@@ -170,6 +198,57 @@ class _MediaPickIconButton extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _InlinePickChip extends StatelessWidget {
+  const _InlinePickChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = onTap != null;
+    final borderColor =
+        active ? AppColors.brand.withOpacity(0.35) : AppColors.borderSubtle;
+    final color = active ? AppColors.brand : AppColors.textMuted;
+
+    return Material(
+      color: active ? AppColors.brandBlueContainer : AppColors.surfaceTinted,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: borderColor),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.1,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -4,14 +4,9 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_thread.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
-import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 
-/// Pedido aún negociable en el hilo (ni entregado ni rechazado).
-bool orderChatReplyOpen(String status) {
-  return status != TransactionRequestStatus.entregado &&
-      status != TransactionRequestStatus.rechazado;
-}
+export 'package:motolink_pro_app/features/orders/shared/order_chat_access.dart';
 
 /// Flags de respuesta del hilo, alineados a Pedidos.
 ({bool aliado, bool admin, bool importador}) orderChatInboxReplyFlags({
@@ -45,6 +40,7 @@ void openOrderChatFromInbox({
     allowReplyAsAliado: flags.aliado,
     allowReplyAsAdmin: flags.admin,
     allowReplyAsImportador: flags.importador,
+    deliveryGrace: thread.inDeliveryGrace,
     title: title,
     onThreadChanged: onThreadChanged,
   );
@@ -57,6 +53,7 @@ Future<void> showOrderChatSheet({
   required bool allowReplyAsAliado,
   required bool allowReplyAsAdmin,
   bool allowReplyAsImportador = false,
+  bool deliveryGrace = false,
   String title = 'Chat del pedido',
   VoidCallback? onThreadChanged,
 }) {
@@ -128,6 +125,7 @@ Future<void> showOrderChatSheet({
                     allowReplyAsAliado: allowReplyAsAliado,
                     allowReplyAsAdmin: allowReplyAsAdmin,
                     allowReplyAsImportador: allowReplyAsImportador,
+                    deliveryGrace: deliveryGrace,
                     onThreadChanged: onThreadChanged,
                     suppressBuiltinTitle: true,
                     suppressInlineHelp: false,

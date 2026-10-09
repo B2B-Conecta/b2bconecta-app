@@ -10,8 +10,9 @@ abstract final class OrderSectionHelp {
       'Un solo pedido en B2B Conecta: destino y productos compartidos. '
       'Elija un importador abajo para ver envío, factura y pago.';
   static const chatPedido =
-      'Desde que el pedido está pendiente, tienda minorista e importador pueden escribir aquí '
-      '(cantidad, plazos y logística). B2B Conecta puede leer el hilo.';
+      'La tienda, el proveedor y B2B Conecta pueden escribir aquí, y enviar fotos o video. '
+      'Si el pedido ya se recibió, el chat sigue abierto 7 días por si hay una observación. '
+      'Cada mensaje avisa a la otra parte.';
   static const pagoAliadoMetodo =
       'Revise la factura, elija el método y adjunte el comprobante.';
   static const pagoAliadoArchivo =

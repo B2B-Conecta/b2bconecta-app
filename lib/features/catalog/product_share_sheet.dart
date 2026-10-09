@@ -58,8 +58,14 @@ Future<void> showProductShareSheet(
               ),
               ListTile(
                 leading: const Icon(Icons.ios_share_rounded, color: AppColors.brand),
-                title: const Text('Compartir enlace'),
-                subtitle: const Text('Texto y enlace para WhatsApp u otras apps'),
+                title: Text(
+                  includeDevLink ? 'Compartir enlace real' : 'Compartir enlace',
+                ),
+                subtitle: Text(
+                  includeDevLink
+                      ? 'El de la aplicación publicada. Sirve para WhatsApp u otras aplicaciones.'
+                      : 'Para enviarlo por WhatsApp u otra aplicación.',
+                ),
                 onTap: () async {
                   Navigator.of(ctx).pop();
                   await _shareText(context, name: name, url: url);
@@ -67,23 +73,34 @@ Future<void> showProductShareSheet(
               ),
               ListTile(
                 leading: const Icon(Icons.link, color: AppColors.brand),
-                title: const Text('Copiar enlace de producción'),
-                subtitle: const Text(ProductShareLink.origin),
+                title: Text(
+                  includeDevLink ? 'Copiar enlace real' : 'Copiar enlace',
+                ),
+                subtitle: Text(
+                  includeDevLink
+                      ? 'Este es el principal. Es el que deben abrir los clientes.'
+                      : 'Para pegarlo donde quiera enviarlo.',
+                ),
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: url));
                   if (ctx.mounted) Navigator.of(ctx).pop();
-                  _toast(context, 'Enlace de producción copiado.');
+                  _toast(
+                    context,
+                    includeDevLink ? 'Enlace real copiado.' : 'Enlace copiado.',
+                  );
                 },
               ),
               if (includeDevLink)
                 ListTile(
-                  leading: const Icon(Icons.link, color: AppColors.brand),
-                  title: const Text('Copiar enlace de DEV'),
-                  subtitle: const Text(ProductShareLink.devOrigin),
+                  leading: const Icon(Icons.science_outlined, color: AppColors.brand),
+                  title: const Text('Copiar enlace de prueba'),
+                  subtitle: const Text(
+                    'Solo para revisar en el sitio de pruebas. No se lo envíe a un cliente.',
+                  ),
                   onTap: () async {
                     await Clipboard.setData(ClipboardData(text: devUrl));
                     if (ctx.mounted) Navigator.of(ctx).pop();
-                    _toast(context, 'Enlace de DEV copiado.');
+                    _toast(context, 'Enlace de prueba copiado.');
                   },
                 ),
               if (image != null && image.isNotEmpty) ...[

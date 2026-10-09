@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/orders/shared/order_chat_access.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
@@ -22,6 +23,7 @@ class OrderChatThread {
     required this.status,
     required this.statusLabel,
     required this.canReply,
+    this.inDeliveryGrace = false,
     this.updatedAt,
     this.productSku,
     this.aliadoName,
@@ -35,6 +37,9 @@ class OrderChatThread {
   final String status;
   final String statusLabel;
   final bool canReply;
+
+  /// Pedido recibido y todavía dentro de los 7 días de observaciones.
+  final bool inDeliveryGrace;
   final DateTime? updatedAt;
   final String? productSku;
   final String? aliadoName;
@@ -127,11 +132,8 @@ OrderChatThread _threadFromLines(
     counterpartName: counterpart,
     status: status,
     statusLabel: statusLabel,
-    canReply: lines.any(
-      (l) =>
-          l.status != TransactionRequestStatus.entregado &&
-          l.status != TransactionRequestStatus.rechazado,
-    ),
+    canReply: orderLinesAllowChatReply(lines),
+    inDeliveryGrace: orderLinesChatDeliveryGrace(lines),
     updatedAt: latest,
     productSku: sku.isEmpty ? null : sku,
     aliadoName: aliado.isEmpty ? null : aliado,

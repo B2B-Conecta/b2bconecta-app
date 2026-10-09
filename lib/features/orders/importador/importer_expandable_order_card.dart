@@ -525,7 +525,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
           isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
       allowReplyAsAliado: false,
       allowReplyAsAdmin: false,
-      allowReplyAsImportador: lines.any((l) => orderChatReplyOpen(l.status)),
+      allowReplyAsImportador: orderLinesAllowChatReply(lines),
+      deliveryGrace: orderLinesChatDeliveryGrace(lines),
       title: (shop != null && shop.isNotEmpty) ? 'Chat · $shop' : 'Chat del pedido',
       onThreadChanged: onThreadChanged,
     );

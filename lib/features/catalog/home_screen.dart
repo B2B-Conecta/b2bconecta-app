@@ -254,9 +254,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   PartModel _withCampaignDiscount(PartModel part, PromoCampaignModel campaign) {
-    if (!campaign.hasProductDiscount) return part;
+    final pct = campaign.effectivePercentFor(part.id);
+    if (pct == null || pct <= 0) return part;
     return part.copyWith(
-      activeCampaignDiscountPercent: campaign.discountPercent,
+      activeCampaignDiscountPercent: pct,
       activePromoCampaignId: campaign.id,
     );
   }

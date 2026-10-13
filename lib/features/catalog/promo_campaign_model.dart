@@ -11,6 +11,7 @@ class PromoCampaignModel {
     this.productId,
     this.productIds = const [],
     this.discountPercent,
+    this.productDiscountPercents = const {},
     required this.actionType,
     required this.startsAt,
     required this.endsAt,
@@ -48,8 +49,12 @@ class PromoCampaignModel {
   /// Compat: primer producto de [productIds].
   final String? productId;
   final List<String> productIds;
-  /// % descuento de valla sobre lista (null = sin precio promo).
+  /// % general de la valla. Si un producto no tiene el suyo, usa este.
   final double? discountPercent;
+
+  /// % de esta valla por producto. Sin clave hereda [discountPercent].
+  /// 0 = ese producto queda sin descuento de esta valla.
+  final Map<String, double> productDiscountPercents;
   final String actionType;
   final DateTime startsAt;
   final DateTime endsAt;
@@ -101,8 +106,27 @@ class PromoCampaignModel {
       resolvedProductIds.isNotEmpty;
 
   bool get hasProductDiscount {
-    final pct = discountPercent;
-    return pct != null && pct > 0 && pct < 100 && resolvedProductIds.isNotEmpty;
+    if (resolvedProductIds.isEmpty) return false;
+    final general = discountPercent;
+    if (general != null && general > 0 && general < 100) return true;
+    for (final id in resolvedProductIds) {
+      final own = productDiscountPercents[id];
+      if (own != null && own > 0 && own < 100) return true;
+    }
+    return false;
+  }
+
+  /// % que ve ese producto en esta valla.
+  /// Vacío hereda el general. 0 explícito no hereda y no descuenta.
+  double? effectivePercentFor(String productId) {
+    final id = productId.trim();
+    if (id.isEmpty || !resolvedProductIds.contains(id)) return null;
+    if (productDiscountPercents.containsKey(id)) {
+      final own = productDiscountPercents[id];
+      if (own == null || own <= 0 || own >= 100) return null;
+      return own;
+    }
+    return discountPercent;
   }
 
   bool get isTappable =>
@@ -113,6 +137,36 @@ class PromoCampaignModel {
     final n = raw is num ? raw.toDouble() : double.tryParse(raw.toString());
     if (n == null || n <= 0 || n >= 100) return null;
     return n;
+  }
+
+  /// Campo vacío = sin override. 0 es válido y significa sin descuento.
+  static double? parseProductDiscountOverride(String raw) {
+    final t = raw.trim().replaceAll(',', '.');
+    if (t.isEmpty) return null;
+    final n = double.tryParse(t);
+    if (n == null || n < 0 || n >= 100) return null;
+    return n;
+  }
+
+  static bool isBlankOrValidProductDiscountOverride(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return true;
+    return parseProductDiscountOverride(t) != null;
+  }
+
+  static Map<String, double> parseProductDiscountPercents(dynamic raw) {
+    if (raw is! Map) return const {};
+    final out = <String, double>{};
+    raw.forEach((key, value) {
+      final id = key.toString().trim();
+      if (id.isEmpty) return;
+      final n = value is num
+          ? value.toDouble()
+          : double.tryParse(value.toString().replaceAll(',', '.'));
+      if (n == null || n < 0 || n >= 100) return;
+      out[id] = n;
+    });
+    return out;
   }
 
   String get destinationCtaLabel {
@@ -178,6 +232,9 @@ class PromoCampaignModel {
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
       discountPercent: parseDiscountPercent(json['discount_percent']),
+      productDiscountPercents: parseProductDiscountPercents(
+        json['product_discount_percents'],
+      ),
       actionType: json['action_type']?.toString() ?? actionNone,
       startsAt: DateTime.parse(json['starts_at'].toString()).toLocal(),
       endsAt: DateTime.parse(json['ends_at'].toString()).toLocal(),
@@ -191,6 +248,17 @@ class PromoCampaignModel {
       advertiserName: json['advertiser_name']?.toString(),
       externalUrl: json['external_url']?.toString(),
     );
+  }
+
+  Map<String, double> _productDiscountJson(List<String> ids) {
+    if (ids.isEmpty || productDiscountPercents.isEmpty) return const {};
+    final out = <String, double>{};
+    for (final id in ids) {
+      final pct = productDiscountPercents[id];
+      if (pct == null || pct < 0 || pct >= 100) continue;
+      out[id] = pct;
+    }
+    return out;
   }
 
   Map<String, dynamic> toInsertJson({required String createdBy}) {
@@ -207,6 +275,7 @@ class PromoCampaignModel {
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
       'discount_percent': hasProductDiscount ? discountPercent : null,
+      'product_discount_percents': _productDiscountJson(ids),
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -239,6 +308,7 @@ class PromoCampaignModel {
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
       'discount_percent': hasProductDiscount ? discountPercent : null,
+      'product_discount_percents': _productDiscountJson(ids),
       'action_type': actionType,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
@@ -256,6 +326,11 @@ class PromoCampaignModel {
     };
   }
 
+  static DateTime _parseRpcDate(dynamic raw) {
+    if (raw == null) return DateTime.now();
+    return DateTime.tryParse(raw.toString())?.toLocal() ?? DateTime.now();
+  }
+
   /// Respuesta compacta del RPC aliado / vallas importador.
   factory PromoCampaignModel.fromAliadoRpcJson(Map<String, dynamic> json) {
     final single = json['product_id']?.toString();
@@ -271,9 +346,12 @@ class PromoCampaignModel {
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
       discountPercent: parseDiscountPercent(json['discount_percent']),
+      productDiscountPercents: parseProductDiscountPercents(
+        json['product_discount_percents'],
+      ),
       actionType: json['action_type']?.toString() ?? actionNone,
-      startsAt: DateTime.now(),
-      endsAt: DateTime.now(),
+      startsAt: _parseRpcDate(json['starts_at']),
+      endsAt: _parseRpcDate(json['ends_at']),
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       isActive: true,
       sponsorType: json['sponsor_type']?.toString() ?? sponsorImportador,

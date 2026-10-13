@@ -22,17 +22,72 @@ const _promoMonthShort = [
   'dic',
 ];
 
-/// Periodo en que la valla está vigente, en una frase corta.
+String _promoDayMonth(DateTime d, {required bool withYear}) {
+  final monthDay = '${d.day} ${_promoMonthShort[d.month - 1]}';
+  return withYear ? '$monthDay ${d.year}' : monthDay;
+}
+
+/// Rango de la valla, en una frase corta.
 String promoActivePeriodLabel(DateTime start, DateTime end) {
   final a = DateTime(start.year, start.month, start.day);
   final b = DateTime(end.year, end.month, end.day);
-  String monthDay(DateTime d) => '${d.day} ${_promoMonthShort[d.month - 1]}';
-  if (a == b) return 'Solo el ${monthDay(a)}';
+  if (a == b) return 'Solo el ${_promoDayMonth(a, withYear: false)}';
   if (a.year == b.year && a.month == b.month) {
     return 'Del ${a.day} al ${b.day} ${_promoMonthShort[a.month - 1]}';
   }
-  if (a.year == b.year) return 'Del ${monthDay(a)} al ${monthDay(b)}';
-  return 'Del ${monthDay(a)} ${a.year} al ${monthDay(b)} ${b.year}';
+  if (a.year == b.year) {
+    return 'Del ${_promoDayMonth(a, withYear: false)} al ${_promoDayMonth(b, withYear: false)}';
+  }
+  return 'Del ${_promoDayMonth(a, withYear: true)} al ${_promoDayMonth(b, withYear: true)}';
+}
+
+/// Cuánto le queda a la valla, contado desde [now].
+String promoPeriodCountdownLabel(
+  DateTime start,
+  DateTime end, {
+  DateTime? now,
+}) {
+  final clock = now ?? DateTime.now();
+  final today = DateTime(clock.year, clock.month, clock.day);
+  final startDay = DateTime(start.year, start.month, start.day);
+  final endDay = DateTime(end.year, end.month, end.day);
+  final daysLeft = endDay.difference(today).inDays;
+  final endText = _promoDayMonth(endDay, withYear: endDay.year != today.year);
+
+  if (startDay == endDay) {
+    if (daysLeft <= 0) return 'Solo hoy';
+    return 'Solo el $endText';
+  }
+  if (daysLeft <= 0) return 'Termina hoy';
+  if (daysLeft == 1) return 'Termina mañana';
+  if (daysLeft <= 14) return 'Quedan $daysLeft días';
+  return 'Hasta el $endText';
+}
+
+/// Frase corta sobre la foto de la valla.
+String promoPeriodOnPhotoLabel(
+  DateTime start,
+  DateTime end, {
+  DateTime? now,
+}) {
+  final clock = now ?? DateTime.now();
+  final today = DateTime(clock.year, clock.month, clock.day);
+  final startDay = DateTime(start.year, start.month, start.day);
+  final endDay = DateTime(end.year, end.month, end.day);
+  final daysLeft = endDay.difference(today).inDays;
+  final endText = _promoDayMonth(endDay, withYear: endDay.year != today.year);
+  if (startDay == endDay && daysLeft <= 0) return 'Solo hoy';
+  if (daysLeft <= 0) return 'Termina hoy';
+  if (daysLeft == 1) return 'Termina mañana';
+  return 'Hasta el $endText';
+}
+
+/// Aclara que el precio o la valla dependen de esas fechas.
+String promoPeriodFootnote(PromoCampaignModel campaign) {
+  if (campaign.hasProductDiscount) {
+    return 'El descuento aplica solo mientras esta valla esté vigente.';
+  }
+  return 'Esta valla se muestra solo en estas fechas.';
 }
 
 /// Pastilla de vigencia para banners, pop-ups y la lista de promociones.
@@ -51,33 +106,61 @@ class PromoActivePeriodChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = onPhoto ? Colors.white : AppColors.brand;
+    final headline = onPhoto
+        ? promoPeriodOnPhotoLabel(startsAt, endsAt)
+        : promoPeriodCountdownLabel(startsAt, endsAt);
+    final range = promoActivePeriodLabel(startsAt, endsAt);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: onPhoto
             ? Colors.black.withOpacity(0.62)
             : AppColors.brandBlueContainer,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         border: onPhoto
             ? null
             : Border.all(color: AppColors.brand.withOpacity(0.16)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: EdgeInsets.symmetric(
+          horizontal: onPhoto ? 8 : 10,
+          vertical: onPhoto ? 4 : 6,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.calendar_month_outlined, size: 13, color: fg),
-            const SizedBox(width: 4),
-            Text(
-              promoActivePeriodLabel(startsAt, endsAt),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: fg,
-                fontSize: 11,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
-              ),
+            Icon(Icons.calendar_month_outlined, size: 14, color: fg),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  headline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: onPhoto ? 11 : 12,
+                    height: 1.15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (!onPhoto && headline != range) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    range,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      height: 1.15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -395,6 +478,15 @@ Future<void> showAliadoPromoPopupDialog({
                     startsAt: campaign.startsAt,
                     endsAt: campaign.endsAt,
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    promoPeriodFootnote(campaign),
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -631,9 +723,11 @@ Future<PartModel?> showAliadoPromoProductsSheet({
     ),
     builder: (ctx) {
       final maxH = MediaQuery.sizeOf(ctx).height * 0.62;
-      final discountLabel = ProductCatalogPricing.campaignDiscountChipEs(
-        campaign.discountPercent,
-      );
+      final discountLabel = campaign.productDiscountPercents.isEmpty
+          ? ProductCatalogPricing.campaignDiscountChipEs(
+              campaign.discountPercent,
+            )
+          : null;
 
       return SafeArea(
         child: Padding(
@@ -680,6 +774,15 @@ Future<PartModel?> showAliadoPromoProductsSheet({
                         PromoActivePeriodChip(
                           startsAt: campaign.startsAt,
                           endsAt: campaign.endsAt,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          promoPeriodFootnote(campaign),
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),

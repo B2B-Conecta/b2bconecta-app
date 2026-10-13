@@ -129,7 +129,7 @@ class PartModel {
   /// E4: tramos por volumen (`volume_tiers` con `min_units`).
   final Map<String, dynamic>? discountRules;
 
-  /// % de valla activa (`promo_campaigns.discount_percent`) mientras dure la campaña.
+  /// % de valla activa para este producto (el suyo, o el general de la campaña).
   final double? activeCampaignDiscountPercent;
 
   /// Campaña de valla que aporta [activeCampaignDiscountPercent].

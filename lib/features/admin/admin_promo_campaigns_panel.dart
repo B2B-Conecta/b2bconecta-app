@@ -348,6 +348,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late String _audience;
   String? _importadorId;
   final Set<String> _selectedProductIds = {};
+  final Map<String, TextEditingController> _productPctCtrls = {};
   List<PartModel> _products = const [];
   bool _productsLoading = false;
   late DateTime _startsAt;
@@ -427,6 +428,9 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _selectedProductIds
       ..clear()
       ..addAll(e?.resolvedProductIds ?? const []);
+    for (final id in _selectedProductIds) {
+      _pctCtrlFor(id);
+    }
     final now = DateTime.now();
     _startsAt = e?.startsAt ?? DateTime(now.year, now.month, now.day);
     _endsAt = e?.endsAt ??
@@ -488,6 +492,9 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _displayTitleCtrl.dispose();
     _priorityCtrl.dispose();
     _discountPctCtrl.dispose();
+    for (final c in _productPctCtrls.values) {
+      c.dispose();
+    }
     _advertiserNameCtrl.dispose();
     _externalUrlCtrl.dispose();
     super.dispose();
@@ -557,6 +564,28 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     });
   }
 
+  TextEditingController _pctCtrlFor(String productId) {
+    return _productPctCtrls.putIfAbsent(productId, () {
+      final saved = widget.existing?.productDiscountPercents[productId];
+      final text = saved == null
+          ? ''
+          : (saved == saved.roundToDouble()
+              ? saved.toStringAsFixed(0)
+              : saved.toStringAsFixed(1));
+      return TextEditingController(text: text);
+    });
+  }
+
+  Map<String, double> _productDiscountOverrides() {
+    final out = <String, double>{};
+    for (final id in _selectedProductIds) {
+      final raw = _productPctCtrls[id]?.text ?? '';
+      final pct = PromoCampaignModel.parseProductDiscountOverride(raw);
+      if (pct != null) out[id] = pct;
+    }
+    return out;
+  }
+
   PromoCampaignModel _buildDraft() {
     final priority = int.tryParse(_priorityCtrl.text.trim()) ?? 0;
     final thirdParty = _isThirdParty;
@@ -578,6 +607,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
           : null,
       productIds: openProduct ? _selectedProductIds.toList() : const [],
       discountPercent: discountPct,
+      productDiscountPercents:
+          openProduct ? _productDiscountOverrides() : const {},
       actionType: _actionType,
       startsAt: _startsAt,
       endsAt: _endsAt,
@@ -622,6 +653,20 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
           .toList();
       final belongs = selected.isNotEmpty &&
           selected.every((id) => _products.any((p) => p.id == id));
+      final badPct = selected.where((id) {
+        final raw = _productPctCtrls[id]?.text ?? '';
+        return !PromoCampaignModel.isBlankOrValidProductDiscountOverride(raw);
+      }).isNotEmpty;
+      if (badPct) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'El % de un producto debe estar entre 0 y 99. Vacío usa el general.',
+            ),
+          ),
+        );
+        return;
+      }
       if (_productsLoading || !belongs) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -932,27 +977,55 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                             itemBuilder: (p) {
                               final selected =
                                   _selectedProductIds.contains(p.id);
-                              return CheckboxListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                value: selected,
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                                title: Text(
-                                  _productOptionLabel(p),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                                onChanged: (v) {
-                                  setState(() {
-                                    if (v == true) {
-                                      _selectedProductIds.add(p.id);
-                                    } else {
-                                      _selectedProductIds.remove(p.id);
-                                    }
-                                  });
-                                },
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    value: selected,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    title: Text(
+                                      _productOptionLabel(p),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                    onChanged: (v) {
+                                      setState(() {
+                                        if (v == true) {
+                                          _selectedProductIds.add(p.id);
+                                          _pctCtrlFor(p.id);
+                                        } else {
+                                          _selectedProductIds.remove(p.id);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  if (selected)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        left: 40,
+                                        bottom: 8,
+                                      ),
+                                      child: TextField(
+                                        controller: _pctCtrlFor(p.id),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          labelText: '% de este producto',
+                                          hintText: 'Vacío usa el general',
+                                          helperText:
+                                              '0 lo deja sin descuento de esta valla.',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               );
                             },
                           ),
@@ -969,7 +1042,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                   labelText: 'Descuento % en productos (opcional)',
                   hintText: 'Ej. 5',
                   helperText:
-                      'Se aplica a los SKU marcados mientras la campaña esté vigente.',
+                      'Si un producto no tiene el suyo, usa este. 0 en un producto lo deja sin descuento.',
                   border: OutlineInputBorder(),
                 ),
               ),

@@ -108,7 +108,6 @@ function render(card: {
   <meta name="twitter:description" content="${description}">
   <meta name="twitter:image" content="${image}">
   <link rel="canonical" href="${pageUrl}">
-  <meta http-equiv="refresh" content="0; url=${pageUrl}">
 </head>
 <body>
   <p><a href="${pageUrl}">Abrir en B2B Conecta</a></p>

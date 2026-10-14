@@ -144,6 +144,21 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  static const messageNotificationTypes = <String>[
+    'mensaje',
+    'mensaje_directo',
+  ];
+
+  Future<void> deleteMessageNotifications() async {
+    await SupabaseService.deleteMyNotificationsByTypes(
+      messageNotificationTypes,
+    );
+    _items.removeWhere(
+      (n) => messageNotificationTypes.contains(n.type.trim()),
+    );
+    notifyListeners();
+  }
+
   Future<void> deleteAllNotifications() async {
     await SupabaseService.deleteAllMyNotifications();
     _items.clear();

@@ -102,6 +102,8 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                             setState(() => _selectionMode = true);
                           } else if (value == 0) {
                             await _confirmAndDeleteAll(context);
+                          } else if (value == 2) {
+                            await _confirmAndDeleteMessages(context);
                           } else if (value == 30) {
                             await _confirmAndDeleteOld(context, 30);
                           } else if (value == 60) {
@@ -123,6 +125,14 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
+                            ),
+                          if (items.any(
+                            (n) => NotificationProvider.messageNotificationTypes
+                                .contains(n.type.trim()),
+                          ))
+                            const PopupMenuItem<int>(
+                              value: 2,
+                              child: Text('Eliminar avisos de mensajes'),
                             ),
                           if (items.isNotEmpty) const PopupMenuDivider(),
                           const PopupMenuItem<int>(
@@ -411,6 +421,18 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
     );
     if (ok != true) return;
     await widget.provider.deleteAllNotifications();
+  }
+
+  Future<void> _confirmAndDeleteMessages(BuildContext context) async {
+    final ok = await _showDeleteDialog(
+      context: context,
+      title: 'Eliminar avisos de mensajes',
+      message:
+          'Se borrarán los avisos de chats y consultas. Los de pedidos y pagos se conservan. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar avisos',
+    );
+    if (ok != true) return;
+    await widget.provider.deleteMessageNotifications();
   }
 
   Future<void> _confirmAndDeleteOld(BuildContext context, int days) async {

@@ -108,6 +108,23 @@ class NotificationsService {
         .inFilter('id', ids);
   }
 
+  /// Elimina las notificaciones del usuario cuyo tipo está en [types].
+  static Future<void> deleteMyNotificationsByTypes(List<String> types) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return;
+    final wanted = types
+        .map((type) => type.trim())
+        .where((type) => type.isNotEmpty)
+        .toSet()
+        .toList();
+    if (wanted.isEmpty) return;
+    await SupabaseAccess.client
+        .from('notifications')
+        .delete()
+        .eq('user_id', uid)
+        .inFilter('type', wanted);
+  }
+
   /// Elimina todas las notificaciones del usuario actual.
   static Future<void> deleteAllMyNotifications() async {
     final uid = SupabaseAccess.currentUserId;

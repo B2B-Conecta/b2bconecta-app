@@ -99,23 +99,16 @@ void main() {
                   selected: PedidosListScope.enCurso,
                   onSelected: (_) {},
                 ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    ...orderDateShortcutChips(
-                      from: null,
-                      to: null,
-                      onChanged: (DateTime? from, DateTime? to) {},
-                      onPickRange: () {},
-                    ),
-                    ...orderSignalFilterChips(
-                      creditOnly: false,
-                      replacementOnly: false,
-                      onCreditChanged: (_) {},
-                      onReplacementChanged: (_) {},
-                    ),
-                  ],
+                OrderDateShortcutBar(
+                  from: null,
+                  to: null,
+                  onChanged: (DateTime? from, DateTime? to) {},
+                  onPickRange: () {},
+                ),
+                OrderSignalFilterBar(
+                  creditOnly: false,
+                  replacementOnly: false,
+                  onChanged: (bool credit, bool replacement) {},
                 ),
               ],
             ),

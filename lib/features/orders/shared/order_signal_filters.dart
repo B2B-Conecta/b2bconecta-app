@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'transaction_request_model.dart';
 
 bool orderLineUsesStoreCredit(TransactionRequestModel line) =>
@@ -25,52 +25,26 @@ List<List<TransactionRequestModel>> filterOrderGroupsBySignals(
   }).toList();
 }
 
-/// Chips «Bajo crédito» y «Cambio de producto» para la fila de filtros.
-List<Widget> orderSignalFilterChips({
-  required bool creditOnly,
-  required bool replacementOnly,
-  required ValueChanged<bool> onCreditChanged,
-  required ValueChanged<bool> onReplacementChanged,
-}) {
-  Widget chip({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required ValueChanged<bool> onSelected,
-  }) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: onSelected,
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      selectedColor: AppColors.brand.withOpacity(0.16),
-      checkmarkColor: AppColors.brand,
-      labelStyle: TextStyle(
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        color: selected ? AppColors.brand : AppColors.textSecondary,
-      ),
-      avatar: Icon(
-        icon,
-        size: 16,
-        color: selected ? AppColors.brand : AppColors.textSecondary,
-      ),
+/// Todos · Bajo crédito · Cambio de producto, una sola elección.
+class OrderSignalFilterBar extends StatelessWidget {
+  const OrderSignalFilterBar({
+    super.key,
+    required this.creditOnly,
+    required this.replacementOnly,
+    required this.onChanged,
+  });
+
+  final bool creditOnly;
+  final bool replacementOnly;
+  final void Function(bool credit, bool replacement) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = creditOnly ? 1 : (replacementOnly ? 2 : 0);
+    return SegmentedFilterBar(
+      labels: const ['Todos', 'Bajo crédito', 'Cambio de producto'],
+      selectedIndex: selected,
+      onSelected: (index) => onChanged(index == 1, index == 2),
     );
   }
-
-  return [
-    chip(
-      label: 'Bajo crédito',
-      icon: Icons.account_balance_wallet_outlined,
-      selected: creditOnly,
-      onSelected: onCreditChanged,
-    ),
-    chip(
-      label: 'Cambio de producto',
-      icon: Icons.swap_horiz,
-      selected: replacementOnly,
-      onSelected: onReplacementChanged,
-    ),
-  ];
 }

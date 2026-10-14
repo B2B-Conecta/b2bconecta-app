@@ -30,6 +30,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dar
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
@@ -195,8 +196,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       _dateTo = draft.dateTo;
     });
   }
-
-  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   void _onScopeChanged(PedidosListScope next) {
     if (next == _scope) return;
@@ -593,51 +592,46 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    FilterChip(
-                      label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                      selected: _hasDateFilter,
-                      onSelected: (_) => _openDateFilters(),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                      checkmarkColor: AppColors.brandBlue,
-                      avatar: Icon(
-                        Icons.calendar_month_outlined,
-                        size: 16,
-                        color: _hasDateFilter
-                            ? AppColors.brandBlue
-                            : AppColors.textSecondary,
-                      ),
+                    OrderDateShortcutBar(
+                      from: _dateFrom,
+                      to: _dateTo,
+                      onChanged: (from, to) => setState(() {
+                        _dateFrom = from;
+                        _dateTo = to;
+                      }),
+                      onPickRange: _openDateFilters,
                     ),
-                    if (_showMorosoChip)
-                      FilterChip(
-                        label: const Text('Pago pendiente'),
-                        selected: _morosoOnly,
-                        onSelected: (v) => setState(() => _morosoOnly = v),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        selectedColor: Colors.red.shade100,
-                        checkmarkColor: Colors.red.shade800,
-                        avatar: Icon(
-                          Icons.warning_amber_rounded,
-                          size: 16,
-                          color: _morosoOnly
-                              ? Colors.red.shade800
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ...orderSignalFilterChips(
+                    OrderSignalFilterBar(
                       creditOnly: _creditOnly,
                       replacementOnly: _replacementOnly,
-                      onCreditChanged: (value) =>
-                          setState(() => _creditOnly = value),
-                      onReplacementChanged: (value) =>
-                          setState(() => _replacementOnly = value),
+                      onChanged: (credit, replacement) => setState(() {
+                        _creditOnly = credit;
+                        _replacementOnly = replacement;
+                      }),
                     ),
+                    if (_showMorosoChip)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilterChip(
+                          label: const Text('Pago pendiente'),
+                          selected: _morosoOnly,
+                          onSelected: (v) => setState(() => _morosoOnly = v),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          selectedColor: Colors.red.shade100,
+                          checkmarkColor: Colors.red.shade800,
+                          avatar: Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: _morosoOnly
+                                ? Colors.red.shade800
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

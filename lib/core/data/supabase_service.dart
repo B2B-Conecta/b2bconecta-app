@@ -108,6 +108,9 @@ class SupabaseService {
   static Future<void> deleteAllMyNotifications() =>
       NotificationsService.deleteAllMyNotifications();
 
+  static Future<void> deleteMyNotificationsByTypes(List<String> types) =>
+      NotificationsService.deleteMyNotificationsByTypes(types);
+
   static Future<TransactionRequestModel?> fetchTransactionRequestById(
     String requestId,
   ) =>

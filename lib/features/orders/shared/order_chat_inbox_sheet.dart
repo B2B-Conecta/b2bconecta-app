@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
@@ -339,34 +340,25 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
                   _kindSwitch(),
                   const SizedBox(height: 10),
                 ],
-                if (_kind == _ChatKind.pedidos) ...[
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final f in OrderChatInboxFilter.values) _statusChip(f),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _dateChip('Todas', _DatePreset.all),
-                    _dateChip('Hoy', _DatePreset.today),
-                    _dateChip('7 días', _DatePreset.days7),
-                    _dateChip('30 días', _DatePreset.days30),
-                    _dateChip(
-                      _datePreset == _DatePreset.custom &&
-                              _customFrom != null &&
-                              _customTo != null
-                          ? '${formatAppFilterDate(_customFrom!)} – ${formatAppFilterDate(_customTo!)}'
-                          : 'Fechas',
-                      _DatePreset.custom,
-                      onTap: _pickDates,
+                if (_kind == _ChatKind.pedidos)
+                  SegmentedFilterBar(
+                    labels: const ['Todos', 'Activos', 'Cerrados', 'No leídos'],
+                    selectedIndex: _filter.index,
+                    onSelected: (index) => setState(
+                      () => _filter = OrderChatInboxFilter.values[index],
                     ),
-                  ],
+                  ),
+                SegmentedFilterBar(
+                  labels: const ['Todas', 'Hoy', '7 días', '30 días', 'Fechas'],
+                  selectedIndex: _datePreset.index,
+                  onSelected: (index) {
+                    final preset = _DatePreset.values[index];
+                    if (preset == _DatePreset.custom) {
+                      _pickDates();
+                      return;
+                    }
+                    setState(() => _datePreset = preset);
+                  },
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -424,52 +416,6 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _statusChip(OrderChatInboxFilter filter) {
-    final selected = _filter == filter;
-    return FilterChip(
-      label: Text(_filterLabel(filter)),
-      selected: selected,
-      onSelected: (_) => setState(() => _filter = filter),
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      selectedColor: AppColors.brand.withOpacity(0.16),
-      checkmarkColor: AppColors.brand,
-      labelStyle: TextStyle(
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        color: selected ? AppColors.brand : AppColors.textSecondary,
-      ),
-    );
-  }
-
-  Widget _dateChip(
-    String label,
-    _DatePreset preset, {
-    VoidCallback? onTap,
-  }) {
-    final selected = _datePreset == preset;
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) {
-        if (onTap != null) {
-          onTap();
-          return;
-        }
-        setState(() => _datePreset = preset);
-      },
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      selectedColor: AppColors.brand.withOpacity(0.16),
-      checkmarkColor: AppColors.brand,
-      labelStyle: TextStyle(
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        color: selected ? AppColors.brand : AppColors.textSecondary,
       ),
     );
   }
@@ -631,14 +577,6 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     );
   }
 
-  String _filterLabel(OrderChatInboxFilter f) {
-    return switch (f) {
-      OrderChatInboxFilter.all => 'Todos',
-      OrderChatInboxFilter.active => 'Activos',
-      OrderChatInboxFilter.closed => 'Cerrados',
-      OrderChatInboxFilter.unread => 'No leídos',
-    };
-  }
 }
 
 class _ConversationCard extends StatelessWidget {

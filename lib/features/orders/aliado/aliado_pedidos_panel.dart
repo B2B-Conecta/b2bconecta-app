@@ -1342,12 +1342,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 context,
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      ...orderDateShortcutChips(
+                      OrderDateShortcutBar(
                         from: _dateFrom,
                         to: _dateTo,
                         onChanged: (from, to) => setState(() {
@@ -1356,13 +1354,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                         }),
                         onPickRange: _openDateFilters,
                       ),
-                      ...orderSignalFilterChips(
+                      OrderSignalFilterBar(
                         creditOnly: _creditOnly,
                         replacementOnly: _replacementOnly,
-                        onCreditChanged: (value) =>
-                            setState(() => _creditOnly = value),
-                        onReplacementChanged: (value) =>
-                            setState(() => _replacementOnly = value),
+                        onChanged: (credit, replacement) => setState(() {
+                          _creditOnly = credit;
+                          _replacementOnly = replacement;
+                        }),
                       ),
                     ],
                   ),

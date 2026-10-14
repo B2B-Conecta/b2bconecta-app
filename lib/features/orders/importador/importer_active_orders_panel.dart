@@ -322,53 +322,51 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               if (scope != PedidosListScope.entregados) _morosoOnly = false;
             }),
           ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              ...orderDateShortcutChips(
-                from: _dateFrom,
-                to: _dateTo,
-                onChanged: (from, to) => setState(() {
-                  _dateFrom = from;
-                  _dateTo = to;
-                }),
-                onPickRange: _openDateFilters,
-              ),
-              if (_scope == PedidosListScope.entregados ||
-                  _scope == PedidosListScope.todos)
-                FilterChip(
-                  label: const Text('Pago pendiente'),
-                  selected: _morosoOnly,
-                  onSelected: (v) => setState(() => _morosoOnly = v),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  selectedColor: Colors.red.shade100,
-                  checkmarkColor: Colors.red.shade800,
-                  labelStyle: TextStyle(
-                    fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 12.5,
-                    color: _morosoOnly
-                        ? Colors.red.shade900
-                        : AppColors.textPrimary,
-                  ),
-                  avatar: Icon(
-                    Icons.warning_amber_rounded,
-                    size: 16,
-                    color: _morosoOnly
-                        ? Colors.red.shade800
-                        : AppColors.textSecondary,
-                  ),
-                ),
-              ...orderSignalFilterChips(
-                creditOnly: _creditOnly,
-                replacementOnly: _replacementOnly,
-                onCreditChanged: (value) => setState(() => _creditOnly = value),
-                onReplacementChanged: (value) =>
-                    setState(() => _replacementOnly = value),
-              ),
-            ],
+          OrderDateShortcutBar(
+            from: _dateFrom,
+            to: _dateTo,
+            onChanged: (from, to) => setState(() {
+              _dateFrom = from;
+              _dateTo = to;
+            }),
+            onPickRange: _openDateFilters,
           ),
+          OrderSignalFilterBar(
+            creditOnly: _creditOnly,
+            replacementOnly: _replacementOnly,
+            onChanged: (credit, replacement) => setState(() {
+              _creditOnly = credit;
+              _replacementOnly = replacement;
+            }),
+          ),
+          if (_scope == PedidosListScope.entregados ||
+              _scope == PedidosListScope.todos)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                label: const Text('Pago pendiente'),
+                selected: _morosoOnly,
+                onSelected: (v) => setState(() => _morosoOnly = v),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                selectedColor: Colors.red.shade100,
+                checkmarkColor: Colors.red.shade800,
+                labelStyle: TextStyle(
+                  fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12.5,
+                  color: _morosoOnly
+                      ? Colors.red.shade900
+                      : AppColors.textPrimary,
+                ),
+                avatar: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 16,
+                  color: _morosoOnly
+                      ? Colors.red.shade800
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
         ],
       ),
     );

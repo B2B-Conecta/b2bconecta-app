@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 
 enum OrderDateShortcut { all, today, days7, days30, custom }
 
@@ -42,29 +42,41 @@ class OrderDateShortcuts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      children: orderDateShortcutChips(
-        from: from,
-        to: to,
-        onChanged: onChanged,
-        onPickRange: onPickRange,
-      ),
+    return OrderDateShortcutBar(
+      from: from,
+      to: to,
+      onChanged: onChanged,
+      onPickRange: onPickRange,
     );
   }
 }
 
-/// Atajos de fecha como chips sueltos, para la misma fila que el resto de filtros.
-List<Widget> orderDateShortcutChips({
-  required DateTime? from,
-  required DateTime? to,
-  required void Function(DateTime? from, DateTime? to) onChanged,
-  required VoidCallback onPickRange,
-}) {
-  final current = OrderDateShortcuts.active(from, to);
+/// Todas · Hoy · 7 días · 30 días · Fechas, con la barra azul de Pedidos.
+class OrderDateShortcutBar extends StatelessWidget {
+  const OrderDateShortcutBar({
+    super.key,
+    required this.from,
+    required this.to,
+    required this.onChanged,
+    required this.onPickRange,
+  });
 
-  void apply(OrderDateShortcut shortcut) {
+  final DateTime? from;
+  final DateTime? to;
+  final void Function(DateTime? from, DateTime? to) onChanged;
+  final VoidCallback onPickRange;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = OrderDateShortcuts.active(from, to);
+    return SegmentedFilterBar(
+      labels: const ['Todas', 'Hoy', '7 días', '30 días', 'Fechas'],
+      selectedIndex: current.index,
+      onSelected: (index) => _apply(OrderDateShortcut.values[index]),
+    );
+  }
+
+  void _apply(OrderDateShortcut shortcut) {
     final today = OrderDateShortcuts.day(DateTime.now());
     switch (shortcut) {
       case OrderDateShortcut.all:
@@ -79,33 +91,5 @@ List<Widget> orderDateShortcutChips({
         onPickRange();
     }
   }
-
-  Widget chip(String label, OrderDateShortcut shortcut) {
-    final selected = shortcut == current;
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => apply(shortcut),
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      selectedColor: AppColors.brand.withOpacity(0.16),
-      checkmarkColor: AppColors.brand,
-      labelStyle: TextStyle(
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        color: selected ? AppColors.brand : AppColors.textSecondary,
-      ),
-    );
-  }
-
-  return [
-    chip('Todas', OrderDateShortcut.all),
-    chip('Hoy', OrderDateShortcut.today),
-    chip('7 días', OrderDateShortcut.days7),
-    chip('30 días', OrderDateShortcut.days30),
-    chip(
-      current == OrderDateShortcut.custom ? 'Fechas ✓' : 'Fechas',
-      OrderDateShortcut.custom,
-    ),
-  ];
 }
+

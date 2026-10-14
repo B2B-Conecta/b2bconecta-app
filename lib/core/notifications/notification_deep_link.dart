@@ -9,6 +9,7 @@ void navigateFromNotificationPayload({
   String? relatedId,
   String? title,
 }) {
+  MainShellTabController.setPendingOpenOrderChat(false);
   MainShellTabController.setPendingNotificationRelatedId(relatedId);
   MainShellTabController.setPendingNotificationType(type);
   final t0 = type.trim();
@@ -66,6 +67,7 @@ void navigateFromNotificationPayload({
     switch (homeRole) {
       case AppHomeRole.aliado:
       case AppHomeRole.importador:
+        MainShellTabController.setPendingOpenOrderChat(true);
         MainShellTabController.navigateToPedidosForNotification();
         return;
       case AppHomeRole.administrador:

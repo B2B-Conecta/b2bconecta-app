@@ -84,4 +84,91 @@ void main() {
       isFalse,
     );
   });
+
+  test('el plazo de postventa usa la fecha de entrega', () {
+    final delivered = DateTime.utc(2026, 10, 1, 12);
+    final laterEdit = DateTime.utc(2026, 10, 20, 12);
+    expect(
+      OrderReturnRules.isAvailable(
+        status: TransactionRequestStatus.entregado,
+        deliveredAt: delivered,
+        updatedAt: laterEdit,
+        now: DateTime.utc(2026, 10, 8, 12),
+      ),
+      isTrue,
+    );
+    expect(
+      OrderReturnRules.isAvailable(
+        status: TransactionRequestStatus.entregado,
+        deliveredAt: delivered,
+        updatedAt: laterEdit,
+        now: DateTime.utc(2026, 10, 9, 12),
+      ),
+      isFalse,
+    );
+  });
+
+  test('la recepción confirma el plazo de 7 días', () {
+    expect(OrderReturnRules.receptionConfirmedHint, contains('7 días'));
+    expect(
+      OrderReturnRules.receptionConfirmedPagoPendienteHint,
+      contains('7 días'),
+    );
+  });
+
+  test('las unidades afectadas no superan la línea y el crédito usa el precio', () {
+    expect(OrderReturnRules.clampAffectedQty(0, 4), 1);
+    expect(OrderReturnRules.clampAffectedQty(9, 4), 4);
+    expect(
+      OrderReturnRules.creditAmount(
+        unitPrice: 12.5,
+        lineTotal: 50,
+        lineQty: 4,
+        affectedQty: 2,
+      ),
+      25,
+    );
+    expect(
+      OrderReturnRules.creditAmount(
+        unitPrice: 0,
+        lineTotal: 40,
+        lineQty: 4,
+        affectedQty: 1,
+      ),
+      10,
+    );
+  });
+
+  test('el saldo a favor no supera el subtotal del proveedor', () {
+    expect(OrderReturnRules.cappedCredit(30, 12.5), 12.5);
+    expect(OrderReturnRules.cappedCredit(8, 20), 8);
+    expect(OrderReturnRules.cappedCredit(0, 20), 0);
+    expect(OrderReturnRules.preferenceLabel('credito'), 'Crédito a favor');
+    expect(
+      OrderReturnRules.replacementStatusLabel('pendiente_retiro'),
+      'Pendiente por retiro',
+    );
+  });
+
+  test('el chat reconoce la tarjeta de la solicitud', () {
+    final parsed = OrderReturnRules.parseReturnRequestMessage(
+      'Solicitud de devolución. Preferencia: cambio de producto. Producto: Disco freno delantero 245 mm. Unidades: 2. Llegó rayado.',
+    );
+    expect(parsed, isNotNull);
+    expect(parsed!.preference, 'cambio');
+    expect(parsed.productName, 'Disco freno delantero 245 mm');
+    expect(parsed.units, 2);
+    expect(parsed.reason, 'Llegó rayado.');
+    expect(
+      OrderReturnRules.parseReturnRequestMessage('Hola, ¿llegó el pedido?'),
+      isNull,
+    );
+    final observation = OrderReturnRules.parseReturnRequestMessage(
+      'Observación del pedido. Producto: Pastillas freno delantero Ferodo. Unidades: 2. Llegaron rayadas.',
+    );
+    expect(observation, isNotNull);
+    expect(observation!.preference, isEmpty);
+    expect(observation.productName, 'Pastillas freno delantero Ferodo');
+    expect(observation.units, 2);
+  });
 }

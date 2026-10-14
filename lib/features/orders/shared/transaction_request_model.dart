@@ -43,6 +43,11 @@ class TransactionRequestModel {
     this.atPedidoListo,
     this.atEnTransito,
     this.atEntregado,
+    this.postventaDevolucionAt,
+    this.postventaQuejaAt,
+    this.postventaResolucion,
+    this.postventaCreditoMonto,
+    this.creditoAplicadoMonto = 0,
     this.productName,
     this.productSku,
     this.productImageUrls = const <String>[],
@@ -182,6 +187,21 @@ class TransactionRequestModel {
   final DateTime? atPedidoListo;
   final DateTime? atEnTransito;
   final DateTime? atEntregado;
+
+  /// Devolución anotada en el pedido. No cambia [status].
+  final DateTime? postventaDevolucionAt;
+
+  /// Queja anotada en el pedido. No cambia [status].
+  final DateTime? postventaQuejaAt;
+
+  /// `cambio`, `credito` o `rechazo` cuando el proveedor ya respondió.
+  final String? postventaResolucion;
+
+  /// Crédito REF anotado para el próximo pedido con este proveedor.
+  final double? postventaCreditoMonto;
+
+  /// Saldo a favor ya descontado de esta línea.
+  final double creditoAplicadoMonto;
   final String? productName;
   final String? productSku;
 
@@ -1037,6 +1057,12 @@ class TransactionRequestModel {
       atPedidoListo: _parseDate(json['at_pedido_listo']),
       atEnTransito: _parseDate(json['at_en_transito']),
       atEntregado: _parseDate(json['at_entregado']),
+      postventaDevolucionAt: _parseDate(json['postventa_devolucion_at']),
+      postventaQuejaAt: _parseDate(json['postventa_queja_at']),
+      postventaResolucion: _nullableText(json['postventa_resolucion']),
+      postventaCreditoMonto: _asNullableDouble(json['postventa_credito_monto']),
+      creditoAplicadoMonto:
+          _asNullableDouble(json['credito_aplicado_monto']) ?? 0,
       productName: productName,
       productSku: productSku,
       productImageUrls: productImageUrls,

@@ -1617,7 +1617,7 @@ class _ProductGridCard extends StatelessWidget {
                   TextSpan(
                     children: [
                       TextSpan(
-                        text: '${part.stock} en stock',
+                        text: '${part.stockForSale} en stock',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,

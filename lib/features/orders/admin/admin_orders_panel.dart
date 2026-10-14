@@ -26,9 +26,12 @@ import 'package:motolink_pro_app/features/payments/admin_pago_revision_section.d
 import 'package:motolink_pro_app/features/payments/efectivo_respaldo_registrar.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
 /// Bandeja admin unificada: pedidos en curso, cerrados o todos, con filtros por estado.
@@ -48,6 +51,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   String? _statusFilter;
   String? _anularMotolinkBusyId;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   Map<String, AdminAliadoMorosidadFlag> _morosidadFlags = {};
   PedidosListScope _scope = PedidosListScope.enCurso;
   String? _loadedKind;
@@ -170,6 +175,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     setState(() {
       _statusFilter = null;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -189,8 +196,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       _dateTo = draft.dateTo;
     });
   }
-
-  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   void _onScopeChanged(PedidosListScope next) {
     if (next == _scope) return;
@@ -232,7 +237,11 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     if (_showMorosoChip && _morosoOnly) {
       groups = groups.where((g) => g.any((r) => r.esPedidoMoroso)).toList();
     }
-    return groups;
+    return filterOrderGroupsBySignals(
+      groups,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
   }
 
   void _toggleExpand(String id) {
@@ -386,18 +395,29 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
-          child: OrderOpenChatButton(
-            relatedOrderIds: [r.id],
-            onPressed: () {
-              showOrderChatSheet(
-                context: context,
-                transactionRequestId: r.id,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderOpenChatButton(
+                relatedOrderIds: [r.id],
+                onPressed: () {
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: r.id,
+                    orderLines: [r],
+                    allowReplyAsAliado: false,
+                    allowReplyAsAdmin: true,
+                    title: 'Chat del pedido',
+                    onThreadChanged: _load,
+                  );
+                },
+              ),
+              OrderReturnButtons(
+                lines: [r],
                 allowReplyAsAliado: false,
-                allowReplyAsAdmin: true,
-                title: 'Chat del pedido',
-                onThreadChanged: _load,
-              );
-            },
+                allowReplyAsImportador: false,
+              ),
+            ],
           ),
         ),
       ],
@@ -441,18 +461,29 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
-          child: OrderOpenChatButton(
-            relatedOrderIds: [primary.id],
-            onPressed: () {
-              showOrderChatSheet(
-                context: context,
-                transactionRequestId: primary.id,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderOpenChatButton(
+                relatedOrderIds: [primary.id],
+                onPressed: () {
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: primary.id,
+                    orderLines: [primary],
+                    allowReplyAsAliado: false,
+                    allowReplyAsAdmin: true,
+                    title: 'Chat del pedido',
+                    onThreadChanged: _load,
+                  );
+                },
+              ),
+              OrderReturnButtons(
+                lines: [primary],
                 allowReplyAsAliado: false,
-                allowReplyAsAdmin: true,
-                title: 'Chat del pedido',
-                onThreadChanged: _load,
-              );
-            },
+                allowReplyAsImportador: false,
+              ),
+            ],
           ),
         ),
       ],
@@ -561,39 +592,44 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    FilterChip(
-                      label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                      selected: _hasDateFilter,
-                      onSelected: (_) => _openDateFilters(),
-                      visualDensity: VisualDensity.compact,
-                      selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                      checkmarkColor: AppColors.brandBlue,
-                      avatar: Icon(
-                        Icons.calendar_month_outlined,
-                        size: 16,
-                        color: _hasDateFilter
-                            ? AppColors.brandBlue
-                            : AppColors.textSecondary,
-                      ),
+                    OrderDateShortcutBar(
+                      from: _dateFrom,
+                      to: _dateTo,
+                      onChanged: (from, to) => setState(() {
+                        _dateFrom = from;
+                        _dateTo = to;
+                      }),
+                      onPickRange: _openDateFilters,
+                    ),
+                    OrderSignalFilterBar(
+                      creditOnly: _creditOnly,
+                      replacementOnly: _replacementOnly,
+                      onChanged: (credit, replacement) => setState(() {
+                        _creditOnly = credit;
+                        _replacementOnly = replacement;
+                      }),
                     ),
                     if (_showMorosoChip)
-                      FilterChip(
-                        label: const Text('Pago pendiente'),
-                        selected: _morosoOnly,
-                        onSelected: (v) => setState(() => _morosoOnly = v),
-                        visualDensity: VisualDensity.compact,
-                        selectedColor: Colors.red.shade100,
-                        checkmarkColor: Colors.red.shade800,
-                        avatar: Icon(
-                          Icons.warning_amber_rounded,
-                          size: 16,
-                          color: _morosoOnly
-                              ? Colors.red.shade800
-                              : AppColors.textSecondary,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilterChip(
+                          label: const Text('Pago pendiente'),
+                          selected: _morosoOnly,
+                          onSelected: (v) => setState(() => _morosoOnly = v),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          selectedColor: Colors.red.shade100,
+                          checkmarkColor: Colors.red.shade800,
+                          avatar: Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: _morosoOnly
+                                ? Colors.red.shade800
+                                : AppColors.textSecondary,
+                          ),
                         ),
                       ),
                   ],

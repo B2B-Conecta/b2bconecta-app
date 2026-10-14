@@ -73,6 +73,41 @@ void main() {
     expect(threads.first.requestIds, isNotEmpty);
   });
 
+  test('names the products when a chat covers more than one', () {
+    final orders = [
+      _order(
+        id: 'a',
+        checkoutGroupId: 'g1',
+        ownerId: 'imp-a',
+        productName: 'Disco freno delantero 245 mm',
+        importerName: 'Repuestos Delta Caracas C.A.',
+      ),
+      _order(
+        id: 'b',
+        checkoutGroupId: 'g1',
+        ownerId: 'imp-a',
+        productName: 'Aceite Mobil 4T 20W50 1 L',
+        importerName: 'Repuestos Delta Caracas C.A.',
+      ),
+      _order(
+        id: 'c',
+        checkoutGroupId: 'g1',
+        ownerId: 'imp-a',
+        productName: 'Pastillas de freno',
+        importerName: 'Repuestos Delta Caracas C.A.',
+      ),
+    ];
+    final threads = orderChatThreadsFromOrders(
+      orders,
+      role: AppHomeRole.aliado,
+    );
+    expect(threads, hasLength(1));
+    expect(
+      threads.single.title,
+      'Disco freno delantero 245 mm · Aceite Mobil 4T 20W50 1 L y 1 más',
+    );
+  });
+
   test('filter keeps active, closed, unread and search', () {
     const active = OrderChatThread(
       primaryRequestId: '1',
@@ -190,8 +225,8 @@ void main() {
         ),
       ),
     );
-    expect(find.byTooltip('Mensajes'), findsOneWidget);
-    await tester.tap(find.byTooltip('Mensajes'));
+    expect(find.byTooltip('Chats'), findsOneWidget);
+    await tester.tap(find.byTooltip('Chats'));
     expect(opened, isTrue);
   });
 
@@ -202,7 +237,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.byTooltip('Mensajes'), findsNothing);
+    expect(find.byTooltip('Chats'), findsNothing);
   });
 
   testWidgets('app bar shows messages when authenticated callback is set',
@@ -216,8 +251,8 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.byTooltip('Mensajes'), findsOneWidget);
-    await tester.tap(find.byTooltip('Mensajes'));
+    expect(find.byTooltip('Chats'), findsOneWidget);
+    await tester.tap(find.byTooltip('Chats'));
     expect(opened, isTrue);
   });
 
@@ -252,7 +287,20 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Sesión vencida'), findsOneWidget);
-    expect(find.byTooltip('Mensajes'), findsNothing);
+    expect(find.byTooltip('Chats'), findsNothing);
+  });
+
+  test('el filtro de fechas incluye el día de inicio y el de cierre', () {
+    final day = DateTime(2026, 10, 13, 22);
+    expect(
+      chatActivityInRange(at: day, from: DateTime(2026, 10, 13), to: DateTime(2026, 10, 13)),
+      isTrue,
+    );
+    expect(
+      chatActivityInRange(at: day, from: DateTime(2026, 10, 14), to: DateTime(2026, 10, 14)),
+      isFalse,
+    );
+    expect(chatActivityInRange(at: null, from: null, to: null), isTrue);
   });
 
   testWidgets('inbox lists an order thread for the signed-in user',

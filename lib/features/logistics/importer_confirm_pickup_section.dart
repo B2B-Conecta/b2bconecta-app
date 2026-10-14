@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'carrier_decision.dart';
 import 'pickup_location_mode.dart';
 import 'importer_pickup_location_model.dart';
+import 'importer_pickup_locations_panel.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_pickup_flow_copy.dart';
@@ -220,7 +221,9 @@ class _ConfirmPickupDialog extends StatefulWidget {
 
 class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
   late String _mode;
+  late List<ImporterPickupLocationModel> _locations;
   String? _locationId;
+  bool _adding = false;
 
   @override
   void initState() {
@@ -231,9 +234,41 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
     } else {
       _mode = PickupLocationMode.warehouse;
     }
-    final defaultLoc = widget.locations.where((l) => l.isDefault).toList();
+    _locations = List.of(widget.locations);
+    final defaultLoc = _locations.where((l) => l.isDefault).toList();
     if (defaultLoc.isNotEmpty) {
       _locationId = defaultLoc.first.id;
+    } else if (_locations.isNotEmpty) {
+      _locationId = _locations.first.id;
+    }
+  }
+
+  Future<void> _addLocation() async {
+    setState(() => _adding = true);
+    try {
+      final saved = await showImporterPickupLocationForm(context);
+      if (saved != true || !mounted) return;
+      final rows = await SupabaseService.listMyImporterPickupLocations();
+      final active = rows.where((l) => l.isActive).toList();
+      if (!mounted) return;
+      final known = _locations.map((l) => l.id).toSet();
+      String? created;
+      for (final item in active) {
+        if (!known.contains(item.id)) created = item.id;
+      }
+      setState(() {
+        _locations = active;
+        _mode = PickupLocationMode.alternate;
+        _locationId = created ??
+            (active.isEmpty ? null : active.last.id);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar la ubicación: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _adding = false);
     }
   }
 
@@ -242,6 +277,12 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
     final r = widget.request;
     final canCarrierBase = r.carrierDecision == CarrierDecision.selected;
 
+    final selectedId = _locationId ??
+        (_locations.isEmpty ? null : _locations.first.id);
+    ImporterPickupLocationModel? selectedLocation;
+    for (final item in _locations) {
+      if (item.id == selectedId) selectedLocation = item;
+    }
     return AlertDialog(
       title: const Text(OrderPickupFlowCopy.importadorRecoleccionDialogTitulo),
       content: SingleChildScrollView(
@@ -249,54 +290,83 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            RadioListTile<String>(
-              value: PickupLocationMode.warehouse,
-              groupValue: _mode,
-              onChanged: (v) => setState(() => _mode = v!),
-              title: const Text('Mi almacén'),
-              subtitle: const Text(OrderPickupFlowCopy.importadorAlmacenSubtitulo),
-              contentPadding: EdgeInsets.zero,
+            Text(
+              'La tienda y el transporte usan este punto para retirar la mercancía.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
             ),
-            if (canCarrierBase)
-              RadioListTile<String>(
-                value: PickupLocationMode.carrierBase,
-                groupValue: _mode,
-                onChanged: (v) => setState(() => _mode = v!),
-                title: const Text('Base del transportista'),
-                subtitle: Text(
-                  r.carrierDisplayCompanyName != null
-                      ? '${OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo}: ${r.carrierDisplayCompanyName}'
-                      : OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo,
-                ),
-                contentPadding: EdgeInsets.zero,
+            const SizedBox(height: 12),
+            _PickupChoice(
+              selected: _mode == PickupLocationMode.warehouse,
+              icon: Icons.warehouse_outlined,
+              title: 'Mi almacén',
+              body: OrderPickupFlowCopy.importadorAlmacenSubtitulo,
+              onTap: () => setState(() => _mode = PickupLocationMode.warehouse),
+            ),
+            if (canCarrierBase) ...[
+              const SizedBox(height: 8),
+              _PickupChoice(
+                selected: _mode == PickupLocationMode.carrierBase,
+                icon: Icons.local_shipping_outlined,
+                title: 'Base del transportista',
+                body: r.carrierDisplayCompanyName != null
+                    ? '${OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo}: ${r.carrierDisplayCompanyName}'
+                    : OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo,
+                onTap: () =>
+                    setState(() => _mode = PickupLocationMode.carrierBase),
               ),
-            if (widget.locations.isNotEmpty)
-              RadioListTile<String>(
-                value: PickupLocationMode.alternate,
-                groupValue: _mode,
-                onChanged: (v) => setState(() => _mode = v!),
-                title: const Text('Ubicación alterna'),
-                subtitle: const Text(OrderPickupFlowCopy.importadorUbicacionAlternaSubtitulo),
-                contentPadding: EdgeInsets.zero,
-              ),
+            ],
+            const SizedBox(height: 8),
+            _PickupChoice(
+              selected: _mode == PickupLocationMode.alternate,
+              icon: Icons.edit_location_alt_outlined,
+              title: 'Otra ubicación',
+              body: _mode == PickupLocationMode.alternate &&
+                      selectedLocation != null
+                  ? selectedLocation.ubicacionMultilinea
+                  : 'Un punto distinto al almacén de su perfil.',
+              onTap: () => setState(() => _mode = PickupLocationMode.alternate),
+            ),
             if (_mode == PickupLocationMode.alternate) ...[
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _locationId ?? widget.locations.first.id,
-                decoration: const InputDecoration(
-                  labelText: 'Seleccione la ubicación',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+              if (_locations.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  value: selectedId,
+                  decoration: const InputDecoration(
+                    labelText: 'Seleccione la ubicación',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: _locations
+                      .map(
+                        (l) => DropdownMenuItem(
+                          value: l.id,
+                          child: Text(l.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _locationId = v),
                 ),
-                items: widget.locations
-                    .map(
-                      (l) => DropdownMenuItem(
-                        value: l.id,
-                        child: Text(l.label),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _locationId = v),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _adding ? null : _addLocation,
+                  icon: _adding
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_location_alt_outlined, size: 18),
+                  label: Text(
+                    _locations.isEmpty
+                        ? 'Agregar ubicación'
+                        : 'Agregar otra ubicación',
+                  ),
+                ),
               ),
             ],
           ],
@@ -310,22 +380,101 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
         FilledButton(
           onPressed: () {
             if (_mode == PickupLocationMode.alternate &&
-                (_locationId == null || _locationId!.isEmpty)) {
+                (selectedId == null || selectedId.isEmpty)) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Seleccione una ubicación de la lista.'),
+                  content: Text(
+                    'Agregue o seleccione una ubicación distinta al almacén.',
+                  ),
                 ),
               );
               return;
             }
             Navigator.pop(
               context,
-              (mode: _mode, locationId: _locationId),
+              (
+                mode: _mode,
+                locationId: _mode == PickupLocationMode.alternate
+                    ? selectedId
+                    : null,
+              ),
             );
           },
           child: const Text('Guardar'),
         ),
       ],
+    );
+  }
+}
+
+class _PickupChoice extends StatelessWidget {
+  const _PickupChoice({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.brandBlueContainer : AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.borderSubtle,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected ? AppColors.brand : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

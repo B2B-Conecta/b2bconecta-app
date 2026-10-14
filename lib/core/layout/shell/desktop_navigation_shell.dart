@@ -146,7 +146,7 @@ class _DesktopSideRail extends StatelessWidget {
     return Material(
       color: AppColors.surfaceTinted,
       child: Container(
-        width: extended ? 232 : 80,
+        width: extended ? 232 : 96,
         decoration: BoxDecoration(
           border: Border(right: BorderSide(color: AppColors.borderSubtle)),
         ),
@@ -349,31 +349,53 @@ class _RailNavTile extends StatelessWidget {
                   )
                 : null,
           ),
-          child: Padding(
+            child: Tooltip(
+            message: label,
+            child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: extended ? 14 : 8,
-              vertical: 12,
+              horizontal: extended ? 14 : 4,
+              vertical: extended ? 12 : 8,
             ),
-            child: Row(
-              mainAxisAlignment:
-                  extended ? MainAxisAlignment.start : MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 22, color: iconColor),
-                if (extended) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                        color: fg,
+            child: extended
+                ? Row(
+                    children: [
+                      Icon(icon, size: 22, color: iconColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w600,
+                            color: fg,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Icon(icon, size: 22, color: iconColor),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.15,
+                          fontWeight:
+                              selected ? FontWeight.w800 : FontWeight.w600,
+                          color: fg,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ],
-            ),
+          ),
           ),
         ),
       ),

@@ -29,6 +29,10 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
     final name = chunk.first.ownerBusinessName ?? 'Importador';
     final fase = fasePagoBloqueImportador(chunk);
     final monto = subtotalBloqueImportador(chunk);
+    final credito = chunk.fold<double>(
+      0,
+      (sum, line) => sum + line.creditoAplicadoMonto,
+    );
     final lineCount = chunk.length;
 
     return Container(
@@ -142,6 +146,17 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (credito > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Incluye saldo a favor de ${formatRefAmount(credito)} REF.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brand,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   fasePagoBloqueLabelEs(fase),

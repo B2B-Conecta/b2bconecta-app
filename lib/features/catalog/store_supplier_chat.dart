@@ -260,6 +260,56 @@ class StoreSupplierChatService {
     return channel;
   }
 
+  static Future<List<StoreSupplierInboxItem>> listInbox() async {
+    final rows = await SupabaseAccess.client
+        .from('store_supplier_threads')
+        .select(
+          'id, aliado_id, importador_id, created_at, '
+          'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name), '
+          'importador:profiles!store_supplier_threads_importador_id_fkey(business_name)',
+        )
+        .order('created_at', ascending: false);
+    final threads = <StoreSupplierThread>[];
+    final created = <String, DateTime?>{};
+    for (final raw in rows as List<dynamic>) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final id = row['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      threads.add(
+        StoreSupplierThread(
+          id: id,
+          aliadoId: row['aliado_id']?.toString() ?? '',
+          importadorId: row['importador_id']?.toString() ?? '',
+          aliadoName: _embeddedName(row['aliado']),
+          importadorName: _embeddedName(row['importador']),
+        ),
+      );
+      created[id] = DateTime.tryParse(row['created_at']?.toString() ?? '');
+    }
+    final latest = <String, StoreSupplierMessage>{};
+    if (threads.isNotEmpty) {
+      final messages = await SupabaseAccess.client
+          .from('store_supplier_messages')
+          .select(_messageSelect)
+          .order('created_at', ascending: false)
+          .limit(300);
+      for (final raw in messages as List<dynamic>) {
+        final message = StoreSupplierMessage.fromJson(
+          Map<String, dynamic>.from(raw as Map),
+        );
+        latest.putIfAbsent(message.threadId, () => message);
+      }
+    }
+    return [
+      for (final thread in threads)
+        StoreSupplierInboxItem(
+          thread: thread,
+          lastBody: latest[thread.id]?.body,
+          lastAt: latest[thread.id]?.createdAt ?? created[thread.id],
+        ),
+    ];
+  }
+
   static String? _embeddedName(dynamic raw) {
     if (raw is Map) {
       final name = raw['business_name']?.toString().trim();
@@ -270,6 +320,18 @@ class StoreSupplierChatService {
     }
     return null;
   }
+}
+
+class StoreSupplierInboxItem {
+  const StoreSupplierInboxItem({
+    required this.thread,
+    this.lastBody,
+    this.lastAt,
+  });
+
+  final StoreSupplierThread thread;
+  final String? lastBody;
+  final DateTime? lastAt;
 }
 
 /// Abre el hilo encima de la ruta actual. No cambia de pestaña.

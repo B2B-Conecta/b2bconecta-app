@@ -65,9 +65,16 @@ String orderCardTimelineSubtitle(
   if (r.hasTransitEta &&
       (r.status == TransactionRequestStatus.enTransito ||
           r.status == TransactionRequestStatus.enviado)) {
-    return '$label · ETA ${r.transitEtaResumenEs}';
+    return '$label · Llegada ${r.transitEtaResumenEs}';
   }
   return label;
+}
+
+/// Al abrir la ficha, los productos solo se despliegan si el paso actual es alistarlos.
+bool orderCardProductsInitiallyExpanded(String status) {
+  return status == TransactionRequestStatus.pendiente ||
+      status == TransactionRequestStatus.enPreparacion ||
+      status == TransactionRequestStatus.pedidoListo;
 }
 
 bool orderCardTimelineInitiallyExpanded(TransactionRequestModel r) {

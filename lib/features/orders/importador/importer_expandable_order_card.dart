@@ -43,6 +43,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.expandedFooter,
     this.onThreadChanged,
     this.ratingBar,
+    this.aliadoCreditRemaining,
   });
 
   final TransactionRequestModel request;
@@ -63,6 +64,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final Widget? expandedFooter;
   final VoidCallback? onThreadChanged;
   final Widget? ratingBar;
+
+  /// Saldo a favor de esta tienda con el proveedor que mira la ficha.
+  final double? aliadoCreditRemaining;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +91,10 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       estado: lines.first.aliadoEstado,
     );
     final totalRef = lines.fold<double>(0, (a, x) => a + x.precioTotal);
+    final creditApplied = lines.fold<double>(
+      0,
+      (sum, line) => sum + line.creditoAplicadoMonto,
+    );
 
     final fechaLabel = isCheckoutGroup
         ? ImporterOrderDate.etiquetaGrupo(lines)
@@ -144,6 +152,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    OrderPostventaHeaderMarks(lines: lines),
                     const SizedBox(height: 10),
                     if (isCheckoutGroup && titulo != null)
                       Text(
@@ -160,6 +169,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                       lines: lines,
                       viewerRole: AppHomeRole.importador,
                       importerUserId: uid,
+                      compact: !expanded,
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -175,16 +185,19 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (!expanded) ...[
+                        if (creditApplied > 0 || (aliadoCreditRemaining ?? 0) > 0) ...[
                           const SizedBox(width: 8),
-                          Expanded(
+                          Flexible(
                             child: Text(
-                              destinoTxt,
+                              creditApplied > 0
+                                  ? 'Crédito aplicado ${formatRefAmount(creditApplied)} REF'
+                                  : 'Saldo a favor ${formatRefAmount(aliadoCreditRemaining!)} REF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.brandAccent,
                               ),
                             ),
                           ),
@@ -195,7 +208,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       promoChip,
                     ],
-                    if (operationalHeadline != null &&
+                    if (expanded &&
+                        operationalHeadline != null &&
                         operationalHeadline!.isNotEmpty &&
                         operationalHeadline != '—') ...[
                       const SizedBox(height: 8),
@@ -215,7 +229,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             r.status == TransactionRequestStatus.enviado)) ...[
                       const SizedBox(height: 6),
                       Text(
-                        'ETA al taller: ${r.transitEtaResumenEs}',
+                        'Llegada al taller: ${r.transitEtaResumenEs}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -264,10 +278,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               ),
           ),
           OrderCardGuidance(
-            hint: isCheckoutGroup &&
-                    !lines.every((x) => x.status == lines.first.status)
-                ? 'Hay líneas en distinto estado. Abra el detalle para ver cada una.'
-                : TransactionRequestStatus.importerCollapsedHint(lines.first.status),
             expanded: expanded,
             onToggle: onToggle,
           ),
@@ -285,7 +295,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-          if (canCancelByImporter && onCancelByImporter != null)
+          if (expanded && canCancelByImporter && onCancelByImporter != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
               child: OutlinedButton.icon(
@@ -303,7 +313,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-          if (canNotifyQtyAdjustment || qtyAdjustmentDisabledHint != null)
+          if (expanded &&
+              (canNotifyQtyAdjustment || qtyAdjustmentDisabledHint != null))
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
               child: Column(
@@ -388,7 +399,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         OrderCardCollapsibleSection(
                           title: 'Tienda minorista y entrega',
                           subtitle: '$aliadoTxt · $destinoTxt',
-                          initiallyExpanded: true,
                           trailingActions: [
                             if (TransactionRequestAliadoContactSection
                                 .kycAprobadoPara(lines.first))
@@ -429,7 +439,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             lines,
                             viewer: PedidoDesgloseViewer.importador,
                           ),
-                          initiallyExpanded: true,
+                          initiallyExpanded: orderCardProductsInitiallyExpanded(
+                            lines.first.status,
+                          ),
                           child: TransactionRequestProductosDesgloseSection(
                             lines: lines,
                             compact: true,
@@ -469,7 +481,12 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         OrderCardCollapsibleSection(
                           title: 'Mensajes',
                           subtitle: 'Chat con la tienda minorista',
-                          initiallyExpanded: true,
+                          initiallyExpanded: lines.any(
+                            (line) =>
+                                (line.postventaDevolucionAt != null &&
+                                    line.postventaResolucion == null) ||
+                                line.postventaResolucion == 'cambio',
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -481,7 +498,10 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               OrderReturnButtons(
                                 lines: lines,
                                 allowReplyAsAliado: false,
-                                allowReplyAsImportador: true,
+                                allowReplyAsImportador:
+                                    orderLinesAllowChatReply(lines),
+                                dispatchReplacementAsImporter: true,
+                                onChanged: onThreadChanged,
                               ),
                             ],
                           ),
@@ -523,6 +543,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       transactionRequestId: lines.first.id,
       mergedThreadRequestIds:
           isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+      orderLines: lines,
       allowReplyAsAliado: false,
       allowReplyAsAdmin: false,
       allowReplyAsImportador: orderLinesAllowChatReply(lines),

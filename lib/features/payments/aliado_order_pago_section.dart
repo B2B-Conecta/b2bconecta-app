@@ -522,7 +522,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               Text(
                 pe == PagoRevisionEstado.enRevision
                     ? 'Puede reemplazar el archivo si hubo error.'
-                    : 'Use cámara, galería o suba imagen/PDF legible.',
+                    : 'Adjunte una imagen o un PDF legible.',
                 style: TextStyle(
                   fontSize: 11,
                   color: AppColors.textSecondary,

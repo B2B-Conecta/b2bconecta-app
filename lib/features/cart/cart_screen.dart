@@ -9,6 +9,8 @@ import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
+import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'importer_min_order.dart';
 import 'min_order_currency.dart';
 
@@ -31,12 +33,15 @@ class _CartScreenState extends State<CartScreen> {
   final _cart = CartService.instance;
   bool _submitting = false;
   double? _tasa;
+  Map<String, ImporterCreditBalance> _credits = const {};
+  final Set<String> _creditOptOut = {};
 
   @override
   void initState() {
     super.initState();
     _tasa = widget.liveTasaBcv;
     _cart.addListener(_onCart);
+    _loadCredits();
     if (_tasa == null) {
       SupabaseService.fetchGlobalTasaBcv().then((v) {
         if (mounted) setState(() => _tasa = v);
@@ -46,6 +51,43 @@ class _CartScreenState extends State<CartScreen> {
 
   void _onCart() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadCredits() async {
+    try {
+      final rows = await OrdersService.fetchImporterCreditBalances();
+      if (!mounted) return;
+      setState(() {
+        _credits = {for (final row in rows) row.importadorId: row};
+      });
+    } catch (_) {}
+  }
+
+  double _groupSubtotal(List<CartLine> lines) => lines.fold<double>(
+        0,
+        (sum, line) => sum + line.precioUnitarioAliadoRef * line.quantity,
+      );
+
+  double _creditFor(List<CartLine> lines) {
+    final id = lines.isEmpty ? null : lines.first.part.ownerId?.trim();
+    if (id == null || id.isEmpty || _creditOptOut.contains(id)) return 0;
+    final available = _credits[id]?.remaining ?? 0;
+    return OrderReturnRules.cappedCredit(available, _groupSubtotal(lines));
+  }
+
+  double get _appliedCredit => _cart.linesGroupedByImporterName.values.fold(
+        0,
+        (sum, lines) => sum + _creditFor(lines),
+      );
+
+  Map<String, bool> _creditPayload() {
+    final out = <String, bool>{};
+    for (final entry in _cart.linesGroupedByImportadorId.entries) {
+      if (_creditOptOut.contains(entry.key)) continue;
+      if ((_credits[entry.key]?.remaining ?? 0) <= 0) continue;
+      out[entry.key] = true;
+    }
+    return out;
   }
 
   @override
@@ -80,14 +122,16 @@ class _CartScreenState extends State<CartScreen> {
           )
           .toList();
 
+      final appliedCredit = _appliedCredit;
       final orderId = await SupabaseService.checkoutMultiImportadorCart(
         lines: lines,
         destinoEntregaUsaPerfil: result.useProfile,
         destinoEntregaTexto: result.texto,
         destinoEntregaMapsUrl: result.mapsUrl,
         promoByImportador: _cart.promoAttributionPayloadForCheckout(),
+        applyCreditByImportador: _creditPayload(),
       );
-      final purchaseValue = _cart.totalRef();
+      final purchaseValue = _cart.totalRef() - appliedCredit;
       trackPurchase(
         orderId: orderId.trim().isNotEmpty
             ? orderId.trim()
@@ -99,9 +143,11 @@ class _CartScreenState extends State<CartScreen> {
       MainShellTabController.notifyPedidosReload();
       if (!mounted) return;
       messenger.showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Pedido registrado. Los importadores recibirán un aviso para confirmar stock.',
+            appliedCredit > 0
+                ? 'Pedido registrado. Se aplicaron ${formatRefAmount(appliedCredit)} REF de saldo a favor.'
+                : 'Pedido registrado. Los importadores recibirán un aviso para confirmar stock.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -149,7 +195,9 @@ class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     final tasa = _tasa;
-    final totalRef = _cart.totalRef();
+    final grossRef = _cart.totalRef();
+    final appliedCredit = _appliedCredit;
+    final totalRef = grossRef - appliedCredit;
     final totalBs = tasa != null ? totalRef * tasa : null;
     final canConfirm = !_submitting && _cart.meetsAllImporterMinOrders;
 
@@ -281,6 +329,25 @@ class _CartScreenState extends State<CartScreen> {
                             );
                           },
                         ),
+                        _CreditToggle(
+                          lines: entry.value,
+                          balance: _credits[entry.value.first.part.ownerId?.trim() ?? ''],
+                          applied: _creditFor(entry.value),
+                          optedOut: _creditOptOut.contains(
+                            entry.value.first.part.ownerId?.trim(),
+                          ),
+                          onChanged: (useCredit) {
+                            final id = entry.value.first.part.ownerId?.trim();
+                            if (id == null || id.isEmpty) return;
+                            setState(() {
+                              if (useCredit) {
+                                _creditOptOut.remove(id);
+                              } else {
+                                _creditOptOut.add(id);
+                              }
+                            });
+                          },
+                        ),
                         ...entry.value.map(
                           (line) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
@@ -307,6 +374,15 @@ class _CartScreenState extends State<CartScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          if (appliedCredit > 0)
+                            Text(
+                              'Saldo a favor: −${formatRefAmount(appliedCredit)} REF',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: AppColors.brand,
+                              ),
+                            ),
                           Text(
                             'Total REF: ${formatRefAmount(totalRef)}',
                             style: const TextStyle(
@@ -381,7 +457,7 @@ class _CartLineCard extends StatelessWidget {
     final list = part.precio;
     final showStrike = unit < list - 0.0001;
     final minQty = part.minOrderQtyEffective;
-    final maxQty = part.stock;
+    final maxQty = part.stockForSale;
     final canDec = line.quantity > minQty;
     final canInc = line.quantity < maxQty;
 
@@ -800,28 +876,55 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
     );
   }
 
+  String get _fiscalSummary {
+    final parts = <String>[
+      if ((widget.profile.estado ?? '').trim().isNotEmpty)
+        widget.profile.estado!.trim(),
+      if ((widget.profile.ciudad ?? '').trim().isNotEmpty)
+        widget.profile.ciudad!.trim(),
+      if ((widget.profile.direccion ?? '').trim().isNotEmpty)
+        widget.profile.direccion!.trim(),
+    ];
+    if (parts.isEmpty) {
+      return 'Complete la dirección fiscal en Mi perfil.';
+    }
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Destino de entrega'),
+      title: const Text('¿Dónde entregamos el pedido?'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Usar dirección fiscal del perfil'),
-              subtitle: Text(
-                _usaPerfil
-                    ? (widget.profile.hasFiscalMapsShareLink
-                        ? 'El reparto usará su domicilio y el enlace Maps guardados en Mi perfil.'
-                        : 'Debe completar el enlace de Google Maps en Mi perfil para usar esta opción.')
-                    : 'Indique otra dirección y enlace Maps a continuación.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            Text(
+              'La tienda recibe la mercancía en esta dirección. Puede usar la de su perfil u otra para este pedido.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: AppColors.textSecondary,
               ),
-              value: _usaPerfil,
-              onChanged: (v) => setState(() => _usaPerfil = v),
+            ),
+            const SizedBox(height: 12),
+            _LocationChoice(
+              selected: _usaPerfil,
+              icon: Icons.storefront_outlined,
+              title: 'Dirección de mi perfil',
+              body: widget.profile.hasFiscalMapsShareLink
+                  ? _fiscalSummary
+                  : 'Falta el enlace de Google Maps en Mi perfil.',
+              onTap: () => setState(() => _usaPerfil = true),
+            ),
+            const SizedBox(height: 8),
+            _LocationChoice(
+              selected: !_usaPerfil,
+              icon: Icons.edit_location_alt_outlined,
+              title: 'Otra dirección',
+              body: 'Solo para este pedido. El enlace de mapas es obligatorio.',
+              onTap: () => setState(() => _usaPerfil = false),
             ),
             if (!_usaPerfil) ...[
               const SizedBox(height: 4),
@@ -891,6 +994,131 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
           child: const Text('Confirmar pedido'),
         ),
       ],
+    );
+  }
+}
+
+class _LocationChoice extends StatelessWidget {
+  const _LocationChoice({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.brandBlueContainer : AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.borderSubtle,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected ? AppColors.brand : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreditToggle extends StatelessWidget {
+  const _CreditToggle({
+    required this.lines,
+    required this.balance,
+    required this.applied,
+    required this.optedOut,
+    required this.onChanged,
+  });
+
+  final List<CartLine> lines;
+  final ImporterCreditBalance? balance;
+  final double applied;
+  final bool optedOut;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = balance?.remaining ?? 0;
+    if (lines.isEmpty || available <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: CheckboxListTile(
+          value: !optedOut,
+          onChanged: (value) => onChanged(value ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: Text(
+            optedOut
+                ? 'Usar saldo a favor · ${formatRefAmount(available)} REF'
+                : 'Saldo a favor · −${formatRefAmount(applied)} REF',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            'Se descuenta de este proveedor en el próximo pedido. El mínimo se calcula antes del saldo.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.3,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

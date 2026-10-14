@@ -25,8 +25,13 @@ import 'importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 
 /// Pedidos del importador: ingreso directo, filtros rápidos y ciclo completo en una sola vista.
 class ImporterActiveOrdersPanel extends StatefulWidget {
@@ -46,8 +51,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   late final TextEditingController _searchCtrl;
   PedidosListScope _scope = PedidosListScope.enCurso;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
+  List<AliadoCreditBalance> _credits = const [];
 
   @override
   void initState() {
@@ -174,8 +182,21 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     if (pending == null) return false;
     final key = _expandKeyForPendingId(pending);
     if (key == null) return false;
+    final openChat = MainShellTabController.consumePendingOpenOrderChat();
     MainShellTabController.consumePendingNotificationRelatedId();
     setState(() => _expandedRequestId = key);
+    if (openChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openOrderChatForNotification(
+          context: context,
+          rows: _rows,
+          relatedId: pending,
+          asAliado: false,
+          onThreadChanged: () => _load(silent: true),
+        );
+      });
+    }
     return true;
   }
 
@@ -201,9 +222,14 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     try {
       final rows =
           await SupabaseService.fetchUnifiedTransactionRequestsForImporter();
+      List<AliadoCreditBalance> credits = const [];
+      try {
+        credits = await OrdersService.fetchAliadoCreditBalancesForImporter();
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _rows = rows;
+        _credits = credits;
         _loading = false;
       });
       _tryExpandFromPendingNotification();
@@ -216,11 +242,20 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
   }
 
+  double? _creditFor(String aliadoId) {
+    for (final credit in _credits) {
+      if (credit.aliadoId == aliadoId) return credit.remaining;
+    }
+    return null;
+  }
+
   void _clearFilters() {
     _searchCtrl.clear();
     setState(() {
       _scope = PedidosListScope.enCurso;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -240,8 +275,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       _dateTo = draft.dateTo;
     });
   }
-
-  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   bool _matchesScope(TransactionRequestModel r) {
     switch (_scope) {
@@ -274,8 +307,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String _rowKey(TransactionRequestModel r) => r.id;
 
   Widget _quickFilterBar() {
+    final pad = B2bOrdersPanelLayout.listHorizontalPadding(
+      MediaQuery.sizeOf(context).width,
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      padding: EdgeInsets.fromLTRB(pad, 0, pad, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -286,56 +322,51 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               if (scope != PedidosListScope.entregados) _morosoOnly = false;
             }),
           ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              FilterChip(
-                label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                selected: _hasDateFilter,
-                onSelected: (_) => _openDateFilters(),
-                selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                checkmarkColor: AppColors.brandBlue,
-                avatar: Icon(
-                  Icons.calendar_month_outlined,
-                  size: 16,
-                  color: _hasDateFilter
-                      ? AppColors.brandBlue
-                      : AppColors.textSecondary,
-                ),
+          OrderDateShortcutBar(
+            from: _dateFrom,
+            to: _dateTo,
+            onChanged: (from, to) => setState(() {
+              _dateFrom = from;
+              _dateTo = to;
+            }),
+            onPickRange: _openDateFilters,
+          ),
+          OrderSignalFilterBar(
+            creditOnly: _creditOnly,
+            replacementOnly: _replacementOnly,
+            onChanged: (credit, replacement) => setState(() {
+              _creditOnly = credit;
+              _replacementOnly = replacement;
+            }),
+          ),
+          if (_scope == PedidosListScope.entregados ||
+              _scope == PedidosListScope.todos)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                label: const Text('Pago pendiente'),
+                selected: _morosoOnly,
+                onSelected: (v) => setState(() => _morosoOnly = v),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                selectedColor: Colors.red.shade100,
+                checkmarkColor: Colors.red.shade800,
                 labelStyle: TextStyle(
-                  fontWeight: _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
                   fontSize: 12.5,
-                  color: _hasDateFilter
-                      ? AppColors.brandBlue
+                  color: _morosoOnly
+                      ? Colors.red.shade900
                       : AppColors.textPrimary,
                 ),
-              ),
-              if (_scope == PedidosListScope.entregados ||
-                  _scope == PedidosListScope.todos)
-                FilterChip(
-                  label: const Text('Pago pendiente'),
-                  selected: _morosoOnly,
-                  onSelected: (v) => setState(() => _morosoOnly = v),
-                  selectedColor: Colors.red.shade100,
-                  checkmarkColor: Colors.red.shade800,
-                  labelStyle: TextStyle(
-                    fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 12.5,
-                    color: _morosoOnly
-                        ? Colors.red.shade900
-                        : AppColors.textPrimary,
-                  ),
-                  avatar: Icon(
-                    Icons.warning_amber_rounded,
-                    size: 16,
-                    color: _morosoOnly
-                        ? Colors.red.shade800
-                        : AppColors.textSecondary,
-                  ),
+                avatar: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 16,
+                  color: _morosoOnly
+                      ? Colors.red.shade800
+                      : AppColors.textSecondary,
                 ),
-            ],
-          ),
+              ),
+            ),
         ],
       ),
     );
@@ -392,7 +423,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       SnackBar(
         content: Text(
           next == TransactionRequestStatus.enTransito
-              ? 'Pedido marcado en tránsito con ETA registrado.'
+              ? 'Pedido marcado en tránsito. La tienda ya ve el tiempo de llegada.'
               : 'Estado actualizado.',
         ),
         behavior: SnackBarBehavior.floating,
@@ -624,7 +655,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final listPad = B2bOrdersPanelLayout.listHorizontalPadding(screenWidth);
     final filtered = _filtered;
-    final groups = _groupsForDisplay(filtered);
+    final groups = filterOrderGroupsBySignals(
+      _groupsForDisplay(filtered),
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
     return Stack(
       children: [
         Positioned.fill(
@@ -639,8 +674,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                 hintText: 'Buscar por producto, SKU o tienda minorista',
               ),
               _quickFilterBar(),
+              if (_credits.isNotEmpty)
+                _AliadoCreditStrip(credits: _credits),
               Expanded(
-                child: filtered.isEmpty
+                child: filtered.isEmpty || groups.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
@@ -667,6 +704,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         resetKey: Object.hash(
                           _scope,
                           _morosoOnly,
+                          _creditOnly,
+                          _replacementOnly,
                           _dateFrom,
                           _dateTo,
                           _searchCtrl.text,
@@ -754,6 +793,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                   : null,
                               qtyAdjustmentDisabledHint: qtyAdjHint,
                               onThreadChanged: _load,
+                              aliadoCreditRemaining: _creditFor(primary.aliadoId),
                               expandedFooter: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -836,6 +876,63 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _AliadoCreditStrip extends StatelessWidget {
+  const _AliadoCreditStrip({required this.credits});
+
+  final List<AliadoCreditBalance> credits;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 18,
+                    color: AppColors.brand,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Crédito a favor',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              for (final credit in credits)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '${credit.aliadoName} · ${formatRefAmount(credit.remaining)} REF',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.3,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -16,6 +16,7 @@ import 'package:motolink_pro_app/features/orders/importador/importer_aliado_soli
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'transaction_request_admin_sections.dart';
 
 /// Detalle admin de carrito: un proveedor a la vez (timeline, pago, chat único).
@@ -431,20 +432,32 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
           subtitle: 'Hilo con tienda minorista, importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
-          child: OrderOpenChatButton(
-            relatedOrderIds: chunk.map((e) => e.id).toList(),
-            onPressed: () {
-              showOrderChatSheet(
-                context: context,
-                transactionRequestId: anchor.id,
-                mergedThreadRequestIds:
-                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderOpenChatButton(
+                relatedOrderIds: chunk.map((e) => e.id).toList(),
+                onPressed: () {
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: anchor.id,
+                    mergedThreadRequestIds: chunk.length > 1
+                        ? chunk.map((e) => e.id).toList()
+                        : null,
+                    orderLines: chunk,
+                    allowReplyAsAliado: false,
+                    allowReplyAsAdmin: true,
+                    title: 'Chat del pedido',
+                    onThreadChanged: onRefresh,
+                  );
+                },
+              ),
+              OrderReturnButtons(
+                lines: chunk,
                 allowReplyAsAliado: false,
-                allowReplyAsAdmin: true,
-                title: 'Chat del pedido',
-                onThreadChanged: onRefresh,
-              );
-            },
+                allowReplyAsImportador: false,
+              ),
+            ],
           ),
         ),
       ],

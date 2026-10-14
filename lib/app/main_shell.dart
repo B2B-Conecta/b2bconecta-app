@@ -240,7 +240,7 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.analytics,
       label: 'Reportes',
       title: 'Reportes',
-      subtitle: 'Encomiendas · Promos · Usuarios',
+      subtitle: 'Encomiendas · Promos · Devoluciones',
     ),
     AdminShellDestination(
       icon: Icons.star_rate_outlined,
@@ -724,6 +724,8 @@ class _MainShellState extends State<MainShell> {
               child: BottomNavigationBar(
                 currentIndex: _tabIndex,
                 type: BottomNavigationBarType.fixed,
+                selectedFontSize: 12,
+                unselectedFontSize: 11,
                 onTap: (i) => _onB2bTabSelected(i, role),
                 items: navItems,
               ),

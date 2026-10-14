@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
+import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
+import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_access.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_thread.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
+import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 
 export 'package:motolink_pro_app/features/orders/shared/order_chat_access.dart';
@@ -37,6 +41,7 @@ void openOrderChatFromInbox({
     context: context,
     transactionRequestId: thread.primaryRequestId,
     mergedThreadRequestIds: merged,
+    orderLines: thread.lines,
     allowReplyAsAliado: flags.aliado,
     allowReplyAsAdmin: flags.admin,
     allowReplyAsImportador: flags.importador,
@@ -50,6 +55,7 @@ Future<void> showOrderChatSheet({
   required BuildContext context,
   required String transactionRequestId,
   List<String>? mergedThreadRequestIds,
+  List<TransactionRequestModel> orderLines = const [],
   required bool allowReplyAsAliado,
   required bool allowReplyAsAdmin,
   bool allowReplyAsImportador = false,
@@ -122,6 +128,7 @@ Future<void> showOrderChatSheet({
                     ),
                     transactionRequestId: transactionRequestId,
                     mergedThreadRequestIds: mergedThreadRequestIds,
+                    orderLines: orderLines,
                     allowReplyAsAliado: allowReplyAsAliado,
                     allowReplyAsAdmin: allowReplyAsAdmin,
                     allowReplyAsImportador: allowReplyAsImportador,
@@ -140,6 +147,49 @@ Future<void> showOrderChatSheet({
   ).whenComplete(() {
     NotificationProvider.active?.reload();
   });
+}
+
+/// Abre el chat del pedido que coincide con el `related_id` de una notificación.
+void openOrderChatForNotification({
+  required BuildContext context,
+  required List<TransactionRequestModel> rows,
+  required String relatedId,
+  required bool asAliado,
+  VoidCallback? onThreadChanged,
+}) {
+  final line = findTransactionForNotificationRelatedId(rows, relatedId);
+  if (line == null) return;
+  List<TransactionRequestModel>? chunk;
+  for (final cart in groupAliadoOrdersByCheckout(rows)) {
+    if (!cart.any((row) => row.id == line.id)) continue;
+    final chunks = groupCheckoutLinesByImportador(cart);
+    final groups = chunks.isEmpty ? <List<TransactionRequestModel>>[cart] : chunks;
+    for (final group in groups) {
+      if (group.any((row) => row.id == line.id)) {
+        chunk = group;
+        break;
+      }
+    }
+  }
+  final lines = chunk ?? <TransactionRequestModel>[line];
+  final counterpart = asAliado
+      ? lines.first.ownerBusinessName?.trim()
+      : lines.first.aliadoBusinessName?.trim();
+  showOrderChatSheet(
+    context: context,
+    transactionRequestId: lines.first.id,
+    mergedThreadRequestIds:
+        lines.length > 1 ? lines.map((row) => row.id).toList() : null,
+    orderLines: lines,
+    allowReplyAsAliado: asAliado && orderLinesAllowChatReply(lines),
+    allowReplyAsAdmin: false,
+    allowReplyAsImportador: !asAliado && orderLinesAllowChatReply(lines),
+    deliveryGrace: orderLinesChatDeliveryGrace(lines),
+    title: (counterpart != null && counterpart.isNotEmpty)
+        ? 'Chat · $counterpart'
+        : 'Chat del pedido',
+    onThreadChanged: onThreadChanged,
+  );
 }
 
 /// Icono de chat en la ficha cerrada; no expande el pedido.

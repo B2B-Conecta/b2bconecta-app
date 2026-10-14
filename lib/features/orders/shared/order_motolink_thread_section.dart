@@ -5,7 +5,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'order_chat_access.dart';
+import 'order_postventa_chat_card.dart';
+import 'order_return_rules.dart';
 import 'order_message_attachment.dart';
+import 'orders_service.dart';
+import 'transaction_request_model.dart';
 import 'order_message_media.dart';
 import 'order_message_pick.dart';
 import 'transaction_request_message_model.dart';
@@ -15,6 +19,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 
 /// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión B2B Conecta.
@@ -29,8 +34,11 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.onThreadChanged,
     this.suppressBuiltinTitle = false,
     this.suppressInlineHelp = false,
+    this.expandMessages = false,
+    this.emptyHint,
     /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
     this.mergedThreadRequestIds,
+    this.orderLines = const [],
   });
 
   final String transactionRequestId;
@@ -44,6 +52,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   /// Varios ids de `transaction_requests` (mismo importador en un carrito): se listan mensajes juntos.
   final List<String>? mergedThreadRequestIds;
 
+  /// Líneas del pedido, para la foto y la decisión del reporte en el chat.
+  final List<TransactionRequestModel> orderLines;
+
   /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido.
   final VoidCallback? onThreadChanged;
 
@@ -52,6 +63,12 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 
   /// La ayuda va en el icono ℹ️ del bloque colapsable padre.
   final bool suppressInlineHelp;
+
+  /// La lista de mensajes ocupa el alto libre y el campo queda abajo.
+  final bool expandMessages;
+
+  /// Texto cuando todavía no hay mensajes.
+  final String? emptyHint;
 
   @override
   State<OrderMotolinkThreadSection> createState() =>
@@ -64,7 +81,10 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   bool _loading = true;
   bool _sending = false;
   String? _error;
+  String? _composeHint;
   final List<RealtimeChannel> _messageChannels = [];
+  final Set<String> _resolvedRequestIds = {};
+  String? _resolvingRequestId;
 
   bool get _usaHiloFusionado =>
       widget.mergedThreadRequestIds != null &&
@@ -194,7 +214,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
       setState(() {
         _error = isJwtIssuedAtFutureError(e)
             ? 'El reloj local y Supabase no coinciden. Cierra el chat y ábrelo de nuevo en unos segundos.'
-            : e.toString();
+            : 'No se pudieron cargar los mensajes. Toque actualizar para reintentar.';
         _loading = false;
       });
     }
@@ -207,9 +227,21 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     return null;
   }
 
+  String _friendlySendError(Object error) {
+    final raw = error.toString();
+    if (raw.contains('plazo') || raw.contains('7 days') || raw.contains('7 días')) {
+      return OrderReturnRules.closedHint;
+    }
+    return 'No se pudo enviar. Revise su conexión e intente de nuevo.';
+  }
+
   Future<void> _send() async {
     final text = _ctrl.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (_sending) return;
+    if (text.isEmpty) {
+      setState(() => _composeHint = 'Escriba el mensaje antes de enviarlo.');
+      return;
+    }
 
     setState(() => _sending = true);
     try {
@@ -230,11 +262,12 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
         );
       }
       _ctrl.clear();
+      if (mounted) setState(() => _composeHint = null);
       await _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
+        SnackBar(content: Text(_friendlySendError(e))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -287,11 +320,144 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
+        SnackBar(content: Text(_friendlySendError(e))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  TransactionRequestModel? _lineForMessage(
+    TransactionRequestMessageModel message,
+    ParsedReturnRequest data,
+  ) {
+    for (final line in widget.orderLines) {
+      if (line.id == message.transactionRequestId) return line;
+    }
+    final name = data.productName.trim().toLowerCase();
+    if (name.isEmpty) return null;
+    for (final line in widget.orderLines) {
+      final product = (line.productName ?? '').trim().toLowerCase();
+      if (product == name) return line;
+    }
+    return null;
+  }
+
+  Future<void> _resolveReturn(
+    TransactionRequestModel line,
+    String resolution,
+    String? note,
+  ) async {
+    setState(() => _resolvingRequestId = line.id);
+    try {
+      await OrdersService.resolveOrderPostventaCaso(
+        transactionRequestId: line.id,
+        resolution: resolution,
+        note: note,
+      );
+      if (!mounted) return;
+      setState(() => _resolvedRequestIds.add(line.id));
+      await _load();
+      widget.onThreadChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Acuerdo registrado en el chat.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      final message = RegExp(r'message:\s*([^,\n]+)')
+              .firstMatch(raw)
+              ?.group(1)
+              ?.trim() ??
+          'No se pudo registrar el acuerdo.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => _resolvingRequestId = null);
+    }
+  }
+
+  Widget _messageTile(String? uid, int i) {
+    final m = _items[i];
+    final request = OrderReturnRules.parseReturnRequestMessage(m.body);
+    final line = request == null ? null : _lineForMessage(m, request);
+    final mine = uid != null && m.authorId == uid;
+    final label = mine
+        ? 'Tú'
+        : (m.isFromAdmin
+            ? 'B2B Conecta'
+            : (m.isFromImportador ? 'Importador' : 'Tienda minorista'));
+    final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final bg = m.isFromAdmin
+        ? AppColors.surfaceTinted.withOpacity(0.55)
+        : (m.isFromImportador
+            ? AppColors.brandBlueContainer
+            : (mine
+                ? AppColors.brandBlue.withOpacity(0.12)
+                : Colors.grey.shade200));
+    return Column(
+      crossAxisAlignment: align,
+      children: [
+        Text(
+          '$label · ${formatEsShortDateTime(m.createdAt)}',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: request == null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (m.body.trim().isNotEmpty)
+                        Text(
+                          m.body,
+                          style: const TextStyle(fontSize: 13, height: 1.35),
+                        ),
+                      OrderMessageMediaStrip(attachments: m.attachments),
+                    ],
+                  )
+                : OrderPostventaChatCard(
+                    data: request,
+                    attachments: m.attachments,
+                    imageUrl: line == null
+                        ? null
+                        : productCoverImageUrl(line.productImageUrls),
+                    creditAmount: line == null
+                        ? 0
+                        : OrderReturnRules.creditAmount(
+                            unitPrice: line.precioUnitarioAliado,
+                            lineTotal: line.precioTotal,
+                            lineQty: line.cantidad,
+                            affectedQty: request.units > 0
+                                ? request.units
+                                : line.cantidad,
+                          ),
+                    canDecide: widget.allowReplyAsImportador &&
+                        line != null &&
+                        line.postventaDevolucionAt != null &&
+                        line.postventaResolucion == null &&
+                        !_resolvedRequestIds.contains(line.id),
+                    busy: _resolvingRequestId == line?.id,
+                    onResolve: (resolution, note) =>
+                        _resolveReturn(line!, resolution, note),
+                  ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -302,7 +468,8 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
         widget.allowReplyAsImportador;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize:
+          widget.expandMessages ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -347,10 +514,19 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           Text(_error!, style: TextStyle(fontSize: 12, color: Colors.red.shade800))
         else if (_items.isEmpty)
           Text(
-            canReply
-                ? 'Aún no hay mensajes. Escriba aquí si tiene dudas sobre este pedido.'
-                : 'Sin mensajes en este pedido.',
+            widget.emptyHint ??
+                (canReply
+                    ? 'Aún no hay mensajes. Escriba aquí si tiene dudas sobre este pedido.'
+                    : 'Sin mensajes en este pedido.'),
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          )
+        else if (widget.expandMessages)
+          Expanded(
+            child: ListView.separated(
+              itemCount: _items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) => _messageTile(uid, i),
+            ),
           )
         else
           ListView.separated(
@@ -358,60 +534,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _items.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final m = _items[i];
-              final mine = uid != null && m.authorId == uid;
-              final label = mine
-                  ? 'Tú'
-                  : (m.isFromAdmin
-                      ? 'B2B Conecta'
-                      : (m.isFromImportador ? 'Importador' : 'Tienda minorista'));
-              final align =
-                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-              final bg = m.isFromAdmin
-                  ? AppColors.surfaceTinted.withOpacity(0.55)
-                  : (m.isFromImportador
-                      ? AppColors.brandBlueContainer
-                      : (mine
-                          ? AppColors.brandBlue.withOpacity(0.12)
-                          : Colors.grey.shade200));
-
-              return Column(
-                crossAxisAlignment: align,
-                children: [
-                  Text(
-                    '$label · ${formatEsShortDateTime(m.createdAt)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: bg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (m.body.trim().isNotEmpty)
-                            Text(
-                              m.body,
-                              style: const TextStyle(fontSize: 13, height: 1.35),
-                            ),
-                          OrderMessageMediaStrip(attachments: m.attachments),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+            itemBuilder: (context, i) => _messageTile(uid, i),
           ),
         if (canReply) ...[
           if (widget.deliveryGrace) ...[
@@ -429,6 +552,9 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           TextField(
             controller: _ctrl,
             enabled: !_sending,
+            onChanged: (_) {
+              if (_composeHint != null) setState(() => _composeHint = null);
+            },
             minLines: 1,
             maxLines: 4,
             textInputAction: TextInputAction.newline,
@@ -436,6 +562,7 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
               hintText: widget.allowReplyAsAdmin
                   ? 'Respuesta a la tienda minorista…'
                   : 'Escriba su mensaje…',
+              errorText: _composeHint,
               isDense: true,
               border: const OutlineInputBorder(),
             ),

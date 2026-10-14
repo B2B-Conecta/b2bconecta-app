@@ -108,6 +108,9 @@ class SupabaseService {
   static Future<void> deleteAllMyNotifications() =>
       NotificationsService.deleteAllMyNotifications();
 
+  static Future<void> deleteMyNotificationsByTypes(List<String> types) =>
+      NotificationsService.deleteMyNotificationsByTypes(types);
+
   static Future<TransactionRequestModel?> fetchTransactionRequestById(
     String requestId,
   ) =>
@@ -701,6 +704,7 @@ class SupabaseService {
     String? destinoEntregaMapsUrl,
     Map<String, String> promoByImportador = const {},
     Map<String, Map<String, String?>> carriersByImportador = const {},
+    Map<String, bool> applyCreditByImportador = const {},
   }) =>
       OrdersService.checkoutMultiImportadorCart(
           lines: lines,
@@ -708,7 +712,8 @@ class SupabaseService {
           destinoEntregaTexto: destinoEntregaTexto,
           destinoEntregaMapsUrl: destinoEntregaMapsUrl,
           promoByImportador: promoByImportador,
-          carriersByImportador: carriersByImportador);
+          carriersByImportador: carriersByImportador,
+          applyCreditByImportador: applyCreditByImportador);
 
   static Future<double?> fetchGlobalTasaBcv() =>
       CommissionsService.fetchGlobalTasaBcv();

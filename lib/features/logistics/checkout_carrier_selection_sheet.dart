@@ -165,7 +165,7 @@ class _CheckoutCarrierSelectionSheetState
           ),
           Text(
             'Elija la empresa de transporte de cada importador. '
-            'Compare ETA, distancia y métodos de pago aceptados.',
+            'Compare el tiempo de llegada, la distancia y los métodos de pago.',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),

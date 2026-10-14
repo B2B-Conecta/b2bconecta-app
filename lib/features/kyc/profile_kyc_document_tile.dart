@@ -37,7 +37,7 @@ class ProfileKycDocumentTile extends StatelessWidget {
   /// Abre el archivo ya cargado. Solo se muestra si hay documento.
   final VoidCallback? onView;
 
-  /// Cámara, galería y archivo en chips bajos. El expediente del admin lo usa.
+  /// Un botón Adjuntar. En el teléfono abre cámara, galería o archivo.
   final bool compactActions;
 
   /// Oculta cámara, galería y archivo. Un documento aprobado o en revisión no se reemplaza.

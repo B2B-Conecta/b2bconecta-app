@@ -143,7 +143,7 @@ class _ProductValidatedOrdersListState extends State<ProductValidatedOrdersList>
       SnackBar(
         content: Text(
           next == TransactionRequestStatus.enTransito
-              ? 'Pedido marcado en tránsito con ETA registrado.'
+              ? 'Pedido marcado en tránsito. La tienda ya ve el tiempo de llegada.'
               : 'Estado actualizado.',
         ),
         behavior: SnackBarBehavior.floating,

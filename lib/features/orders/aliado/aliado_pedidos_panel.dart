@@ -32,13 +32,17 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_replacement_tracker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
 class AliadoPedidosPanel extends StatefulWidget {
@@ -58,6 +62,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String? _statusFilter;
   PedidosListScope _scope = PedidosListScope.todos;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
   String? _entregaBusyId;
@@ -115,13 +121,27 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   void _prepareAliadoFiltersForNotificationDeepLink() {
     final notifType = MainShellTabController.peekPendingNotificationType();
-    if (notifType == null) return;
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    final match = pending == null
+        ? null
+        : findTransactionForNotificationRelatedId(_rows, pending);
+    if (notifType == null && match == null) return;
     setState(() {
       if (notifType == 'morosidad') {
         _morosoOnly = true;
+        _scope = PedidosListScope.entregados;
+      } else if (match != null) {
+        _statusFilter = null;
+        _morosoOnly = false;
+        _scope = switch (match.status) {
+          TransactionRequestStatus.entregado => PedidosListScope.entregados,
+          TransactionRequestStatus.rechazado => PedidosListScope.cancelados,
+          _ => PedidosListScope.enCurso,
+        };
       } else {
         _statusFilter = null;
         _morosoOnly = false;
+        _scope = PedidosListScope.todos;
       }
     });
   }
@@ -131,8 +151,21 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     if (pending == null) return false;
     final key = _expandKeyForTransactionId(pending);
     if (key == null) return false;
+    final openChat = MainShellTabController.consumePendingOpenOrderChat();
     MainShellTabController.consumePendingNotificationRelatedId();
     setState(() => _expandedRequestId = key);
+    if (openChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openOrderChatForNotification(
+          context: context,
+          rows: _rows,
+          relatedId: pending,
+          asAliado: true,
+          onThreadChanged: _refreshExpandedCard,
+        );
+      });
+    }
     return true;
   }
 
@@ -194,6 +227,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       _statusFilter = null;
       _scope = PedidosListScope.todos;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -207,8 +242,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       _dateTo = draft.dateTo;
     });
   }
-
-  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   Future<void> _openDateFilters() async {
     final draft = await ImporterPedidosFiltersSheet.show(
@@ -564,8 +597,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
-              'sigue pendiente de registrar o aprobar por B2B Conecta. Revise la ficha del pedido.',
+              OrderReturnRules.receptionConfirmedPagoPendienteHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -574,7 +606,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción confirmada. El pedido queda cerrado y registrado para B2B Conecta.',
+              OrderReturnRules.receptionConfirmedHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -606,8 +638,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
-              'sigue pendiente de registrar o aprobar por B2B Conecta. Revise la ficha del pedido.',
+              OrderReturnRules.receptionConfirmedPagoPendienteHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -616,7 +647,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción confirmada. El pedido queda cerrado y registrado para B2B Conecta.',
+              OrderReturnRules.receptionConfirmedHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -667,7 +698,22 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         checkoutGroupId: cg,
       ),
     );
-    return AliadoConfirmarRecepcionSection(bloques: bloques);
+    final hasChange = g.any((line) => line.postventaResolucion == 'cambio');
+    if (!hasChange) {
+      return AliadoConfirmarRecepcionSection(bloques: bloques);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AliadoConfirmarRecepcionSection(bloques: bloques),
+        OrderReplacementTracker(
+          lines: g,
+          allowImporterAdvance: false,
+          allowAliadoAdvance: true,
+          onChanged: _refreshExpandedCard,
+        ),
+      ],
+    );
   }
 
   Widget _wrapExpandedFooter(Widget child) => child;
@@ -759,12 +805,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                   relatedOrderIds: [r.id],
                   onPressed: () {
                     final counterpart = r.ownerBusinessName?.trim();
-                    showOrderChatSheet(
-                      context: context,
-                      transactionRequestId: r.id,
-                      allowReplyAsAliado: orderLinesAllowChatReply([r]),
-                      allowReplyAsAdmin: false,
-                      deliveryGrace: orderLinesChatDeliveryGrace([r]),
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: r.id,
+                    orderLines: [r],
+                    allowReplyAsAliado: orderLinesAllowChatReply([r]),
+                    allowReplyAsAdmin: false,
+                    deliveryGrace: orderLinesChatDeliveryGrace([r]),
                       title: (counterpart != null && counterpart.isNotEmpty)
                           ? 'Chat · $counterpart'
                           : 'Chat del pedido',
@@ -774,8 +821,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 ),
                 OrderReturnButtons(
                   lines: [r],
-                  allowReplyAsAliado: true,
+                  allowReplyAsAliado: orderLinesAllowChatReply([r]),
                   allowReplyAsImportador: false,
+                  showReplacementTracker: false,
+                  onChanged: _refreshExpandedCard,
                 ),
               ],
             ),
@@ -944,6 +993,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     mergedThreadRequestIds: chunk.length > 1
                         ? chunk.map((e) => e.id).toList()
                         : null,
+                    orderLines: chunk,
                     allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                     allowReplyAsAdmin: false,
                     deliveryGrace: orderLinesChatDeliveryGrace(chunk),
@@ -956,8 +1006,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ),
               OrderReturnButtons(
                 lines: chunk,
-                allowReplyAsAliado: true,
+                allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                 allowReplyAsImportador: false,
+                showReplacementTracker: false,
+                onChanged: _refreshExpandedCard,
               ),
             ],
           ),
@@ -1236,12 +1288,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final cerradosGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => !_esEnCurso(r.status)).toList(),
     );
-    final visibleGroups = switch (_scope) {
-      PedidosListScope.todos => [...enCursoGroups, ...cerradosGroups],
-      PedidosListScope.enCurso => enCursoGroups,
-      PedidosListScope.entregados => entregadosGroups,
-      PedidosListScope.cancelados => canceladosGroups,
-    };
+    final visibleGroups = filterOrderGroupsBySignals(
+      switch (_scope) {
+        PedidosListScope.todos => [...enCursoGroups, ...cerradosGroups],
+        PedidosListScope.enCurso => enCursoGroups,
+        PedidosListScope.entregados => entregadosGroups,
+        PedidosListScope.cancelados => canceladosGroups,
+      },
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
     final scopeEmpty = switch (_scope) {
       PedidosListScope.todos =>
         enCursoGroups.isEmpty && cerradosGroups.isEmpty,
@@ -1286,31 +1342,27 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 context,
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilterChip(
-                      label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                      selected: _hasDateFilter,
-                      onSelected: (_) => _openDateFilters(),
-                      visualDensity: VisualDensity.compact,
-                      selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                      checkmarkColor: AppColors.brandBlue,
-                      avatar: Icon(
-                        Icons.calendar_month_outlined,
-                        size: 16,
-                        color: _hasDateFilter
-                            ? AppColors.brandBlue
-                            : AppColors.textSecondary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OrderDateShortcutBar(
+                        from: _dateFrom,
+                        to: _dateTo,
+                        onChanged: (from, to) => setState(() {
+                          _dateFrom = from;
+                          _dateTo = to;
+                        }),
+                        onPickRange: _openDateFilters,
                       ),
-                      labelStyle: TextStyle(
-                        fontWeight:
-                            _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 12.5,
-                        color: _hasDateFilter
-                            ? AppColors.brandBlue
-                            : AppColors.textPrimary,
+                      OrderSignalFilterBar(
+                        creditOnly: _creditOnly,
+                        replacementOnly: _replacementOnly,
+                        onChanged: (credit, replacement) => setState(() {
+                          _creditOnly = credit;
+                          _replacementOnly = replacement;
+                        }),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -1355,14 +1407,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                       )
                     : B2bOrdersPanelLayout.listColumn(
                         context,
-                        scopeEmpty
+                        scopeEmpty || visibleGroups.isEmpty
                             ? ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 children: [
                                   const SizedBox(height: 48),
                                   Center(
                                     child: Text(
-                                      scopeEmptyLabel,
+                                      visibleGroups.isEmpty && !scopeEmpty
+                                          ? 'Ningún pedido coincide con los filtros.'
+                                          : scopeEmptyLabel,
                                       style: TextStyle(
                                         color: AppColors.textSecondary,
                                       ),
@@ -1377,6 +1431,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   _scope,
                                   _statusFilter,
                                   _morosoOnly,
+                                  _creditOnly,
+                                  _replacementOnly,
                                   _dateFrom,
                                   _dateTo,
                                   _searchCtrl.text,

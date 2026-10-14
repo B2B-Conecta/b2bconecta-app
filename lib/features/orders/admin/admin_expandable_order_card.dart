@@ -18,6 +18,7 @@ import 'package:motolink_pro_app/features/commissions/order_commission_summary.d
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -101,6 +102,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          OrderPostventaHeaderMarks(lines: lines),
                           const SizedBox(height: 8),
                           if (isCheckoutGroup && titulo != null)
                             Text(
@@ -116,6 +118,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           OrderCardDirectSummary(
                             lines: lines,
                             viewerRole: AppHomeRole.administrador,
+                            compact: !expanded,
                           ),
                           if (resumen != null) ...[
                             const SizedBox(height: 4),
@@ -183,6 +186,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           mergedThreadRequestIds: isCheckoutGroup
                               ? lines.map((e) => e.id).toList()
                               : null,
+                          orderLines: lines,
                           allowReplyAsAliado: false,
                           allowReplyAsAdmin: true,
                           title: 'Chat del pedido',
@@ -195,7 +199,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
               ),
             ),
           OrderCardGuidance(
-            hint: '',
             expanded: expanded,
             onToggle: onToggle,
           ),
@@ -255,7 +258,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         [r],
                         viewer: PedidoDesgloseViewer.importador,
                       ),
-                      initiallyExpanded: true,
+                      initiallyExpanded: orderCardProductsInitiallyExpanded(r.status),
                       child: TransactionRequestProductosDesgloseSection(
                         lines: [r],
                         compact: true,

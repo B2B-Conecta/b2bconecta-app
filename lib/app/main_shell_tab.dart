@@ -25,6 +25,7 @@ class MainShellTabController {
   static bool _importerPedidosPreferCerradosFilter = false;
   static String? _pendingImporterPedidosExploreFilter;
   static String? _pendingNotificationType;
+  static bool _pendingOpenOrderChat = false;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
   static String? _pendingCommissionSettlementId;
@@ -56,6 +57,7 @@ class MainShellTabController {
     _importerPedidosPreferCerradosFilter = false;
     _pendingImporterPedidosExploreFilter = null;
     _pendingNotificationType = null;
+    _pendingOpenOrderChat = false;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
     _pendingCommissionSettlementId = null;
@@ -175,6 +177,16 @@ class MainShellTabController {
     final v = _pendingImporterPedidosExploreFilter;
     _pendingImporterPedidosExploreFilter = null;
     return v;
+  }
+
+  static void setPendingOpenOrderChat(bool value) {
+    _pendingOpenOrderChat = value;
+  }
+
+  static bool consumePendingOpenOrderChat() {
+    final value = _pendingOpenOrderChat;
+    _pendingOpenOrderChat = false;
+    return value;
   }
 
   static void setPendingNotificationType(String? type) {

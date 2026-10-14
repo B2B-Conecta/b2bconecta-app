@@ -5,6 +5,7 @@ import 'support_ticket_status.dart';
 import 'support_ticket_detail_screen.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
@@ -128,20 +129,11 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: SegmentedButton<_AdminSupportFilter>(
-            segments: const [
-              ButtonSegment(
-                value: _AdminSupportFilter.abiertos,
-                label: Text('Abiertos'),
-              ),
-              ButtonSegment(
-                value: _AdminSupportFilter.todos,
-                label: Text('Todos'),
-              ),
-            ],
-            selected: {_filter},
-            onSelectionChanged: (s) {
-              setState(() => _filter = s.first);
+          child: SegmentedFilterBar(
+            labels: const ['Abiertos', 'Todos'],
+            selectedIndex: _filter.index,
+            onSelected: (index) {
+              setState(() => _filter = _AdminSupportFilter.values[index]);
               _load();
             },
           ),

@@ -28,6 +28,7 @@ class OrderChatThread {
     this.productSku,
     this.aliadoName,
     this.importerName,
+    this.lines = const [],
   });
 
   final String primaryRequestId;
@@ -44,6 +45,7 @@ class OrderChatThread {
   final String? productSku;
   final String? aliadoName;
   final String? importerName;
+  final List<TransactionRequestModel> lines;
 
   String get searchBlob {
     final parts = <String>[
@@ -86,11 +88,7 @@ OrderChatThread _threadFromLines(
       .whereType<String>()
       .where((s) => s.isNotEmpty)
       .toList();
-  final title = names.isEmpty
-      ? 'Pedido'
-      : names.toSet().length == 1
-          ? names.first
-          : '${lines.length} productos';
+  final title = _chatProductTitle(names);
 
   final importer = (primary.ownerBusinessName ?? '').trim();
   final aliado = (primary.aliadoBusinessName ?? '').trim();
@@ -138,7 +136,39 @@ OrderChatThread _threadFromLines(
     productSku: sku.isEmpty ? null : sku,
     aliadoName: aliado.isEmpty ? null : aliado,
     importerName: importer.isEmpty ? null : importer,
+    lines: lines,
   );
+}
+
+String _chatProductTitle(List<String> names) {
+  final unique = <String>[];
+  for (final name in names) {
+    if (!unique.contains(name)) unique.add(name);
+  }
+  if (unique.isEmpty) return 'Pedido';
+  if (unique.length == 1) return unique.first;
+  if (unique.length == 2) return '${unique[0]} · ${unique[1]}';
+  return '${unique[0]} · ${unique[1]} y ${unique.length - 2} más';
+}
+
+bool chatActivityInRange({
+  required DateTime? at,
+  DateTime? from,
+  DateTime? to,
+}) {
+  if (from == null && to == null) return true;
+  if (at == null) return false;
+  final local = at.toLocal();
+  final day = DateTime(local.year, local.month, local.day);
+  if (from != null) {
+    final start = DateTime(from.year, from.month, from.day);
+    if (day.isBefore(start)) return false;
+  }
+  if (to != null) {
+    final end = DateTime(to.year, to.month, to.day);
+    if (day.isAfter(end)) return false;
+  }
+  return true;
 }
 
 List<OrderChatThread> filterOrderChatThreads({

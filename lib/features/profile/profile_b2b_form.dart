@@ -732,6 +732,8 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ),
               actions: MediaPickActionChips(
                 iconOnly: true,
+                imagesOnly: true,
+                buttonLabel: 'Cambiar logo',
                 busy: _logoBusy,
                 enabled: !_saving,
                 fileLabel: 'Archivo',

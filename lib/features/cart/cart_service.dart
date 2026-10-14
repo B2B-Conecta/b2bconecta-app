@@ -116,7 +116,7 @@ class CartService extends ChangeNotifier {
     required double precioUnitarioAliadoRef,
     int delta = 1,
   }) {
-    final maxStock = part.stock;
+    final maxStock = part.stockForSale;
     final minQty = part.minOrderQtyEffective;
     if (maxStock < minQty) return;
     final idx = _lines.indexWhere((l) => l.part.id == part.id);
@@ -152,7 +152,7 @@ class CartService extends ChangeNotifier {
     final idx = _lines.indexWhere((l) => l.part.id == productId);
     if (idx < 0) return;
     final line = _lines[idx];
-    final maxStock = line.part.stock;
+    final maxStock = line.part.stockForSale;
     final minQty = line.part.minOrderQtyEffective;
     if (qty < 1) {
       _lines.removeAt(idx);

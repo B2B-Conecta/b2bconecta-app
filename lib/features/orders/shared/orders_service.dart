@@ -136,6 +136,11 @@ class OrdersService {
     at_pedido_listo,
     at_en_transito,
     at_entregado,
+    postventa_devolucion_at,
+    postventa_queja_at,
+    postventa_resolucion,
+    postventa_credito_monto,
+    credito_aplicado_monto,
     importer_carrier_id,
     importer_carrier_driver_id,
     carrier_eta_hours_snapshot,
@@ -560,6 +565,7 @@ class OrdersService {
     String? destinoEntregaMapsUrl,
     Map<String, String> promoByImportador = const {},
     Map<String, Map<String, String?>> carriersByImportador = const {},
+    Map<String, bool> applyCreditByImportador = const {},
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -607,6 +613,7 @@ class OrdersService {
         'p_destino_entrega_maps_url': destinoEntregaMapsUrl,
         'p_promo_by_importador': promoByImportador,
         'p_carriers_by_importador': carrierPayload,
+        'p_apply_credit_by_importador': applyCreditByImportador,
       },
     );
     return res?.toString() ?? '';
@@ -1098,6 +1105,191 @@ class OrdersService {
         messageId: messageId,
       );
 
+  static Future<Map<String, dynamic>?> fetchOrderPostventaCaso({
+    required String transactionRequestId,
+    required String kind,
+  }) async {
+    final row = await SupabaseAccess.client
+        .from('order_postventa_casos')
+        .select(
+          'id, kind, body, opened_role, created_at, product_name, affected_qty, resolution, credit_amount, resolved_at, requested_resolution, evidence, status, rejection_note',
+        )
+        .eq('transaction_request_id', transactionRequestId)
+        .eq('kind', kind)
+        .maybeSingle();
+    if (row == null) return null;
+    return Map<String, dynamic>.from(row);
+  }
+
+  static Future<DateTime> registerOrderPostventaCaso({
+    required String transactionRequestId,
+    required String kind,
+    required String body,
+    required int affectedQty,
+    String? requestedResolution,
+    List<OrderMessageAttachment> evidence = const [],
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'register_order_postventa_caso',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_kind': kind,
+        'p_body': body.trim(),
+        'p_affected_qty': affectedQty,
+        'p_requested_resolution': requestedResolution,
+        'p_evidence': evidence.map((e) => e.toJson()).toList(),
+      },
+    );
+    if (res is Map && res['created_at'] != null) {
+      return DateTime.tryParse(res['created_at'].toString())?.toLocal() ??
+          DateTime.now();
+    }
+    return DateTime.now();
+  }
+
+  static Future<({String resolution, double? creditAmount, DateTime? resolvedAt})>
+      resolveOrderPostventaCaso({
+    required String transactionRequestId,
+    required String resolution,
+    String? note,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'resolve_order_postventa_caso',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_resolution': resolution,
+        'p_note': note,
+      },
+    );
+    final map = res is Map ? Map<String, dynamic>.from(res) : const {};
+    final amount = map['credit_amount'];
+    return (
+      resolution: map['resolution']?.toString() ?? resolution,
+      creditAmount: amount == null ? null : double.tryParse(amount.toString()),
+      resolvedAt: DateTime.tryParse(map['resolved_at']?.toString() ?? '')
+          ?.toLocal(),
+    );
+  }
+
+  static Future<Map<String, dynamic>?> fetchReplacementOrder(String casoId) async {
+    final id = casoId.trim();
+    if (id.isEmpty) return null;
+    final row = await SupabaseAccess.client
+        .from('replacement_orders')
+        .select('id, status, qty')
+        .eq('caso_id', id)
+        .maybeSingle();
+    if (row == null) return null;
+    return Map<String, dynamic>.from(row);
+  }
+
+  static Future<String> advanceReplacementOrder({
+    required String casoId,
+    required String status,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'advance_replacement_order',
+      params: <String, dynamic>{
+        'p_caso_id': casoId,
+        'p_status': status,
+      },
+    );
+    final map = res is Map ? Map<String, dynamic>.from(res) : const {};
+    return map['status']?.toString() ?? status;
+  }
+
+  static Future<List<AliadoCreditBalance>> fetchAliadoCreditBalancesForImporter() async {
+    final res = await SupabaseAccess.client.rpc('importer_aliado_credit_balances');
+    if (res is! List) return const [];
+    return res
+        .whereType<Map>()
+        .map(
+          (row) => AliadoCreditBalance(
+            aliadoId: row['aliado_id']?.toString() ?? '',
+            aliadoName: row['aliado_name']?.toString() ?? 'Tienda',
+            remaining: double.tryParse(row['remaining']?.toString() ?? '') ?? 0,
+          ),
+        )
+        .where((row) => row.aliadoId.isNotEmpty && row.remaining > 0)
+        .toList();
+  }
+
+  static Future<List<ImporterCreditBalance>> fetchImporterCreditBalances() async {
+    final res = await SupabaseAccess.client.rpc('aliado_importer_credit_balances');
+    if (res is! List) return const [];
+    return res
+        .whereType<Map>()
+        .map(
+          (row) => ImporterCreditBalance(
+            importadorId: row['importador_id']?.toString() ?? '',
+            importerName: row['importer_name']?.toString() ?? 'Importador',
+            remaining: double.tryParse(row['remaining']?.toString() ?? '') ?? 0,
+          ),
+        )
+        .where((row) => row.importadorId.isNotEmpty && row.remaining > 0)
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>> fetchAdminPostventaResumen() async {
+    final res = await SupabaseAccess.client.rpc('admin_postventa_resumen');
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return const {'importers': [], 'casos': []};
+  }
+
+  /// Sube evidencia al bucket privado del pedido, sin dejar todavía el mensaje.
+  static Future<OrderMessageAttachment> uploadOrderReturnEvidence({
+    required String transactionRequestId,
+    required Uint8List bytes,
+    required String fileName,
+    required String mime,
+    required String kind,
+  }) async {
+    final orderId = transactionRequestId.trim();
+    if (orderId.isEmpty) {
+      throw ArgumentError('Pedido inválido.');
+    }
+    if (kind != 'image' && kind != 'video') {
+      throw ArgumentError('Tipo de adjunto inválido.');
+    }
+    if (bytes.isEmpty) {
+      throw OrderMessageLimitException('El archivo está vacío.');
+    }
+    if (kind == 'image' && bytes.length > OrderMessageLimits.maxImageBytes) {
+      throw OrderMessageLimitException(
+        'La foto supera 8 MB después de comprimirla.',
+      );
+    }
+    if (kind == 'video' && bytes.length > OrderMessageLimits.maxVideoBytes) {
+      throw OrderMessageLimitException('El video supera 50 MB.');
+    }
+
+    final fileId = _newUuidV4();
+    final safeName = fileName.trim().isEmpty ? 'archivo' : fileName.trim();
+    final path = '$orderId/$fileId/$safeName';
+    final attachment = OrderMessageAttachment(
+      path: path,
+      kind: kind,
+      mime: mime,
+      name: safeName,
+    );
+    await SupabaseAccess.client.storage
+        .from(SupabaseAccess.orderMessageAttachmentsBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: mime, upsert: false),
+        );
+    return attachment;
+  }
+
+  static Future<void> removeOrderReturnEvidence(String storagePath) async {
+    final path = storagePath.trim();
+    if (path.isEmpty) return;
+    await SupabaseAccess.client.storage
+        .from(SupabaseAccess.orderMessageAttachmentsBucket)
+        .remove([path]);
+  }
+
   static Future<void> insertTransactionRequestMessageAsAliado({
     required String transactionRequestId,
     required String body,
@@ -1395,4 +1587,28 @@ class OrdersService {
 
   /// Obtiene repuestos desde [products] con paginacion.
   /// Incluye nombre del importador vía FK `owner_id` → `profiles`.
+}
+
+class AliadoCreditBalance {
+  const AliadoCreditBalance({
+    required this.aliadoId,
+    required this.aliadoName,
+    required this.remaining,
+  });
+
+  final String aliadoId;
+  final String aliadoName;
+  final double remaining;
+}
+
+class ImporterCreditBalance {
+  const ImporterCreditBalance({
+    required this.importadorId,
+    required this.importerName,
+    required this.remaining,
+  });
+
+  final String importadorId;
+  final String importerName;
+  final double remaining;
 }

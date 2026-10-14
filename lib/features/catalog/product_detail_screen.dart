@@ -216,7 +216,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool get _cartActionsDisabled =>
       !part.isActive ||
-      !part.stockCoversMinOrder ||
+      part.stockForSale < part.minOrderQtyEffective ||
       _pedidosSuspendidosMorosidad;
 
   String? _cartBlockReason() {
@@ -228,8 +228,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return 'B2B Conecta suspendió nuevos pedidos en su cuenta por morosidad.';
     }
     if (!part.isActive) return 'Este producto está pausado por el proveedor.';
-    if (part.stock < 1) return 'Sin stock disponible.';
-    if (!part.stockCoversMinOrder) {
+    if (part.stockForSale < 1) return 'Sin stock disponible.';
+    if (part.stockForSale < part.minOrderQtyEffective) {
       return 'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).';
     }
     return null;
@@ -784,7 +784,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildStockBadge({bool desktop = false}) {
-    final inStock = part.stockCoversMinOrder;
+    final inStock = part.stockForSale >= part.minOrderQtyEffective;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: desktop ? 14 : 0,
@@ -812,10 +812,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(width: 8),
           Text(
             inStock
-                ? 'Stock: ${part.stock} uds · ${part.minOrderQtyLabelEs}'
-                : part.stock < 1
+                ? 'Stock: ${part.stockForSale} uds · ${part.minOrderQtyLabelEs}'
+                : part.stockForSale < 1
                     ? 'Sin stock disponible'
-                    : 'Stock ${part.stock} uds · ${part.minOrderQtyLabelEs}',
+                    : 'Stock ${part.stockForSale} uds · ${part.minOrderQtyLabelEs}',
             style: TextStyle(
               fontSize: desktop ? 15 : 14,
               fontWeight: FontWeight.w700,
@@ -831,14 +831,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (part.stock < 1)
+        if (part.stockForSale < 1)
           _AlertBanner(
             text: 'Sin stock disponible',
             color: AppColors.brandBlue,
             background: AppColors.brandBlueContainer,
             border: AppColors.brandAccent.withOpacity(0.35),
           )
-        else if (!part.stockCoversMinOrder)
+        else if (part.stockForSale < part.minOrderQtyEffective)
           _AlertBanner(
             text:
                 'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).',
@@ -931,7 +931,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildActionAlerts(),
-          if (!part.stockCoversMinOrder || _pedidosSuspendidosMorosidad)
+          if (part.stockForSale < part.minOrderQtyEffective ||
+              _pedidosSuspendidosMorosidad)
             const SizedBox(height: 8),
           _buildActionButtons(),
         ],

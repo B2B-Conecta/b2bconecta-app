@@ -292,11 +292,8 @@ void main() {
     expect(find.text('Pastillas freno'), findsWidgets);
     expect(find.textContaining('×6'), findsWidgets);
     expect(find.text('En preparación'), findsOneWidget);
-    expect(find.text('Ver detalle y seguimiento'), findsOneWidget);
-    expect(
-      find.textContaining('Abra el detalle para ver el avance'),
-      findsOneWidget,
-    );
+    expect(find.text('Detalle'), findsOneWidget);
+    expect(find.text('Ver detalle y seguimiento'), findsNothing);
     expect(find.byTooltip('Chat del pedido'), findsOneWidget);
     expect(find.byIcon(Icons.expand_more), findsOneWidget);
     expect(find.byIcon(Icons.expand_less), findsNothing);

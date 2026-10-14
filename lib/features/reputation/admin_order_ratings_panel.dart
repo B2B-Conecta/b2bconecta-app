@@ -4,6 +4,7 @@ import 'admin_order_rating_row_model.dart';
 import 'rating_questionnaire_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'rating_scale_labels.dart';
@@ -380,68 +381,18 @@ class _AdminRatingsToolbar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _filterChip(
-                label: 'Todas',
-                selected: filter == _AdminRatingFilter.all,
-                onTap: () => onFilterChanged(_AdminRatingFilter.all),
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: MediaQuery.sizeOf(context).width < 600
-                    ? 'Tienda minorista → Imp.'
-                    : 'Tienda minorista → importador',
-                selected: filter == _AdminRatingFilter.aliadoRatesImporter,
-                onTap: () =>
-                    onFilterChanged(_AdminRatingFilter.aliadoRatesImporter),
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: MediaQuery.sizeOf(context).width < 600
-                    ? 'Imp. → Tienda minorista'
-                    : 'Importador → tienda minorista',
-                selected: filter == _AdminRatingFilter.importerRatesAliado,
-                onTap: () =>
-                    onFilterChanged(_AdminRatingFilter.importerRatesAliado),
-              ),
-              const SizedBox(width: 6),
-              _filterChip(
-                label: 'Ocultos',
-                selected: filter == _AdminRatingFilter.commentHidden,
-                onTap: () =>
-                    onFilterChanged(_AdminRatingFilter.commentHidden),
-              ),
-            ],
-          ),
+        SegmentedFilterBar(
+          labels: const [
+            'Todas',
+            'Tienda → mayorista',
+            'Mayorista → tienda',
+            'Ocultos',
+          ],
+          selectedIndex: filter.index,
+          onSelected: (index) =>
+              onFilterChanged(_AdminRatingFilter.values[index]),
         ),
       ],
-    );
-  }
-
-  Widget _filterChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          color: selected ? AppColors.textPrimary : AppColors.textSecondary,
-        ),
-      ),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      visualDensity: VisualDensity.compact,
-      showCheckmark: false,
-      selectedColor: AppColors.brandBlueContainer,
-      side: BorderSide(
-        color: selected ? AppColors.brandAccent : AppColors.borderSubtle,
-      ),
     );
   }
 }

@@ -138,4 +138,15 @@ void main() {
       10,
     );
   });
+
+  test('el saldo a favor no supera el subtotal del proveedor', () {
+    expect(OrderReturnRules.cappedCredit(30, 12.5), 12.5);
+    expect(OrderReturnRules.cappedCredit(8, 20), 8);
+    expect(OrderReturnRules.cappedCredit(0, 20), 0);
+    expect(OrderReturnRules.preferenceLabel('credito'), 'Crédito a favor');
+    expect(
+      OrderReturnRules.replacementStatusLabel('pendiente_retiro'),
+      'Pendiente de retiro',
+    );
+  });
 }

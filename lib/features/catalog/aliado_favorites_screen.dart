@@ -157,15 +157,16 @@ class _FavoriteRow extends StatelessWidget {
 
   final PartModel part;
 
-  bool get _purchasable => part.isActive && part.stockCoversMinOrder;
+  bool get _purchasable =>
+      part.isActive && part.stockForSale >= part.minOrderQtyEffective;
 
   String get _availability {
     if (!part.isActive) return 'Pausado por el proveedor';
-    if (part.stock < 1) return 'Sin stock';
-    if (!part.stockCoversMinOrder) {
+    if (part.stockForSale < 1) return 'Sin stock';
+    if (part.stockForSale < part.minOrderQtyEffective) {
       return 'Stock insuficiente para el mínimo';
     }
-    return '${part.stock} en stock · ${part.minOrderQtyLabelEs}';
+    return '${part.stockForSale} en stock · ${part.minOrderQtyLabelEs}';
   }
 
   @override

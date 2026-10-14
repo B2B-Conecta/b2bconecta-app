@@ -468,7 +468,7 @@ class _GuestStoreProductCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${part.stock} en stock · ${part.minOrderQtyLabelEs}',
+                  '${part.stockForSale} en stock · ${part.minOrderQtyLabelEs}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

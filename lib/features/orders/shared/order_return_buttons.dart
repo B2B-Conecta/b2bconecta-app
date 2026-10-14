@@ -17,11 +17,12 @@ class OrderPostventaHeaderMarks extends StatelessWidget {
   Widget build(BuildContext context) {
     final cambio = lines.any((l) => l.postventaResolucion == 'cambio');
     final credito = lines.any((l) => l.postventaResolucion == 'credito');
+    final rechazo = lines.any((l) => l.postventaResolucion == 'rechazo');
     final devolucionAbierta = lines.any(
       (l) => l.postventaDevolucionAt != null && l.postventaResolucion == null,
     );
     final queja = lines.any((l) => l.postventaQuejaAt != null);
-    if (!cambio && !credito && !devolucionAbierta && !queja) {
+    if (!cambio && !credito && !rechazo && !devolucionAbierta && !queja) {
       return const SizedBox.shrink();
     }
     return Padding(
@@ -32,9 +33,15 @@ class OrderPostventaHeaderMarks extends StatelessWidget {
         children: [
           if (devolucionAbierta)
             const OrderCardCompactNoticeChip(
-              label: 'Devolución registrada',
+              label: 'Devolución en revisión',
               icon: Icons.assignment_return_outlined,
               color: AppColors.brand,
+            ),
+          if (rechazo)
+            OrderCardCompactNoticeChip(
+              label: 'Devolución no aceptada',
+              icon: Icons.assignment_return_outlined,
+              color: AppColors.textSecondary,
             ),
           if (cambio)
             const OrderCardCompactNoticeChip(
@@ -44,7 +51,7 @@ class OrderPostventaHeaderMarks extends StatelessWidget {
             ),
           if (credito)
             const OrderCardCompactNoticeChip(
-              label: 'Crédito para el próximo pedido',
+              label: 'Crédito a favor',
               icon: Icons.account_balance_wallet_outlined,
               color: AppColors.brandAccent,
             ),
@@ -90,7 +97,7 @@ class OrderReturnButtons extends StatelessWidget {
         updatedAt: line.updatedAt,
         deliveredAt: line.atEntregado,
       );
-      if (line.postventaDevolucionAt != null || (open && _canRegister)) {
+      if (line.postventaDevolucionAt != null || (open && allowReplyAsAliado)) {
         buttons.add(
           _button(
             context,

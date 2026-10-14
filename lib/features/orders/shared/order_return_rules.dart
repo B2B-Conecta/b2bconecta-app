@@ -17,7 +17,7 @@ abstract final class OrderReturnRules {
       'Recepción registrada. La mercancía queda como entregada. Durante 7 días puede pedir una devolución o presentar una queja desde el detalle. El comprobante de pago sigue pendiente de registrar o aprobar por B2B Conecta.';
 
   static const openHint =
-      'Si un producto tuvo un inconveniente, regístrelo aquí. El plazo es de 7 días desde la recepción y el pedido sigue entregado.';
+      'Si un producto tuvo un inconveniente, solicítelo aquí dentro de los 7 días. Elija crédito o cambio y adjunte una foto o un video. El pedido sigue entregado.';
 
   static DateTime? anchor({
     DateTime? deliveredAt,
@@ -70,5 +70,38 @@ abstract final class OrderReturnRules {
         : (lineQty > 0 ? lineTotal / lineQty : lineTotal);
     if (unit <= 0) return 0;
     return double.parse((unit * qty).toStringAsFixed(4));
+  }
+
+  /// Saldo que cabe en el subtotal de ese importador.
+  static double cappedCredit(double available, double subtotal) {
+    if (available <= 0 || subtotal <= 0) return 0;
+    final value = available < subtotal ? available : subtotal;
+    return double.parse(value.toStringAsFixed(4));
+  }
+
+  static String preferenceLabel(String? value) {
+    switch (value) {
+      case 'credito':
+        return 'Crédito a favor';
+      case 'cambio':
+        return 'Cambio de producto';
+      default:
+        return '';
+    }
+  }
+
+  static String replacementStatusLabel(String? status) {
+    switch (status) {
+      case 'pendiente_retiro':
+        return 'Pendiente de retiro';
+      case 'en_transito':
+        return 'En tránsito';
+      case 'entregado':
+        return 'Entregado';
+      case 'cancelado':
+        return 'Cancelado';
+      default:
+        return '';
+    }
   }
 }

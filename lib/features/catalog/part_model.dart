@@ -21,6 +21,7 @@ class PartModel {
     this.compatibilidad,
     required this.precio,
     required this.stock,
+    this.stockReserved = 0,
     this.minOrderQty = ProductMinOrderQty.platformFloor,
     this.imagenUrl,
     this.imageUrls = const [],
@@ -68,6 +69,14 @@ class PartModel {
   /// Precio mayorista USD cargado por el importador (`products.price_usd`).
   final double precio;
   final int stock;
+
+  /// Unidades apartadas para un cambio. El catálogo vende [stockForSale].
+  final int stockReserved;
+
+  int get stockForSale {
+    final free = stock - stockReserved;
+    return free < 0 ? 0 : free;
+  }
 
   /// Unidades mínimas para crear un pedido (`products.min_order_qty`, piso 5).
   final int minOrderQty;
@@ -247,6 +256,7 @@ class PartModel {
       salePriceUsd: _asNullableDouble(saleRaw),
       discountRules: _discountRulesFromJson(json['discount_rules']),
       stock: _asInt(json['stock']),
+      stockReserved: _asInt(json['stock_reserved']),
       minOrderQty: ProductMinOrderQty.resolve(_asInt(json['min_order_qty'])),
       imagenUrl: productCoverImageUrl(
         imageUrls,
@@ -274,6 +284,7 @@ class PartModel {
     String? compatibilidad,
     double? precio,
     int? stock,
+    int? stockReserved,
     int? minOrderQty,
     String? imagenUrl,
     List<String>? imageUrls,
@@ -311,6 +322,7 @@ class PartModel {
       compatibilidad: compatibilidad ?? this.compatibilidad,
       precio: precio ?? this.precio,
       stock: stock ?? this.stock,
+      stockReserved: stockReserved ?? this.stockReserved,
       minOrderQty: minOrderQty ?? this.minOrderQty,
       imagenUrl: imagenUrl ?? this.imagenUrl,
       imageUrls: imageUrls ?? this.imageUrls,

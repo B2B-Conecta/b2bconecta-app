@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'admin_promo_campaigns_panel.dart';
 import 'package:motolink_pro_app/features/referrals/admin_referrals_panel.dart';
+import 'admin_returns_report_panel.dart';
 import 'admin_user_monitoring_panel.dart';
 import 'encomiendas_report_excel_service.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
@@ -1011,51 +1012,36 @@ class _AdminEncomiendasReportPanelState
   }
 
   Widget _sectionSwitcher() {
-    const labels = ['Pedidos', 'Promos', 'Usuarios', 'Referidos'];
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.brandBlueContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(3),
-        child: Row(
-          children: [
-            for (var i = 0; i < labels.length; i++)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Material(
-                    color: _sectionIndex == i
-                        ? AppColors.brand
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () => setState(() => _sectionIndex = i),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Text(
-                          labels[i],
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
-                            color: _sectionIndex == i
-                                ? Colors.white
-                                : AppColors.brand,
-                          ),
-                        ),
-                      ),
-                    ),
+    const labels = ['Pedidos', 'Promos', 'Usuarios', 'Referidos', 'Devoluciones'];
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, i) {
+          final selected = _sectionIndex == i;
+          return Material(
+            color: selected ? AppColors.brand : AppColors.brandBlueContainer,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () => setState(() => _sectionIndex = i),
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Text(
+                  labels[i],
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? Colors.white : AppColors.brand,
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1097,6 +1083,19 @@ class _AdminEncomiendasReportPanelState
             child: _sectionSwitcher(),
           ),
           const Expanded(child: AdminReferralsPanel()),
+        ],
+      );
+    }
+
+    if (_sectionIndex == 4) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _sectionSwitcher(),
+          ),
+          const Expanded(child: AdminReturnsReportPanel()),
         ],
       );
     }

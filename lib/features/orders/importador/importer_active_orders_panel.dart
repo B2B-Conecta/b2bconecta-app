@@ -26,9 +26,7 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
-import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
@@ -328,9 +326,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              const OrderChatsEntryButton(
-                homeRole: AppHomeRole.importador,
-              ),
               ...orderDateShortcutChips(
                 from: _dateFrom,
                 to: _dateTo,

@@ -130,14 +130,19 @@ class _AliadoNavButton extends StatelessWidget {
               color: color,
             ),
           const SizedBox(height: 2),
-          Text(
-            item.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              color: color,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                item.label,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: color,
+                ),
+              ),
             ),
           ),
         ],

@@ -410,9 +410,7 @@ class _MainShellState extends State<MainShell> {
         logoHeight: MotolinkAppBarLogoSizes.importador,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
       ),
       body: Column(
@@ -458,9 +456,7 @@ class _MainShellState extends State<MainShell> {
       profile: _profile,
       unreadNotifications: _notifications.unreadCount,
       onNotificationTap: _openNotificationCenter,
-      onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+      onMessagesTap: _openMessagesInbox,
       unreadMessages: _notifications.unreadChatCount,
       onOpenSettings: _openAccountSettings,
       pages: [
@@ -489,9 +485,7 @@ class _MainShellState extends State<MainShell> {
             onProfileSaved: _refreshProfile,
             onNotificationTap: _openNotificationCenter,
             unreadNotifications: _notifications.unreadCount,
-            onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+            onMessagesTap: _openMessagesInbox,
             unreadMessages: _notifications.unreadChatCount,
           ),
         ],
@@ -566,9 +560,7 @@ class _MainShellState extends State<MainShell> {
         homeRole: role,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -577,9 +569,7 @@ class _MainShellState extends State<MainShell> {
         homeRole: role,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -588,9 +578,7 @@ class _MainShellState extends State<MainShell> {
         homeRole: role,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         onProfileRefresh: _refreshProfile,
         embedInDesktopShell: embedded,
@@ -601,9 +589,7 @@ class _MainShellState extends State<MainShell> {
         onProfileSaved: _refreshProfile,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -618,9 +604,7 @@ class _MainShellState extends State<MainShell> {
         homeRole: AppHomeRole.aliado,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -629,9 +613,7 @@ class _MainShellState extends State<MainShell> {
         homeRole: AppHomeRole.aliado,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         onProfileRefresh: _refreshProfile,
         embedInDesktopShell: embedded,
@@ -641,9 +623,7 @@ class _MainShellState extends State<MainShell> {
         homeRole: AppHomeRole.aliado,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -651,9 +631,7 @@ class _MainShellState extends State<MainShell> {
         profile: _profile,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -663,9 +641,7 @@ class _MainShellState extends State<MainShell> {
         onProfileSaved: _refreshProfile,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+        onMessagesTap: _openMessagesInbox,
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
@@ -696,9 +672,7 @@ class _MainShellState extends State<MainShell> {
             profile: _profile,
             unreadNotifications: _notifications.unreadCount,
             onNotificationTap: _openNotificationCenter,
-            onMessagesTap: widget.homeRole == AppHomeRole.administrador
-            ? _openMessagesInbox
-            : null,
+            onMessagesTap: _openMessagesInbox,
             unreadMessages: _notifications.unreadChatCount,
             onOpenSettings: _openAccountSettings,
             railBadgeLabel: railBadgeLabel,
@@ -750,6 +724,8 @@ class _MainShellState extends State<MainShell> {
               child: BottomNavigationBar(
                 currentIndex: _tabIndex,
                 type: BottomNavigationBarType.fixed,
+                selectedFontSize: 12,
+                unselectedFontSize: 11,
                 onTap: (i) => _onB2bTabSelected(i, role),
                 items: navItems,
               ),

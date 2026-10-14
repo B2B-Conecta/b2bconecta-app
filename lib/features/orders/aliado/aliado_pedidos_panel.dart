@@ -33,9 +33,7 @@ import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
-import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_replacement_tracker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
@@ -1358,7 +1356,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                         }),
                         onPickRange: _openDateFilters,
                       ),
-                      const OrderChatsEntryButton(homeRole: AppHomeRole.aliado),
                       ...orderSignalFilterChips(
                         creditOnly: _creditOnly,
                         replacementOnly: _replacementOnly,

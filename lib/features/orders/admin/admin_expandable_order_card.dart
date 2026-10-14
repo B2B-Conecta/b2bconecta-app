@@ -118,6 +118,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           OrderCardDirectSummary(
                             lines: lines,
                             viewerRole: AppHomeRole.administrador,
+                            compact: !expanded,
                           ),
                           if (resumen != null) ...[
                             const SizedBox(height: 4),
@@ -198,7 +199,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
               ),
             ),
           OrderCardGuidance(
-            hint: '',
             expanded: expanded,
             onToggle: onToggle,
           ),
@@ -258,7 +258,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         [r],
                         viewer: PedidoDesgloseViewer.importador,
                       ),
-                      initiallyExpanded: true,
+                      initiallyExpanded: orderCardProductsInitiallyExpanded(r.status),
                       child: TransactionRequestProductosDesgloseSection(
                         lines: [r],
                         compact: true,

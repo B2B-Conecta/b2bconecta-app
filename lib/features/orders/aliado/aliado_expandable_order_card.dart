@@ -164,7 +164,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           ),
                           OrderPostventaHeaderMarks(lines: lines),
                           SizedBox(height: density.isDesktop ? 6 : 8),
-                          if (showHeadline) ...[
+                          if (expanded && showHeadline) ...[
                             Text(
                               tracking,
                               style: TextStyle(
@@ -204,6 +204,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           OrderCardDirectSummary(
                             lines: lines,
                             viewerRole: AppHomeRole.aliado,
+                            compact: !expanded,
                           ),
                           SizedBox(height: density.isDesktop ? 2 : 4),
                           Text(
@@ -220,17 +221,6 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               r.tieneDescuentoDivisasAplicadoEnPedido) ...[
                             const SizedBox(height: 4),
                             _DescuentoDivisasFichaChip(request: r),
-                          ],
-                          if (!expanded) ...[
-                            SizedBox(height: density.isDesktop ? 2 : 4),
-                            Text(
-                              lines.first.destinoEntregaLineaCompactaEs,
-                              style: TextStyle(
-                                fontSize: density.secondaryTextSize,
-                                color: AppColors.textSecondary,
-                                height: 1.25,
-                              ),
-                            ),
                           ],
                           if (!isCheckoutGroup &&
                               r.aliadoPagoEstadoResumenEs != null &&
@@ -325,10 +315,6 @@ class AliadoExpandableOrderCard extends StatelessWidget {
               ),
             ),
           OrderCardGuidance(
-            hint: isCheckoutGroup &&
-                    !lines.every((x) => x.status == lines.first.status)
-                ? 'Hay líneas en distinto estado. Abra el detalle para ver cada proveedor.'
-                : TransactionRequestStatus.aliadoCollapsedHint(lines.first.status),
             expanded: expanded,
             onToggle: onToggle,
           ),
@@ -495,7 +481,10 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                                 lines,
                                 viewer: PedidoDesgloseViewer.aliado,
                               ),
-                              initiallyExpanded: true,
+                              initiallyExpanded:
+                                  orderCardProductsInitiallyExpanded(
+                                lines.first.status,
+                              ),
                               child: TransactionRequestProductosDesgloseSection(
                                 lines: lines,
                                 compact: true,
@@ -580,7 +569,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               [r],
                               viewer: PedidoDesgloseViewer.aliado,
                             ),
-                            initiallyExpanded: true,
+                            initiallyExpanded: orderCardProductsInitiallyExpanded(
+                              r.status,
+                            ),
                             child: TransactionRequestProductosDesgloseSection(
                               lines: <TransactionRequestModel>[r],
                               compact: true,

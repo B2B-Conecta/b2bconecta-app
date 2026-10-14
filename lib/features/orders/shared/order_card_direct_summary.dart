@@ -181,11 +181,15 @@ class OrderCardDirectSummary extends StatelessWidget {
     required this.lines,
     required this.viewerRole,
     this.importerUserId,
+    this.compact = false,
   });
 
   final List<TransactionRequestModel> lines;
   final AppHomeRole viewerRole;
   final String? importerUserId;
+
+  /// Cerrada: una partida y el resto como «y N más».
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -202,9 +206,13 @@ class OrderCardDirectSummary extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final showLineTotal = products.length > 1;
+    final visible = compact && products.length > 1
+        ? products.take(1).toList()
+        : products;
+    final extra = products.length - visible.length;
+    final showLineTotal = !compact && products.length > 1;
     final gap = density.isDesktop ? 4.0 : 6.0;
-    final singleProduct = products.length == 1;
+    final singleProduct = visible.length == 1;
 
     return Padding(
       padding: EdgeInsets.only(top: density.isDesktop ? 6 : 8),
@@ -215,14 +223,26 @@ class OrderCardDirectSummary extends StatelessWidget {
             _OrderCardPartyRow(party: party, density: density),
             SizedBox(height: gap),
           ],
-          for (var i = 0; i < products.length; i++) ...[
+          for (var i = 0; i < visible.length; i++) ...[
             _OrderCardProductRow(
-              product: products[i],
+              product: visible[i],
               density: density,
               emphasizeName: singleProduct,
               showLineTotal: showLineTotal,
+              hideSku: compact,
             ),
-            if (i < products.length - 1) SizedBox(height: gap),
+            if (i < visible.length - 1) SizedBox(height: gap),
+          ],
+          if (extra > 0) ...[
+            SizedBox(height: gap),
+            Text(
+              extra == 1 ? 'y 1 producto más' : 'y $extra productos más',
+              style: TextStyle(
+                fontSize: density.metaTextSize,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ],
       ),
@@ -314,12 +334,14 @@ class _OrderCardProductRow extends StatelessWidget {
     required this.density,
     required this.emphasizeName,
     required this.showLineTotal,
+    this.hideSku = false,
   });
 
   final OrderCardProductPeek product;
   final B2bOrderCardDensity density;
   final bool emphasizeName;
   final bool showLineTotal;
+  final bool hideSku;
 
   @override
   Widget build(BuildContext context) {
@@ -349,7 +371,7 @@ class _OrderCardProductRow extends StatelessWidget {
                   height: 1.2,
                 ),
               ),
-              if (hasSku)
+              if (hasSku && !hideSku)
                 Text(
                   sku,
                   maxLines: 1,

@@ -1198,6 +1198,22 @@ class OrdersService {
     return map['status']?.toString() ?? status;
   }
 
+  static Future<List<AliadoCreditBalance>> fetchAliadoCreditBalancesForImporter() async {
+    final res = await SupabaseAccess.client.rpc('importer_aliado_credit_balances');
+    if (res is! List) return const [];
+    return res
+        .whereType<Map>()
+        .map(
+          (row) => AliadoCreditBalance(
+            aliadoId: row['aliado_id']?.toString() ?? '',
+            aliadoName: row['aliado_name']?.toString() ?? 'Tienda',
+            remaining: double.tryParse(row['remaining']?.toString() ?? '') ?? 0,
+          ),
+        )
+        .where((row) => row.aliadoId.isNotEmpty && row.remaining > 0)
+        .toList();
+  }
+
   static Future<List<ImporterCreditBalance>> fetchImporterCreditBalances() async {
     final res = await SupabaseAccess.client.rpc('aliado_importer_credit_balances');
     if (res is! List) return const [];
@@ -1571,6 +1587,18 @@ class OrdersService {
 
   /// Obtiene repuestos desde [products] con paginacion.
   /// Incluye nombre del importador vía FK `owner_id` → `profiles`.
+}
+
+class AliadoCreditBalance {
+  const AliadoCreditBalance({
+    required this.aliadoId,
+    required this.aliadoName,
+    required this.remaining,
+  });
+
+  final String aliadoId;
+  final String aliadoName;
+  final double remaining;
 }
 
 class ImporterCreditBalance {

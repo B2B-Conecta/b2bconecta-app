@@ -36,6 +36,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dar
 import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_replacement_tracker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
@@ -694,7 +695,22 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         checkoutGroupId: cg,
       ),
     );
-    return AliadoConfirmarRecepcionSection(bloques: bloques);
+    final hasChange = g.any((line) => line.postventaResolucion == 'cambio');
+    if (!hasChange) {
+      return AliadoConfirmarRecepcionSection(bloques: bloques);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AliadoConfirmarRecepcionSection(bloques: bloques),
+        OrderReplacementTracker(
+          lines: g,
+          allowImporterAdvance: false,
+          allowAliadoAdvance: true,
+          onChanged: _refreshExpandedCard,
+        ),
+      ],
+    );
   }
 
   Widget _wrapExpandedFooter(Widget child) => child;
@@ -804,6 +820,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                   lines: [r],
                   allowReplyAsAliado: orderLinesAllowChatReply([r]),
                   allowReplyAsImportador: false,
+                  showReplacementTracker: false,
                   onChanged: _refreshExpandedCard,
                 ),
               ],
@@ -988,6 +1005,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 lines: chunk,
                 allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                 allowReplyAsImportador: false,
+                showReplacementTracker: false,
                 onChanged: _refreshExpandedCard,
               ),
             ],

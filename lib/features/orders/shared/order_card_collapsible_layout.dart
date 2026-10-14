@@ -70,6 +70,13 @@ String orderCardTimelineSubtitle(
   return label;
 }
 
+/// Al abrir la ficha, los productos solo se despliegan si el paso actual es alistarlos.
+bool orderCardProductsInitiallyExpanded(String status) {
+  return status == TransactionRequestStatus.pendiente ||
+      status == TransactionRequestStatus.enPreparacion ||
+      status == TransactionRequestStatus.pedidoListo;
+}
+
 bool orderCardTimelineInitiallyExpanded(TransactionRequestModel r) {
   return r.status != TransactionRequestStatus.entregado &&
       r.status != TransactionRequestStatus.rechazado;

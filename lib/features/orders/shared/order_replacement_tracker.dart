@@ -27,12 +27,18 @@ class OrderReplacementTracker extends StatefulWidget {
   const OrderReplacementTracker({
     super.key,
     required this.lines,
-    required this.allowAdvance,
+    required this.allowImporterAdvance,
+    required this.allowAliadoAdvance,
     this.onChanged,
   });
 
   final List<TransactionRequestModel> lines;
-  final bool allowAdvance;
+
+  /// El proveedor solo pasa el cambio a tránsito.
+  final bool allowImporterAdvance;
+
+  /// La tienda confirma la recepción, igual que en el pedido original.
+  final bool allowAliadoAdvance;
   final VoidCallback? onChanged;
 
   @override
@@ -100,13 +106,17 @@ class _OrderReplacementTrackerState extends State<OrderReplacementTracker> {
   }
 
   Future<void> _advance(_Track item, String next) async {
-    final label = OrderReturnRules.replacementStatusLabel(next);
+    final reception = next == 'entregado';
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Actualizar a $label'),
-        content: const Text(
-          'La tienda recibe el aviso de este cambio.',
+        title: Text(
+          reception ? 'Confirmar recepción' : 'Marcar en tránsito',
+        ),
+        content: Text(
+          reception
+              ? 'Confirme que recibió el cambio en su taller. El proveedor recibe el aviso.'
+              : 'La tienda recibe el aviso de que el cambio va en camino.',
         ),
         actions: [
           TextButton(
@@ -176,7 +186,8 @@ class _OrderReplacementTrackerState extends State<OrderReplacementTracker> {
           for (final item in _items) ...[
             _TrackCard(
               item: item,
-              allowAdvance: widget.allowAdvance,
+              allowImporterAdvance: widget.allowImporterAdvance,
+              allowAliadoAdvance: widget.allowAliadoAdvance,
               busy: _busyId == item.casoId,
               onAdvance: _advance,
             ),
@@ -191,13 +202,15 @@ class _OrderReplacementTrackerState extends State<OrderReplacementTracker> {
 class _TrackCard extends StatelessWidget {
   const _TrackCard({
     required this.item,
-    required this.allowAdvance,
+    required this.allowImporterAdvance,
+    required this.allowAliadoAdvance,
     required this.busy,
     required this.onAdvance,
   });
 
   final _Track item;
-  final bool allowAdvance;
+  final bool allowImporterAdvance;
+  final bool allowAliadoAdvance;
   final bool busy;
   final void Function(_Track item, String next) onAdvance;
 
@@ -207,9 +220,11 @@ class _TrackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = (item.line.productName ?? 'Producto').trim();
     final index = _steps.indexOf(item.status);
-    final next = item.status == 'pendiente_retiro'
+    final next = item.status == 'pendiente_retiro' && allowImporterAdvance
         ? 'en_transito'
-        : (item.status == 'en_transito' ? 'entregado' : null);
+        : (item.status == 'en_transito' && allowAliadoAdvance
+            ? 'entregado'
+            : null);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -281,7 +296,7 @@ class _TrackCard extends StatelessWidget {
                 ],
               ],
             ),
-          if (allowAdvance && next != null) ...[
+          if (next != null) ...[
             const SizedBox(height: 12),
             FilledButton(
               onPressed: busy ? null : () => onAdvance(item, next),
@@ -291,7 +306,7 @@ class _TrackCard extends StatelessWidget {
               child: Text(
                 next == 'en_transito'
                     ? 'Marcar en tránsito'
-                    : 'Marcar como entregado',
+                    : 'Confirmar recepción',
               ),
             ),
           ],

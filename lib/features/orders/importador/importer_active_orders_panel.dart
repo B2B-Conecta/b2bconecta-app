@@ -31,6 +31,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 
 /// Pedidos del importador: ingreso directo, filtros rápidos y ciclo completo en una sola vista.
 class ImporterActiveOrdersPanel extends StatefulWidget {
@@ -52,6 +54,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   bool _morosoOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
+  List<AliadoCreditBalance> _credits = const [];
 
   @override
   void initState() {
@@ -218,9 +221,14 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     try {
       final rows =
           await SupabaseService.fetchUnifiedTransactionRequestsForImporter();
+      List<AliadoCreditBalance> credits = const [];
+      try {
+        credits = await OrdersService.fetchAliadoCreditBalancesForImporter();
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _rows = rows;
+        _credits = credits;
         _loading = false;
       });
       _tryExpandFromPendingNotification();
@@ -231,6 +239,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         _loading = false;
       });
     }
+  }
+
+  double? _creditFor(String aliadoId) {
+    for (final credit in _credits) {
+      if (credit.aliadoId == aliadoId) return credit.remaining;
+    }
+    return null;
   }
 
   void _clearFilters() {
@@ -645,6 +660,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                 hintText: 'Buscar por producto, SKU o tienda minorista',
               ),
               _quickFilterBar(),
+              if (_credits.isNotEmpty)
+                _AliadoCreditStrip(credits: _credits),
               Expanded(
                 child: filtered.isEmpty
                     ? ListView(
@@ -760,6 +777,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                                   : null,
                               qtyAdjustmentDisabledHint: qtyAdjHint,
                               onThreadChanged: _load,
+                              aliadoCreditRemaining: _creditFor(primary.aliadoId),
                               expandedFooter: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -842,6 +860,63 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _AliadoCreditStrip extends StatelessWidget {
+  const _AliadoCreditStrip({required this.credits});
+
+  final List<AliadoCreditBalance> credits;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 18,
+                    color: AppColors.brand,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Crédito a favor',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              for (final credit in credits)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '${credit.aliadoName} · ${formatRefAmount(credit.remaining)} REF',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.3,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

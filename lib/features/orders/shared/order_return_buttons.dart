@@ -75,12 +75,22 @@ class OrderReturnButtons extends StatelessWidget {
     required this.lines,
     required this.allowReplyAsAliado,
     required this.allowReplyAsImportador,
+    this.confirmReplacementAsAliado = false,
+    this.dispatchReplacementAsImporter = false,
+    this.showReplacementTracker = true,
     this.onChanged,
   });
 
   final List<TransactionRequestModel> lines;
   final bool allowReplyAsAliado;
   final bool allowReplyAsImportador;
+
+  /// La tienda confirma la recepción del cambio aunque el chat ya esté cerrado.
+  final bool confirmReplacementAsAliado;
+
+  /// El proveedor marca el cambio en tránsito aunque el chat ya esté cerrado.
+  final bool dispatchReplacementAsImporter;
+  final bool showReplacementTracker;
   final VoidCallback? onChanged;
 
   bool _open(TransactionRequestModel line) => OrderReturnRules.isAvailable(
@@ -113,11 +123,7 @@ class OrderReturnButtons extends StatelessWidget {
         );
 
     if (!canStart && !canReview && !windowClosed && !pendingForImporter) {
-      return OrderReplacementTracker(
-        lines: lines,
-        allowAdvance: allowReplyAsImportador,
-        onChanged: onChanged,
-      );
+      return _tracker();
     }
 
     return Padding(
@@ -175,13 +181,20 @@ class OrderReturnButtons extends StatelessWidget {
               ),
             ),
           ],
-          OrderReplacementTracker(
-            lines: lines,
-            allowAdvance: allowReplyAsImportador,
-            onChanged: onChanged,
-          ),
+          _tracker(),
         ],
       ),
+    );
+  }
+
+  Widget _tracker() {
+    if (!showReplacementTracker) return const SizedBox.shrink();
+    return OrderReplacementTracker(
+      lines: lines,
+      allowImporterAdvance:
+          allowReplyAsImportador || dispatchReplacementAsImporter,
+      allowAliadoAdvance: allowReplyAsAliado || confirmReplacementAsAliado,
+      onChanged: onChanged,
     );
   }
 

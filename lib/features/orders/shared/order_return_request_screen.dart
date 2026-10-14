@@ -611,11 +611,15 @@ class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
                         replacementStatus: _replacementStatus,
                       ),
                     ],
-                    if (_replacementStatus != null &&
-                        widget.allowReplyAsImportador &&
-                        _replacementStatus != 'entregado') ...[
+                    if (_replacementStatus == 'pendiente_retiro' &&
+                        widget.allowReplyAsImportador) ...[
                       const SizedBox(height: 8),
-                      _advanceButton(),
+                      _advanceButton('en_transito'),
+                    ],
+                    if (_replacementStatus == 'en_transito' &&
+                        widget.allowReplyAsAliado) ...[
+                      const SizedBox(height: 8),
+                      _advanceButton('entregado'),
                     ],
                     if (_canResolve) ...[
                       const SizedBox(height: 16),
@@ -877,13 +881,10 @@ class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
     );
   }
 
-  Widget _advanceButton() {
-    final next = _replacementStatus == 'pendiente_retiro'
-        ? 'en_transito'
-        : 'entregado';
+  Widget _advanceButton(String next) {
     final label = next == 'en_transito'
         ? 'Marcar en tránsito'
-        : 'Marcar como entregado';
+        : 'Confirmar recepción';
     return FilledButton.icon(
       onPressed: _resolving ? null : () => _advanceReplacement(next),
       icon: Icon(

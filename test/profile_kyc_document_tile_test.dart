@@ -89,9 +89,7 @@ void main() {
     );
 
     expect(find.text('Ver archivo'), findsOneWidget);
-    expect(find.text('Cámara'), findsNothing);
-    expect(find.text('Galería'), findsNothing);
-    expect(find.text('Archivo'), findsNothing);
+    expect(find.text('Adjuntar'), findsNothing);
   });
 
   testWidgets('un documento rechazado muestra el motivo y permite reenviarlo', (
@@ -117,9 +115,7 @@ void main() {
     );
 
     expect(find.text('La imagen está cortada.'), findsOneWidget);
-    expect(find.text('Cámara'), findsOneWidget);
-    expect(find.text('Galería'), findsOneWidget);
-    expect(find.text('Archivo'), findsOneWidget);
+    expect(find.text('Adjuntar'), findsOneWidget);
   });
 }
 

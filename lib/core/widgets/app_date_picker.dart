@@ -63,6 +63,155 @@ String formatAppFilterDate(DateTime d) {
   return '$dd/$mm/${local.year}';
 }
 
+/// Rango Desde / Hasta con el mismo calendario de los filtros de pedidos.
+Future<({DateTime from, DateTime to})?> showAppDateRangeDialog({
+  required BuildContext context,
+  required DateTime firstDate,
+  required DateTime lastDate,
+  DateTime? initialFrom,
+  DateTime? initialTo,
+}) {
+  return showDialog<({DateTime from, DateTime to})>(
+    context: context,
+    builder: (ctx) => _AppDateRangeDialog(
+      firstDate: _dateOnly(firstDate),
+      lastDate: _dateOnly(lastDate),
+      initialFrom: initialFrom == null ? null : _dateOnly(initialFrom),
+      initialTo: initialTo == null ? null : _dateOnly(initialTo),
+    ),
+  );
+}
+
+class _AppDateRangeDialog extends StatefulWidget {
+  const _AppDateRangeDialog({
+    required this.firstDate,
+    required this.lastDate,
+    required this.initialFrom,
+    required this.initialTo,
+  });
+
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final DateTime? initialFrom;
+  final DateTime? initialTo;
+
+  @override
+  State<_AppDateRangeDialog> createState() => _AppDateRangeDialogState();
+}
+
+class _AppDateRangeDialogState extends State<_AppDateRangeDialog> {
+  DateTime? _from;
+  DateTime? _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.initialFrom;
+    _to = widget.initialTo;
+  }
+
+  Future<void> _pick({required bool isFrom}) async {
+    final initial = isFrom
+        ? (_from ?? _to ?? DateTime.now())
+        : (_to ?? _from ?? DateTime.now());
+    final picked = await showAppDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: widget.firstDate,
+      lastDate: widget.lastDate,
+      helpText: isFrom ? 'Desde' : 'Hasta',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (isFrom) {
+        _from = picked;
+        if (_to != null && _to!.isBefore(picked)) _to = picked;
+      } else {
+        _to = picked;
+        if (_from != null && _from!.isAfter(picked)) _from = picked;
+      }
+    });
+  }
+
+  void _apply() {
+    final from = _from;
+    final to = _to;
+    if (from == null && to == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final start = from ?? to!;
+    final end = to ?? from!;
+    Navigator.of(context).pop((from: start, to: end));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.card,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Fechas',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Elija el inicio y el cierre. Puede usar un solo día.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilterDateField(
+                label: 'Desde',
+                value: _from,
+                onTap: () => _pick(isFrom: true),
+                onClear: _from == null ? null : () => setState(() => _from = null),
+              ),
+              const SizedBox(height: 10),
+              FilterDateField(
+                label: 'Hasta',
+                value: _to,
+                onTap: () => _pick(isFrom: false),
+                onClear: _to == null ? null : () => setState(() => _to = null),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _apply,
+                      child: const Text('Aplicar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Campo Desde / Hasta usado en los filtros de fecha.
 class FilterDateField extends StatelessWidget {
   const FilterDateField({

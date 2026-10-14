@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -17,9 +18,11 @@ class MediaPickActionChips extends StatelessWidget {
     this.enabled = true,
     this.busy = false,
     this.fileLabel = 'Archivo',
+    this.buttonLabel = 'Adjuntar',
     this.maxWidth = 280,
     this.iconOnly = false,
     this.compact = false,
+    this.imagesOnly = false,
   });
 
   final VoidCallback? onCamera;
@@ -29,8 +32,12 @@ class MediaPickActionChips extends StatelessWidget {
   final bool enabled;
   final bool busy;
   final String fileLabel;
+  final String buttonLabel;
   final double maxWidth;
   final bool iconOnly;
+
+  /// En la web abre solo imágenes. El comprobante deja el PDF incluido.
+  final bool imagesOnly;
 
   /// Chips bajos, icono y texto en una línea, sin estirarse al ancho.
   final bool compact;
@@ -51,26 +58,15 @@ class MediaPickActionChips extends StatelessWidget {
     }
 
     final active = enabled;
+    final pick = active ? () => _pick(context) : null;
     if (iconOnly) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           _MediaPickIconButton(
-            icon: Icons.photo_camera_outlined,
-            tooltip: 'Cámara',
-            onTap: active ? onCamera : null,
-          ),
-          const SizedBox(width: 4),
-          _MediaPickIconButton(
-            icon: Icons.photo_library_outlined,
-            tooltip: 'Galería',
-            onTap: active ? onGallery : null,
-          ),
-          const SizedBox(width: 4),
-          _MediaPickIconButton(
-            icon: Icons.upload_file_outlined,
-            tooltip: fileLabel,
-            onTap: active ? onFile : null,
+            icon: Icons.add_a_photo_outlined,
+            tooltip: buttonLabel,
+            onTap: pick,
           ),
           if (onDelete != null) ...[
             const SizedBox(width: 4),
@@ -85,58 +81,75 @@ class MediaPickActionChips extends StatelessWidget {
       );
     }
 
-    if (compact) {
-      return Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: [
-          _InlinePickChip(
-            icon: Icons.photo_camera_outlined,
-            label: 'Cámara',
-            onTap: active ? onCamera : null,
-          ),
-          _InlinePickChip(
-            icon: Icons.photo_library_outlined,
-            label: 'Galería',
-            onTap: active ? onGallery : null,
-          ),
-          _InlinePickChip(
-            icon: Icons.upload_file_outlined,
-            label: fileLabel,
-            onTap: active ? onFile : null,
-          ),
-        ],
-      );
-    }
-
+    final button = OutlinedButton.icon(
+      onPressed: pick,
+      icon: const Icon(Icons.attach_file, size: 18),
+      label: Text(buttonLabel),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: active ? AppColors.brand : AppColors.textMuted,
+        side: BorderSide(
+          color: active ? AppColors.brand : AppColors.borderSubtle,
+        ),
+        visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+        minimumSize: Size(compact ? 0 : double.infinity, compact ? 32 : 44),
+      ),
+    );
+    if (compact) return button;
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Row(
-        children: [
-          Expanded(
-            child: _MediaPickChip(
-              icon: Icons.photo_camera_outlined,
-              label: 'Cámara',
-              onTap: active ? onCamera : null,
+      child: SizedBox(width: double.infinity, child: button),
+    );
+  }
+
+  void _pick(BuildContext context) {
+    if (kIsWeb) {
+      (imagesOnly ? onGallery ?? onFile : onFile ?? onGallery)?.call();
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(
+                'Adjuntar',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _MediaPickChip(
-              icon: Icons.photo_library_outlined,
-              label: 'Galería',
-              onTap: active ? onGallery : null,
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                onCamera?.call();
+              },
             ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _MediaPickChip(
-              icon: Icons.upload_file_outlined,
-              label: fileLabel,
-              onTap: active ? onFile : null,
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de galería'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                onGallery?.call();
+              },
             ),
-          ),
-        ],
+            ListTile(
+              leading: const Icon(Icons.upload_file_outlined),
+              title: Text(imagesOnly ? 'Elegir archivo de imagen' : fileLabel),
+              subtitle: Text(
+                imagesOnly ? 'JPG, PNG o WEBP' : 'PDF, JPG, PNG o WEBP',
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                onFile?.call();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -202,109 +215,3 @@ class _MediaPickIconButton extends StatelessWidget {
   }
 }
 
-class _InlinePickChip extends StatelessWidget {
-  const _InlinePickChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = onTap != null;
-    final borderColor =
-        active ? AppColors.brand.withOpacity(0.35) : AppColors.borderSubtle;
-    final color = active ? AppColors.brand : AppColors.textMuted;
-
-    return Material(
-      color: active ? AppColors.brandBlueContainer : AppColors.surfaceTinted,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: borderColor),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.1,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MediaPickChip extends StatelessWidget {
-  const _MediaPickChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = onTap != null;
-    final borderColor =
-        active ? AppColors.brandAccent.withOpacity(0.45) : AppColors.borderSubtle;
-    final iconColor = active ? AppColors.brandAccent : AppColors.textMuted;
-    final textColor = active ? AppColors.textPrimary : AppColors.textMuted;
-
-    return Material(
-      color: active ? AppColors.card : AppColors.surfaceTinted,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: borderColor),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: iconColor),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  height: 1.1,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

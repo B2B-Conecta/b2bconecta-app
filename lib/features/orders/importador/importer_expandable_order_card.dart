@@ -91,6 +91,10 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       estado: lines.first.aliadoEstado,
     );
     final totalRef = lines.fold<double>(0, (a, x) => a + x.precioTotal);
+    final creditApplied = lines.fold<double>(
+      0,
+      (sum, line) => sum + line.creditoAplicadoMonto,
+    );
 
     final fechaLabel = isCheckoutGroup
         ? ImporterOrderDate.etiquetaGrupo(lines)
@@ -181,11 +185,13 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if ((aliadoCreditRemaining ?? 0) > 0) ...[
+                        if (creditApplied > 0 || (aliadoCreditRemaining ?? 0) > 0) ...[
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              'Crédito ${formatRefAmount(aliadoCreditRemaining!)} REF',
+                              creditApplied > 0
+                                  ? 'Crédito aplicado ${formatRefAmount(creditApplied)} REF'
+                                  : 'Saldo a favor ${formatRefAmount(aliadoCreditRemaining!)} REF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(

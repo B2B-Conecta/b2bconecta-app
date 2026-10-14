@@ -84,4 +84,27 @@ void main() {
       isFalse,
     );
   });
+
+  test('el plazo de postventa usa la fecha de entrega', () {
+    final delivered = DateTime.utc(2026, 10, 1, 12);
+    final laterEdit = DateTime.utc(2026, 10, 20, 12);
+    expect(
+      OrderReturnRules.isAvailable(
+        status: TransactionRequestStatus.entregado,
+        deliveredAt: delivered,
+        updatedAt: laterEdit,
+        now: DateTime.utc(2026, 10, 8, 12),
+      ),
+      isTrue,
+    );
+    expect(
+      OrderReturnRules.isAvailable(
+        status: TransactionRequestStatus.entregado,
+        deliveredAt: delivered,
+        updatedAt: laterEdit,
+        now: DateTime.utc(2026, 10, 9, 12),
+      ),
+      isFalse,
+    );
+  });
 }

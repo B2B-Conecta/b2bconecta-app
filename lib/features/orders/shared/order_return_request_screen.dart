@@ -4,73 +4,310 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'order_motolink_thread_section.dart';
 import 'order_return_rules.dart';
+import 'orders_service.dart';
 import 'transaction_request_model.dart';
 
-/// Pantalla base de devolución. El proceso de estados aún no existe:
-/// la evidencia se adjunta en el chat del pedido, aunque el chat normal
-/// ya no acepte respuestas porque el pedido está entregado.
-class OrderReturnRequestScreen extends StatelessWidget {
+abstract final class OrderPostventaKind {
+  static const devolucion = 'devolucion';
+  static const queja = 'queja';
+
+  static String actionLabel(String kind) =>
+      kind == queja ? 'Presentar una queja' : 'Pedir devolución';
+
+  static String viewLabel(String kind) =>
+      kind == queja ? 'Ver queja' : 'Ver devolución';
+
+  static String registeredTitle(String kind) =>
+      kind == queja ? 'Queja registrada' : 'Devolución registrada';
+}
+
+/// Registra una devolución o una queja y la deja anotada en el pedido.
+class OrderReturnRequestScreen extends StatefulWidget {
   const OrderReturnRequestScreen({
     super.key,
     required this.request,
+    required this.kind,
+    required this.alreadyRegistered,
     required this.allowReplyAsAliado,
     required this.allowReplyAsImportador,
+    this.mergedThreadRequestIds,
   });
 
   final TransactionRequestModel request;
+  final String kind;
+  final bool alreadyRegistered;
   final bool allowReplyAsAliado;
   final bool allowReplyAsImportador;
+  final List<String>? mergedThreadRequestIds;
+
+  @override
+  State<OrderReturnRequestScreen> createState() =>
+      _OrderReturnRequestScreenState();
+}
+
+class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
+  final _noteCtrl = TextEditingController();
+  bool _loading = true;
+  bool _saving = false;
+  bool _registered = false;
+  String? _savedBody;
+  DateTime? _savedAt;
+  String? _formError;
+
+  bool get _canRegister =>
+      widget.allowReplyAsAliado || widget.allowReplyAsImportador;
+
+  bool get _windowOpen => OrderReturnRules.isAvailable(
+        status: widget.request.status,
+        updatedAt: widget.request.updatedAt,
+        deliveredAt: widget.request.atEntregado,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _registered = widget.alreadyRegistered;
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final row = await OrdersService.fetchOrderPostventaCaso(
+        transactionRequestId: widget.request.id,
+        kind: widget.kind,
+      );
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        if (row != null) {
+          _registered = true;
+          _savedBody = row['body']?.toString();
+          _savedAt = DateTime.tryParse(row['created_at']?.toString() ?? '')
+              ?.toLocal();
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _register() async {
+    final note = _noteCtrl.text.trim();
+    if (note.length < 3) {
+      setState(() {
+        _formError = 'Escriba qué ocurrió antes de registrarlo.';
+      });
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _formError = null;
+    });
+    try {
+      final at = await OrdersService.registerOrderPostventaCaso(
+        transactionRequestId: widget.request.id,
+        kind: widget.kind,
+        body: note,
+      );
+      if (!mounted) return;
+      setState(() {
+        _registered = true;
+        _savedBody = note;
+        _savedAt = at;
+        _saving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${OrderPostventaKind.registeredTitle(widget.kind)} en este pedido. '
+            'La otra parte la verá aquí y en el chat.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      final friendly = raw.contains('plazo de 7 días')
+          ? OrderReturnRules.closedHint
+          : raw.contains('ya quedó registrado')
+              ? 'Eso ya quedó registrado en este pedido.'
+              : 'No se pudo registrar. Revise su conexión e intente de nuevo.';
+      setState(() {
+        _saving = false;
+        _formError = friendly;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final product = request.productName?.trim();
-    final until = OrderReturnRules.availableUntil(request.updatedAt);
-    final untilLabel = until == null ? null : formatEsShortDateTime(until.toLocal());
+    final product = widget.request.productName?.trim();
+    final until = OrderReturnRules.availableUntil(
+      deliveredAt: widget.request.atEntregado,
+      updatedAt: widget.request.updatedAt,
+    );
+    final untilLabel =
+        until == null ? null : formatEsShortDateTime(until.toLocal());
+    final title = _registered
+        ? OrderPostventaKind.viewLabel(widget.kind)
+        : OrderPostventaKind.actionLabel(widget.kind);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Devoluciones'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              (product == null || product.isEmpty)
-                  ? 'Devolución de este pedido'
-                  : 'Devolución · $product',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Puedes iniciar la devolución mientras el pedido figura como entregado'
-              '${untilLabel == null ? '' : ' y hasta $untilLabel'}. '
-              'Adjunta fotos o un video como evidencia en el chat. '
-              'La otra parte del pedido recibe el aviso de mensaje nuevo. '
-              'Este paso no cambia todavía el estado del pedido.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: SingleChildScrollView(
-                child: OrderMotolinkThreadSection(
-                  transactionRequestId: request.id,
-                  allowReplyAsAliado: allowReplyAsAliado,
-                  allowReplyAsImportador: allowReplyAsImportador,
-                  allowReplyAsAdmin: false,
-                  suppressBuiltinTitle: true,
+    final savedNow = _registered && !widget.alreadyRegistered;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        Navigator.of(context).pop(savedNow);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(savedNow),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                (product == null || product.isEmpty)
+                    ? title
+                    : '$title · $product',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                _windowOpen
+                    ? 'Puede registrarlo mientras el pedido está entregado'
+                        '${untilLabel == null ? '' : ', hasta $untilLabel'}. '
+                        'Queda anotado en este pedido y no cambia su estado. '
+                        'La otra parte recibe un aviso.'
+                    : OrderReturnRules.closedHint,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_loading)
+                const LinearProgressIndicator(minHeight: 2)
+              else if (_registered)
+                _SavedNote(body: _savedBody, at: _savedAt)
+              else if (_canRegister && _windowOpen) ...[
+                TextField(
+                  controller: _noteCtrl,
+                  enabled: !_saving,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: InputDecoration(
+                    labelText: widget.kind == OrderPostventaKind.queja
+                        ? 'Qué ocurrió'
+                        : 'Qué desea devolver',
+                    hintText: 'Escríbalo con claridad.',
+                    border: const OutlineInputBorder(),
+                    errorText: _formError,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: _saving ? null : _register,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(OrderPostventaKind.actionLabel(widget.kind)),
+                ),
+              ] else if (_formError != null)
+                Text(
+                  _formError!,
+                  style: TextStyle(color: Colors.red.shade800, fontSize: 13),
+                ),
+              const SizedBox(height: 12),
+              Text(
+                'El chat de este pedido sirve para agregar fotos o un video.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: OrderMotolinkThreadSection(
+                  transactionRequestId: widget.request.id,
+                  allowReplyAsAliado:
+                      widget.allowReplyAsAliado && _windowOpen,
+                  allowReplyAsImportador:
+                      widget.allowReplyAsImportador && _windowOpen,
+                  allowReplyAsAdmin: false,
+                  deliveryGrace: _windowOpen,
+                  suppressBuiltinTitle: true,
+                  suppressInlineHelp: true,
+                  expandMessages: true,
+                  emptyHint: _registered
+                      ? 'Si quiere, agregue una foto o un video como evidencia.'
+                      : 'Después de registrarlo, puede adjuntar una foto o un video.',
+                  mergedThreadRequestIds: widget.mergedThreadRequestIds,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedNote extends StatelessWidget {
+  const _SavedNote({required this.body, required this.at});
+
+  final String? body;
+  final DateTime? at;
+
+  @override
+  Widget build(BuildContext context) {
+    final when = at == null ? null : formatEsShortDateTime(at!.toLocal());
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.brand.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              when == null
+                  ? 'Quedó registrado en este pedido.'
+                  : 'Quedó registrado en este pedido el $when.',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             ),
+            if (body != null && body!.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(body!.trim(), style: const TextStyle(fontSize: 13, height: 1.35)),
+            ],
           ],
         ),
       ),

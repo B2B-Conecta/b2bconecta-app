@@ -774,8 +774,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 ),
                 OrderReturnButtons(
                   lines: [r],
-                  allowReplyAsAliado: true,
+                  allowReplyAsAliado: orderLinesAllowChatReply([r]),
                   allowReplyAsImportador: false,
+                  onChanged: _refreshExpandedCard,
                 ),
               ],
             ),
@@ -956,8 +957,11 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ),
               OrderReturnButtons(
                 lines: chunk,
-                allowReplyAsAliado: true,
+                allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                 allowReplyAsImportador: false,
+                mergedThreadRequestIds:
+                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
+                onChanged: _refreshExpandedCard,
               ),
             ],
           ),

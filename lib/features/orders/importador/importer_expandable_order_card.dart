@@ -144,6 +144,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    OrderPostventaHeaderMarks(lines: lines),
                     const SizedBox(height: 10),
                     if (isCheckoutGroup && titulo != null)
                       Text(
@@ -481,7 +482,12 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                               OrderReturnButtons(
                                 lines: lines,
                                 allowReplyAsAliado: false,
-                                allowReplyAsImportador: true,
+                                allowReplyAsImportador:
+                                    orderLinesAllowChatReply(lines),
+                                mergedThreadRequestIds: lines.length > 1
+                                    ? lines.map((e) => e.id).toList()
+                                    : null,
+                                onChanged: onThreadChanged,
                               ),
                             ],
                           ),

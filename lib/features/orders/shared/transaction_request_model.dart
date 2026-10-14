@@ -43,6 +43,8 @@ class TransactionRequestModel {
     this.atPedidoListo,
     this.atEnTransito,
     this.atEntregado,
+    this.postventaDevolucionAt,
+    this.postventaQuejaAt,
     this.productName,
     this.productSku,
     this.productImageUrls = const <String>[],
@@ -182,6 +184,12 @@ class TransactionRequestModel {
   final DateTime? atPedidoListo;
   final DateTime? atEnTransito;
   final DateTime? atEntregado;
+
+  /// Devolución anotada en el pedido. No cambia [status].
+  final DateTime? postventaDevolucionAt;
+
+  /// Queja anotada en el pedido. No cambia [status].
+  final DateTime? postventaQuejaAt;
   final String? productName;
   final String? productSku;
 
@@ -1037,6 +1045,8 @@ class TransactionRequestModel {
       atPedidoListo: _parseDate(json['at_pedido_listo']),
       atEnTransito: _parseDate(json['at_en_transito']),
       atEntregado: _parseDate(json['at_entregado']),
+      postventaDevolucionAt: _parseDate(json['postventa_devolucion_at']),
+      postventaQuejaAt: _parseDate(json['postventa_queja_at']),
       productName: productName,
       productSku: productSku,
       productImageUrls: productImageUrls,

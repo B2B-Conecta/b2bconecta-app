@@ -18,6 +18,7 @@ import 'package:motolink_pro_app/features/commissions/order_commission_summary.d
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -101,6 +102,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          OrderPostventaHeaderMarks(lines: lines),
                           const SizedBox(height: 8),
                           if (isCheckoutGroup && titulo != null)
                             Text(

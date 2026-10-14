@@ -18,6 +18,7 @@ import 'aliado_transit_eta_banner.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
@@ -161,6 +162,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          OrderPostventaHeaderMarks(lines: lines),
                           SizedBox(height: density.isDesktop ? 6 : 8),
                           if (showHeadline) ...[
                             Text(

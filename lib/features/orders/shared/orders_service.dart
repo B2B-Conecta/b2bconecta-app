@@ -136,6 +136,8 @@ class OrdersService {
     at_pedido_listo,
     at_en_transito,
     at_entregado,
+    postventa_devolucion_at,
+    postventa_queja_at,
     importer_carrier_id,
     importer_carrier_driver_id,
     carrier_eta_hours_snapshot,
@@ -1097,6 +1099,40 @@ class OrdersService {
         attachments: attachments,
         messageId: messageId,
       );
+
+  static Future<Map<String, dynamic>?> fetchOrderPostventaCaso({
+    required String transactionRequestId,
+    required String kind,
+  }) async {
+    final row = await SupabaseAccess.client
+        .from('order_postventa_casos')
+        .select('id, kind, body, opened_role, created_at')
+        .eq('transaction_request_id', transactionRequestId)
+        .eq('kind', kind)
+        .maybeSingle();
+    if (row == null) return null;
+    return Map<String, dynamic>.from(row);
+  }
+
+  static Future<DateTime> registerOrderPostventaCaso({
+    required String transactionRequestId,
+    required String kind,
+    required String body,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'register_order_postventa_caso',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_kind': kind,
+        'p_body': body.trim(),
+      },
+    );
+    if (res is Map && res['created_at'] != null) {
+      return DateTime.tryParse(res['created_at'].toString())?.toLocal() ??
+          DateTime.now();
+    }
+    return DateTime.now();
+  }
 
   static Future<void> insertTransactionRequestMessageAsAliado({
     required String transactionRequestId,

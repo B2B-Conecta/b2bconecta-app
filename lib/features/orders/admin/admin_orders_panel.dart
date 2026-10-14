@@ -26,6 +26,7 @@ import 'package:motolink_pro_app/features/payments/admin_pago_revision_section.d
 import 'package:motolink_pro_app/features/payments/efectivo_respaldo_registrar.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
@@ -386,18 +387,28 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
-          child: OrderOpenChatButton(
-            relatedOrderIds: [r.id],
-            onPressed: () {
-              showOrderChatSheet(
-                context: context,
-                transactionRequestId: r.id,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderOpenChatButton(
+                relatedOrderIds: [r.id],
+                onPressed: () {
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: r.id,
+                    allowReplyAsAliado: false,
+                    allowReplyAsAdmin: true,
+                    title: 'Chat del pedido',
+                    onThreadChanged: _load,
+                  );
+                },
+              ),
+              OrderReturnButtons(
+                lines: [r],
                 allowReplyAsAliado: false,
-                allowReplyAsAdmin: true,
-                title: 'Chat del pedido',
-                onThreadChanged: _load,
-              );
-            },
+                allowReplyAsImportador: false,
+              ),
+            ],
           ),
         ),
       ],
@@ -441,18 +452,28 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           subtitle: 'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
-          child: OrderOpenChatButton(
-            relatedOrderIds: [primary.id],
-            onPressed: () {
-              showOrderChatSheet(
-                context: context,
-                transactionRequestId: primary.id,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrderOpenChatButton(
+                relatedOrderIds: [primary.id],
+                onPressed: () {
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: primary.id,
+                    allowReplyAsAliado: false,
+                    allowReplyAsAdmin: true,
+                    title: 'Chat del pedido',
+                    onThreadChanged: _load,
+                  );
+                },
+              ),
+              OrderReturnButtons(
+                lines: [primary],
                 allowReplyAsAliado: false,
-                allowReplyAsAdmin: true,
-                title: 'Chat del pedido',
-                onThreadChanged: _load,
-              );
-            },
+                allowReplyAsImportador: false,
+              ),
+            ],
           ),
         ),
       ],

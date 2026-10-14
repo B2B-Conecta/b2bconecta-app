@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'commission_settlement_document_type.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'commission_settlement_filter_utils.dart';
 
 /// Búsqueda y chips para filtrar cortes de comisión en el panel admin.
@@ -51,29 +52,6 @@ class _CommissionSettlementListFilterBarState
 
   void _patch(CommissionSettlementFilters Function(CommissionSettlementFilters f) fn) {
     widget.onFiltersChanged(fn(widget.filters));
-  }
-
-  Widget _chip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    Color? selectedColor,
-  }) {
-    return FilterChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      visualDensity: VisualDensity.compact,
-      selectedColor: (selectedColor ?? AppColors.brandBlue).withOpacity(0.2),
-      checkmarkColor: selectedColor ?? AppColors.brandBlue,
-    );
-  }
-
-  Widget _chipRow(List<Widget> chips) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(children: chips),
-    );
   }
 
   int get _activeFilterCount {
@@ -207,94 +185,61 @@ class _CommissionSettlementListFilterBarState
           ],
         ),
         const SizedBox(height: 8),
-        _chipRow([
-          _chip(
-            label: 'Todos',
-            selected: f.status == null,
-            onTap: () => _patch((x) => x.copyWithStatus(null)),
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Borrador',
-            selected: f.status == 'borrador',
-            onTap: () => _patch((x) => x.copyWithStatus('borrador')),
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Emitido',
-            selected: f.status == 'emitido',
-            onTap: () => _patch((x) => x.copyWithStatus('emitido')),
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'En revisión',
-            selected: f.status == 'pago_revision',
-            onTap: () => _patch((x) => x.copyWithStatus('pago_revision')),
-            selectedColor: Colors.deepOrange,
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Pagado',
-            selected: f.status == 'pagado',
-            onTap: () => _patch((x) => x.copyWithStatus('pagado')),
-            selectedColor: Colors.green.shade700,
-          ),
-        ]),
-        const SizedBox(height: 8),
-        _chipRow([
-          _chip(
-            label: 'Todas las semanas',
-            selected: f.weekScope == null,
-            onTap: () => _patch((x) => x.copyWithWeekScope(null)),
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Sem. actual',
-            selected: f.weekScope == CommissionSettlementWeekScope.current,
-            onTap: () => _patch(
-              (x) => x.copyWithWeekScope(CommissionSettlementWeekScope.current),
+        SegmentedFilterBar(
+          labels: const [
+            'Todos',
+            'Borrador',
+            'Emitido',
+            'En revisión',
+            'Pagado',
+          ],
+          selectedIndex: switch (f.status) {
+            'borrador' => 1,
+            'emitido' => 2,
+            'pago_revision' => 3,
+            'pagado' => 4,
+            _ => 0,
+          },
+          onSelected: (index) => _patch(
+            (x) => x.copyWithStatus(
+              const [null, 'borrador', 'emitido', 'pago_revision', 'pagado'][index],
             ),
           ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Sem. anterior',
-            selected: f.weekScope == CommissionSettlementWeekScope.previous,
-            onTap: () => _patch(
-              (x) =>
-                  x.copyWithWeekScope(CommissionSettlementWeekScope.previous),
+        ),
+        SegmentedFilterBar(
+          labels: const ['Todas las semanas', 'Sem. actual', 'Sem. anterior'],
+          selectedIndex: switch (f.weekScope) {
+            CommissionSettlementWeekScope.current => 1,
+            CommissionSettlementWeekScope.previous => 2,
+            _ => 0,
+          },
+          onSelected: (index) => _patch(
+            (x) => x.copyWithWeekScope(
+              const [
+                null,
+                CommissionSettlementWeekScope.current,
+                CommissionSettlementWeekScope.previous,
+              ][index],
             ),
           ),
-        ]),
-        const SizedBox(height: 8),
-        _chipRow([
-          _chip(
-            label: 'Todo documento',
-            selected: f.documentType == null,
-            onTap: () => _patch((x) => x.copyWithDocumentType(null)),
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Factura fiscal',
-            selected: f.documentType ==
+        ),
+        SegmentedFilterBar(
+          labels: const ['Todo documento', 'Factura fiscal', 'Nota (NOT)'],
+          selectedIndex: switch (f.documentType) {
+            CommissionSettlementDocumentType.fiscalInvoice => 1,
+            CommissionSettlementDocumentType.deliveryNote => 2,
+            _ => 0,
+          },
+          onSelected: (index) => _patch(
+            (x) => x.copyWithDocumentType(
+              const [
+                null,
                 CommissionSettlementDocumentType.fiscalInvoice,
-            onTap: () => _patch(
-              (x) => x.copyWithDocumentType(
-                CommissionSettlementDocumentType.fiscalInvoice,
-              ),
+                CommissionSettlementDocumentType.deliveryNote,
+              ][index],
             ),
           ),
-          const SizedBox(width: 6),
-          _chip(
-            label: 'Nota (NOT)',
-            selected: f.documentType ==
-                CommissionSettlementDocumentType.deliveryNote,
-            onTap: () => _patch(
-              (x) => x.copyWithDocumentType(
-                CommissionSettlementDocumentType.deliveryNote,
-              ),
-            ),
-          ),
-        ]),
+        ),
         if (hasFilters) ...[
           const SizedBox(height: 8),
           Align(

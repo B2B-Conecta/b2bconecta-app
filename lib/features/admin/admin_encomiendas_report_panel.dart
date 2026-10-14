@@ -19,6 +19,7 @@ import 'admin_product_sales_ranking.dart';
 import 'admin_catalog_featured_section.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
+import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 
 /// Reportes de encomiendas: facturación (preferencia de documento) y métricas gerenciales.
@@ -332,28 +333,15 @@ class _AdminEncomiendasReportPanelState
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final opt in _docOptions)
-                          FilterChip(
-                            label: Text(
-                              opt.label,
-                              style: const TextStyle(fontSize: 11.5),
-                            ),
-                            selected: _docPrefFilter == opt.value,
-                            visualDensity: VisualDensity.compact,
-                            onSelected: (_) {
-                              _setDocPrefFilter(
-                                _docPrefFilter == opt.value
-                                    ? 'all'
-                                    : opt.value,
-                              );
-                              refreshSheet();
-                            },
-                          ),
-                      ],
+                    SegmentedFilterBar(
+                      labels: [for (final opt in _docOptions) opt.label],
+                      selectedIndex: _docOptions
+                          .indexWhere((opt) => opt.value == _docPrefFilter)
+                          .clamp(0, _docOptions.length - 1),
+                      onSelected: (index) {
+                        _setDocPrefFilter(_docOptions[index].value);
+                        refreshSheet();
+                      },
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
@@ -417,40 +405,22 @@ class _AdminEncomiendasReportPanelState
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        FilterChip(
-                          label: const Text(
-                            'Todos',
-                            style: TextStyle(fontSize: 11.5),
-                          ),
-                          selected: _topSoldLimit == null,
-                          visualDensity: VisualDensity.compact,
-                          onSelected: (_) {
-                            setState(() => _topSoldLimit = null);
-                            _applyLocalFilters();
-                            refreshSheet();
-                          },
-                        ),
-                        for (final n in _topSoldOptions)
-                          FilterChip(
-                            label: Text(
-                              'Top $n',
-                              style: const TextStyle(fontSize: 11.5),
-                            ),
-                            selected: _topSoldLimit == n,
-                            visualDensity: VisualDensity.compact,
-                            onSelected: (_) {
-                              setState(() {
-                                _topSoldLimit = _topSoldLimit == n ? null : n;
-                              });
-                              _applyLocalFilters();
-                              refreshSheet();
-                            },
-                          ),
+                    SegmentedFilterBar(
+                      labels: [
+                        'Todos',
+                        for (final n in _topSoldOptions) 'Top $n',
                       ],
+                      selectedIndex: _topSoldLimit == null
+                          ? 0
+                          : _topSoldOptions.indexOf(_topSoldLimit!) + 1,
+                      onSelected: (index) {
+                        setState(() {
+                          _topSoldLimit =
+                              index == 0 ? null : _topSoldOptions[index - 1];
+                        });
+                        _applyLocalFilters();
+                        refreshSheet();
+                      },
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -552,22 +522,21 @@ class _AdminEncomiendasReportPanelState
               ],
             ),
             const SizedBox(height: 8),
+            SegmentedFilterBar(
+              labels: const ['30 días', '90 días', '365 días'],
+              selectedIndex: _presetDayIndex,
+              onSelected: _loading
+                  ? (_) {}
+                  : (index) {
+                      _presetDays(const [30, 90, 365][index]);
+                      _load();
+                    },
+            ),
             Wrap(
               spacing: 6,
               runSpacing: 4,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                for (final days in const [30, 90, 365])
-                  ActionChip(
-                    label: Text('$days d'),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _loading
-                        ? null
-                        : () {
-                            _presetDays(days);
-                            _load();
-                          },
-                  ),
                 TextButton.icon(
                   onPressed: _showAdvancedFiltersSheet,
                   icon: const Icon(Icons.tune, size: 18),
@@ -642,6 +611,15 @@ class _AdminEncomiendasReportPanelState
       helpText: 'Hasta',
     );
     if (d != null) setState(() => _hasta = d);
+  }
+
+  int get _presetDayIndex {
+    final end = DateTime(_hasta.year, _hasta.month, _hasta.day);
+    final start = DateTime(_desde.year, _desde.month, _desde.day);
+    final today = DateTime.now();
+    final todayDay = DateTime(today.year, today.month, today.day);
+    if (end != todayDay) return -1;
+    return const [30, 90, 365].indexOf(end.difference(start).inDays);
   }
 
   void _presetDays(int days) {
@@ -1012,37 +990,16 @@ class _AdminEncomiendasReportPanelState
   }
 
   Widget _sectionSwitcher() {
-    const labels = ['Pedidos', 'Promos', 'Usuarios', 'Referidos', 'Devoluciones'];
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        itemCount: labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (context, i) {
-          final selected = _sectionIndex == i;
-          return Material(
-            color: selected ? AppColors.brand : AppColors.brandBlueContainer,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              onTap: () => setState(() => _sectionIndex = i),
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Text(
-                  labels[i],
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: selected ? Colors.white : AppColors.brand,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+    return SegmentedFilterBar(
+      labels: const [
+        'Pedidos',
+        'Promos',
+        'Usuarios',
+        'Referidos',
+        'Devoluciones',
+      ],
+      selectedIndex: _sectionIndex,
+      onSelected: (index) => setState(() => _sectionIndex = index),
     );
   }
 

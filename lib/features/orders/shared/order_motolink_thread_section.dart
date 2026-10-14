@@ -5,8 +5,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'order_chat_access.dart';
+import 'order_postventa_chat_card.dart';
 import 'order_return_rules.dart';
 import 'order_message_attachment.dart';
+import 'orders_service.dart';
+import 'transaction_request_model.dart';
 import 'order_message_media.dart';
 import 'order_message_pick.dart';
 import 'transaction_request_message_model.dart';
@@ -16,6 +19,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 
 /// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión B2B Conecta.
@@ -34,6 +38,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.emptyHint,
     /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
     this.mergedThreadRequestIds,
+    this.orderLines = const [],
   });
 
   final String transactionRequestId;
@@ -46,6 +51,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 
   /// Varios ids de `transaction_requests` (mismo importador en un carrito): se listan mensajes juntos.
   final List<String>? mergedThreadRequestIds;
+
+  /// Líneas del pedido, para la foto y la decisión del reporte en el chat.
+  final List<TransactionRequestModel> orderLines;
 
   /// Nuevo mensaje (Realtime) u operaciones en el hilo: refresca la ficha del pedido.
   final VoidCallback? onThreadChanged;
@@ -75,6 +83,8 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   String? _error;
   String? _composeHint;
   final List<RealtimeChannel> _messageChannels = [];
+  final Set<String> _resolvedRequestIds = {};
+  String? _resolvingRequestId;
 
   bool get _usaHiloFusionado =>
       widget.mergedThreadRequestIds != null &&
@@ -317,8 +327,62 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     }
   }
 
+  TransactionRequestModel? _lineForMessage(
+    TransactionRequestMessageModel message,
+    ParsedReturnRequest data,
+  ) {
+    for (final line in widget.orderLines) {
+      if (line.id == message.transactionRequestId) return line;
+    }
+    final name = data.productName.trim().toLowerCase();
+    if (name.isEmpty) return null;
+    for (final line in widget.orderLines) {
+      final product = (line.productName ?? '').trim().toLowerCase();
+      if (product == name) return line;
+    }
+    return null;
+  }
+
+  Future<void> _resolveReturn(
+    TransactionRequestModel line,
+    String resolution,
+    String? note,
+  ) async {
+    setState(() => _resolvingRequestId = line.id);
+    try {
+      await OrdersService.resolveOrderPostventaCaso(
+        transactionRequestId: line.id,
+        resolution: resolution,
+        note: note,
+      );
+      if (!mounted) return;
+      setState(() => _resolvedRequestIds.add(line.id));
+      await _load();
+      widget.onThreadChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Acuerdo registrado en el chat.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      final message = RegExp(r'message:\s*([^,\n]+)')
+              .firstMatch(raw)
+              ?.group(1)
+              ?.trim() ??
+          'No se pudo registrar el acuerdo.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => _resolvingRequestId = null);
+    }
+  }
+
   Widget _messageTile(String? uid, int i) {
     final m = _items[i];
+    final request = OrderReturnRules.parseReturnRequestMessage(m.body);
+    final line = request == null ? null : _lineForMessage(m, request);
     final mine = uid != null && m.authorId == uid;
     final label = mine
         ? 'Tú'
@@ -353,17 +417,43 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (m.body.trim().isNotEmpty)
-                  Text(
-                    m.body,
-                    style: const TextStyle(fontSize: 13, height: 1.35),
+            child: request == null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (m.body.trim().isNotEmpty)
+                        Text(
+                          m.body,
+                          style: const TextStyle(fontSize: 13, height: 1.35),
+                        ),
+                      OrderMessageMediaStrip(attachments: m.attachments),
+                    ],
+                  )
+                : OrderPostventaChatCard(
+                    data: request,
+                    attachments: m.attachments,
+                    imageUrl: line == null
+                        ? null
+                        : productCoverImageUrl(line.productImageUrls),
+                    creditAmount: line == null
+                        ? 0
+                        : OrderReturnRules.creditAmount(
+                            unitPrice: line.precioUnitarioAliado,
+                            lineTotal: line.precioTotal,
+                            lineQty: line.cantidad,
+                            affectedQty: request.units > 0
+                                ? request.units
+                                : line.cantidad,
+                          ),
+                    canDecide: widget.allowReplyAsImportador &&
+                        line != null &&
+                        line.postventaDevolucionAt != null &&
+                        line.postventaResolucion == null &&
+                        !_resolvedRequestIds.contains(line.id),
+                    busy: _resolvingRequestId == line?.id,
+                    onResolve: (resolution, note) =>
+                        _resolveReturn(line!, resolution, note),
                   ),
-                OrderMessageMediaStrip(attachments: m.attachments),
-              ],
-            ),
           ),
         ),
       ],

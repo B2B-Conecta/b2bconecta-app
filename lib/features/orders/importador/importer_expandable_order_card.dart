@@ -484,9 +484,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                                 allowReplyAsAliado: false,
                                 allowReplyAsImportador:
                                     orderLinesAllowChatReply(lines),
-                                mergedThreadRequestIds: lines.length > 1
-                                    ? lines.map((e) => e.id).toList()
-                                    : null,
                                 onChanged: onThreadChanged,
                               ),
                             ],
@@ -529,6 +526,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       transactionRequestId: lines.first.id,
       mergedThreadRequestIds:
           isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+      orderLines: lines,
       allowReplyAsAliado: false,
       allowReplyAsAdmin: false,
       allowReplyAsImportador: orderLinesAllowChatReply(lines),

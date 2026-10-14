@@ -25,6 +25,9 @@ import 'importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
@@ -174,8 +177,21 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     if (pending == null) return false;
     final key = _expandKeyForPendingId(pending);
     if (key == null) return false;
+    final openChat = MainShellTabController.consumePendingOpenOrderChat();
     MainShellTabController.consumePendingNotificationRelatedId();
     setState(() => _expandedRequestId = key);
+    if (openChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openOrderChatForNotification(
+          context: context,
+          rows: _rows,
+          relatedId: pending,
+          asAliado: false,
+          onThreadChanged: () => _load(silent: true),
+        );
+      });
+    }
     return true;
   }
 
@@ -290,6 +306,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             spacing: 8,
             runSpacing: 6,
             children: [
+              const OrderChatsEntryButton(
+                homeRole: AppHomeRole.importador,
+              ),
               FilterChip(
                 label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
                 selected: _hasDateFilter,

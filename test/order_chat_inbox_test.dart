@@ -190,8 +190,8 @@ void main() {
         ),
       ),
     );
-    expect(find.byTooltip('Mensajes'), findsOneWidget);
-    await tester.tap(find.byTooltip('Mensajes'));
+    expect(find.byTooltip('Chats'), findsOneWidget);
+    await tester.tap(find.byTooltip('Chats'));
     expect(opened, isTrue);
   });
 
@@ -202,7 +202,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.byTooltip('Mensajes'), findsNothing);
+    expect(find.byTooltip('Chats'), findsNothing);
   });
 
   testWidgets('app bar shows messages when authenticated callback is set',
@@ -216,8 +216,8 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.byTooltip('Mensajes'), findsOneWidget);
-    await tester.tap(find.byTooltip('Mensajes'));
+    expect(find.byTooltip('Chats'), findsOneWidget);
+    await tester.tap(find.byTooltip('Chats'));
     expect(opened, isTrue);
   });
 
@@ -252,7 +252,20 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Sesión vencida'), findsOneWidget);
-    expect(find.byTooltip('Mensajes'), findsNothing);
+    expect(find.byTooltip('Chats'), findsNothing);
+  });
+
+  test('el filtro de fechas incluye el día de inicio y el de cierre', () {
+    final day = DateTime(2026, 10, 13, 22);
+    expect(
+      chatActivityInRange(at: day, from: DateTime(2026, 10, 13), to: DateTime(2026, 10, 13)),
+      isTrue,
+    );
+    expect(
+      chatActivityInRange(at: day, from: DateTime(2026, 10, 14), to: DateTime(2026, 10, 14)),
+      isFalse,
+    );
+    expect(chatActivityInRange(at: null, from: null, to: null), isTrue);
   });
 
   testWidgets('inbox lists an order thread for the signed-in user',

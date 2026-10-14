@@ -444,6 +444,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                     mergedThreadRequestIds: chunk.length > 1
                         ? chunk.map((e) => e.id).toList()
                         : null,
+                    orderLines: chunk,
                     allowReplyAsAliado: false,
                     allowReplyAsAdmin: true,
                     title: 'Chat del pedido',
@@ -455,8 +456,6 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                 lines: chunk,
                 allowReplyAsAliado: false,
                 allowReplyAsImportador: false,
-                mergedThreadRequestIds:
-                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
               ),
             ],
           ),

@@ -4,20 +4,36 @@ import 'transaction_request_status.dart';
 ///
 /// Solo con el pedido `entregado`, durante 7 días desde la entrega
 /// (`at_entregado`). Si esa fecha no existe, se usa `updated_at`.
+class ParsedReturnRequest {
+  const ParsedReturnRequest({
+    required this.preference,
+    required this.preferenceLabel,
+    required this.productName,
+    required this.units,
+    required this.reason,
+  });
+
+  final String preference;
+  final String preferenceLabel;
+  final String productName;
+  final int units;
+  final String reason;
+}
+
 abstract final class OrderReturnRules {
   static const window = Duration(days: 7);
 
   static const closedHint =
-      'El plazo de 7 días para una devolución o una queja terminó.';
+      'El plazo de 7 días para reportar un inconveniente terminó.';
 
   static const receptionConfirmedHint =
-      'Recepción confirmada. El pedido queda registrado. Durante 7 días puede pedir una devolución o presentar una queja desde el detalle.';
+      'Recepción confirmada. El pedido queda registrado. Durante 7 días puede reportar un inconveniente con un producto.';
 
   static const receptionConfirmedPagoPendienteHint =
-      'Recepción registrada. La mercancía queda como entregada. Durante 7 días puede pedir una devolución o presentar una queja desde el detalle. El comprobante de pago sigue pendiente de registrar o aprobar por B2B Conecta.';
+      'Recepción registrada. La mercancía queda como entregada. Durante 7 días puede reportar un inconveniente con un producto. El comprobante de pago sigue pendiente de registrar o aprobar por B2B Conecta.';
 
   static const openHint =
-      'Si un producto tuvo un inconveniente, solicítelo aquí dentro de los 7 días. Elija crédito o cambio y adjunte una foto o un video. El pedido sigue entregado.';
+      'Si un producto tuvo un inconveniente, repórtelo dentro de los 7 días. Elija crédito o cambio y adjunte una foto o un video. El pedido sigue entregado.';
 
   static DateTime? anchor({
     DateTime? deliveredAt,
@@ -90,10 +106,42 @@ abstract final class OrderReturnRules {
     }
   }
 
+  /// Lee el mensaje que deja el registro de una devolución en el chat.
+  static ParsedReturnRequest? parseReturnRequestMessage(String body) {
+    final text = body.trim();
+    const prefix = 'Solicitud de devolución. Preferencia: ';
+    if (!text.startsWith(prefix)) return null;
+    const productMark = '. Producto: ';
+    const unitsMark = '. Unidades: ';
+    final productAt = text.indexOf(productMark, prefix.length);
+    if (productAt < 0) return null;
+    final unitsAt = text.indexOf(unitsMark, productAt + productMark.length);
+    if (unitsAt < 0) return null;
+    final preferenceLabel = text.substring(prefix.length, productAt).trim();
+    final productName =
+        text.substring(productAt + productMark.length, unitsAt).trim();
+    final afterUnits = text.substring(unitsAt + unitsMark.length);
+    final dot = afterUnits.indexOf('.');
+    final unitsRaw =
+        (dot < 0 ? afterUnits : afterUnits.substring(0, dot)).trim();
+    final reason = dot < 0 ? '' : afterUnits.substring(dot + 1).trim();
+    final lower = preferenceLabel.toLowerCase();
+    final preference = lower.contains('crédit') || lower.contains('credit')
+        ? 'credito'
+        : 'cambio';
+    return ParsedReturnRequest(
+      preference: preference,
+      preferenceLabel: preferenceLabel,
+      productName: productName,
+      units: int.tryParse(unitsRaw) ?? 0,
+      reason: reason,
+    );
+  }
+
   static String replacementStatusLabel(String? status) {
     switch (status) {
       case 'pendiente_retiro':
-        return 'Pendiente de retiro';
+        return 'Pendiente por retiro';
       case 'en_transito':
         return 'En tránsito';
       case 'entregado':

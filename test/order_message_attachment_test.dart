@@ -146,7 +146,22 @@ void main() {
     expect(OrderReturnRules.preferenceLabel('credito'), 'Crédito a favor');
     expect(
       OrderReturnRules.replacementStatusLabel('pendiente_retiro'),
-      'Pendiente de retiro',
+      'Pendiente por retiro',
+    );
+  });
+
+  test('el chat reconoce la tarjeta de la solicitud', () {
+    final parsed = OrderReturnRules.parseReturnRequestMessage(
+      'Solicitud de devolución. Preferencia: cambio de producto. Producto: Disco freno delantero 245 mm. Unidades: 2. Llegó rayado.',
+    );
+    expect(parsed, isNotNull);
+    expect(parsed!.preference, 'cambio');
+    expect(parsed.productName, 'Disco freno delantero 245 mm');
+    expect(parsed.units, 2);
+    expect(parsed.reason, 'Llegó rayado.');
+    expect(
+      OrderReturnRules.parseReturnRequestMessage('Hola, ¿llegó el pedido?'),
+      isNull,
     );
   });
 }

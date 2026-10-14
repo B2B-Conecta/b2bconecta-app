@@ -309,6 +309,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                           mergedThreadRequestIds: isCheckoutGroup
                               ? lines.map((e) => e.id).toList()
                               : null,
+                          orderLines: lines,
                           allowReplyAsAliado: orderLinesAllowChatReply(lines),
                           allowReplyAsAdmin: false,
                           deliveryGrace: orderLinesChatDeliveryGrace(lines),

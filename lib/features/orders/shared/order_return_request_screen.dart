@@ -661,7 +661,7 @@ class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.textPrimary,
                           side: BorderSide(color: AppColors.borderSubtle),
-                          minimumSize: const Size.fromHeight(44),
+                          minimumSize: const Size(double.infinity, 44),
                         ),
                       ),
                     ],
@@ -858,14 +858,20 @@ class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
     );
     final onPressed = _resolving ? null : () => _resolve(resolution);
     if (preferred) {
-      return FilledButton(onPressed: onPressed, child: child);
+      return FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(double.infinity, 44),
+        ),
+        child: child,
+      );
     }
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.brand,
         side: const BorderSide(color: AppColors.brand),
-        minimumSize: const Size.fromHeight(44),
+        minimumSize: const Size(double.infinity, 44),
       ),
       child: child,
     );

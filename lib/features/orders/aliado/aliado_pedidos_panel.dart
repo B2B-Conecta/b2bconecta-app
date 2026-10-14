@@ -32,7 +32,9 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
@@ -116,13 +118,27 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   void _prepareAliadoFiltersForNotificationDeepLink() {
     final notifType = MainShellTabController.peekPendingNotificationType();
-    if (notifType == null) return;
+    final pending = MainShellTabController.peekPendingNotificationRelatedId();
+    final match = pending == null
+        ? null
+        : findTransactionForNotificationRelatedId(_rows, pending);
+    if (notifType == null && match == null) return;
     setState(() {
       if (notifType == 'morosidad') {
         _morosoOnly = true;
+        _scope = PedidosListScope.entregados;
+      } else if (match != null) {
+        _statusFilter = null;
+        _morosoOnly = false;
+        _scope = switch (match.status) {
+          TransactionRequestStatus.entregado => PedidosListScope.entregados,
+          TransactionRequestStatus.rechazado => PedidosListScope.cancelados,
+          _ => PedidosListScope.enCurso,
+        };
       } else {
         _statusFilter = null;
         _morosoOnly = false;
+        _scope = PedidosListScope.todos;
       }
     });
   }
@@ -132,8 +148,21 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     if (pending == null) return false;
     final key = _expandKeyForTransactionId(pending);
     if (key == null) return false;
+    final openChat = MainShellTabController.consumePendingOpenOrderChat();
     MainShellTabController.consumePendingNotificationRelatedId();
     setState(() => _expandedRequestId = key);
+    if (openChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openOrderChatForNotification(
+          context: context,
+          rows: _rows,
+          relatedId: pending,
+          asAliado: true,
+          onThreadChanged: _refreshExpandedCard,
+        );
+      });
+    }
     return true;
   }
 
@@ -758,12 +787,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                   relatedOrderIds: [r.id],
                   onPressed: () {
                     final counterpart = r.ownerBusinessName?.trim();
-                    showOrderChatSheet(
-                      context: context,
-                      transactionRequestId: r.id,
-                      allowReplyAsAliado: orderLinesAllowChatReply([r]),
-                      allowReplyAsAdmin: false,
-                      deliveryGrace: orderLinesChatDeliveryGrace([r]),
+                  showOrderChatSheet(
+                    context: context,
+                    transactionRequestId: r.id,
+                    orderLines: [r],
+                    allowReplyAsAliado: orderLinesAllowChatReply([r]),
+                    allowReplyAsAdmin: false,
+                    deliveryGrace: orderLinesChatDeliveryGrace([r]),
                       title: (counterpart != null && counterpart.isNotEmpty)
                           ? 'Chat · $counterpart'
                           : 'Chat del pedido',
@@ -944,6 +974,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     mergedThreadRequestIds: chunk.length > 1
                         ? chunk.map((e) => e.id).toList()
                         : null,
+                    orderLines: chunk,
                     allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                     allowReplyAsAdmin: false,
                     deliveryGrace: orderLinesChatDeliveryGrace(chunk),
@@ -958,8 +989,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 lines: chunk,
                 allowReplyAsAliado: orderLinesAllowChatReply(chunk),
                 allowReplyAsImportador: false,
-                mergedThreadRequestIds:
-                    chunk.length > 1 ? chunk.map((e) => e.id).toList() : null,
                 onChanged: _refreshExpandedCard,
               ),
             ],
@@ -1289,31 +1318,37 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                 context,
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilterChip(
-                      label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                      selected: _hasDateFilter,
-                      onSelected: (_) => _openDateFilters(),
-                      visualDensity: VisualDensity.compact,
-                      selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                      checkmarkColor: AppColors.brandBlue,
-                      avatar: Icon(
-                        Icons.calendar_month_outlined,
-                        size: 16,
-                        color: _hasDateFilter
-                            ? AppColors.brandBlue
-                            : AppColors.textSecondary,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      FilterChip(
+                        label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
+                        selected: _hasDateFilter,
+                        onSelected: (_) => _openDateFilters(),
+                        visualDensity: VisualDensity.compact,
+                        selectedColor: AppColors.brandBlue.withOpacity(0.18),
+                        checkmarkColor: AppColors.brandBlue,
+                        avatar: Icon(
+                          Icons.calendar_month_outlined,
+                          size: 16,
+                          color: _hasDateFilter
+                              ? AppColors.brandBlue
+                              : AppColors.textSecondary,
+                        ),
+                        labelStyle: TextStyle(
+                          fontWeight: _hasDateFilter
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          fontSize: 12.5,
+                          color: _hasDateFilter
+                              ? AppColors.brandBlue
+                              : AppColors.textPrimary,
+                        ),
                       ),
-                      labelStyle: TextStyle(
-                        fontWeight:
-                            _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 12.5,
-                        color: _hasDateFilter
-                            ? AppColors.brandBlue
-                            : AppColors.textPrimary,
-                      ),
-                    ),
+                      const OrderChatsEntryButton(homeRole: AppHomeRole.aliado),
+                    ],
                   ),
                 ),
               ),

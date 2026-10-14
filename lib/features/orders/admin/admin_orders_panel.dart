@@ -396,6 +396,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                   showOrderChatSheet(
                     context: context,
                     transactionRequestId: r.id,
+                    orderLines: [r],
                     allowReplyAsAliado: false,
                     allowReplyAsAdmin: true,
                     title: 'Chat del pedido',
@@ -461,6 +462,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                   showOrderChatSheet(
                     context: context,
                     transactionRequestId: primary.id,
+                    orderLines: [primary],
                     allowReplyAsAliado: false,
                     allowReplyAsAdmin: true,
                     title: 'Chat del pedido',

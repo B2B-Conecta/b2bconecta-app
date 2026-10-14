@@ -185,6 +185,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                           mergedThreadRequestIds: isCheckoutGroup
                               ? lines.map((e) => e.id).toList()
                               : null,
+                          orderLines: lines,
                           allowReplyAsAliado: false,
                           allowReplyAsAdmin: true,
                           title: 'Chat del pedido',

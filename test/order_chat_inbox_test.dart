@@ -73,6 +73,41 @@ void main() {
     expect(threads.first.requestIds, isNotEmpty);
   });
 
+  test('names the products when a chat covers more than one', () {
+    final orders = [
+      _order(
+        id: 'a',
+        checkoutGroupId: 'g1',
+        ownerId: 'imp-a',
+        productName: 'Disco freno delantero 245 mm',
+        importerName: 'Repuestos Delta Caracas C.A.',
+      ),
+      _order(
+        id: 'b',
+        checkoutGroupId: 'g1',
+        ownerId: 'imp-a',
+        productName: 'Aceite Mobil 4T 20W50 1 L',
+        importerName: 'Repuestos Delta Caracas C.A.',
+      ),
+      _order(
+        id: 'c',
+        checkoutGroupId: 'g1',
+        ownerId: 'imp-a',
+        productName: 'Pastillas de freno',
+        importerName: 'Repuestos Delta Caracas C.A.',
+      ),
+    ];
+    final threads = orderChatThreadsFromOrders(
+      orders,
+      role: AppHomeRole.aliado,
+    );
+    expect(threads, hasLength(1));
+    expect(
+      threads.single.title,
+      'Disco freno delantero 245 mm · Aceite Mobil 4T 20W50 1 L y 1 más',
+    );
+  });
+
   test('filter keeps active, closed, unread and search', () {
     const active = OrderChatThread(
       primaryRequestId: '1',

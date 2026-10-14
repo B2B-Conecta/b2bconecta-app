@@ -242,6 +242,12 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
     final r = widget.request;
     final canCarrierBase = r.carrierDecision == CarrierDecision.selected;
 
+    final selectedId = _locationId ??
+        (widget.locations.isEmpty ? null : widget.locations.first.id);
+    ImporterPickupLocationModel? selectedLocation;
+    for (final item in widget.locations) {
+      if (item.id == selectedId) selectedLocation = item;
+    }
     return AlertDialog(
       title: const Text(OrderPickupFlowCopy.importadorRecoleccionDialogTitulo),
       content: SingleChildScrollView(
@@ -249,36 +255,48 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            RadioListTile<String>(
-              value: PickupLocationMode.warehouse,
-              groupValue: _mode,
-              onChanged: (v) => setState(() => _mode = v!),
-              title: const Text('Mi almacén'),
-              subtitle: const Text(OrderPickupFlowCopy.importadorAlmacenSubtitulo),
-              contentPadding: EdgeInsets.zero,
+            Text(
+              'La tienda y el transporte usan este punto para retirar la mercancía.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
             ),
-            if (canCarrierBase)
-              RadioListTile<String>(
-                value: PickupLocationMode.carrierBase,
-                groupValue: _mode,
-                onChanged: (v) => setState(() => _mode = v!),
-                title: const Text('Base del transportista'),
-                subtitle: Text(
-                  r.carrierDisplayCompanyName != null
-                      ? '${OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo}: ${r.carrierDisplayCompanyName}'
-                      : OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo,
-                ),
-                contentPadding: EdgeInsets.zero,
+            const SizedBox(height: 12),
+            _PickupChoice(
+              selected: _mode == PickupLocationMode.warehouse,
+              icon: Icons.warehouse_outlined,
+              title: 'Mi almacén',
+              body: OrderPickupFlowCopy.importadorAlmacenSubtitulo,
+              onTap: () => setState(() => _mode = PickupLocationMode.warehouse),
+            ),
+            if (canCarrierBase) ...[
+              const SizedBox(height: 8),
+              _PickupChoice(
+                selected: _mode == PickupLocationMode.carrierBase,
+                icon: Icons.local_shipping_outlined,
+                title: 'Base del transportista',
+                body: r.carrierDisplayCompanyName != null
+                    ? '${OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo}: ${r.carrierDisplayCompanyName}'
+                    : OrderPickupFlowCopy.importadorBaseTransportistaSubtitulo,
+                onTap: () =>
+                    setState(() => _mode = PickupLocationMode.carrierBase),
               ),
-            if (widget.locations.isNotEmpty)
-              RadioListTile<String>(
-                value: PickupLocationMode.alternate,
-                groupValue: _mode,
-                onChanged: (v) => setState(() => _mode = v!),
-                title: const Text('Ubicación alterna'),
-                subtitle: const Text(OrderPickupFlowCopy.importadorUbicacionAlternaSubtitulo),
-                contentPadding: EdgeInsets.zero,
+            ],
+            if (widget.locations.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _PickupChoice(
+                selected: _mode == PickupLocationMode.alternate,
+                icon: Icons.edit_location_alt_outlined,
+                title: 'Ubicación guardada',
+                body: _mode == PickupLocationMode.alternate &&
+                        selectedLocation != null
+                    ? selectedLocation.ubicacionMultilinea
+                    : OrderPickupFlowCopy.importadorUbicacionAlternaSubtitulo,
+                onTap: () => setState(() => _mode = PickupLocationMode.alternate),
               ),
+            ],
             if (_mode == PickupLocationMode.alternate) ...[
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
@@ -326,6 +344,78 @@ class _ConfirmPickupDialogState extends State<_ConfirmPickupDialog> {
           child: const Text('Guardar'),
         ),
       ],
+    );
+  }
+}
+
+class _PickupChoice extends StatelessWidget {
+  const _PickupChoice({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.brandBlueContainer : AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.borderSubtle,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected ? AppColors.brand : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

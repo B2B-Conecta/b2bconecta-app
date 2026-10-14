@@ -876,28 +876,55 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
     );
   }
 
+  String get _fiscalSummary {
+    final parts = <String>[
+      if ((widget.profile.estado ?? '').trim().isNotEmpty)
+        widget.profile.estado!.trim(),
+      if ((widget.profile.ciudad ?? '').trim().isNotEmpty)
+        widget.profile.ciudad!.trim(),
+      if ((widget.profile.direccion ?? '').trim().isNotEmpty)
+        widget.profile.direccion!.trim(),
+    ];
+    if (parts.isEmpty) {
+      return 'Complete la dirección fiscal en Mi perfil.';
+    }
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Destino de entrega'),
+      title: const Text('¿Dónde entregamos el pedido?'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Usar dirección fiscal del perfil'),
-              subtitle: Text(
-                _usaPerfil
-                    ? (widget.profile.hasFiscalMapsShareLink
-                        ? 'El reparto usará su domicilio y el enlace Maps guardados en Mi perfil.'
-                        : 'Debe completar el enlace de Google Maps en Mi perfil para usar esta opción.')
-                    : 'Indique otra dirección y enlace Maps a continuación.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            Text(
+              'La tienda recibe la mercancía en esta dirección. Puede usar la de su perfil u otra para este pedido.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: AppColors.textSecondary,
               ),
-              value: _usaPerfil,
-              onChanged: (v) => setState(() => _usaPerfil = v),
+            ),
+            const SizedBox(height: 12),
+            _LocationChoice(
+              selected: _usaPerfil,
+              icon: Icons.storefront_outlined,
+              title: 'Dirección de mi perfil',
+              body: widget.profile.hasFiscalMapsShareLink
+                  ? _fiscalSummary
+                  : 'Falta el enlace de Google Maps en Mi perfil.',
+              onTap: () => setState(() => _usaPerfil = true),
+            ),
+            const SizedBox(height: 8),
+            _LocationChoice(
+              selected: !_usaPerfil,
+              icon: Icons.edit_location_alt_outlined,
+              title: 'Otra dirección',
+              body: 'Solo para este pedido. El enlace de mapas es obligatorio.',
+              onTap: () => setState(() => _usaPerfil = false),
             ),
             if (!_usaPerfil) ...[
               const SizedBox(height: 4),
@@ -967,6 +994,78 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
           child: const Text('Confirmar pedido'),
         ),
       ],
+    );
+  }
+}
+
+class _LocationChoice extends StatelessWidget {
+  const _LocationChoice({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.brandBlueContainer : AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.borderSubtle,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected ? AppColors.brand : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

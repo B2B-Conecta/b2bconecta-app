@@ -71,7 +71,7 @@ abstract final class OrderStatusFlowCopy {
         TransactionRequestStatus.enTransito ||
         TransactionRequestStatus.enviado =>
           'En camino · confirme al recibir en su taller',
-        TransactionRequestStatus.entregado => 'Pedido completado',
+        TransactionRequestStatus.entregado => 'Entregado',
         TransactionRequestStatus.rechazado => () {
           if (canceladoPorAliado) return 'Solicitud cancelada por usted';
           if (canceladoPorImportador) {
@@ -98,7 +98,7 @@ abstract final class OrderStatusFlowCopy {
         TransactionRequestStatus.enviado =>
           'Va en camino. Abra el detalle y confirme cuando lo reciba en el taller.',
         TransactionRequestStatus.entregado =>
-          'Pedido recibido. Durante 7 días, abra el detalle para pedir una devolución o presentar una queja.',
+          'Entregado. Durante 7 días, abra el detalle si algo no está bien con el pedido.',
         TransactionRequestStatus.rechazado =>
           'Este pedido no sigue. Abra el detalle para ver el motivo.',
         _ => 'Abra el detalle para ver el seguimiento.',

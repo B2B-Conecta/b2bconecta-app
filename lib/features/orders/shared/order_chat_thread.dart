@@ -88,11 +88,7 @@ OrderChatThread _threadFromLines(
       .whereType<String>()
       .where((s) => s.isNotEmpty)
       .toList();
-  final title = names.isEmpty
-      ? 'Pedido'
-      : names.toSet().length == 1
-          ? names.first
-          : '${lines.length} productos';
+  final title = _chatProductTitle(names);
 
   final importer = (primary.ownerBusinessName ?? '').trim();
   final aliado = (primary.aliadoBusinessName ?? '').trim();
@@ -142,6 +138,17 @@ OrderChatThread _threadFromLines(
     importerName: importer.isEmpty ? null : importer,
     lines: lines,
   );
+}
+
+String _chatProductTitle(List<String> names) {
+  final unique = <String>[];
+  for (final name in names) {
+    if (!unique.contains(name)) unique.add(name);
+  }
+  if (unique.isEmpty) return 'Pedido';
+  if (unique.length == 1) return unique.first;
+  if (unique.length == 2) return '${unique[0]} · ${unique[1]}';
+  return '${unique[0]} · ${unique[1]} y ${unique.length - 2} más';
 }
 
 bool chatActivityInRange({

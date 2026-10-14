@@ -98,7 +98,7 @@ abstract final class OrderStatusFlowCopy {
         TransactionRequestStatus.enviado =>
           'Va en camino. Abra el detalle y confirme cuando lo reciba en el taller.',
         TransactionRequestStatus.entregado =>
-          'Pedido recibido. En el detalle puede pagar, valorar o pedir una devolución.',
+          'Pedido recibido. Durante 7 días, abra el detalle para pedir una devolución o presentar una queja.',
         TransactionRequestStatus.rechazado =>
           'Este pedido no sigue. Abra el detalle para ver el motivo.',
         _ => 'Abra el detalle para ver el seguimiento.',
@@ -116,7 +116,7 @@ abstract final class OrderStatusFlowCopy {
         TransactionRequestStatus.enviado =>
           'La tienda confirma la recepción. El detalle muestra la guía.',
         TransactionRequestStatus.entregado =>
-          'Pedido cerrado. El detalle guarda la factura y el pago.',
+          'Pedido recibido. Si la tienda reporta un producto, en el detalle puede cambiarlo o dejarlo como crédito.',
         TransactionRequestStatus.rechazado =>
           'Este pedido no sigue. Abra el detalle para ver el motivo.',
         _ => 'Abra el detalle para continuar el pedido.',

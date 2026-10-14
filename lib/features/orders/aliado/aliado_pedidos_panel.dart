@@ -34,6 +34,7 @@ import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
@@ -564,8 +565,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
-              'sigue pendiente de registrar o aprobar por B2B Conecta. Revise la ficha del pedido.',
+              OrderReturnRules.receptionConfirmedPagoPendienteHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -574,7 +574,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción confirmada. El pedido queda cerrado y registrado para B2B Conecta.',
+              OrderReturnRules.receptionConfirmedHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -606,8 +606,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción registrada. La mercancía queda como entregada; el comprobante de pago '
-              'sigue pendiente de registrar o aprobar por B2B Conecta. Revise la ficha del pedido.',
+              OrderReturnRules.receptionConfirmedPagoPendienteHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -616,7 +615,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Recepción confirmada. El pedido queda cerrado y registrado para B2B Conecta.',
+              OrderReturnRules.receptionConfirmedHint,
             ),
             behavior: SnackBarBehavior.floating,
           ),

@@ -15,20 +15,38 @@ class OrderPostventaHeaderMarks extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final devolucion = lines.any((l) => l.postventaDevolucionAt != null);
+    final cambio = lines.any((l) => l.postventaResolucion == 'cambio');
+    final credito = lines.any((l) => l.postventaResolucion == 'credito');
+    final devolucionAbierta = lines.any(
+      (l) => l.postventaDevolucionAt != null && l.postventaResolucion == null,
+    );
     final queja = lines.any((l) => l.postventaQuejaAt != null);
-    if (!devolucion && !queja) return const SizedBox.shrink();
+    if (!cambio && !credito && !devolucionAbierta && !queja) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
         children: [
-          if (devolucion)
-            OrderCardCompactNoticeChip(
+          if (devolucionAbierta)
+            const OrderCardCompactNoticeChip(
               label: 'Devolución registrada',
               icon: Icons.assignment_return_outlined,
               color: AppColors.brand,
+            ),
+          if (cambio)
+            const OrderCardCompactNoticeChip(
+              label: 'Cambio de producto',
+              icon: Icons.swap_horiz,
+              color: AppColors.brand,
+            ),
+          if (credito)
+            const OrderCardCompactNoticeChip(
+              label: 'Crédito para el próximo pedido',
+              icon: Icons.account_balance_wallet_outlined,
+              color: AppColors.brandAccent,
             ),
           if (queja)
             const OrderCardCompactNoticeChip(
@@ -112,11 +130,34 @@ class OrderReturnButtons extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final offeringNewCase = _canRegister &&
+        lines.any((line) {
+          final open = OrderReturnRules.isAvailable(
+            status: line.status,
+            updatedAt: line.updatedAt,
+            deliveredAt: line.atEntregado,
+          );
+          return open &&
+              (line.postventaDevolucionAt == null ||
+                  line.postventaQuejaAt == null);
+        });
+
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (offeringNewCase) ...[
+            Text(
+              OrderReturnRules.openHint,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (buttons.isEmpty && _canRegister && deliveredWithoutCase)
             Text(
               OrderReturnRules.closedHint,

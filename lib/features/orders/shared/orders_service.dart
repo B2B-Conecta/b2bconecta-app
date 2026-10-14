@@ -138,6 +138,8 @@ class OrdersService {
     at_entregado,
     postventa_devolucion_at,
     postventa_queja_at,
+    postventa_resolucion,
+    postventa_credito_monto,
     importer_carrier_id,
     importer_carrier_driver_id,
     carrier_eta_hours_snapshot,
@@ -1106,7 +1108,9 @@ class OrdersService {
   }) async {
     final row = await SupabaseAccess.client
         .from('order_postventa_casos')
-        .select('id, kind, body, opened_role, created_at')
+        .select(
+          'id, kind, body, opened_role, created_at, product_name, affected_qty, resolution, credit_amount, resolved_at',
+        )
         .eq('transaction_request_id', transactionRequestId)
         .eq('kind', kind)
         .maybeSingle();
@@ -1118,6 +1122,7 @@ class OrdersService {
     required String transactionRequestId,
     required String kind,
     required String body,
+    required int affectedQty,
   }) async {
     final res = await SupabaseAccess.client.rpc(
       'register_order_postventa_caso',
@@ -1125,6 +1130,7 @@ class OrdersService {
         'p_request_id': transactionRequestId,
         'p_kind': kind,
         'p_body': body.trim(),
+        'p_affected_qty': affectedQty,
       },
     );
     if (res is Map && res['created_at'] != null) {
@@ -1132,6 +1138,28 @@ class OrdersService {
           DateTime.now();
     }
     return DateTime.now();
+  }
+
+  static Future<({String resolution, double? creditAmount, DateTime? resolvedAt})>
+      resolveOrderPostventaCaso({
+    required String transactionRequestId,
+    required String resolution,
+  }) async {
+    final res = await SupabaseAccess.client.rpc(
+      'resolve_order_postventa_caso',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_resolution': resolution,
+      },
+    );
+    final map = res is Map ? Map<String, dynamic>.from(res) : const {};
+    final amount = map['credit_amount'];
+    return (
+      resolution: map['resolution']?.toString() ?? resolution,
+      creditAmount: amount == null ? null : double.tryParse(amount.toString()),
+      resolvedAt: DateTime.tryParse(map['resolved_at']?.toString() ?? '')
+          ?.toLocal(),
+    );
   }
 
   static Future<void> insertTransactionRequestMessageAsAliado({

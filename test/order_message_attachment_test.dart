@@ -107,4 +107,35 @@ void main() {
       isFalse,
     );
   });
+
+  test('la recepción confirma el plazo de 7 días', () {
+    expect(OrderReturnRules.receptionConfirmedHint, contains('7 días'));
+    expect(
+      OrderReturnRules.receptionConfirmedPagoPendienteHint,
+      contains('7 días'),
+    );
+  });
+
+  test('las unidades afectadas no superan la línea y el crédito usa el precio', () {
+    expect(OrderReturnRules.clampAffectedQty(0, 4), 1);
+    expect(OrderReturnRules.clampAffectedQty(9, 4), 4);
+    expect(
+      OrderReturnRules.creditAmount(
+        unitPrice: 12.5,
+        lineTotal: 50,
+        lineQty: 4,
+        affectedQty: 2,
+      ),
+      25,
+    );
+    expect(
+      OrderReturnRules.creditAmount(
+        unitPrice: 0,
+        lineTotal: 40,
+        lineQty: 4,
+        affectedQty: 1,
+      ),
+      10,
+    );
+  });
 }

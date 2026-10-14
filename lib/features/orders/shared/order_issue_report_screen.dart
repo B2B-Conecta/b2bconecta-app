@@ -510,7 +510,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
                     width: 72,
                     height: 72,
                     child: item.isVideo
-                        ? const ColoredBox(
+                        ? ColoredBox(
                             color: AppColors.brandBlueContainer,
                             child: Icon(
                               Icons.videocam_outlined,
@@ -849,7 +849,7 @@ class _Preview extends StatelessWidget {
                       width: 56,
                       height: 56,
                       child: item.isVideo
-                          ? const ColoredBox(
+                          ? ColoredBox(
                               color: AppColors.brandBlueContainer,
                               child: Icon(
                                 Icons.videocam_outlined,

@@ -18,6 +18,7 @@ class PedidosScopeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 420;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: DecoratedBox(
@@ -30,10 +31,10 @@ class PedidosScopeBar extends StatelessWidget {
           padding: const EdgeInsets.all(3),
           child: Row(
             children: [
-              _item('Todos', PedidosListScope.todos),
-              _item('En curso', PedidosListScope.enCurso),
-              _item('Entregados', PedidosListScope.entregados),
-              _item('Cancelados', PedidosListScope.cancelados),
+              _item('Todos', PedidosListScope.todos, narrow),
+              _item('En curso', PedidosListScope.enCurso, narrow),
+              _item('Entregados', PedidosListScope.entregados, narrow),
+              _item('Cancelados', PedidosListScope.cancelados, narrow),
             ],
           ),
         ),
@@ -41,7 +42,7 @@ class PedidosScopeBar extends StatelessWidget {
     );
   }
 
-  Widget _item(String label, PedidosListScope value) {
+  Widget _item(String label, PedidosListScope value, bool narrow) {
     final isSelected = selected == value;
     return Expanded(
       child: Padding(
@@ -53,14 +54,14 @@ class PedidosScopeBar extends StatelessWidget {
             onTap: () => onSelected(value),
             borderRadius: BorderRadius.circular(10),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: EdgeInsets.symmetric(vertical: narrow ? 8 : 10),
               child: Text(
                 label,
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: narrow ? 11 : 12.5,
                   fontWeight: FontWeight.w800,
                   color: isSelected ? Colors.white : AppColors.brand,
                 ),

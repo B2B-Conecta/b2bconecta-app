@@ -44,6 +44,7 @@ import 'aliado_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
 class AliadoPedidosPanel extends StatefulWidget {
@@ -63,6 +64,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String? _statusFilter;
   PedidosListScope _scope = PedidosListScope.todos;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
   String? _entregaBusyId;
@@ -226,6 +229,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       _statusFilter = null;
       _scope = PedidosListScope.todos;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -1285,12 +1290,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final cerradosGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => !_esEnCurso(r.status)).toList(),
     );
-    final visibleGroups = switch (_scope) {
-      PedidosListScope.todos => [...enCursoGroups, ...cerradosGroups],
-      PedidosListScope.enCurso => enCursoGroups,
-      PedidosListScope.entregados => entregadosGroups,
-      PedidosListScope.cancelados => canceladosGroups,
-    };
+    final visibleGroups = filterOrderGroupsBySignals(
+      switch (_scope) {
+        PedidosListScope.todos => [...enCursoGroups, ...cerradosGroups],
+        PedidosListScope.enCurso => enCursoGroups,
+        PedidosListScope.entregados => entregadosGroups,
+        PedidosListScope.cancelados => canceladosGroups,
+      },
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
     final scopeEmpty = switch (_scope) {
       PedidosListScope.todos =>
         enCursoGroups.isEmpty && cerradosGroups.isEmpty,
@@ -1340,7 +1349,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      OrderDateShortcuts(
+                      ...orderDateShortcutChips(
                         from: _dateFrom,
                         to: _dateTo,
                         onChanged: (from, to) => setState(() {
@@ -1350,6 +1359,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                         onPickRange: _openDateFilters,
                       ),
                       const OrderChatsEntryButton(homeRole: AppHomeRole.aliado),
+                      ...orderSignalFilterChips(
+                        creditOnly: _creditOnly,
+                        replacementOnly: _replacementOnly,
+                        onCreditChanged: (value) =>
+                            setState(() => _creditOnly = value),
+                        onReplacementChanged: (value) =>
+                            setState(() => _replacementOnly = value),
+                      ),
                     ],
                   ),
                 ),
@@ -1395,14 +1412,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                       )
                     : B2bOrdersPanelLayout.listColumn(
                         context,
-                        scopeEmpty
+                        scopeEmpty || visibleGroups.isEmpty
                             ? ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 children: [
                                   const SizedBox(height: 48),
                                   Center(
                                     child: Text(
-                                      scopeEmptyLabel,
+                                      visibleGroups.isEmpty && !scopeEmpty
+                                          ? 'Ningún pedido coincide con los filtros.'
+                                          : scopeEmptyLabel,
                                       style: TextStyle(
                                         color: AppColors.textSecondary,
                                       ),
@@ -1417,6 +1436,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   _scope,
                                   _statusFilter,
                                   _morosoOnly,
+                                  _creditOnly,
+                                  _replacementOnly,
                                   _dateFrom,
                                   _dateTo,
                                   _searchCtrl.text,

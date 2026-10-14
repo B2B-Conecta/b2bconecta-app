@@ -30,6 +30,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dar
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
 /// Bandeja admin unificada: pedidos en curso, cerrados o todos, con filtros por estado.
@@ -49,6 +50,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   String? _statusFilter;
   String? _anularMotolinkBusyId;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   Map<String, AdminAliadoMorosidadFlag> _morosidadFlags = {};
   PedidosListScope _scope = PedidosListScope.enCurso;
   String? _loadedKind;
@@ -171,6 +174,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     setState(() {
       _statusFilter = null;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -233,7 +238,11 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     if (_showMorosoChip && _morosoOnly) {
       groups = groups.where((g) => g.any((r) => r.esPedidoMoroso)).toList();
     }
-    return groups;
+    return filterOrderGroupsBySignals(
+      groups,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
   }
 
   void _toggleExpand(String id) {
@@ -593,6 +602,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                       selected: _hasDateFilter,
                       onSelected: (_) => _openDateFilters(),
                       visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       selectedColor: AppColors.brandBlue.withOpacity(0.18),
                       checkmarkColor: AppColors.brandBlue,
                       avatar: Icon(
@@ -609,6 +619,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                         selected: _morosoOnly,
                         onSelected: (v) => setState(() => _morosoOnly = v),
                         visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         selectedColor: Colors.red.shade100,
                         checkmarkColor: Colors.red.shade800,
                         avatar: Icon(
@@ -619,6 +630,14 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                               : AppColors.textSecondary,
                         ),
                       ),
+                    ...orderSignalFilterChips(
+                      creditOnly: _creditOnly,
+                      replacementOnly: _replacementOnly,
+                      onCreditChanged: (value) =>
+                          setState(() => _creditOnly = value),
+                      onReplacementChanged: (value) =>
+                          setState(() => _replacementOnly = value),
+                    ),
                   ],
                 ),
               ),

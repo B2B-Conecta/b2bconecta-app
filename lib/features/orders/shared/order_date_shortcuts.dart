@@ -19,7 +19,7 @@ class OrderDateShortcuts extends StatelessWidget {
   final void Function(DateTime? from, DateTime? to) onChanged;
   final VoidCallback onPickRange;
 
-  static DateTime _day(DateTime value) {
+  static DateTime day(DateTime value) {
     final local = value.toLocal();
     return DateTime(local.year, local.month, local.day);
   }
@@ -27,9 +27,9 @@ class OrderDateShortcuts extends StatelessWidget {
   static OrderDateShortcut active(DateTime? from, DateTime? to) {
     if (from == null && to == null) return OrderDateShortcut.all;
     if (from == null || to == null) return OrderDateShortcut.custom;
-    final start = _day(from);
-    final end = _day(to);
-    final today = _day(DateTime.now());
+    final start = day(from);
+    final end = day(to);
+    final today = day(DateTime.now());
     if (start == today && end == today) return OrderDateShortcut.today;
     if (end == today && start == today.subtract(const Duration(days: 6))) {
       return OrderDateShortcut.days7;
@@ -40,8 +40,32 @@ class OrderDateShortcuts extends StatelessWidget {
     return OrderDateShortcut.custom;
   }
 
-  void _apply(OrderDateShortcut shortcut) {
-    final today = _day(DateTime.now());
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: orderDateShortcutChips(
+        from: from,
+        to: to,
+        onChanged: onChanged,
+        onPickRange: onPickRange,
+      ),
+    );
+  }
+}
+
+/// Atajos de fecha como chips sueltos, para la misma fila que el resto de filtros.
+List<Widget> orderDateShortcutChips({
+  required DateTime? from,
+  required DateTime? to,
+  required void Function(DateTime? from, DateTime? to) onChanged,
+  required VoidCallback onPickRange,
+}) {
+  final current = OrderDateShortcuts.active(from, to);
+
+  void apply(OrderDateShortcut shortcut) {
+    final today = OrderDateShortcuts.day(DateTime.now());
     switch (shortcut) {
       case OrderDateShortcut.all:
         onChanged(null, null);
@@ -56,44 +80,32 @@ class OrderDateShortcuts extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final current = active(from, to);
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _chip('Todas', OrderDateShortcut.all, current),
-          _chip('Hoy', OrderDateShortcut.today, current),
-          _chip('7 días', OrderDateShortcut.days7, current),
-          _chip('30 días', OrderDateShortcut.days30, current),
-          _chip(
-            current == OrderDateShortcut.custom ? 'Fechas ✓' : 'Fechas',
-            OrderDateShortcut.custom,
-            current,
-          ),
-        ],
+  Widget chip(String label, OrderDateShortcut shortcut) {
+    final selected = shortcut == current;
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => apply(shortcut),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      selectedColor: AppColors.brand.withOpacity(0.16),
+      checkmarkColor: AppColors.brand,
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+        color: selected ? AppColors.brand : AppColors.textSecondary,
       ),
     );
   }
 
-  Widget _chip(String label, OrderDateShortcut shortcut, OrderDateShortcut current) {
-    final selected = shortcut == current;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => _apply(shortcut),
-        visualDensity: VisualDensity.compact,
-        selectedColor: AppColors.brand.withOpacity(0.16),
-        checkmarkColor: AppColors.brand,
-        labelStyle: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-          color: selected ? AppColors.brand : AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
+  return [
+    chip('Todas', OrderDateShortcut.all),
+    chip('Hoy', OrderDateShortcut.today),
+    chip('7 días', OrderDateShortcut.days7),
+    chip('30 días', OrderDateShortcut.days30),
+    chip(
+      current == OrderDateShortcut.custom ? 'Fechas ✓' : 'Fechas',
+      OrderDateShortcut.custom,
+    ),
+  ];
 }

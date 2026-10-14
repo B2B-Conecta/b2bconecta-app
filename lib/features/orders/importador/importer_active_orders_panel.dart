@@ -30,6 +30,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.d
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -52,6 +53,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   late final TextEditingController _searchCtrl;
   PedidosListScope _scope = PedidosListScope.enCurso;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
   List<AliadoCreditBalance> _credits = const [];
@@ -253,6 +256,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     setState(() {
       _scope = PedidosListScope.enCurso;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -304,8 +309,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String _rowKey(TransactionRequestModel r) => r.id;
 
   Widget _quickFilterBar() {
+    final pad = B2bOrdersPanelLayout.listHorizontalPadding(
+      MediaQuery.sizeOf(context).width,
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      padding: EdgeInsets.fromLTRB(pad, 0, pad, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -323,7 +331,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               const OrderChatsEntryButton(
                 homeRole: AppHomeRole.importador,
               ),
-              OrderDateShortcuts(
+              ...orderDateShortcutChips(
                 from: _dateFrom,
                 to: _dateTo,
                 onChanged: (from, to) => setState(() {
@@ -338,6 +346,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                   label: const Text('Pago pendiente'),
                   selected: _morosoOnly,
                   onSelected: (v) => setState(() => _morosoOnly = v),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   selectedColor: Colors.red.shade100,
                   checkmarkColor: Colors.red.shade800,
                   labelStyle: TextStyle(
@@ -355,6 +365,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         : AppColors.textSecondary,
                   ),
                 ),
+              ...orderSignalFilterChips(
+                creditOnly: _creditOnly,
+                replacementOnly: _replacementOnly,
+                onCreditChanged: (value) => setState(() => _creditOnly = value),
+                onReplacementChanged: (value) =>
+                    setState(() => _replacementOnly = value),
+              ),
             ],
           ),
         ],
@@ -645,7 +662,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final listPad = B2bOrdersPanelLayout.listHorizontalPadding(screenWidth);
     final filtered = _filtered;
-    final groups = _groupsForDisplay(filtered);
+    final groups = filterOrderGroupsBySignals(
+      _groupsForDisplay(filtered),
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
     return Stack(
       children: [
         Positioned.fill(
@@ -663,7 +684,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               if (_credits.isNotEmpty)
                 _AliadoCreditStrip(credits: _credits),
               Expanded(
-                child: filtered.isEmpty
+                child: filtered.isEmpty || groups.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
@@ -690,6 +711,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         resetKey: Object.hash(
                           _scope,
                           _morosoOnly,
+                          _creditOnly,
+                          _replacementOnly,
                           _dateFrom,
                           _dateTo,
                           _searchCtrl.text,

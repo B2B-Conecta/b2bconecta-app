@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'order_message_attachment.dart';
 import 'order_message_media.dart';
@@ -65,7 +64,6 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
   final _selected = <String>{};
   final _qty = <String, int>{};
   final _evidence = <_DraftEvidence>[];
-  String? _preference;
   bool _saving = false;
   bool _loadingSaved = false;
   bool _changed = false;
@@ -186,29 +184,6 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
     });
   }
 
-  double get _previewCredit {
-    var total = 0.0;
-    for (final line in _eligible) {
-      if (!_selected.contains(line.id)) continue;
-      final qty = _qty[line.id] ?? 1;
-      total += OrderReturnRules.creditAmount(
-        unitPrice: line.precioUnitarioAliado,
-        lineTotal: line.precioTotal,
-        lineQty: line.cantidad,
-        affectedQty: qty,
-      );
-    }
-    return total;
-  }
-
-  int get _previewUnits {
-    var total = 0;
-    for (final id in _selected) {
-      total += _qty[id] ?? 1;
-    }
-    return total;
-  }
-
   Future<void> _submit() async {
     final note = _noteCtrl.text.trim();
     final chosen =
@@ -219,12 +194,6 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
     }
     if (note.length < 3) {
       setState(() => _formError = 'Escriba qué ocurrió antes de enviarlo.');
-      return;
-    }
-    if (_preference == null) {
-      setState(() {
-        _formError = 'Elija si prefiere crédito a favor o un cambio.';
-      });
       return;
     }
     if (_evidence.isEmpty) {
@@ -258,7 +227,6 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
               _qty[line.id] ?? 1,
               line.cantidad,
             ),
-            requestedResolution: _preference,
             evidence: uploaded,
           );
         } catch (e) {
@@ -274,7 +242,9 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
       setState(() => _changed = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Reporte enviado. El proveedor lo ve en el chat.'),
+          content: Text(
+            'Observación enviada. El proveedor la ve en el chat y acuerda la solución.',
+          ),
         ),
       );
       Navigator.of(context).pop(true);
@@ -324,8 +294,8 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
           children: [
             Text(
               showForm
-                  ? 'Seleccione los productos afectados. El proveedor recibe el reporte en el chat del pedido.'
-                  : 'Así quedó el reporte enviado a su proveedor.',
+                  ? 'Seleccione los productos y describa el inconveniente. El proveedor acuerda con usted la solución en el chat.'
+                  : 'Así quedó la observación enviada a su proveedor.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -391,48 +361,6 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
       ),
       const SizedBox(height: 16),
       Text(
-        'Cómo prefiere resolverlo',
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
-          fontSize: 14,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        'El proveedor puede aceptar esta opción u otra.',
-        style: TextStyle(
-          fontSize: 13,
-          height: 1.35,
-          color: AppColors.textSecondary,
-        ),
-      ),
-      const SizedBox(height: 8),
-      _Choice(
-        selected: _preference == OrderPostventaKind.credito,
-        icon: Icons.account_balance_wallet_outlined,
-        title: 'Crédito a favor',
-        body: _previewCredit > 0
-            ? 'Saldo para el próximo pedido con este proveedor. Hoy serían ${formatRefAmount(_previewCredit)} REF.'
-            : 'Saldo para el próximo pedido con este proveedor.',
-        onTap: _saving
-            ? null
-            : () => setState(() => _preference = OrderPostventaKind.credito),
-      ),
-      const SizedBox(height: 8),
-      _Choice(
-        selected: _preference == OrderPostventaKind.cambio,
-        icon: Icons.swap_horiz,
-        title: 'Cambio de producto',
-        body: _previewUnits == 1
-            ? 'Que le envíen 1 unidad de reemplazo, sin costo.'
-            : 'Que le envíen $_previewUnits unidades de reemplazo, sin costo.',
-        onTap: _saving
-            ? null
-            : () => setState(() => _preference = OrderPostventaKind.cambio),
-      ),
-      const SizedBox(height: 16),
-      Text(
         'Evidencia',
         style: TextStyle(
           fontWeight: FontWeight.w800,
@@ -463,7 +391,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
           lines: selected,
           qtyFor: (id) => _qty[id] ?? 1,
           reason: _noteCtrl.text.trim(),
-          preference: _preference,
+          preference: null,
           evidence: _evidence,
         ),
       ],
@@ -685,78 +613,6 @@ class _ProductRow extends StatelessWidget {
             ],
           ),
         ),
-    );
-  }
-}
-
-class _Choice extends StatelessWidget {
-  const _Choice({
-    required this.selected,
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.onTap,
-  });
-
-  final bool selected;
-  final IconData icon;
-  final String title;
-  final String body;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.brandBlueContainer : AppColors.card,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? AppColors.brand : AppColors.borderSubtle,
-              width: selected ? 1.6 : 1,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: AppColors.brand),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      body,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppColors.brand : AppColors.textSecondary,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

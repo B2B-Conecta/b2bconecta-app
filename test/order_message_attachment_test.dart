@@ -163,5 +163,12 @@ void main() {
       OrderReturnRules.parseReturnRequestMessage('Hola, ¿llegó el pedido?'),
       isNull,
     );
+    final observation = OrderReturnRules.parseReturnRequestMessage(
+      'Observación del pedido. Producto: Pastillas freno delantero Ferodo. Unidades: 2. Llegaron rayadas.',
+    );
+    expect(observation, isNotNull);
+    expect(observation!.preference, isEmpty);
+    expect(observation.productName, 'Pastillas freno delantero Ferodo');
+    expect(observation.units, 2);
   });
 }

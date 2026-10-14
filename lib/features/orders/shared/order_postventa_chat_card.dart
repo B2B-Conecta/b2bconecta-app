@@ -33,6 +33,9 @@ class OrderPostventaChatCard extends StatelessWidget {
     final pref = data.preferenceLabel.trim().isEmpty
         ? OrderReturnRules.preferenceLabel(data.preference)
         : _capitalize(data.preferenceLabel);
+    final title = pref.isEmpty
+        ? 'Observación del pedido'
+        : 'Solicitud de devolución';
     final units = data.units == 1 ? '1 unidad' : '${data.units} unidades';
     final product =
         data.productName.trim().isEmpty ? 'Producto' : data.productName.trim();
@@ -49,7 +52,7 @@ class OrderPostventaChatCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Solicitud de devolución',
+                    title,
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
@@ -88,20 +91,27 @@ class OrderPostventaChatCard extends StatelessWidget {
         OrderMessageMediaStrip(attachments: attachments),
         if (canDecide) ...[
           const SizedBox(height: 10),
+          Text(
+            'Usted acuerda la solución con la tienda.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
           _decision(
             context,
             resolution: 'credito',
             label: creditAmount > 0
                 ? 'Aprobar crédito a favor · ${formatRefAmount(creditAmount)} REF'
                 : 'Aprobar crédito a favor',
-            filled: data.preference == 'credito',
           ),
           const SizedBox(height: 8),
           _decision(
             context,
             resolution: 'cambio',
             label: 'Aprobar cambio de producto',
-            filled: data.preference != 'credito',
           ),
           Align(
             alignment: Alignment.center,
@@ -119,7 +129,6 @@ class OrderPostventaChatCard extends StatelessWidget {
     BuildContext context, {
     required String resolution,
     required String label,
-    required bool filled,
   }) {
     final onPressed = busy
         ? null
@@ -149,25 +158,13 @@ class OrderPostventaChatCard extends StatelessWidget {
             );
             if (ok == true) await onResolve(resolution, null);
           };
-    final style = ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(double.infinity, 44)),
-      foregroundColor: filled
-          ? null
-          : const WidgetStatePropertyAll(AppColors.brand),
-      side: filled
-          ? null
-          : const WidgetStatePropertyAll(BorderSide(color: AppColors.brand)),
-    );
-    if (filled) {
-      return FilledButton(
-        onPressed: onPressed,
-        style: style,
-        child: Text(label, textAlign: TextAlign.center),
-      );
-    }
     return OutlinedButton(
       onPressed: onPressed,
-      style: style,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.brand,
+        side: const BorderSide(color: AppColors.brand),
+        minimumSize: const Size(double.infinity, 44),
+      ),
       child: Text(label, textAlign: TextAlign.center),
     );
   }

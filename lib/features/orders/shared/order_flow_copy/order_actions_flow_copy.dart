@@ -42,14 +42,14 @@ abstract final class OrderActionsFlowCopy {
   static const bloqueoQtyPendiente =
       'Espere la respuesta de la tienda minorista sobre la cantidad antes de avanzar el pedido.';
 
-  // —— Tránsito (ETA) ——
+  // —— Tiempo de llegada ——
 
-  static const transitEtaTitulo = '¿Cuándo llegará a la tienda minorista?';
+  static const transitEtaTitulo = 'Tiempo de llegada';
   static const transitEtaIntro =
-      'Indique el tiempo estimado de llegada al taller de la tienda minorista. '
-      'Él verá este plazo en el seguimiento.';
-  static const transitEtaDias = 'Días (0–365)';
-  static const transitEtaHoras = 'Horas (0–23)';
+      'Indique en cuántos días y horas llega el pedido al taller. '
+      'La tienda ve este plazo en el seguimiento.';
+  static const transitEtaDias = 'Días';
+  static const transitEtaHoras = 'Horas';
   static const transitEtaErrorCero =
       'Indique al menos un día o una hora mayor que cero.';
   static const transitEtaConfirmar = 'Guardar y marcar en tránsito';

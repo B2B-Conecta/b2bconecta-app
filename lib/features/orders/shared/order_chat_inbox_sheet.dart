@@ -235,21 +235,23 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
               to: range.$2,
             );
           }).toList();
-          final uid = SupabaseAccess.currentUserId;
           final query = _search.text.trim().toLowerCase();
-          final consultas = _consultas.where((item) {
-            if (query.isNotEmpty) {
-              final blob =
-                  '${item.thread.titleFor(uid)} ${item.lastBody ?? ''}'
-                      .toLowerCase();
-              if (!blob.contains(query)) return false;
-            }
-            return chatActivityInRange(
-              at: item.lastAt,
-              from: range.$1,
-              to: range.$2,
-            );
-          }).toList();
+          final consultas = _kind == _ChatKind.consultas
+              ? _consultas.where((item) {
+                  if (query.isNotEmpty) {
+                    final uid = SupabaseAccess.currentUserId;
+                    final blob =
+                        '${item.thread.titleFor(uid)} ${item.lastBody ?? ''}'
+                            .toLowerCase();
+                    if (!blob.contains(query)) return false;
+                  }
+                  return chatActivityInRange(
+                    at: item.lastAt,
+                    from: range.$1,
+                    to: range.$2,
+                  );
+                }).toList()
+              : _consultas;
           return Padding(
             padding: EdgeInsets.only(
               left: 16,
@@ -296,9 +298,11 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Pedidos y consultas de producto. El soporte va en otra bandeja.',
+                        _kind == _ChatKind.consultas
+                            ? 'Consultas de producto y catálogo.'
+                            : 'Conversaciones de sus pedidos.',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: AppColors.textSecondary,
                           height: 1.3,
                         ),
@@ -311,7 +315,7 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
                 TextField(
                   controller: _search,
                   textInputAction: TextInputAction.search,
@@ -321,83 +325,72 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
                         ? 'Buscar tienda, mayorista, producto o SKU'
                         : 'Buscar producto, SKU o contraparte',
                     prefixIcon: const Icon(Icons.search, size: 20),
+                    filled: true,
+                    fillColor: AppColors.fieldFill,
                     isDense: true,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (widget.homeRole != AppHomeRole.administrador)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _kindChip('Pedidos', _ChatKind.pedidos),
-                        _kindChip(
-                          'Consultas de producto / Catálogo',
-                          _ChatKind.consultas,
-                        ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _dateChip('Todas', _DatePreset.all),
-                      _dateChip('Hoy', _DatePreset.today),
-                      _dateChip('7 días', _DatePreset.days7),
-                      _dateChip('30 días', _DatePreset.days30),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ActionChip(
-                          label: Text(
-                            _datePreset == _DatePreset.custom &&
-                                    _customFrom != null &&
-                                    _customTo != null
-                                ? '${formatEsShortDateTime(_customFrom)} – ${formatEsShortDateTime(_customTo)}'
-                                : 'Fechas',
-                          ),
-                          onPressed: _pickDates,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_kind == _ChatKind.pedidos) ...[
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final f in OrderChatInboxFilter.values) ...[
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(_filterLabel(f)),
-                              selected: _filter == f,
-                              onSelected: (_) => setState(() => _filter = f),
-                              visualDensity: VisualDensity.compact,
-                              selectedColor: AppColors.brand.withOpacity(0.16),
-                              checkmarkColor: AppColors.brand,
-                              labelStyle: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                                color: _filter == f
-                                    ? AppColors.brand
-                                    : AppColors.textSecondary,
+                const SizedBox(height: 12),
+                if (widget.homeRole != AppHomeRole.administrador) ...[
+                  _kindSwitch(),
+                  const SizedBox(height: 10),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            if (_kind == _ChatKind.pedidos)
+                              for (final f in OrderChatInboxFilter.values)
+                                _statusChip(f),
+                            _dateChip('Todas', _DatePreset.all),
+                            _dateChip('Hoy', _DatePreset.today),
+                            _dateChip('7 días', _DatePreset.days7),
+                            _dateChip('30 días', _DatePreset.days30),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                avatar: Icon(
+                                  Icons.calendar_month_outlined,
+                                  size: 16,
+                                  color: _datePreset == _DatePreset.custom
+                                      ? AppColors.brand
+                                      : AppColors.textSecondary,
+                                ),
+                                label: Text(
+                                  _datePreset == _DatePreset.custom &&
+                                          _customFrom != null &&
+                                          _customTo != null
+                                      ? '${formatEsShortDateTime(_customFrom)} – ${formatEsShortDateTime(_customTo)}'
+                                      : 'Fechas',
+                                ),
+                                selected: _datePreset == _DatePreset.custom,
+                                onSelected: (_) => _pickDates(),
+                                visualDensity: VisualDensity.compact,
+                                selectedColor: AppColors.brand.withOpacity(0.16),
+                                checkmarkColor: AppColors.brand,
+                                labelStyle: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: _datePreset == _DatePreset.custom
+                                      ? AppColors.brand
+                                      : AppColors.textSecondary,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 8),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: _kind == _ChatKind.consultas
                       ? _consultasBody(consultas)
@@ -412,16 +405,62 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     return SizedBox(height: height, child: page);
   }
 
-  Widget _kindChip(String label, _ChatKind kind) {
+  Widget _kindSwitch() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            Expanded(child: _kindSegment('Pedidos', _ChatKind.pedidos)),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _kindSegment('Consultas', _ChatKind.consultas),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kindSegment(String label, _ChatKind kind) {
     final selected = _kind == kind;
+    return Material(
+      color: selected ? AppColors.card : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => setState(() => _kind = kind),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: selected ? AppColors.brand : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusChip(OrderChatInboxFilter filter) {
+    final selected = _filter == filter;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
+      child: FilterChip(
+        label: Text(_filterLabel(filter)),
         selected: selected,
-        onSelected: (_) => setState(() => _kind = kind),
+        onSelected: (_) => setState(() => _filter = filter),
         visualDensity: VisualDensity.compact,
         selectedColor: AppColors.brand.withOpacity(0.16),
+        checkmarkColor: AppColors.brand,
         labelStyle: TextStyle(
           fontWeight: FontWeight.w700,
           fontSize: 12,
@@ -487,38 +526,16 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     final uid = SupabaseAccess.currentUserId;
     return ListView.separated(
       itemCount: visible.length,
-      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final item = visible[i];
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          leading: CircleAvatar(
-            backgroundColor: AppColors.brand.withOpacity(0.12),
-            child: const Icon(Icons.storefront_outlined, color: AppColors.brand, size: 20),
-          ),
-          title: Text(
-            item.thread.titleFor(uid),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          subtitle: Text(
-            [
-              if ((item.lastBody ?? '').trim().isNotEmpty) item.lastBody!.trim(),
-              if (item.lastAt != null) formatEsShortDateTime(item.lastAt),
-            ].join(' · '),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.3,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary),
+        final when = item.lastAt == null ? '' : formatEsShortDateTime(item.lastAt);
+        return _ConversationCard(
+          icon: Icons.storefront_outlined,
+          title: item.thread.titleFor(uid),
+          subtitle: (item.lastBody ?? '').trim(),
+          meta: when,
+          unread: 0,
           onTap: () => openStoreSupplierChat(item.thread.id),
         );
       },
@@ -568,61 +585,22 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     }
     return ListView.separated(
       itemCount: visible.length,
-      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final t = visible[i];
         final unread = _unreadFor(t.requestIds);
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          leading: CircleAvatar(
-            backgroundColor: AppColors.brand.withOpacity(0.12),
-            child: Icon(
-              unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
-              color: AppColors.brand,
-              size: 20,
-            ),
-          ),
-          title: Text(
-            t.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight: unread > 0 ? FontWeight.w800 : FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          subtitle: Text(
-            [
-              t.counterpartName,
-              t.statusLabel,
-              if (!t.canReply) 'Solo lectura',
-              if (t.updatedAt != null) formatEsShortDateTime(t.updatedAt),
-            ].join(' · '),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.3,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          trailing: unread > 0
-              ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.brand,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    unread > 9 ? '9+' : '$unread',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                )
-              : Icon(Icons.chevron_right, color: AppColors.textSecondary),
+        final when =
+            t.updatedAt == null ? '' : formatEsShortDateTime(t.updatedAt);
+        return _ConversationCard(
+          icon: unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
+          title: t.title,
+          subtitle: t.counterpartName,
+          meta: [
+            t.statusLabel,
+            if (!t.canReply) 'Solo lectura',
+            if (when.isNotEmpty) when,
+          ].join(' · '),
+          unread: unread,
           onTap: () => _openThread(t),
         );
       },
@@ -676,6 +654,115 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
       OrderChatInboxFilter.closed => 'Cerrados',
       OrderChatInboxFilter.unread => 'No leídos',
     };
+  }
+}
+
+class _ConversationCard extends StatelessWidget {
+  const _ConversationCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+    required this.unread,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String meta;
+  final int unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: unread > 0 ? AppColors.brand : AppColors.borderSubtle,
+            ),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.brand.withOpacity(0.12),
+                child: Icon(icon, color: AppColors.brand, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight:
+                            unread > 0 ? FontWeight.w800 : FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (subtitle.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                    if (meta.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        meta.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (unread > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.brand,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ] else
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

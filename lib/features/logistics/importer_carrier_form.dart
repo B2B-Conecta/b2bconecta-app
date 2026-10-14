@@ -495,7 +495,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                   _section(
                     title: 'Tiempos y tarifas',
                     subtitle:
-                        'Se usan para estimar ETA y costo de envío en el checkout de la tienda minorista.',
+                        'Se usan para estimar el tiempo de llegada y el costo de envío en el checkout de la tienda minorista.',
                     children: [
                       _twoCol(
                         left: TextField(
@@ -504,7 +504,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                             decimal: true,
                           ),
                           decoration: _fieldDecoration(
-                            label: 'ETA base (horas)',
+                            label: 'Tiempo base (horas)',
                             icon: Icons.schedule_outlined,
                           ),
                         ),
@@ -513,7 +513,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          decoration: _fieldDecoration(label: 'ETA por km (h)'),
+                          decoration: _fieldDecoration(label: 'Horas por km'),
                         ),
                       ),
                       const SizedBox(height: 10),

@@ -33,7 +33,7 @@ abstract final class OrderReturnRules {
       'Recepción registrada. La mercancía queda como entregada. Durante 7 días puede reportar un inconveniente con un producto. El comprobante de pago sigue pendiente de registrar o aprobar por B2B Conecta.';
 
   static const openHint =
-      'Si un producto tuvo un inconveniente, repórtelo dentro de los 7 días. Elija crédito o cambio y adjunte una foto o un video. El pedido sigue entregado.';
+      'Si un producto tuvo un inconveniente, descríbalo dentro de los 7 días y adjunte una foto o un video. El proveedor acuerda la solución en el chat.';
 
   static DateTime? anchor({
     DateTime? deliveredAt,
@@ -106,11 +106,35 @@ abstract final class OrderReturnRules {
     }
   }
 
-  /// Lee el mensaje que deja el registro de una devolución en el chat.
+  /// Lee el mensaje que deja la observación, o una solicitud antigua con preferencia.
   static ParsedReturnRequest? parseReturnRequestMessage(String body) {
     final text = body.trim();
-    const prefix = 'Solicitud de devolución. Preferencia: ';
-    if (!text.startsWith(prefix)) return null;
+    const legacy = 'Solicitud de devolución. Preferencia: ';
+    const observation = 'Observación del pedido. Producto: ';
+    if (text.startsWith(legacy)) {
+      return _parseLegacyReturn(text, legacy);
+    }
+    if (!text.startsWith(observation)) return null;
+    const unitsMark = '. Unidades: ';
+    final unitsAt = text.indexOf(unitsMark, observation.length);
+    if (unitsAt < 0) return null;
+    final productName =
+        text.substring(observation.length, unitsAt).trim();
+    final afterUnits = text.substring(unitsAt + unitsMark.length);
+    final dot = afterUnits.indexOf('.');
+    final unitsRaw =
+        (dot < 0 ? afterUnits : afterUnits.substring(0, dot)).trim();
+    final reason = dot < 0 ? '' : afterUnits.substring(dot + 1).trim();
+    return ParsedReturnRequest(
+      preference: '',
+      preferenceLabel: '',
+      productName: productName,
+      units: int.tryParse(unitsRaw) ?? 0,
+      reason: reason,
+    );
+  }
+
+  static ParsedReturnRequest? _parseLegacyReturn(String text, String prefix) {
     const productMark = '. Producto: ';
     const unitsMark = '. Unidades: ';
     final productAt = text.indexOf(productMark, prefix.length);

@@ -65,7 +65,7 @@ String orderCardTimelineSubtitle(
   if (r.hasTransitEta &&
       (r.status == TransactionRequestStatus.enTransito ||
           r.status == TransactionRequestStatus.enviado)) {
-    return '$label · ETA ${r.transitEtaResumenEs}';
+    return '$label · Llegada ${r.transitEtaResumenEs}';
   }
   return label;
 }

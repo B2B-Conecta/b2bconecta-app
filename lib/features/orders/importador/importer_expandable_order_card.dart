@@ -216,7 +216,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             r.status == TransactionRequestStatus.enviado)) ...[
                       const SizedBox(height: 6),
                       Text(
-                        'ETA al taller: ${r.transitEtaResumenEs}',
+                        'Llegada al taller: ${r.transitEtaResumenEs}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

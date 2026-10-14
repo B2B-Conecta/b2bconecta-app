@@ -32,6 +32,7 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
@@ -237,8 +238,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       _dateTo = draft.dateTo;
     });
   }
-
-  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
 
   Future<void> _openDateFilters() async {
     final draft = await ImporterPedidosFiltersSheet.show(
@@ -1323,29 +1322,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      FilterChip(
-                        label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                        selected: _hasDateFilter,
-                        onSelected: (_) => _openDateFilters(),
-                        visualDensity: VisualDensity.compact,
-                        selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                        checkmarkColor: AppColors.brandBlue,
-                        avatar: Icon(
-                          Icons.calendar_month_outlined,
-                          size: 16,
-                          color: _hasDateFilter
-                              ? AppColors.brandBlue
-                              : AppColors.textSecondary,
-                        ),
-                        labelStyle: TextStyle(
-                          fontWeight: _hasDateFilter
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          fontSize: 12.5,
-                          color: _hasDateFilter
-                              ? AppColors.brandBlue
-                              : AppColors.textPrimary,
-                        ),
+                      OrderDateShortcuts(
+                        from: _dateFrom,
+                        to: _dateTo,
+                        onChanged: (from, to) => setState(() {
+                          _dateFrom = from;
+                          _dateTo = to;
+                        }),
+                        onPickRange: _openDateFilters,
                       ),
                       const OrderChatsEntryButton(homeRole: AppHomeRole.aliado),
                     ],

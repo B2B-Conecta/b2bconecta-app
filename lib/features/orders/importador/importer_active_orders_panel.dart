@@ -25,6 +25,7 @@ import 'importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
@@ -257,8 +258,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     });
   }
 
-  bool get _hasDateFilter => _dateFrom != null || _dateTo != null;
-
   bool _matchesScope(TransactionRequestModel r) {
     switch (_scope) {
       case PedidosListScope.todos:
@@ -309,26 +308,14 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               const OrderChatsEntryButton(
                 homeRole: AppHomeRole.importador,
               ),
-              FilterChip(
-                label: Text(_hasDateFilter ? 'Fecha ✓' : 'Fecha'),
-                selected: _hasDateFilter,
-                onSelected: (_) => _openDateFilters(),
-                selectedColor: AppColors.brandBlue.withOpacity(0.18),
-                checkmarkColor: AppColors.brandBlue,
-                avatar: Icon(
-                  Icons.calendar_month_outlined,
-                  size: 16,
-                  color: _hasDateFilter
-                      ? AppColors.brandBlue
-                      : AppColors.textSecondary,
-                ),
-                labelStyle: TextStyle(
-                  fontWeight: _hasDateFilter ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 12.5,
-                  color: _hasDateFilter
-                      ? AppColors.brandBlue
-                      : AppColors.textPrimary,
-                ),
+              OrderDateShortcuts(
+                from: _dateFrom,
+                to: _dateTo,
+                onChanged: (from, to) => setState(() {
+                  _dateFrom = from;
+                  _dateTo = to;
+                }),
+                onPickRange: _openDateFilters,
               ),
               if (_scope == PedidosListScope.entregados ||
                   _scope == PedidosListScope.todos)
@@ -411,7 +398,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       SnackBar(
         content: Text(
           next == TransactionRequestStatus.enTransito
-              ? 'Pedido marcado en tránsito con ETA registrado.'
+              ? 'Pedido marcado en tránsito. La tienda ya ve el tiempo de llegada.'
               : 'Estado actualizado.',
         ),
         behavior: SnackBarBehavior.floating,

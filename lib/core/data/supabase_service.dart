@@ -338,8 +338,16 @@ class SupabaseService {
       );
 
   static Future<List<ImporterSalesSnapshot>>
-      adminListImporterSalesSnapshots({int days = 30}) =>
-          CatalogService.adminListImporterSalesSnapshots(days: days);
+      adminListImporterSalesSnapshots({
+    int days = 30,
+    int? limit,
+    int offset = 0,
+  }) =>
+          CatalogService.adminListImporterSalesSnapshots(
+            days: days,
+            limit: limit,
+            offset: offset,
+          );
 
   static Future<List<PartModel>> fetchMyInventory({
     int limit = 200,

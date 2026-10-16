@@ -320,6 +320,15 @@ class MainShellTabController {
     _goTo?.call(_adminProfileTabIndex);
   }
 
+  /// Cada incremento pide abrir Reportes → Usuarios → Presencia.
+  static final ValueNotifier<int> adminPresenceRequest = ValueNotifier<int>(0);
+
+  /// Admin: pestaña Reportes (índice 1) con la presencia desplegada.
+  static void navigateToAdminPresence() {
+    _goTo?.call(1);
+    adminPresenceRequest.value++;
+  }
+
   /// Admin: pestaña Comisiones (índice 3).
   static void navigateToAdminComisionesForNotification() {
     _goTo?.call(3);

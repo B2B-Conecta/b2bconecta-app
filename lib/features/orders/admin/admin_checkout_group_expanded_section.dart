@@ -368,9 +368,14 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                   ),
                 ),
             ],
-            if (onEliminarPedido != null) ...[
+            if (onEliminarPedido != null &&
+                chunk.any(
+                  (x) => x.status != TransactionRequestStatus.entregado,
+                )) ...[
               const SizedBox(height: 8),
-              for (final r in chunk)
+              for (final r in chunk.where(
+                (x) => x.status != TransactionRequestStatus.entregado,
+              ))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: OutlinedButton.icon(

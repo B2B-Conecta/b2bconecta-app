@@ -228,6 +228,7 @@ class PagedItems<T> extends StatefulWidget {
     super.key,
     required this.items,
     required this.itemBuilder,
+    this.itemKey,
     this.resetKey,
     this.padding = EdgeInsets.zero,
     this.separator = 0,
@@ -241,6 +242,9 @@ class PagedItems<T> extends StatefulWidget {
 
   final List<T> items;
   final Widget Function(T item) itemBuilder;
+
+  /// Id estable por fila: conserva el estado de cada tarjeta al filtrar.
+  final Object Function(T item)? itemKey;
   final Object? resetKey;
   final EdgeInsetsGeometry padding;
   final double separator;
@@ -310,12 +314,21 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       pageSizeOptions: widget.pageSizeOptions,
       alwaysShow: widget.alwaysShow,
     );
-    final children = <Widget>[
-      for (var i = 0; i < page.length; i++) ...[
-        if (i > 0 && widget.separator > 0) SizedBox(height: widget.separator),
-        widget.itemBuilder(page[i]),
-      ],
-    ];
+    Widget buildItem(int i) {
+      final item = page[i];
+      final child = widget.itemBuilder(item);
+      final keyOf = widget.itemKey;
+      return KeyedSubtree(
+        key: keyOf == null ? null : ValueKey<Object>(keyOf(item)),
+        child: i > 0 && widget.separator > 0
+            ? Padding(
+                padding: EdgeInsets.only(top: widget.separator),
+                child: child,
+              )
+            : child,
+      );
+    }
+
     final resolved = widget.padding.resolve(Directionality.of(context));
     final barInset = Padding(
       padding: EdgeInsets.only(left: resolved.left, right: resolved.right),
@@ -327,14 +340,23 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           barInset,
-          ...children,
+          for (var i = 0; i < page.length; i++) buildItem(i),
         ],
       );
     }
-    Widget list = ListView(
+    Widget list = ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: widget.padding,
-      children: children,
+      itemCount: page.length,
+      findChildIndexCallback: widget.itemKey == null
+          ? null
+          : (key) {
+              if (key is! ValueKey<Object>) return null;
+              final index =
+                  page.indexWhere((e) => widget.itemKey!(e) == key.value);
+              return index < 0 ? null : index;
+            },
+      itemBuilder: (context, i) => buildItem(i),
     );
     if (widget.onRefresh != null) {
       list = RefreshIndicator(onRefresh: widget.onRefresh!, child: list);

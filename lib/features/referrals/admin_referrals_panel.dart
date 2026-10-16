@@ -8,6 +8,7 @@ import 'external_referrer_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 
@@ -146,11 +147,9 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
   }
 
   Future<void> _openCreate() async {
-    final created = await showModalBottomSheet<bool>(
+    final created = await showAdaptiveAdminSheet<bool>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => const _ExternalReferrerFormSheet(),
+      builder: (ctx, _) => const _ExternalReferrerFormSheet(),
     );
     if (created == true) await _load();
   }
@@ -276,11 +275,9 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
                         child: FilledButton(
                           onPressed: () async {
                             Navigator.pop(ctx);
-                            final ok = await showModalBottomSheet<bool>(
+                            final ok = await showAdaptiveAdminSheet<bool>(
                               context: context,
-                              isScrollControlled: true,
-                              showDragHandle: true,
-                              builder: (_) =>
+                              builder: (_, __) =>
                                   _ExternalReferrerFormSheet(existing: row),
                             );
                             if (ok == true) await _load();

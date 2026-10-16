@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
+
 import 'order_message_attachment.dart';
 import 'order_message_compress.dart';
 
@@ -56,15 +58,21 @@ Future<PreparedOrderAttachment?> prepareOrderChatImage({
       'La foto supera 8 MB después de comprimirla.',
     );
   }
-  final outMime = switch (ext) {
-    'png' => 'image/png',
-    'webp' => 'image/webp',
-    _ => 'image/jpeg',
-  };
+  final CheckedUpload checked;
+  try {
+    checked = UploadFileGuard.check(
+      bytes,
+      'foto.$ext',
+      kind: UploadKind.image,
+      maxBytes: OrderMessageLimits.maxImageBytes,
+    );
+  } on UploadRejectedException catch (e) {
+    throw OrderMessageLimitException(e.message);
+  }
   return PreparedOrderAttachment(
-    bytes: bytes,
-    fileName: 'foto.$ext',
-    mime: outMime,
+    bytes: checked.bytes,
+    fileName: checked.fileName,
+    mime: checked.mime,
     kind: 'image',
   );
 }

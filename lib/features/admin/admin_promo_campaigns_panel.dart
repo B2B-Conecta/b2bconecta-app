@@ -6,8 +6,10 @@ import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 
 String _formatPromoDate(DateTime d) {
@@ -79,16 +81,10 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
   }
 
   Future<void> _openEditor({PromoCampaignModel? existing}) async {
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showAdaptiveAdminSheet<bool>(
       context: context,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => _PromoCampaignEditorSheet(
+      showDragHandle: false,
+      builder: (ctx, _) => _PromoCampaignEditorSheet(
         existing: existing,
         importers: _importers,
       ),
@@ -516,15 +512,22 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       return;
     }
 
+    final CheckedUpload checked;
+    try {
+      checked = UploadFileGuard.check(bytes, f.name, kind: UploadKind.image);
+    } on UploadRejectedException catch (e) {
+      setState(() => _uploadError = e.message);
+      return;
+    }
+
     setState(() {
       _uploading = true;
       _uploadError = null;
     });
     try {
-      final ext = (f.extension ?? 'jpg').toLowerCase();
       final uploaded = await SupabaseService.uploadPromoCampaignImage(
-        bytes: bytes,
-        fileExtension: ext,
+        bytes: checked.bytes,
+        fileExtension: checked.extension,
         campaignId: widget.existing?.id,
       );
       if (!mounted) return;
@@ -730,17 +733,18 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.borderSubtle,
-                  borderRadius: BorderRadius.circular(2),
+            if (!isAdminDesktopLayout(context))
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.borderSubtle,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
             Row(
               children: [
                 Expanded(

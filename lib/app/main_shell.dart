@@ -18,6 +18,8 @@ import 'package:motolink_pro_app/core/layout/admin_desktop_shell.dart';
 import 'package:motolink_pro_app/core/layout/admin_mobile_nav.dart';
 import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
 import 'package:motolink_pro_app/features/admin/admin_encomiendas_report_panel.dart';
+import 'package:motolink_pro_app/features/admin/admin_daily_presence_card.dart';
+import 'package:motolink_pro_app/features/admin/user_presence.dart';
 import 'package:motolink_pro_app/features/kyc/admin_kyc_review_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_account_management_panel.dart';
 import 'package:motolink_pro_app/features/reputation/admin_order_ratings_panel.dart';
@@ -389,8 +391,11 @@ class _MainShellState extends State<MainShell> {
       const AdminOrdersPanel(),
       const AdminEncomiendasReportPanel(),
       const AdminOrderRatingsPanel(),
-      const AdminCommissionSettlementsPanel(),
-      AdminKycReviewPanel(viewerIsOwner: _profile.isOwner),
+      AdminCommissionSettlementsPanel(viewerRole: _profile.role),
+      AdminKycReviewPanel(
+        viewerRole: _profile.role,
+        viewerIsOwner: _profile.isOwner,
+      ),
       const AdminSupportTicketsPanel(),
       AdminAccountManagementPanel(viewer: _profile),
     ];
@@ -478,6 +483,12 @@ class _MainShellState extends State<MainShell> {
       onMessagesTap: _openMessagesInbox,
       unreadMessages: _notifications.unreadChatCount,
       onOpenSettings: _openAccountSettings,
+      railStatusBuilder: canQueryAdminPresence(_profile.role)
+          ? (extended) => AdminDailyPresenceCard(
+                extended: extended,
+                onOpenDetails: MainShellTabController.navigateToAdminPresence,
+              )
+          : null,
       pages: [
         ...panels,
         _adminProfileBody(),

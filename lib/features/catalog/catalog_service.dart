@@ -241,10 +241,18 @@ class CatalogService {
   }
 
   static Future<List<ImporterSalesSnapshot>>
-      adminListImporterSalesSnapshots({int days = 30}) async {
+      adminListImporterSalesSnapshots({
+    int days = 30,
+    int? limit,
+    int offset = 0,
+  }) async {
     final res = await SupabaseAccess.client.rpc(
       'admin_list_importer_sales_snapshots',
-      params: <String, dynamic>{'p_days': days},
+      params: <String, dynamic>{
+        'p_days': days,
+        if (limit != null) 'p_limit': limit,
+        if (offset > 0) 'p_offset': offset,
+      },
     );
     final list = SupabaseAccess.decodeRpcJsonArray(res);
     return list

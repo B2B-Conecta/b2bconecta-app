@@ -96,7 +96,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: now.add(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
       helpText: isFrom ? 'Desde' : 'Hasta',
     );
     if (picked == null || !mounted) return;

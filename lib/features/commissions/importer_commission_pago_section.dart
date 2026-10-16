@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -53,16 +53,10 @@ class _ImporterCommissionPagoSectionState
   }
 
   Future<void> _subirComprobante() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final f = result.files.single;
-    final bytes = f.bytes;
-    final name = f.name.trim();
-    if (bytes == null || bytes.isEmpty || name.isEmpty) return;
+    final picked = await pickKycDocumentFromFile();
+    if (picked == null) return;
+    final bytes = picked.bytes;
+    final name = picked.fileName;
 
     setState(() => _busy = true);
     try {

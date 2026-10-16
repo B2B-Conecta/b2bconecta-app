@@ -24,7 +24,11 @@ class AdminUserMonitoringPanel extends StatefulWidget {
     this.loadRows,
     this.loadCatalogCoverage,
     this.loadPresence,
+    this.presenceRequest = 0,
   });
+
+  /// Al cambiar (y ser > 0) abre la presencia con el período «hoy».
+  final int presenceRequest;
 
   final Future<List<AdminUserActivityRowModel>> Function({
     String? role,
@@ -62,8 +66,29 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   void initState() {
     super.initState();
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
+    if (widget.presenceRequest > 0) {
+      _presenceOpen = true;
+      _period = _ActivityPeriod.day;
+    }
     _load();
     _loadCoverage();
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminUserMonitoringPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.presenceRequest == oldWidget.presenceRequest ||
+        widget.presenceRequest <= 0) {
+      return;
+    }
+    final reload = _period != _ActivityPeriod.day;
+    setState(() {
+      _presenceOpen = true;
+      _showingCatalogs = false;
+      _period = _ActivityPeriod.day;
+      _pageIndex = 0;
+    });
+    if (reload) _load();
   }
 
   @override

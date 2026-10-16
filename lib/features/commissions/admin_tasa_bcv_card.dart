@@ -10,7 +10,10 @@ import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 
 /// Admin (Comisiones): tasa BCV vigente, compacta.
 class AdminTasaBcvCard extends StatefulWidget {
-  const AdminTasaBcvCard({super.key});
+  const AdminTasaBcvCard({super.key, required this.canEdit});
+
+  /// Sincronizar o fijar la tasa global. Sin permiso la tarjeta es de lectura.
+  final bool canEdit;
 
   @override
   State<AdminTasaBcvCard> createState() => _AdminTasaBcvCardState();
@@ -52,7 +55,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
       final publishedDiffers = quote != null &&
           rec != null &&
           BcvReferenceRateService.ratesDiffer(quote.vesPerUsd, rec.tasa);
-      if (missing || staleDay || publishedDiffers) {
+      if (widget.canEdit && (missing || staleDay || publishedDiffers)) {
         await SupabaseService.syncGlobalTasaBcvFromReference();
         rec = await SupabaseService.fetchGlobalTasaBcvRecord();
       }
@@ -160,7 +163,8 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
     final parts = <String>[
       if (BcvReferenceRateService.formatFechaValorEs(_effectiveDate) != null)
         'Fecha valor ${BcvReferenceRateService.formatFechaValorEs(_effectiveDate)}',
-      if (_updatedAt != null) 'actualizada ${formatEsShortDateTime(_updatedAt)}',
+      if (_updatedAt != null)
+        'actualizada ${formatEsShortDateTime(_updatedAt)}',
     ];
     if (parts.isEmpty) return null;
     return parts.join(' · ');
@@ -233,36 +237,38 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                   final actions = Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    alignment: sideBySide
-                        ? WrapAlignment.end
-                        : WrapAlignment.start,
+                    alignment:
+                        sideBySide ? WrapAlignment.end : WrapAlignment.start,
                     children: [
-                      _action(
-                        onPressed: _busy ? null : _refreshFromBcv,
-                        icon: _busy
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.sync, size: 16),
-                        label: 'Sincronizar',
-                      ),
+                      if (widget.canEdit)
+                        _action(
+                          onPressed: _busy ? null : _refreshFromBcv,
+                          icon: _busy
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.sync, size: 16),
+                          label: 'Sincronizar',
+                        ),
                       _action(
                         onPressed: _openBcvOfficial,
                         icon: const Icon(Icons.open_in_new, size: 16),
                         label: 'BCV oficial',
                       ),
-                      _action(
-                        onPressed: _busy
-                            ? null
-                            : () => setState(() => _editing = !_editing),
-                        icon: Icon(
-                          _editing ? Icons.close : Icons.edit_outlined,
-                          size: 16,
+                      if (widget.canEdit)
+                        _action(
+                          onPressed: _busy
+                              ? null
+                              : () => setState(() => _editing = !_editing),
+                          icon: Icon(
+                            _editing ? Icons.close : Icons.edit_outlined,
+                            size: 16,
+                          ),
+                          label: _editing ? 'Cerrar' : 'Manual',
                         ),
-                        label: _editing ? 'Cerrar' : 'Manual',
-                      ),
                     ],
                   );
                   return Column(
@@ -292,7 +298,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
                           ),
                         ),
                       ],
-                      if (_editing) ...[
+                      if (_editing && widget.canEdit) ...[
                         const SizedBox(height: 10),
                         TextField(
                           controller: _ctrl,

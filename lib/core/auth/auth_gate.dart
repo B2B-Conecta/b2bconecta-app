@@ -19,6 +19,7 @@ import 'auth_link_utils.dart';
 import 'auth_recovery_storage.dart';
 import 'auth_uri_callback_clear_stub.dart'
     if (dart.library.html) 'auth_uri_callback_clear_web.dart';
+import 'phone_brand_intro.dart';
 import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
@@ -70,6 +71,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   String? _initialLinkError;
 
   bool _bootstrapResolved = false;
+
+  /// La entrada de marca del teléfono solo corre una vez por sesión.
+  bool _introDismissed = false;
 
   Timer? _authCallbackTimeoutTimer;
 
@@ -383,6 +387,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     if (data.event == AuthChangeEvent.signedOut || data.session == null) {
       _awaitingPasswordRecovery = false;
+      _introDismissed = false;
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
       unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
@@ -489,21 +494,41 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       );
     }
 
-    if (_bootstrapping ||
+    final waiting = _bootstrapping ||
         _authState == null ||
         _resolvingAuthCallback ||
-        _awaitingInitialAuthEvent) {
-      return const _AuthLoadingScaffold();
-    }
-
-    final session =
-        _authState!.session ?? Supabase.instance.client.auth.currentSession;
-
-    if (session != null &&
+        _awaitingInitialAuthEvent;
+    final session = waiting
+        ? Supabase.instance.client.auth.currentSession
+        : _authState!.session ?? Supabase.instance.client.auth.currentSession;
+    final recovery = session != null &&
         shouldForcePasswordRecoveryScreen(
           awaitingPasswordRecovery: _awaitingPasswordRecovery,
           pendingPasswordRecovery: false,
-        )) {
+        );
+    final phone = MediaQuery.sizeOf(context).shortestSide < 700;
+    final showIntro =
+        phone && !_introDismissed && !recovery && session != null;
+
+    if (showIntro) {
+      final ready = !waiting;
+      return PhoneBrandIntro(
+        key: const ValueKey('phone-brand-intro'),
+        reveal: ready,
+        onFinished: () {
+          if (mounted) setState(() => _introDismissed = true);
+        },
+        child: ready
+            ? const ProfileGate(key: ValueKey('profile_gate'))
+            : const SizedBox.shrink(),
+      );
+    }
+
+    if (waiting) {
+      return const _AuthLoadingScaffold();
+    }
+
+    if (recovery) {
       return const RecoverPasswordScreen(key: ValueKey('recover_password'));
     }
 

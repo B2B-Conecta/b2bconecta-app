@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
+
 class ImporterQuantityAdjustmentDraft {
   const ImporterQuantityAdjustmentDraft({
     required this.availableQty,
@@ -18,15 +21,25 @@ Future<ImporterQuantityAdjustmentDraft?>
 }) async {
   final qtyCtrl = TextEditingController(text: requestedQty.toString());
   final noteCtrl = TextEditingController();
-  final ok = await showDialog<bool>(
+  final ok = await showAdaptiveAdminSheet<bool>(
     context: context,
-    builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Propuesta de ajuste de cantidad'),
-        content: Column(
+    builder: (ctx, _) {
+      final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 4, 20, 16 + bottom),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              'Propuesta de ajuste de cantidad',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               'Cantidad solicitada: $requestedQty uds.\n'
               'Indique una cantidad menor disponible; la tienda minorista deberá aceptar o rechazar en su ficha '
@@ -54,23 +67,28 @@ Future<ImporterQuantityAdjustmentDraft?>
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () {
+                    final q = int.tryParse(qtyCtrl.text.trim()) ?? 0;
+                    if (q < 1) return;
+                    if (q >= requestedQty) return;
+                    Navigator.pop(ctx, true);
+                  },
+                  child: const Text('Enviar propuesta'),
+                ),
+              ],
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final q = int.tryParse(qtyCtrl.text.trim()) ?? 0;
-              if (q < 1) return;
-              if (q >= requestedQty) return;
-              Navigator.pop(ctx, true);
-            },
-            child: const Text('Enviar propuesta'),
-          ),
-        ],
       );
     },
   );

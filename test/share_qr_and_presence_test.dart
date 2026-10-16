@@ -66,6 +66,14 @@ void main() {
       'store_count': 42,
     });
     expect(shown.message, 'Ya hay 42 tiendas activas en B2B Conecta.');
+    expect(shown.panelCount, 42);
+
+    final seen = ImporterDailyStoreNotice.fromRpc({
+      'show': false,
+      'store_count': 15,
+    });
+    expect(seen.message, isNull);
+    expect(seen.panelCount, 15);
   });
 
   test('en línea son los últimos 5 minutos y la consulta es solo admin', () {

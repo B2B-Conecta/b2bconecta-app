@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_share_link.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
@@ -1491,6 +1492,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+              if (!isDesktop)
+                _inventorySection(
+                  hPad: hPad,
+                  child: const ImporterStoreCountCard(
+                    extended: true,
+                    inline: true,
+                  ),
+                ),
               FutureBuilder<InventoryMetrics>(
                 future: _metricsFuture,
                 builder: (context, metricsSnap) {

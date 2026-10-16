@@ -349,6 +349,12 @@ class _OrderCardProductRow extends StatelessWidget {
     final sku = product.sku?.trim();
     final hasSku = sku != null && sku.isNotEmpty;
     final status = product.lineStatusLabel;
+    final nameStyle = TextStyle(
+      fontSize: emphasizeName ? density.productTitleSize : density.metaTextSize,
+      fontWeight: FontWeight.w800,
+      color: AppColors.textPrimary,
+      height: 1.2,
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -358,18 +364,28 @@ class _OrderCardProductRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                product.name,
-                maxLines: emphasizeName ? 2 : 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: emphasizeName
-                      ? density.productTitleSize
-                      : density.metaTextSize,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  height: 1.2,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Text(
+                      product.name,
+                      maxLines: emphasizeName ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: nameStyle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '×${product.quantity}',
+                    style: TextStyle(
+                      fontSize: density.metaTextSize,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
               ),
               if (hasSku && !hideSku)
                 Text(
@@ -394,33 +410,18 @@ class _OrderCardProductRow extends StatelessWidget {
                     height: 1.2,
                   ),
                 ),
+              if (showLineTotal)
+                Text(
+                  '${formatRefAmount(product.lineTotalRef)} REF',
+                  style: TextStyle(
+                    fontSize: density.contentSmallSize,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                    height: 1.2,
+                  ),
+                ),
             ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '×${product.quantity}',
-              style: TextStyle(
-                fontSize: density.metaTextSize,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-                height: 1.2,
-              ),
-            ),
-            if (showLineTotal)
-              Text(
-                '${formatRefAmount(product.lineTotalRef)} REF',
-                style: TextStyle(
-                  fontSize: density.contentSmallSize,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                  height: 1.2,
-                ),
-              ),
-          ],
         ),
       ],
     );

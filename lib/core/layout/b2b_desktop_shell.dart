@@ -20,6 +20,7 @@ class B2bDesktopShell extends StatelessWidget {
     required this.onOpenSettings,
     required this.railBadgeLabel,
     this.trailingActions = const [],
+    this.railStatusBuilder,
   });
 
   final int selectedIndex;
@@ -34,6 +35,9 @@ class B2bDesktopShell extends StatelessWidget {
   final VoidCallback onOpenSettings;
   final String railBadgeLabel;
   final List<Widget> trailingActions;
+
+  /// Bloque opcional sobre la tarjeta de cuenta; recibe si el rail está expandido.
+  final Widget Function(bool extended)? railStatusBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +54,7 @@ class B2bDesktopShell extends StatelessWidget {
       onOpenSettings: onOpenSettings,
       railBadgeLabel: railBadgeLabel,
       trailingActions: trailingActions,
+      railStatusBuilder: railStatusBuilder,
     );
   }
 }

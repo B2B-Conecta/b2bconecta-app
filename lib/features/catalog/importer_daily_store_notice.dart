@@ -11,7 +11,8 @@ class ImporterDailyStoreNotice {
   final bool show;
   final int? storeCount;
 
-  static const officialTemplate = 'Ya hay {cantidad} tiendas activas en B2B Conecta.';
+  static const officialTemplate =
+      'Ya hay {cantidad} tiendas activas en B2B Conecta.';
 
   String? get message {
     final count = storeCount;
@@ -37,18 +38,26 @@ class ImporterDailyStoreNotice {
     );
   }
 
-  /// Regla de presentación. [failed] o un conteo nulo/cero ocultan el aviso.
+  /// Conteo para el panel, aunque el aviso del día ya se haya cerrado.
+  int? get panelCount {
+    final count = storeCount;
+    if (count == null || count <= 0) return null;
+    return count;
+  }
+
+  /// Regla de presentación. [failed] o un conteo nulo/cero ocultan aviso y panel.
+  /// Si el servidor dice que hoy ya se vio, el aviso no sale, pero el conteo queda.
   factory ImporterDailyStoreNotice.decide({
     required bool failed,
     required bool serverSaysShow,
     required int? storeCount,
   }) {
-    if (failed || !serverSaysShow) {
+    if (failed || storeCount == null || storeCount <= 0) {
       return const ImporterDailyStoreNotice(show: false);
     }
-    if (storeCount == null || storeCount <= 0) {
-      return const ImporterDailyStoreNotice(show: false);
-    }
-    return ImporterDailyStoreNotice(show: true, storeCount: storeCount);
+    return ImporterDailyStoreNotice(
+      show: serverSaysShow,
+      storeCount: storeCount,
+    );
   }
 }

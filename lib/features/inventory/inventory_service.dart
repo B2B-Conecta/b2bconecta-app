@@ -99,12 +99,13 @@ class InventoryService {
 
     final rows = await SupabaseAccess.client
         .from('products')
-        .select('stock, is_active, image_url, image_urls')
+        .select('stock, is_active, image_url, image_urls, stock_covers_min_order')
         .eq('owner_id', uid);
 
     final list = rows as List<dynamic>;
     var total = 0;
     var outOfStock = 0;
+    var lowStock = 0;
     var paused = 0;
     var withPhotos = 0;
     var withoutPhotos = 0;
@@ -114,6 +115,7 @@ class InventoryService {
       final s = m['stock'];
       final stock = s is int ? s : int.tryParse(s?.toString() ?? '') ?? 0;
       if (stock <= 0) outOfStock++;
+      if (m['stock_covers_min_order'] != true) lowStock++;
       final ia = m['is_active'];
       final active = ia is bool ? ia : ia?.toString() == 'true';
       if (!active) paused++;
@@ -129,10 +131,45 @@ class InventoryService {
     return InventoryMetrics(
       totalProducts: total,
       outOfStock: outOfStock,
+      lowStock: lowStock,
       paused: paused,
       withPhotos: withPhotos,
       withoutPhotos: withoutPhotos,
     );
+  }
+
+  /// Pedidos en `pendiente` del importador. `null` si la consulta falla.
+  static Future<int?> countMyNewOrders() async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return null;
+    try {
+      final res = await SupabaseAccess.client
+          .from('transaction_requests')
+          .select('id')
+          .eq('importador_id', uid)
+          .eq('status', 'pendiente')
+          .count(CountOption.exact);
+      return (res as PostgrestResponse<dynamic>).count;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Cortes de comisión emitidos y aún sin pagar. `null` si la consulta falla.
+  static Future<int?> countMyPendingCommissionInvoices() async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return null;
+    try {
+      final res = await SupabaseAccess.client
+          .from('commission_settlements')
+          .select('id')
+          .eq('importador_id', uid)
+          .eq('status', 'emitido')
+          .count(CountOption.exact);
+      return (res as PostgrestResponse<dynamic>).count;
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<ImporterSalesSnapshot> fetchMySalesSnapshot({
@@ -616,6 +653,7 @@ class InventoryMetrics {
     required this.totalProducts,
     required this.outOfStock,
     required this.paused,
+    this.lowStock = 0,
     this.withPhotos = 0,
     this.withoutPhotos = 0,
   });
@@ -628,6 +666,9 @@ class InventoryMetrics {
 
   final int totalProducts;
   final int outOfStock;
+
+  /// Stock por debajo del mínimo de pedido (`stock_covers_min_order` falso).
+  final int lowStock;
   final int paused;
   final int withPhotos;
   final int withoutPhotos;

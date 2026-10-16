@@ -18,6 +18,7 @@ import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart';
 import 'admin_checkout_group_expanded_section.dart';
+import 'admin_delete_pedido_dialog.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_motolink_anula_pedido_dialog.dart';
 import 'admin_order_pre_transit_section.dart';
@@ -25,6 +26,7 @@ import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_actions.dar
 import 'package:motolink_pro_app/features/payments/admin_pago_revision_section.dart';
 import 'package:motolink_pro_app/features/payments/efectivo_respaldo_registrar.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
@@ -50,6 +52,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
   String? _anularMotolinkBusyId;
+  String? _deletePedidoBusyId;
   bool _morosoOnly = false;
   bool _creditOnly = false;
   bool _replacementOnly = false;
@@ -296,6 +299,84 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     }
   }
 
+  Future<void> _eliminarPedido(
+    BuildContext context,
+    TransactionRequestModel r,
+  ) async {
+    if (_deletePedidoBusyId != null) return;
+    List<TransactionRequestModel> lines;
+    try {
+      lines = await OrdersService.fetchCheckoutGroupLinesForTransactionRequest(
+        r.id,
+      );
+    } catch (_) {
+      lines = [r];
+    }
+    if (!context.mounted) return;
+    final siblings = lines.where((line) => line.id != r.id).toList();
+    final confirmed = await confirmAdminDeletePedido(context, line: r);
+    if (!confirmed || !context.mounted) return;
+
+    var deleteGroup = false;
+    if (siblings.isNotEmpty) {
+      final scope = await confirmAdminDeletePedidoGroup(
+        context,
+        siblings: siblings,
+      );
+      if (scope == null || !context.mounted) return;
+      deleteGroup = scope == AdminDeletePedidoScope.checkoutGroup;
+    }
+
+    setState(() => _deletePedidoBusyId = r.id);
+    try {
+      final deleted = await SupabaseService.adminDeletePedido(
+        transactionRequestId: r.id,
+        deleteCheckoutGroup: deleteGroup,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            deleted > 1
+                ? 'Se eliminaron $deleted pedidos del carrito.'
+                : 'Pedido eliminado.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _deletePedidoBusyId = null);
+    }
+  }
+
+  Widget _deletePedidoButton(
+    BuildContext context,
+    TransactionRequestModel r, {
+    String? label,
+  }) {
+    final busy = _deletePedidoBusyId == r.id;
+    return OutlinedButton.icon(
+      onPressed: _deletePedidoBusyId != null
+          ? null
+          : () => _eliminarPedido(context, r),
+      icon: busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(Icons.delete_outline, size: 20, color: Colors.red.shade800),
+      label: Text(busy ? 'Eliminando…' : (label ?? 'Eliminar pedido')),
+      style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade800),
+    );
+  }
+
   Future<void> _marcarEnTransito(
     BuildContext context,
     TransactionRequestModel r,
@@ -360,6 +441,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           ),
           const SizedBox(height: 12),
         ],
+        _deletePedidoButton(context, r),
+        const SizedBox(height: 12),
         if (r.status == TransactionRequestStatus.enTransito ||
             r.status == TransactionRequestStatus.entregado)
           Padding(
@@ -431,6 +514,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _deletePedidoButton(context, primary),
+        const SizedBox(height: 12),
         if (primary.esPedidoMoroso) ...[
           AdminAliadoMorosidadActions(
             aliadoId: primary.aliadoId,
@@ -518,6 +603,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
             ? (r) => _anularPedidoPorMotolink(context, r)
             : null,
         anularBusyId: _anularMotolinkBusyId,
+        onEliminarPedido: (r) => _eliminarPedido(context, r),
+        deleteBusyId: _deletePedidoBusyId,
         morosidadFooter: morosoFooter,
       );
     }

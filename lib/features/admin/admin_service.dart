@@ -4,12 +4,62 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
+import 'package:motolink_pro_app/features/admin/user_presence.dart';
+import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/admin/owner_related_orders.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 class AdminService {
   AdminService._();
+
+  static Future<void> touchMyPresence() async {
+    if (SupabaseAccess.client.auth.currentSession == null) return;
+    try {
+      await SupabaseAccess.client.rpc('touch_my_presence');
+    } catch (_) {}
+  }
+
+  static Future<ImporterDailyStoreNotice> fetchImporterDailyStoreNotice() async {
+    try {
+      final res = await SupabaseAccess.client.rpc('importer_daily_store_notice');
+      if (res is Map) {
+        return ImporterDailyStoreNotice.fromRpc(Map<String, dynamic>.from(res));
+      }
+      return ImporterDailyStoreNotice.decide(
+        failed: true,
+        serverSaysShow: false,
+        storeCount: null,
+      );
+    } catch (_) {
+      return ImporterDailyStoreNotice.decide(
+        failed: true,
+        serverSaysShow: false,
+        storeCount: null,
+      );
+    }
+  }
+
+  static Future<void> ackImporterDailyStoreNotice() async {
+    try {
+      await SupabaseAccess.client.rpc('ack_importer_daily_store_notice');
+    } catch (_) {}
+  }
+
+  /// Solo tiene efecto si el JWT es administrador. El RPC rechaza el resto.
+  static Future<List<AdminUserPresenceRow>> listAdminUserPresence({
+    String? callerRole,
+  }) async {
+    if (callerRole != null && !canQueryAdminPresence(callerRole)) {
+      throw StateError('No autorizado');
+    }
+    final res = await SupabaseAccess.client.rpc('list_admin_user_presence');
+    if (res is! List) return const [];
+    return res
+        .whereType<Map>()
+        .map((e) => AdminUserPresenceRow.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
 
   static Future<void> logUserLoginEvent({String source = 'app'}) async {
     if (SupabaseAccess.client.auth.currentSession == null) return;

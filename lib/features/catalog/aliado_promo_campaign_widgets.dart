@@ -198,11 +198,13 @@ class AliadoPromoBannerCarousel extends StatefulWidget {
     required this.campaigns,
     this.onPromoCampaignSelected,
     this.compact = false,
+    this.padding,
   });
 
   final List<PromoCampaignModel> campaigns;
   final ValueChanged<PromoCampaignModel>? onPromoCampaignSelected;
   final bool compact;
+  final EdgeInsetsGeometry? padding;
 
   @override
   State<AliadoPromoBannerCarousel> createState() =>
@@ -246,7 +248,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final minBannerHeight = widget.compact ? 150.0 : 112.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
+      padding: widget.padding ??
+          EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;

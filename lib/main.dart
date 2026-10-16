@@ -15,6 +15,7 @@ import 'package:motolink_pro_app/core/notifications/push_notification_service.da
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_share_link.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 import 'package:motolink_pro_app/features/ads/marketing_consent_host.dart';
 
@@ -24,6 +25,7 @@ void main() async {
   final launchUri = Uri.base;
   unawaited(AdAttributionStorage.captureFromUri(launchUri));
   unawaited(ProductShareLink.capture(launchUri));
+  unawaited(ImporterStoreShareLink.capture(launchUri));
   if (kIsWeb) {
     usePathUrlStrategy();
   }
@@ -135,9 +137,17 @@ class MyApp extends StatelessWidget {
             );
             final sharedId = ProductShareLink.idFromUri(launchUri) ??
                 ProductShareLink.idFromRouteName(pathOnly);
+            final storeId = sharedId != null
+                ? null
+                : ImporterStoreShareLink.idFromUri(launchUri) ??
+                    ImporterStoreShareLink.idFromRouteName(pathOnly);
             final name = register
                 ? PublicAuthRoute.path
-                : (sharedId != null ? '/producto/$sharedId' : '/');
+                : sharedId != null
+                    ? '/producto/$sharedId'
+                    : storeId != null
+                        ? '/vitrina/$storeId'
+                        : '/';
             return [
               MaterialPageRoute<void>(
                 settings: RouteSettings(name: name),
@@ -165,6 +175,11 @@ class MyApp extends StatelessWidget {
                 routeName.startsWith('/') ? routeName : '/$routeName';
             unawaited(
               ProductShareLink.capture(
+                Uri.parse('https://app.b2bconecta.com.ve$routePath'),
+              ),
+            );
+            unawaited(
+              ImporterStoreShareLink.capture(
                 Uri.parse('https://app.b2bconecta.com.ve$routePath'),
               ),
             );

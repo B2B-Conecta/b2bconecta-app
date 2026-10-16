@@ -31,6 +31,7 @@ class MainShellTabController {
   static String? _pendingCommissionSettlementId;
   static VoidCallback? _adminCommissionSettlementDeepLink;
   static VoidCallback? _importerCommissionSettlementDeepLink;
+  static bool _importerCommissionPreferPendiente = false;
   static String? _pendingKycProfileId;
   static VoidCallback? _adminKycNotificationDeepLink;
   static String? _pendingSupportTicketId;
@@ -63,6 +64,7 @@ class MainShellTabController {
     _pendingCommissionSettlementId = null;
     _adminCommissionSettlementDeepLink = null;
     _importerCommissionSettlementDeepLink = null;
+    _importerCommissionPreferPendiente = false;
     _pendingKycProfileId = null;
     _adminKycNotificationDeepLink = null;
     _pendingSupportTicketId = null;
@@ -324,6 +326,18 @@ class MainShellTabController {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminCommissionSettlementDeepLink?.call();
     });
+  }
+
+  /// Importador: Perfil, cortes abiertos y filtro azul «Pago pendiente».
+  static void navigateToImporterPendingCommissions() {
+    _importerCommissionPreferPendiente = true;
+    navigateToImporterCommissionSettlementsForNotification();
+  }
+
+  static bool consumeImporterCommissionPreferPendiente() {
+    final v = _importerCommissionPreferPendiente;
+    _importerCommissionPreferPendiente = false;
+    return v;
   }
 
   /// Importador: Perfil + sección cortes de comisión.

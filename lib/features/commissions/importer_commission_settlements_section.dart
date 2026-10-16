@@ -49,6 +49,7 @@ class _ImporterCommissionSettlementsSectionState
     MainShellTabController.registerImporterCommissionSettlementDeepLink(
       _onCommissionNotificationDeepLink,
     );
+    _applyPendingCommissionFilter(notify: false);
     _load();
   }
 
@@ -58,7 +59,23 @@ class _ImporterCommissionSettlementsSectionState
     super.dispose();
   }
 
+  void _applyPendingCommissionFilter({bool notify = true}) {
+    if (!MainShellTabController.consumeImporterCommissionPreferPendiente()) {
+      return;
+    }
+    void apply() {
+      _sectionExpanded = true;
+      _statusFilter = _ImporterSettlementStatusFilter.pendientePago;
+    }
+    if (notify) {
+      setState(apply);
+    } else {
+      apply();
+    }
+  }
+
   void _onCommissionNotificationDeepLink() {
+    _applyPendingCommissionFilter();
     final id = MainShellTabController.consumePendingCommissionSettlementId();
     if (id == null) return;
     setState(() {

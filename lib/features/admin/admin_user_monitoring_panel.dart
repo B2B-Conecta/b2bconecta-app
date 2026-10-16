@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'admin_catalog_coverage.dart';
+import 'admin_user_presence_section.dart';
+import 'user_presence.dart';
 import 'admin_published_catalogs_section.dart';
 import 'admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
@@ -21,6 +23,7 @@ class AdminUserMonitoringPanel extends StatefulWidget {
     super.key,
     this.loadRows,
     this.loadCatalogCoverage,
+    this.loadPresence,
   });
 
   final Future<List<AdminUserActivityRowModel>> Function({
@@ -28,6 +31,7 @@ class AdminUserMonitoringPanel extends StatefulWidget {
     required String period,
   })? loadRows;
   final Future<AdminCatalogCoverage> Function()? loadCatalogCoverage;
+  final Future<List<AdminUserPresenceRow>> Function()? loadPresence;
 
   @override
   State<AdminUserMonitoringPanel> createState() =>
@@ -51,6 +55,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   AdminCatalogCoverage? _coverage;
   bool _coverageLoading = true;
   bool _showingCatalogs = false;
+  bool _presenceOpen = false;
   ImporterOption? _focusedCatalog;
 
   @override
@@ -341,10 +346,16 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
         value: '$users',
         icon: Icons.people_outline,
       ),
-      _MiniStat(
-        label: 'Ingresos ($_periodLabel)',
-        value: '$logins',
-        icon: Icons.login_outlined,
+      InkWell(
+        onTap: () => setState(() => _presenceOpen = !_presenceOpen),
+        borderRadius: BorderRadius.circular(10),
+        child: _MiniStat(
+          label: 'Ingresos ($_periodLabel)',
+          value: '$logins',
+          icon: Icons.login_outlined,
+          hint: _presenceOpen ? 'Ocultar' : 'Presencia',
+          expanded: _presenceOpen,
+        ),
       ),
       _MiniStat(
         label: 'Pedidos ($_periodLabel)',
@@ -382,12 +393,33 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                 : 2;
         const gap = 8.0;
         final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final tile in tiles)
-              SizedBox(width: width, height: 92, child: tile),
+            Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final tile in tiles)
+                  SizedBox(width: width, height: 92, child: tile),
+              ],
+            ),
+            if (_presenceOpen) ...[
+              const SizedBox(height: 8),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.brand),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                  child: AdminUserPresenceSection(
+                    loadRows: widget.loadPresence,
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -567,12 +599,14 @@ class _MiniStat extends StatelessWidget {
     required this.value,
     required this.icon,
     this.hint,
+    this.expanded = false,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final String? hint;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -615,16 +649,20 @@ class _MiniStat extends StatelessWidget {
           if (hint != null)
             Row(
               children: [
-                Text(
-                  hint!,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.brand,
+                Expanded(
+                  child: Text(
+                    hint!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.brand,
+                    ),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right,
+                Icon(
+                  expanded ? Icons.expand_less : Icons.chevron_right,
                   size: 16,
                   color: AppColors.brand,
                 ),

@@ -185,13 +185,11 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (creditApplied > 0 || (aliadoCreditRemaining ?? 0) > 0) ...[
+                        if (creditApplied > 0) ...[
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              creditApplied > 0
-                                  ? 'Crédito aplicado ${formatRefAmount(creditApplied)} REF'
-                                  : 'Saldo a favor ${formatRefAmount(aliadoCreditRemaining!)} REF',
+                              'Crédito aplicado ${formatRefAmount(creditApplied)} REF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -204,6 +202,13 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    if ((aliadoCreditRemaining ?? 0) > 0) ...[
+                      const SizedBox(height: 8),
+                      _OrderCreditNotice(
+                        storeName: lines.first.aliadoBusinessName,
+                        amount: aliadoCreditRemaining!,
+                      ),
+                    ],
                     if (promoChip != null) ...[
                       const SizedBox(height: 8),
                       promoChip,
@@ -698,6 +703,64 @@ class _SeguimientoBody extends StatelessWidget {
       compact: true,
       viewerRole: AppHomeRole.importador,
       showHeading: false,
+    );
+  }
+}
+
+class _OrderCreditNotice extends StatelessWidget {
+  const _OrderCreditNotice({
+    required this.amount,
+    this.storeName,
+  });
+
+  final double amount;
+  final String? storeName;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = storeName?.trim();
+    final who = (store == null || store.isEmpty) ? 'Esta tienda' : store;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.brandBlueContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.account_balance_wallet_outlined,
+              size: 18,
+              color: AppColors.brand,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Crédito a favor',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    '$who · ${formatRefAmount(amount)} REF',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

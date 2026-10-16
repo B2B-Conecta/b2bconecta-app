@@ -73,7 +73,10 @@ class ImporterPedidoPromoChip extends StatelessWidget {
 
 /// Carrusel de vallas publicitarias de terceros (importador / ambos).
 class ImporterThirdPartyAdsCarousel extends StatefulWidget {
-  const ImporterThirdPartyAdsCarousel({super.key});
+  const ImporterThirdPartyAdsCarousel({super.key, this.padding});
+
+  /// Si es null, el carrusel usa su margen habitual.
+  final EdgeInsetsGeometry? padding;
 
   @override
   State<ImporterThirdPartyAdsCarousel> createState() =>
@@ -102,7 +105,10 @@ class _ImporterThirdPartyAdsCarouselState
             .where((c) => c.isBanner)
             .toList();
         if (banners.isEmpty) return const SizedBox.shrink();
-        return AliadoPromoBannerCarousel(campaigns: banners);
+        return AliadoPromoBannerCarousel(
+          campaigns: banners,
+          padding: widget.padding,
+        );
       },
     );
   }
@@ -110,7 +116,10 @@ class _ImporterThirdPartyAdsCarouselState
 
 /// Banner importador: campañas activas en catálogo aliado.
 class ImporterActivePromoBanner extends StatefulWidget {
-  const ImporterActivePromoBanner({super.key});
+  const ImporterActivePromoBanner({super.key, this.padding});
+
+  /// Si es null, el aviso usa su margen habitual.
+  final EdgeInsetsGeometry? padding;
 
   @override
   State<ImporterActivePromoBanner> createState() =>
@@ -145,7 +154,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
         if (campaigns.isEmpty) return const SizedBox.shrink();
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          padding: widget.padding ?? const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Material(
             color: AppColors.brand.withOpacity(0.08),
             borderRadius: BorderRadius.circular(12),

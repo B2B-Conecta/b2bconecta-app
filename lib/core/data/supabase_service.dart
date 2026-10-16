@@ -7,6 +7,8 @@ import 'package:motolink_pro_app/core/notifications/in_app_notification_model.da
 import 'package:motolink_pro_app/core/notifications/notifications_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
+import 'package:motolink_pro_app/features/admin/user_presence.dart';
+import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
@@ -956,6 +958,15 @@ class SupabaseService {
         kind: kind,
       );
 
+  static Future<int> adminDeletePedido({
+    required String transactionRequestId,
+    bool deleteCheckoutGroup = false,
+  }) =>
+      OrdersService.adminDeletePedido(
+        transactionRequestId: transactionRequestId,
+        deleteCheckoutGroup: deleteCheckoutGroup,
+      );
+
   static Future<void> adminAnulaPedidoPorMotolink({
     required String transactionRequestId,
     required String motivo,
@@ -1107,6 +1118,22 @@ class SupabaseService {
 
   static Future<void> logUserLoginEvent({String source = 'app'}) =>
       AdminService.logUserLoginEvent(source: source);
+
+  static Future<void> touchMyPresence() => AdminService.touchMyPresence();
+
+  static Future<ImporterDailyStoreNotice> fetchImporterDailyStoreNotice() =>
+      AdminService.fetchImporterDailyStoreNotice();
+
+  static Future<void> ackImporterDailyStoreNotice() =>
+      AdminService.ackImporterDailyStoreNotice();
+
+  static Future<List<AdminUserPresenceRow>> listAdminUserPresence() =>
+      AdminService.listAdminUserPresence();
+
+  static Future<int?> countMyNewOrders() => InventoryService.countMyNewOrders();
+
+  static Future<int?> countMyPendingCommissionInvoices() =>
+      InventoryService.countMyPendingCommissionInvoices();
 
   static Future<List<AdminUserActivityRowModel>>
       listAdminUserActivityMonitoring({

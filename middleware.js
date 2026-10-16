@@ -16,7 +16,7 @@ function isLinkPreviewCrawler(userAgent) {
 }
 
 export const config = {
-  matcher: "/producto/:path*",
+  matcher: ["/producto/:path*", "/vitrina/:path*"],
 };
 
 export default async function middleware(request) {
@@ -24,8 +24,11 @@ export default async function middleware(request) {
   if (!isLinkPreviewCrawler(agent)) return;
 
   const parts = new URL(request.url).pathname.split("/").filter(Boolean);
+  const kind = parts[0] === "vitrina" ? "store" : "product";
   const id = parts[1] || "";
-  const upstream = await fetch(`${PREVIEW}?id=${encodeURIComponent(id)}`);
+  const upstream = await fetch(
+    `${PREVIEW}?kind=${kind}&id=${encodeURIComponent(id)}`,
+  );
   const html = await upstream.text();
   return new Response(html, {
     status: upstream.ok ? 200 : upstream.status,

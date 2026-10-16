@@ -27,11 +27,9 @@ import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart
 import 'importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
-import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 
 /// Pedidos del importador: ingreso directo, filtros rápidos y ciclo completo en una sola vista.
 class ImporterActiveOrdersPanel extends StatefulWidget {
@@ -50,6 +48,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String? _cancelBusyKey;
   late final TextEditingController _searchCtrl;
   PedidosListScope _scope = PedidosListScope.enCurso;
+  bool _onlyNuevos = false;
   bool _morosoOnly = false;
   bool _creditOnly = false;
   bool _replacementOnly = false;
@@ -100,6 +99,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           'cerrados' => PedidosListScope.entregados,
           _ => PedidosListScope.enCurso,
         };
+        _onlyNuevos = explore == 'nuevos';
         _morosoOnly = false;
       });
       return;
@@ -152,6 +152,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     if (MainShellTabController.consumeImporterPedidosPreferNuevosFilter()) {
       setState(() {
         _scope = PedidosListScope.enCurso;
+        _onlyNuevos = true;
         _morosoOnly = false;
       });
     }
@@ -253,6 +254,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     _searchCtrl.clear();
     setState(() {
       _scope = PedidosListScope.enCurso;
+      _onlyNuevos = false;
       _morosoOnly = false;
       _creditOnly = false;
       _replacementOnly = false;
@@ -299,75 +301,186 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       dateTo: _dateTo,
       useOrderPanelDate: true,
     );
-    final list = searched.where(_matchesScope).toList()
+    final list = searched.where(_matchesScope).where((r) {
+      if (!_onlyNuevos) return true;
+      return r.status == TransactionRequestStatus.pendiente;
+    }).toList()
       ..sort(ImporterOrderDate.compareByFechaReciente);
     return list;
   }
 
   String _rowKey(TransactionRequestModel r) => r.id;
 
+  String get _estadoFilterId {
+    if (_scope == PedidosListScope.enCurso && _onlyNuevos) return 'nuevo';
+    return _scope.name;
+  }
+
+  String get _fechaFilterId => OrderDateShortcuts.active(_dateFrom, _dateTo).name;
+
+  String get _senalFilterId {
+    if (_creditOnly) return 'credito';
+    if (_replacementOnly) return 'cambio';
+    return 'todos';
+  }
+
+  void _selectEstado(String id) {
+    setState(() {
+      switch (id) {
+        case 'nuevo':
+          _scope = PedidosListScope.enCurso;
+          _onlyNuevos = true;
+          _morosoOnly = false;
+        case 'enCurso':
+          _scope = PedidosListScope.enCurso;
+          _onlyNuevos = false;
+          _morosoOnly = false;
+        case 'entregados':
+          _scope = PedidosListScope.entregados;
+          _onlyNuevos = false;
+        case 'cancelados':
+          _scope = PedidosListScope.cancelados;
+          _onlyNuevos = false;
+          _morosoOnly = false;
+        default:
+          _scope = PedidosListScope.todos;
+          _onlyNuevos = false;
+      }
+    });
+  }
+
+  void _selectFecha(String id) {
+    final today = OrderDateShortcuts.day(DateTime.now());
+    switch (id) {
+      case 'today':
+        setState(() {
+          _dateFrom = today;
+          _dateTo = today;
+        });
+      case 'days7':
+        setState(() {
+          _dateFrom = today.subtract(const Duration(days: 6));
+          _dateTo = today;
+        });
+      case 'days30':
+        setState(() {
+          _dateFrom = today.subtract(const Duration(days: 29));
+          _dateTo = today;
+        });
+      case 'custom':
+        _openDateFilters();
+      default:
+        setState(() {
+          _dateFrom = null;
+          _dateTo = null;
+        });
+    }
+  }
+
+  void _selectSenal(String id) {
+    setState(() {
+      _creditOnly = id == 'credito';
+      _replacementOnly = id == 'cambio';
+    });
+  }
+
   Widget _quickFilterBar() {
     final pad = B2bOrdersPanelLayout.listHorizontalPadding(
       MediaQuery.sizeOf(context).width,
     );
+    final showPago = _scope == PedidosListScope.entregados ||
+        _scope == PedidosListScope.todos;
+    const estadoOptions = [
+      (id: 'todos', label: 'Todos'),
+      (id: 'enCurso', label: 'En curso'),
+      (id: 'nuevo', label: 'Pedido nuevo'),
+      (id: 'entregados', label: 'Entregados'),
+      (id: 'cancelados', label: 'Cancelados'),
+    ];
+    const fechaOptions = [
+      (id: 'all', label: 'Todas'),
+      (id: 'today', label: 'Hoy'),
+      (id: 'days7', label: '7 días'),
+      (id: 'days30', label: '30 días'),
+      (id: 'custom', label: 'Fechas'),
+    ];
+    const senalOptions = [
+      (id: 'todos', label: 'Todos'),
+      (id: 'credito', label: 'Bajo crédito'),
+      (id: 'cambio', label: 'Cambio de producto'),
+    ];
+    const pagoOptions = [
+      (id: 'todos', label: 'Todos'),
+      (id: 'pendiente', label: 'Pago pendiente'),
+    ];
+    String labelOf(List<({String id, String label})> options, String id) {
+      for (final option in options) {
+        if (option.id == id) return option.label;
+      }
+      return options.first.label;
+    }
+
+    final summary = [
+      labelOf(estadoOptions, _estadoFilterId),
+      labelOf(fechaOptions, _fechaFilterId),
+      labelOf(senalOptions, _senalFilterId),
+      if (showPago) labelOf(pagoOptions, _morosoOnly ? 'pendiente' : 'todos'),
+    ].join(' · ');
+    final menus = <Widget>[
+      _OrdersFilterMenu(
+        label: 'Estado',
+        value: _estadoFilterId,
+        options: estadoOptions,
+        onSelected: _selectEstado,
+      ),
+      _OrdersFilterMenu(
+        label: 'Fecha',
+        value: _fechaFilterId,
+        options: fechaOptions,
+        onSelected: _selectFecha,
+      ),
+      _OrdersFilterMenu(
+        label: 'Condición',
+        value: _senalFilterId,
+        options: senalOptions,
+        onSelected: _selectSenal,
+      ),
+      if (showPago)
+        _OrdersFilterMenu(
+          label: 'Pago',
+          value: _morosoOnly ? 'pendiente' : 'todos',
+          options: pagoOptions,
+          onSelected: (id) => setState(() => _morosoOnly = id == 'pendiente'),
+        ),
+    ];
     return Padding(
-      padding: EdgeInsets.fromLTRB(pad, 0, pad, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PedidosScopeBar(
-            selected: _scope,
-            onSelected: (scope) => setState(() {
-              _scope = scope;
-              if (scope != PedidosListScope.entregados) _morosoOnly = false;
-            }),
-          ),
-          OrderDateShortcutBar(
-            from: _dateFrom,
-            to: _dateTo,
-            onChanged: (from, to) => setState(() {
-              _dateFrom = from;
-              _dateTo = to;
-            }),
-            onPickRange: _openDateFilters,
-          ),
-          OrderSignalFilterBar(
-            creditOnly: _creditOnly,
-            replacementOnly: _replacementOnly,
-            onChanged: (credit, replacement) => setState(() {
-              _creditOnly = credit;
-              _replacementOnly = replacement;
-            }),
-          ),
-          if (_scope == PedidosListScope.entregados ||
-              _scope == PedidosListScope.todos)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilterChip(
-                label: const Text('Pago pendiente'),
-                selected: _morosoOnly,
-                onSelected: (v) => setState(() => _morosoOnly = v),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                selectedColor: Colors.red.shade100,
-                checkmarkColor: Colors.red.shade800,
-                labelStyle: TextStyle(
-                  fontWeight: _morosoOnly ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 12.5,
-                  color: _morosoOnly
-                      ? Colors.red.shade900
-                      : AppColors.textPrimary,
-                ),
-                avatar: Icon(
-                  Icons.warning_amber_rounded,
-                  size: 16,
-                  color: _morosoOnly
-                      ? Colors.red.shade800
-                      : AppColors.textSecondary,
-                ),
+      padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 720) {
+            return _OrdersFiltersDisclosure(
+              summary: summary,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < menus.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 12),
+                    menus[i],
+                  ],
+                ],
               ),
-            ),
-        ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < menus.length; i++) ...[
+                if (i > 0) const SizedBox(width: 12),
+                Expanded(child: menus[i]),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -666,22 +779,66 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const ImporterThirdPartyAdsCarousel(),
-              const ImporterActivePromoBanner(),
-              OrderListFilterBar(
-                searchController: _searchCtrl,
-                onSearchChanged: (_) => setState(() {}),
-                hintText: 'Buscar por producto, SKU o tienda minorista',
+              ImporterThirdPartyAdsCarousel(
+                padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 0),
+              ),
+              ImporterActivePromoBanner(
+                padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 0),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 0),
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  style: TextStyle(color: AppColors.textPrimary),
+                  cursorColor: AppColors.brand,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por producto, SKU o tienda minorista',
+                    hintStyle: AppColors.hintStyle,
+                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                    suffixIcon: _searchCtrl.text.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            color: AppColors.textSecondary,
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() {});
+                            },
+                          ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppColors.fieldFill,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.borderSubtle),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.borderSubtle),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.brand,
+                        width: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
               ),
               _quickFilterBar(),
-              if (_credits.isNotEmpty)
-                _AliadoCreditStrip(credits: _credits),
               Expanded(
                 child: filtered.isEmpty || groups.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 24),
                         children: [
-                          const SizedBox(height: 48),
                           Center(
                             child: Column(
                               children: [
@@ -703,6 +860,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         alwaysShow: true,
                         resetKey: Object.hash(
                           _scope,
+                          _onlyNuevos,
                           _morosoOnly,
                           _creditOnly,
                           _replacementOnly,
@@ -712,7 +870,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                         ),
                         padding: EdgeInsets.fromLTRB(
                           listPad,
-                          0,
+                          12,
                           listPad,
                           B2bOrdersPanelLayout.listBottomPadding(screenWidth),
                         ),
@@ -880,56 +1038,158 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   }
 }
 
-class _AliadoCreditStrip extends StatelessWidget {
-  const _AliadoCreditStrip({required this.credits});
+class _OrdersFiltersDisclosure extends StatefulWidget {
+  const _OrdersFiltersDisclosure({
+    required this.summary,
+    required this.child,
+  });
 
-  final List<AliadoCreditBalance> credits;
+  final String summary;
+  final Widget child;
+
+  @override
+  State<_OrdersFiltersDisclosure> createState() =>
+      _OrdersFiltersDisclosureState();
+}
+
+class _OrdersFiltersDisclosureState extends State<_OrdersFiltersDisclosure> {
+  bool _open = false;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Material(
-        color: AppColors.brandBlueContainer,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        border: Border.all(
+          color: _open ? AppColors.brand : AppColors.borderSubtle,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(
                 children: [
-                  const Icon(
-                    Icons.account_balance_wallet_outlined,
-                    size: 18,
-                    color: AppColors.brand,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Crédito a favor',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                  Icon(Icons.filter_list, size: 18, color: AppColors.brand),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Filtros',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          widget.summary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  Icon(
+                    _open ? Icons.expand_less : Icons.expand_more,
+                    color: AppColors.textSecondary,
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              for (final credit in credits)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    '${credit.aliadoName} · ${formatRefAmount(credit.remaining)} REF',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.3,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: widget.child,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrdersFilterMenu extends StatelessWidget {
+  const _OrdersFilterMenu({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onSelected,
+  });
+
+  final String label;
+  final String value;
+  final List<({String id, String label})> options;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = options.firstWhere(
+      (option) => option.id == value,
+      orElse: () => options.first,
+    );
+    return SizedBox(
+      width: double.infinity,
+      child: PopupMenuButton<String>(
+        onSelected: onSelected,
+        tooltip: label,
+        offset: const Offset(0, 46),
+        itemBuilder: (context) => [
+          for (final option in options)
+            PopupMenuItem<String>(
+              value: option.id,
+              child: Text(
+                option.label,
+                style: TextStyle(
+                  fontWeight:
+                      option.id == value ? FontWeight.w800 : FontWeight.w500,
+                  color: option.id == value
+                      ? AppColors.brand
+                      : AppColors.textPrimary,
                 ),
-            ],
+              ),
+            ),
+        ],
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            filled: true,
+            fillColor: AppColors.fieldFill,
+            isDense: true,
+            contentPadding: const EdgeInsets.fromLTRB(12, 14, 8, 14),
+            suffixIcon: Icon(
+              Icons.expand_more,
+              size: 20,
+              color: AppColors.textSecondary,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.borderSubtle),
+            ),
+          ),
+          child: Text(
+            current.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ),

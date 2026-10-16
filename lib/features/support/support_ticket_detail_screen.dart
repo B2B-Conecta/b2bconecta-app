@@ -12,10 +12,18 @@ class SupportTicketDetailScreen extends StatefulWidget {
     super.key,
     required this.ticket,
     required this.isAdminView,
+    this.embedded = false,
+    this.onTicketChanged,
   });
 
   final SupportTicketModel ticket;
   final bool isAdminView;
+
+  /// Panel derecho del master-detail: sin botón atrás.
+  final bool embedded;
+
+  /// Avisa a la lista cuando cambia el estado o llega un mensaje.
+  final VoidCallback? onTicketChanged;
 
   @override
   State<SupportTicketDetailScreen> createState() =>
@@ -36,6 +44,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
     final fresh = await SupabaseService.fetchSupportTicketById(_ticket.id);
     if (!mounted || fresh == null) return;
     setState(() => _ticket = fresh);
+    widget.onTicketChanged?.call();
   }
 
   Future<void> _closeTicket() async {
@@ -97,6 +106,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        automaticallyImplyLeading: !widget.embedded,
         title: const Text('Reclamo'),
         actions: [
           if (!_ticket.isClosed)

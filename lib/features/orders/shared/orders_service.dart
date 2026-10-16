@@ -1443,6 +1443,23 @@ class OrdersService {
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
+  /// Admin: borra la línea. Con [deleteCheckoutGroup] borra el carrito completo.
+  static Future<int> adminDeletePedido({
+    required String transactionRequestId,
+    bool deleteCheckoutGroup = false,
+  }) async {
+    final raw = await SupabaseAccess.client.rpc(
+      'admin_delete_pedido',
+      params: <String, dynamic>{
+        'p_request_id': transactionRequestId,
+        'p_delete_checkout_group': deleteCheckoutGroup,
+      },
+    );
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse('$raw') ?? 0;
+  }
+
   /// Admin B2B Conecta: anula un pedido ya aprobado / en curso (no pendiente ni entregado), con motivo.
   static Future<void> adminAnulaPedidoPorMotolink({
     required String transactionRequestId,

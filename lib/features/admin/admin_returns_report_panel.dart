@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
@@ -61,7 +62,10 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AdminListSkeleton(
+        showHeader: true,
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 24),
+      );
     }
     if (_error != null) {
       return Center(
@@ -91,11 +95,24 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
       (sum, row) => sum + _num(row['saldo_vigente']),
     );
 
+    Widget sectionTitle(String text) => Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            color: AppColors.textPrimary,
+          ),
+        );
+
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            sliver: SliverList.list(
+              children: [
           Text(
             'Devoluciones',
             style: TextStyle(
@@ -139,39 +156,52 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
             ],
           ),
           const SizedBox(height: 20),
-          Text(
-            'Por importador',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          sectionTitle('Por importador'),
           const SizedBox(height: 8),
           if (_importers.isEmpty)
             Text(
               'Todavía no hay devoluciones.',
               style: TextStyle(color: AppColors.textSecondary),
-            )
-          else
-            for (final row in _importers) ...[
-              _ImporterCard(row: row, number: _num, count: _int),
-              const SizedBox(height: 8),
-            ],
-          const SizedBox(height: 12),
-          Text(
-            'Últimas solicitudes',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-              color: AppColors.textPrimary,
+            ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          for (final row in _casos) ...[
-            _CaseCard(row: row, number: _num),
-            const SizedBox(height: 8),
-          ],
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList.builder(
+              itemCount: _importers.length,
+              itemBuilder: (context, i) {
+                final row = _importers[i];
+                return Padding(
+                  key: ValueKey<String>(
+                    'ret-imp-${row['importador_id'] ?? i}',
+                  ),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ImporterCard(row: row, number: _num, count: _int),
+                );
+              },
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: sectionTitle('Últimas solicitudes'),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: SliverList.builder(
+              itemCount: _casos.length,
+              itemBuilder: (context, i) {
+                final row = _casos[i];
+                return Padding(
+                  key: ValueKey<String>('ret-caso-${row['id'] ?? i}'),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _CaseCard(row: row, number: _num),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

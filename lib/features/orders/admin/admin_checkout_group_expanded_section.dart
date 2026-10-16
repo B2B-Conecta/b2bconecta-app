@@ -28,6 +28,8 @@ class AdminCheckoutGroupExpandedSection extends StatefulWidget {
     this.onMarcarEnTransito,
     this.onAnularMotolink,
     this.anularBusyId,
+    this.onEliminarPedido,
+    this.deleteBusyId,
     this.morosidadFooter,
   });
 
@@ -36,6 +38,8 @@ class AdminCheckoutGroupExpandedSection extends StatefulWidget {
   final void Function(TransactionRequestModel line)? onMarcarEnTransito;
   final void Function(TransactionRequestModel line)? onAnularMotolink;
   final String? anularBusyId;
+  final void Function(TransactionRequestModel line)? onEliminarPedido;
+  final String? deleteBusyId;
   final Widget? morosidadFooter;
 
   @override
@@ -103,6 +107,8 @@ class _AdminCheckoutGroupExpandedSectionState
           onMarcarEnTransito: widget.onMarcarEnTransito,
           onAnularMotolink: widget.onAnularMotolink,
           anularBusyId: widget.anularBusyId,
+          onEliminarPedido: widget.onEliminarPedido,
+          deleteBusyId: widget.deleteBusyId,
         ),
         if (widget.morosidadFooter != null) ...[
           const SizedBox(height: 12),
@@ -224,6 +230,8 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
     this.onMarcarEnTransito,
     this.onAnularMotolink,
     this.anularBusyId,
+    this.onEliminarPedido,
+    this.deleteBusyId,
   });
 
   final List<TransactionRequestModel> chunk;
@@ -235,6 +243,8 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
   final void Function(TransactionRequestModel line)? onMarcarEnTransito;
   final void Function(TransactionRequestModel line)? onAnularMotolink;
   final String? anularBusyId;
+  final void Function(TransactionRequestModel line)? onEliminarPedido;
+  final String? deleteBusyId;
 
   @override
   Widget build(BuildContext context) {
@@ -351,6 +361,36 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                       anularBusyId == r.id
                           ? 'Anulando…'
                           : 'Anular línea · ${r.productName ?? r.id.substring(0, 8)}',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade800,
+                    ),
+                  ),
+                ),
+            ],
+            if (onEliminarPedido != null &&
+                chunk.any(
+                  (x) => x.status != TransactionRequestStatus.entregado,
+                )) ...[
+              const SizedBox(height: 8),
+              for (final r in chunk.where(
+                (x) => x.status != TransactionRequestStatus.entregado,
+              ))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: OutlinedButton.icon(
+                    onPressed: deleteBusyId != null
+                        ? null
+                        : () => onEliminarPedido!(r),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Colors.red.shade800,
+                    ),
+                    label: Text(
+                      deleteBusyId == r.id
+                          ? 'Eliminando…'
+                          : 'Eliminar línea · ${r.productName ?? r.id.substring(0, 8)}',
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade800,

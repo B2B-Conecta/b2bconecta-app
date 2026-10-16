@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 
@@ -14,28 +15,21 @@ class ImporterPedidosFiltersSheet extends StatefulWidget {
   });
 
   final ImporterPedidosFiltersDraft initial;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
 
   static Future<ImporterPedidosFiltersDraft?> show(
     BuildContext context, {
     required ImporterPedidosFiltersDraft initial,
   }) {
-    return showModalBottomSheet<ImporterPedidosFiltersDraft>(
+    return showAdaptiveAdminSheet<ImporterPedidosFiltersDraft>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.52,
-        minChildSize: 0.35,
-        maxChildSize: 0.85,
-        expand: false,
-        builder: (_, scrollController) => ImporterPedidosFiltersSheet(
-          initial: initial,
-          scrollController: scrollController,
-        ),
+      showDragHandle: false,
+      draggable: true,
+      initialChildSize: 0.52,
+      maxChildSize: 0.85,
+      builder: (_, scrollController) => ImporterPedidosFiltersSheet(
+        initial: initial,
+        scrollController: scrollController,
       ),
     );
   }
@@ -87,7 +81,7 @@ class _ImporterPedidosFiltersSheetState
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: now.add(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
       helpText: isFrom ? 'Desde' : 'Hasta',
     );
     if (picked == null || !mounted) return;
@@ -114,15 +108,17 @@ class _ImporterPedidosFiltersSheetState
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(height: 8),
-        Container(
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.borderSubtle,
-            borderRadius: BorderRadius.circular(2),
+        if (!isAdminDesktopLayout(context)) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.borderSubtle,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
+        ],
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Row(

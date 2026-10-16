@@ -25,7 +25,11 @@ class DesktopNavigationShell extends StatelessWidget {
     required this.onOpenSettings,
     required this.railBadgeLabel,
     this.trailingActions = const [],
+    this.railStatusBuilder,
   });
+
+  /// Bloque opcional sobre la tarjeta de cuenta; recibe si el rail está expandido.
+  final Widget Function(bool extended)? railStatusBuilder;
 
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
@@ -60,6 +64,7 @@ class DesktopNavigationShell extends StatelessWidget {
             profile: profile,
             onDestinationSelected: onDestinationSelected,
             onOpenSettings: onOpenSettings,
+            statusBuilder: railStatusBuilder,
           ),
           Expanded(
             child: Column(
@@ -131,6 +136,7 @@ class _DesktopSideRail extends StatelessWidget {
     required this.profile,
     required this.onDestinationSelected,
     required this.onOpenSettings,
+    this.statusBuilder,
   });
 
   final bool extended;
@@ -140,6 +146,7 @@ class _DesktopSideRail extends StatelessWidget {
   final ProfileModel profile;
   final ValueChanged<int> onDestinationSelected;
   final VoidCallback onOpenSettings;
+  final Widget Function(bool extended)? statusBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +205,7 @@ class _DesktopSideRail extends StatelessWidget {
                 },
               ),
             ),
+            if (statusBuilder != null) statusBuilder!(extended),
             _DesktopSideRailAccountFooter(
               extended: extended,
               profile: profile,

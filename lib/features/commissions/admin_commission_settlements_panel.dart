@@ -22,10 +22,14 @@ import 'commission_settlement_lines_section.dart';
 import 'commission_settlement_list_filter_bar.dart';
 import 'commission_settlement_filters_sheet.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/features/admin/admin_action_rules.dart';
 
 /// Admin: cortes semanales, facturación y cobro de comisiones B2B Conecta.
 class AdminCommissionSettlementsPanel extends StatefulWidget {
-  const AdminCommissionSettlementsPanel({super.key});
+  const AdminCommissionSettlementsPanel({super.key, required this.viewerRole});
+
+  /// Rol de la sesión: decide si se muestran los ajustes de tasas.
+  final String? viewerRole;
 
   @override
   State<AdminCommissionSettlementsPanel> createState() =>
@@ -266,7 +270,11 @@ class _AdminCommissionSettlementsPanelState
     }
   }
 
+  bool get _canEditRates =>
+      AdminActionRules.canEditCommissionRates(viewerRole: widget.viewerRole);
+
   Future<void> _editImportadorRate() async {
+    if (!_canEditRates) return;
     List<ImporterOption> importers = [];
     try {
       importers = await SupabaseService.fetchImporterOptions();
@@ -368,6 +376,7 @@ class _AdminCommissionSettlementsPanelState
   }
 
   Future<void> _editDefaultRate() async {
+    if (!_canEditRates) return;
     final ctrl = TextEditingController(
       text: (_defaultRate * 100).toStringAsFixed(2),
     );
@@ -423,6 +432,7 @@ class _AdminCommissionSettlementsPanelState
   }
 
   Future<void> _editVolumeTiers() async {
+    if (!_canEditRates) return;
     final rows = _volumeTiers
         .map(
           (t) => (
@@ -946,7 +956,11 @@ class _AdminCommissionSettlementsPanelState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
             children: [
-              const AdminTasaBcvCard(),
+              AdminTasaBcvCard(
+                canEdit: AdminActionRules.canEditPlatformConfig(
+                  viewerRole: widget.viewerRole,
+                ),
+              ),
               const SizedBox(height: 12),
               _CommissionAmountsStrip(rows: _rows),
               const SizedBox(height: 12),
@@ -1021,6 +1035,7 @@ class _AdminCommissionSettlementsPanelState
                 defaultRatePct: _defaultRate * 100,
                 volumeTiersSummary:
                     commissionVolumeTiersSummaryEs(_volumeTiers),
+                canEditRates: _canEditRates,
                 onEditRate: _busy ? null : _editDefaultRate,
                 onEditImportadorRate: _busy ? null : _editImportadorRate,
                 onEditVolumeTiers: _busy ? null : _editVolumeTiers,
@@ -1324,6 +1339,7 @@ class _ConfigCard extends StatelessWidget {
   const _ConfigCard({
     required this.defaultRatePct,
     required this.volumeTiersSummary,
+    required this.canEditRates,
     this.onEditRate,
     this.onEditImportadorRate,
     this.onEditVolumeTiers,
@@ -1333,6 +1349,7 @@ class _ConfigCard extends StatelessWidget {
 
   final double defaultRatePct;
   final String volumeTiersSummary;
+  final bool canEditRates;
   final VoidCallback? onEditRate;
   final VoidCallback? onEditImportadorRate;
   final VoidCallback? onEditVolumeTiers;
@@ -1381,6 +1398,7 @@ class _ConfigCard extends StatelessWidget {
               subtitle: '${defaultRatePct.toStringAsFixed(2)} %',
               actionLabel: 'Editar',
               onAction: onEditRate,
+              showAction: canEditRates,
             ),
             const SizedBox(height: 6),
             _configRow(
@@ -1389,6 +1407,7 @@ class _ConfigCard extends StatelessWidget {
               subtitle: volumeTiersSummary,
               actionLabel: 'Tramos',
               onAction: onEditVolumeTiers,
+              showAction: canEditRates,
             ),
             const SizedBox(height: 6),
             _configRow(
@@ -1397,6 +1416,7 @@ class _ConfigCard extends StatelessWidget {
               subtitle: 'Override opcional',
               actionLabel: 'Configurar',
               onAction: onEditImportadorRate,
+              showAction: canEditRates,
             ),
             const SizedBox(height: 12),
             Text(
@@ -1465,6 +1485,7 @@ class _ConfigCard extends StatelessWidget {
     required String subtitle,
     required String actionLabel,
     VoidCallback? onAction,
+    bool showAction = true,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1502,14 +1523,15 @@ class _ConfigCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+          if (showAction)
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: Text(actionLabel),
             ),
-            child: Text(actionLabel),
-          ),
         ],
       ),
     );

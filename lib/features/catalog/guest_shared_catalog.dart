@@ -8,6 +8,8 @@ import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/catalog/product_warranty_seal.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
+import 'importer_store_share_link.dart';
+import 'share_qr_sheet.dart';
 import 'catalog_service.dart';
 import 'part_model.dart';
 import 'product_detail_screen.dart';
@@ -148,6 +150,16 @@ class _GuestSupplierStoreScreenState extends State<GuestSupplierStoreScreen> {
         appBar: AppBar(
           title: Text(store.name),
           actions: [
+            IconButton(
+              tooltip: 'Compartir QR',
+              onPressed: () => showShareQrSheet(
+                context,
+                title: store.name,
+                url: ImporterStoreShareLink.urlFor(widget.importerId),
+                subtitle: 'Vitrina del proveedor',
+              ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
             TextButton(
               onPressed: widget.onRegister,
               child: const Text('Regístrate'),

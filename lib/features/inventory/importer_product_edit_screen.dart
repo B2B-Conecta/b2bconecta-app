@@ -11,6 +11,7 @@ import 'product_volume_tiers.dart';
 import 'importer_product_commercial_terms_section.dart';
 import 'product_custom_fields_section.dart';
 import 'product_image_gallery_editor.dart';
+import 'importer_product_price_preview.dart';
 import 'product_usd_payment_discount_field.dart';
 
 /// Crear o editar un producto del inventario (importador).
@@ -82,7 +83,19 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _isActive = p?.isActive ?? true;
     _hasWarranty = p?.hasWarranty ?? false;
     _customFields = Map<String, dynamic>.from(p?.customFields ?? const {});
+    for (final controller in [
+      _priceController,
+      _salePriceController,
+      _usdPaymentDiscountController,
+      _minOrderQtyController,
+    ]) {
+      controller.addListener(_onPreviewChanged);
+    }
     _loadImporterPagoPolicy();
+  }
+
+  void _onPreviewChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadImporterPagoPolicy() async {
@@ -95,6 +108,14 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
 
   @override
   void dispose() {
+    for (final controller in [
+      _priceController,
+      _salePriceController,
+      _usdPaymentDiscountController,
+      _minOrderQtyController,
+    ]) {
+      controller.removeListener(_onPreviewChanged);
+    }
     _skuController.dispose();
     _nameController.dispose();
     _descController.dispose();
@@ -341,9 +362,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(
-          _isActive
-              ? 'Visible en catálogo (Modo pausa off)'
-              : 'Producto en pausa (oculto para tiendas minoristas)',
+          _isActive ? 'Publicado' : 'Pausado',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: _isActive ? AppColors.successGreen : AppColors.brandAccent,
@@ -351,8 +370,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         ),
         subtitle: Text(
           _isActive
-              ? 'Las tiendas minoristas pueden ver este producto.'
-              : 'Actívelo cuando quiera volver a publicarlo.',
+              ? 'Las tiendas ven este producto en el catálogo.'
+              : 'Un producto pausado se oculta de inmediato del catálogo de las tiendas.',
           style: const TextStyle(fontSize: 12),
         ),
         value: _isActive,
@@ -394,29 +413,27 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         ),
         const SizedBox(height: 12),
         TextFormField(
-          controller: _descController,
-          decoration: _dec('Descripción'),
-          maxLines: 3,
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
           controller: _priceController,
-          decoration: _dec('Precio lista (USD)'),
+          decoration: _dec('Precio (USD / REF)'),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
           ],
         ),
-        const SizedBox(height: 16),
-        ImporterProductCommercialTermsSection(
-          salePriceController: _salePriceController,
-          usdPaymentDiscountController: _usdPaymentDiscountController,
+        const SizedBox(height: 12),
+        ImporterProductPricePreview(
+          listPriceUsd: parsePreviewMoney(_priceController.text),
+          salePriceUsd: parsePreviewMoney(_salePriceController.text),
           volumeTiers: _volumeTiers,
-          onVolumeTiersChanged: (t) => setState(() => _volumeTiers = t),
-          enabled: !_saving,
-          showUsdPaymentDiscount: !_pagoSoloDivisas,
+          usdPaymentDiscountPct: parsePreviewUsdDiscount(
+            _usdPaymentDiscountController.text,
+            pagoSoloDivisas: _pagoSoloDivisas,
+          ),
+          quantity: int.tryParse(_minOrderQtyController.text.trim()) ??
+              ProductMinOrderQty.platformFloor,
+          ownerPagoSoloDivisas: _pagoSoloDivisas,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         TextFormField(
           controller: _stockController,
           decoration: _dec('Stock'),
@@ -427,7 +444,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         TextFormField(
           controller: _minOrderQtyController,
           decoration: _dec(
-            'Cantidad mínima de pedido',
+            'Pedido mínimo / MOQ',
             hint: 'Mínimo 5 unidades',
           ),
           keyboardType: TextInputType.number,
@@ -440,21 +457,62 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
             return null;
           },
         ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _categoryController,
-          decoration: _dec('Categoría'),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _compatController,
-          decoration: _dec('Compatibilidad'),
-        ),
-        const SizedBox(height: 20),
-        ProductCustomFieldsEditor(
-          initial: _customFields,
-          enabled: !_saving,
-          onChanged: (fields) => _customFields = fields,
+        const SizedBox(height: 8),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text(
+            'Compatibilidad, descuentos y descripción',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: const Text(
+            'Opcional. La tienda puede comprar sin estos datos.',
+            style: TextStyle(fontSize: 12),
+          ),
+          children: [
+            TextFormField(
+              controller: _descController,
+              decoration: _dec('Descripción'),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            ImporterProductCommercialTermsSection(
+              salePriceController: _salePriceController,
+              usdPaymentDiscountController: _usdPaymentDiscountController,
+              volumeTiers: _volumeTiers,
+              onVolumeTiersChanged: (t) => setState(() => _volumeTiers = t),
+              enabled: !_saving,
+              showUsdPaymentDiscount: !_pagoSoloDivisas,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _categoryController,
+              decoration: _dec('Categoría'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _compatController,
+              decoration: _dec('Compatibilidad'),
+            ),
+            const SizedBox(height: 12),
+            ProductCustomFieldsEditor(
+              initial: _customFields,
+              enabled: !_saving,
+              onChanged: (fields) => _customFields = fields,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Producto con garantía',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text(
+                'La tienda ve el sello de garantía en el catálogo.',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: _hasWarranty,
+              onChanged: _saving ? null : (v) => setState(() => _hasWarranty = v),
+            ),
+          ],
         ),
       ],
     );
@@ -557,22 +615,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
                             children: [
                               _buildShareButton(),
                               _buildVisibilitySwitch(),
-                              const SizedBox(height: 12),
-                              SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: const Text(
-                                  'Producto con garantía',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                                subtitle: const Text(
-                                  'La tienda minorista verá el sello de garantía en el catálogo.',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                value: _hasWarranty,
-                                onChanged: _saving
-                                    ? null
-                                    : (v) => setState(() => _hasWarranty = v),
-                              ),
                               const SizedBox(height: 16),
                               _buildImageSection(),
                             ],
@@ -609,20 +651,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           _buildVisibilitySwitch(),
           const SizedBox(height: 8),
           _buildMainFields(),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(
-              'Producto con garantía',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: const Text(
-              'Si está activo, la tienda minorista verá el sello de garantía en el catálogo.',
-              style: TextStyle(fontSize: 12),
-            ),
-            value: _hasWarranty,
-            onChanged: _saving ? null : (v) => setState(() => _hasWarranty = v),
-          ),
           const SizedBox(height: 12),
           _buildImageSection(),
           _buildFormActions(desktop: false),

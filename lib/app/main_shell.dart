@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart';
 
@@ -18,12 +18,16 @@ import 'package:motolink_pro_app/core/layout/admin_desktop_shell.dart';
 import 'package:motolink_pro_app/core/layout/admin_mobile_nav.dart';
 import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
 import 'package:motolink_pro_app/features/admin/admin_encomiendas_report_panel.dart';
+import 'package:motolink_pro_app/features/admin/admin_daily_presence_card.dart';
+import 'package:motolink_pro_app/features/admin/user_presence.dart';
 import 'package:motolink_pro_app/features/kyc/admin_kyc_review_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_account_management_panel.dart';
 import 'package:motolink_pro_app/features/reputation/admin_order_ratings_panel.dart';
 import 'package:motolink_pro_app/features/orders/admin/admin_orders_panel.dart';
 import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.dart';
 import 'package:motolink_pro_app/core/notifications/kyc_notification_match.dart';
+import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
+import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice_banner.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
@@ -64,6 +68,8 @@ class _MainShellState extends State<MainShell> {
   late ProfileModel _profile;
   late final NotificationProvider _notifications;
   bool _showAliadoAccessApprovedBanner = false;
+  ImporterDailyStoreNotice? _dailyStoreNotice;
+  Timer? _presenceTimer;
   String _aliadoAccessApprovedMessage =
       'Su acceso a B2B Conecta está habilitado. Ya puede operar en la plataforma.';
 
@@ -108,6 +114,20 @@ class _MainShellState extends State<MainShell> {
       MainShellTabController.registerAdminProfileTabIndex(7);
     }
     unawaited(_ensureDailyTasaBcvNotification());
+    unawaited(SupabaseService.touchMyPresence());
+    _presenceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      unawaited(SupabaseService.touchMyPresence());
+    });
+    if (widget.homeRole == AppHomeRole.importador) {
+      unawaited(_loadDailyStoreNotice());
+    }
+  }
+
+  Future<void> _loadDailyStoreNotice() async {
+    final notice = await SupabaseService.fetchImporterDailyStoreNotice();
+    if (!mounted || notice.message == null) return;
+    setState(() => _dailyStoreNotice = notice);
+    unawaited(SupabaseService.ackImporterDailyStoreNotice());
   }
 
   Future<void> _loadAliadoFavorites() async {
@@ -124,6 +144,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    _presenceTimer?.cancel();
     PushNotificationService.instance.unregisterTapHandler();
     _notifications.removeListener(_onNotificationsChanged);
     _notifications.dispose();
@@ -370,8 +391,11 @@ class _MainShellState extends State<MainShell> {
       const AdminOrdersPanel(),
       const AdminEncomiendasReportPanel(),
       const AdminOrderRatingsPanel(),
-      const AdminCommissionSettlementsPanel(),
-      AdminKycReviewPanel(viewerIsOwner: _profile.isOwner),
+      AdminCommissionSettlementsPanel(viewerRole: _profile.role),
+      AdminKycReviewPanel(
+        viewerRole: _profile.role,
+        viewerIsOwner: _profile.isOwner,
+      ),
       const AdminSupportTicketsPanel(),
       AdminAccountManagementPanel(viewer: _profile),
     ];
@@ -459,6 +483,12 @@ class _MainShellState extends State<MainShell> {
       onMessagesTap: _openMessagesInbox,
       unreadMessages: _notifications.unreadChatCount,
       onOpenSettings: _openAccountSettings,
+      railStatusBuilder: canQueryAdminPresence(_profile.role)
+          ? (extended) => AdminDailyPresenceCard(
+                extended: extended,
+                onOpenDetails: MainShellTabController.navigateToAdminPresence,
+              )
+          : null,
       pages: [
         ...panels,
         _adminProfileBody(),
@@ -663,6 +693,11 @@ class _MainShellState extends State<MainShell> {
             onDismiss: _dismissAliadoAccessApprovedBanner,
             compact: true,
           ),
+        if (role == AppHomeRole.importador && _dailyStoreNotice != null)
+          ImporterDailyStoreNoticeBanner(
+            notice: _dailyStoreNotice!,
+            onDismiss: () => setState(() => _dailyStoreNotice = null),
+          ),
         Expanded(
           child: B2bDesktopShell(
             selectedIndex: _tabIndex,
@@ -696,6 +731,11 @@ class _MainShellState extends State<MainShell> {
               message: _aliadoAccessApprovedMessage,
               onDismiss: _dismissAliadoAccessApprovedBanner,
               compact: true,
+            ),
+          if (role == AppHomeRole.importador && _dailyStoreNotice != null)
+            ImporterDailyStoreNoticeBanner(
+              notice: _dailyStoreNotice!,
+              onDismiss: () => setState(() => _dailyStoreNotice = null),
             ),
           Expanded(
             child: IndexedStack(

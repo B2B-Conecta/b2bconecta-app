@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
+import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'product_images.dart';
 
 /// Slot de imagen en edición: URL existente o bytes pendientes de subir.
@@ -44,15 +45,21 @@ class ProductImageGalleryEditor extends StatelessWidget {
     try {
       final picked = await pickKycDocument(channel: channel);
       if (picked == null) return;
-      var ext = picked.fileName.contains('.')
-          ? picked.fileName.split('.').last.toLowerCase()
-          : 'jpeg';
-      if (ext == 'jpg') ext = 'jpeg';
-      final bytes = picked.bytes;
+      final checked = UploadFileGuard.check(
+        picked.bytes,
+        picked.fileName,
+        kind: UploadKind.image,
+      );
+      final ext = checked.extension == 'jpg' ? 'jpeg' : checked.extension;
 
       final next = List<ProductImageEditSlot>.from(slots);
-      next.add(ProductImageEditSlot.pending(bytes, ext));
+      next.add(ProductImageEditSlot.pending(checked.bytes, ext));
       onChanged(next);
+    } on UploadRejectedException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

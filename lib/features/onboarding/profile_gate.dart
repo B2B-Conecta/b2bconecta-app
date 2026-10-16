@@ -159,6 +159,7 @@ class _ProfileGateState extends State<ProfileGate> {
 
         if (profile.isReadyForMainApp) {
           return ProductShareLinkHost(
+            viewer: profile,
             child: MainShell(homeRole: _homeRoleFor(profile), profile: profile),
           );
         }

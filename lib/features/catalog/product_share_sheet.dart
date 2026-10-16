@@ -7,6 +7,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/stored_file_actions.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
+import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 
 /// Compartir enlace, copiarlo, o enviar y descargar la foto por separado.
 ///
@@ -69,6 +70,22 @@ Future<void> showProductShareSheet(
                 onTap: () async {
                   Navigator.of(ctx).pop();
                   await _shareText(context, name: name, url: url);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.qr_code_2, color: AppColors.brand),
+                title: const Text('Compartir QR'),
+                subtitle: const Text(
+                  'Código de la ficha pública, sin datos de sesión.',
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  showShareQrSheet(
+                    context,
+                    title: name,
+                    url: url,
+                    subtitle: 'Ficha del producto',
+                  );
                 },
               ),
               ListTile(

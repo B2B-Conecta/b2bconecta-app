@@ -25,14 +25,23 @@ Deno.serve(async (req) => {
     return new Response("method not allowed", { status: 405 });
   }
 
-  const id = new URL(req.url).searchParams.get("id")?.trim() ?? "";
-  const pageUrl = UUID.test(id) ? `${ORIGIN}/producto/${id}` : ORIGIN;
+  const params = new URL(req.url).searchParams;
+  const id = params.get("id")?.trim() ?? "";
+  const kind = params.get("kind") === "store" ? "store" : "product";
+  const pageUrl = UUID.test(id)
+    ? `${ORIGIN}/${kind === "store" ? "vitrina" : "producto"}/${id}`
+    : ORIGIN;
 
   let title = BRAND_TITLE;
   let description = BRAND_DESCRIPTION;
   let image = BRAND_IMAGE;
 
-  if (UUID.test(id)) {
+  if (kind === "store" && UUID.test(id)) {
+    const card = await storeCard(id);
+    title = card.title;
+    description = card.description;
+    image = card.image;
+  } else if (UUID.test(id)) {
     const url = Deno.env.get("SUPABASE_URL") ?? "";
     const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     if (url && key) {
@@ -65,6 +74,38 @@ Deno.serve(async (req) => {
     },
   });
 });
+
+async function storeCard(id: string): Promise<{
+  title: string;
+  description: string;
+  image: string;
+}> {
+  const generic = {
+    title: BRAND_TITLE,
+    description: BRAND_DESCRIPTION,
+    image: BRAND_IMAGE,
+  };
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!url || !key) return generic;
+  const admin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data } = await admin
+    .from("profiles")
+    .select("business_name, role, deactivated_at, logo_storage_path")
+    .eq("id", id)
+    .maybeSingle();
+  if (data?.role !== "importador" || data?.deactivated_at) return generic;
+  const name = typeof data.business_name === "string" ? data.business_name.trim() : "";
+  if (!name) return generic;
+  const logo = String(data.logo_storage_path ?? "").trim();
+  return {
+    title: name,
+    description: "Vitrina en B2B Conecta. Inicia sesión para ver el catálogo y pedir.",
+    image: logo.startsWith("https://") ? logo : BRAND_IMAGE,
+  };
+}
 
 function coverUrl(row: {
   image_url?: unknown;

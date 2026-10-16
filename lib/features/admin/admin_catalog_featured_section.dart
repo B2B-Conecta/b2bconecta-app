@@ -76,9 +76,6 @@ class _AdminCatalogFeaturedSectionState
   List<ImporterSalesSnapshot> get _featured =>
       _rows.where((e) => e.isCatalogFeatured).toList();
 
-  List<ImporterSalesSnapshot> get _verified =>
-      _rows.where((e) => e.isCatalogVerified).toList();
-
   List<ImporterSalesSnapshot> get _candidates {
     final q = _searchCtrl.text.trim().toLowerCase();
     final list = _rows.where((e) {
@@ -238,22 +235,14 @@ class _AdminCatalogFeaturedSectionState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
+            const Row(
               children: [
                 Icon(Icons.verified_outlined, size: 20, color: AppColors.brandBlue),
-                const SizedBox(width: 8),
-                const Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: Text(
                     'Sellos Verificado y Destacado',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
-                ),
-                Text(
-                  'D ${_featured.length}/3 · V ${_verified.length}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

@@ -23,6 +23,7 @@ import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 import 'package:motolink_pro_app/features/catalog/guest_shared_catalog.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_share_link.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 
 /// Enruta entre login, recuperación de contraseña y app según sesión y evento Auth.
@@ -84,10 +85,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       AdAttributionStorage.captureFromUri(widget.launchUri ?? Uri.base),
     );
     unawaited(ProductShareLink.capture(widget.launchUri ?? Uri.base));
+    unawaited(ImporterStoreShareLink.capture(widget.launchUri ?? Uri.base));
     if (!kIsWeb) {
       unawaited(() async {
         final initial = await AppLinks().getInitialLink();
-        if (initial != null) await ProductShareLink.capture(initial);
+        if (initial != null) {
+          await ProductShareLink.capture(initial);
+          await ImporterStoreShareLink.capture(initial);
+        }
       }());
     }
     WidgetsBinding.instance.addObserver(this);
@@ -203,6 +208,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void _onIncomingDeepLink(Uri uri) {
     if (ProductShareLink.idFromUri(uri) != null) {
       unawaited(ProductShareLink.capture(uri));
+    }
+    if (ImporterStoreShareLink.idFromUri(uri) != null) {
+      unawaited(ImporterStoreShareLink.capture(uri));
     }
     if (!hasAuthCallbackInUri(uri)) return;
 
@@ -516,6 +524,19 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return GuestSharedProductScreen(
         key: ValueKey('guest_product_$sharedProductId'),
         productId: sharedProductId,
+        onRegister: _openRegisterFromGuest,
+      );
+    }
+
+    final sharedStoreId = skipGuest
+        ? null
+        : ImporterStoreShareLink.idFromUri(widget.launchUri) ??
+            ImporterStoreShareLink.idFromUri(Uri.base) ??
+            ImporterStoreShareLink.pending.value;
+    if (sharedStoreId != null) {
+      return GuestSupplierStoreScreen(
+        key: ValueKey('guest_store_$sharedStoreId'),
+        importerId: sharedStoreId,
         onRegister: _openRegisterFromGuest,
       );
     }

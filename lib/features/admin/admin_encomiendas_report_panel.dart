@@ -14,6 +14,11 @@ import 'encomiendas_report_excel_service.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
+import 'package:motolink_pro_app/core/layout/filter_chip_strip.dart';
+import 'package:motolink_pro_app/core/layout/filter_menu_button.dart';
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'admin_product_sales_ranking.dart';
 import 'admin_catalog_featured_section.dart';
@@ -51,6 +56,7 @@ class _AdminEncomiendasReportPanelState
   bool _soloConValoracion = false;
   bool _soloPagosAprobados = false;
   bool _soloEntregados = false;
+
   /// `null` = todos; 10/20/50 = solo pedidos de los productos más vendidos.
   int? _topSoldLimit;
   int _sectionIndex = 0;
@@ -72,7 +78,13 @@ class _AdminEncomiendasReportPanelState
     _hasta = DateTime(now.year, now.month, now.day);
     _desde = _hasta.subtract(const Duration(days: 90));
     _searchCtrl.addListener(_applyLocalFilters);
+    MainShellTabController.adminPresenceRequest.addListener(_openPresence);
     _bootstrap();
+  }
+
+  void _openPresence() {
+    if (!mounted) return;
+    setState(() => _sectionIndex = 2);
   }
 
   Future<void> _bootstrap() async {
@@ -90,6 +102,7 @@ class _AdminEncomiendasReportPanelState
 
   @override
   void dispose() {
+    MainShellTabController.adminPresenceRequest.removeListener(_openPresence);
     _searchCtrl.removeListener(_applyLocalFilters);
     _searchCtrl.dispose();
     super.dispose();
@@ -174,9 +187,7 @@ class _AdminEncomiendasReportPanelState
 
     if (applyTopSold && _topSoldLimit != null) {
       final keys = topProductKeys(list, limit: _topSoldLimit!);
-      list = list
-          .where((r) => keys.contains(adminProductSalesKey(r)))
-          .toList();
+      list = list.where((r) => keys.contains(adminProductSalesKey(r))).toList();
     }
 
     return list;
@@ -208,8 +219,7 @@ class _AdminEncomiendasReportPanelState
     _load();
   }
 
-  String _formatDateShort(DateTime d) =>
-      '${d.day}/${d.month}/${d.year}';
+  String _formatDateShort(DateTime d) => '${d.day}/${d.month}/${d.year}';
 
   int get _activeFilterCount {
     var n = 0;
@@ -225,11 +235,9 @@ class _AdminEncomiendasReportPanelState
   }
 
   Future<void> _showAdvancedFiltersSheet() async {
-    await showModalBottomSheet<void>(
+    await showAdaptiveAdminSheet<void>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
+      builder: (ctx, _) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             void refreshSheet() => setSheetState(() {});
@@ -472,39 +480,38 @@ class _AdminEncomiendasReportPanelState
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: _pickDesde,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: MediaQuery.sizeOf(context).width < 600
+                          ? 'Producto, SKU, tienda minorista…'
+                          : 'Buscar producto, SKU, tienda minorista…',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      filled: true,
+                      fillColor: AppColors.fieldFill,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.borderSubtle),
                       ),
-                      visualDensity: VisualDensity.compact,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.borderSubtle),
+                      ),
+                      isDense: true,
+                      suffixIcon: _searchCtrl.text.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _applyLocalFilters();
+                              },
+                            ),
                     ),
-                    child: Text(
-                      'Desde ${_formatDateShort(_desde)}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
+                    onChanged: (_) => _applyLocalFilters(),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _pickHasta,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: Text(
-                      'Hasta ${_formatDateShort(_hasta)}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 IconButton.filled(
                   onPressed: _loading ? null : _load,
                   icon: _loading
@@ -521,74 +528,114 @@ class _AdminEncomiendasReportPanelState
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            SegmentedFilterBar(
-              labels: const ['30 días', '90 días', '365 días'],
-              selectedIndex: _presetDayIndex,
-              onSelected: _loading
-                  ? (_) {}
-                  : (index) {
-                      _presetDays(const [30, 90, 365][index]);
-                      _load();
-                    },
-            ),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                TextButton.icon(
-                  onPressed: _showAdvancedFiltersSheet,
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: Text(
-                    _activeFilterCount == 0
+            const SizedBox(height: 10),
+            if (isAdminDesktopLayout(context))
+              _desktopFilterToolbar()
+            else
+              FilterChipStrip(
+                children: [
+                  for (final (i, days) in const [30, 90, 365].indexed)
+                    StripChip(
+                      label: '$days días',
+                      selected: _presetDayIndex == i,
+                      onTap: _loading
+                          ? null
+                          : () {
+                              _presetDays(days);
+                              _load();
+                            },
+                    ),
+                  StripChip(
+                    label:
+                        '${_formatDateShort(_desde)} – ${_formatDateShort(_hasta)}',
+                    icon: Icons.calendar_today_outlined,
+                    selected: _presetDayIndex < 0,
+                    onTap: _loading ? null : _pickRange,
+                  ),
+                  const StripDivider(),
+                  StripChip(
+                    label: _activeFilterCount == 0
                         ? 'Filtros'
                         : 'Filtros ($_activeFilterCount)',
+                    icon: Icons.tune,
+                    selected: _activeFilterCount > 0,
+                    onTap: _showAdvancedFiltersSheet,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: MediaQuery.sizeOf(context).width < 600
-                    ? 'Producto, SKU, tienda minorista…'
-                    : 'Buscar producto, SKU, tienda minorista…',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                border: const OutlineInputBorder(),
-                isDense: true,
-                suffixIcon: _searchCtrl.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          _applyLocalFilters();
-                        },
-                      ),
-              ),
-              onChanged: (_) {
-                _applyLocalFilters();
-                setState(() {});
-              },
-            ),
-            if (_activeFilterCount > 0) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: _clearAllFilters,
-                    child: const Text('Limpiar'),
-                  ),
+                  ..._activeFilterChips(),
+                  if (_activeFilterCount > 0)
+                    TextButton(
+                      onPressed: _clearAllFilters,
+                      child: const Text('Limpiar'),
+                    ),
                 ],
               ),
-              _activeFilterChips(),
-            ],
           ],
         ),
       ),
     );
+  }
+
+  Widget _desktopFilterToolbar() {
+    final preset = _presetDayIndex;
+    const presets = [30, 90, 365];
+    final rangeLabel =
+        '${_formatDateShort(_desde)} – ${_formatDateShort(_hasta)}';
+    return FilterToolbar(
+      children: [
+        FilterMenuButton(
+          icon: Icons.calendar_today_outlined,
+          label: preset >= 0
+              ? 'Período · ${presets[preset]} días'
+              : 'Período · $rangeLabel',
+          active: true,
+          enabled: !_loading,
+          menuChildren: [
+            for (final (i, days) in presets.indexed)
+              FilterMenuOption(
+                label: 'Últimos $days días',
+                selected: preset == i,
+                onPressed: () {
+                  _presetDays(days);
+                  _load();
+                },
+              ),
+            const Divider(height: 8),
+            FilterMenuOption(
+              label:
+                  preset < 0 ? 'Personalizado · $rangeLabel' : 'Personalizado…',
+              icon: Icons.date_range_outlined,
+              selected: preset < 0,
+              onPressed: _pickRange,
+            ),
+          ],
+        ),
+        FilterPillButton(
+          icon: Icons.tune,
+          label: _activeFilterCount == 0
+              ? 'Filtros'
+              : 'Filtros ($_activeFilterCount)',
+          active: _activeFilterCount > 0,
+          showChevron: false,
+          onTap: _showAdvancedFiltersSheet,
+        ),
+        ..._activeFilterChips(),
+        if (_activeFilterCount > 0)
+          TextButton(
+            onPressed: _clearAllFilters,
+            child: const Text('Limpiar'),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickRange() async {
+    final from = _desde;
+    final to = _hasta;
+    await _pickDesde();
+    if (!mounted) return;
+    await _pickHasta();
+    if (!mounted) return;
+    if (_desde != from || _hasta != to) _load();
   }
 
   Future<void> _pickDesde() async {
@@ -634,9 +681,8 @@ class _AdminEncomiendasReportPanelState
   EncomiendasReportExportMeta _exportMeta() {
     final lines = <String>[];
     if (_statusSelection.isNotEmpty) {
-      final labels = _statusSelection
-          .map(TransactionRequestStatus.labelEs)
-          .join(', ');
+      final labels =
+          _statusSelection.map(TransactionRequestStatus.labelEs).join(', ');
       lines.add('Estados: $labels');
     } else {
       lines.add('Estados: todos');
@@ -655,7 +701,8 @@ class _AdminEncomiendasReportPanelState
     if (docLabel != null && _docPrefFilter != 'all') {
       lines.add('Documento: $docLabel');
     }
-    if (_soloConValoracion) lines.add('Solo con valoración de la tienda minorista');
+    if (_soloConValoracion)
+      lines.add('Solo con valoración de la tienda minorista');
     if (_soloPagosAprobados) lines.add('Solo pagos aprobados');
     if (_soloEntregados) lines.add('Solo entregados');
     if (_topSoldLimit != null) {
@@ -736,7 +783,7 @@ class _AdminEncomiendasReportPanelState
     }
   }
 
-  Widget _activeFilterChips() {
+  List<Widget> _activeFilterChips() {
     final chips = <Widget>[];
     if (_statusSelection.isNotEmpty) {
       for (final s in _statusSelection) {
@@ -766,7 +813,8 @@ class _AdminEncomiendasReportPanelState
           .map((o) => o.label)
           .firstOrNull;
       if (label != null) {
-        chips.add(Chip(label: Text(label), visualDensity: VisualDensity.compact));
+        chips.add(
+            Chip(label: Text(label), visualDensity: VisualDensity.compact));
       }
     }
     if (_soloConValoracion) {
@@ -793,20 +841,7 @@ class _AdminEncomiendasReportPanelState
         visualDensity: VisualDensity.compact,
       ));
     }
-    if (_searchCtrl.text.trim().isNotEmpty) {
-      chips.add(Chip(
-        label: Text('«${_searchCtrl.text.trim()}»'),
-        visualDensity: VisualDensity.compact,
-      ));
-    }
-    if (chips.isEmpty) {
-      return Text(
-        'Sin filtros locales activos · rango ${_desde.day}/${_desde.month}/${_desde.year} — '
-        '${_hasta.day}/${_hasta.month}/${_hasta.year}',
-        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-      );
-    }
-    return Wrap(spacing: 6, runSpacing: 6, children: chips);
+    return chips;
   }
 
   Widget _topSoldProductsSection() {
@@ -868,7 +903,8 @@ class _AdminEncomiendasReportPanelState
                     if ((shown[i].importerName ?? '').isNotEmpty)
                       shown[i].importerName!,
                   ].join(' · '),
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -910,7 +946,8 @@ class _AdminEncomiendasReportPanelState
     final conFacturaImportador =
         list.where((r) => r.hasProveedorFactura).length;
     final pagosAprobados = list
-        .where((r) => r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado)
+        .where(
+            (r) => r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado)
         .length;
     final prefNota = list
         .where((r) =>
@@ -1026,7 +1063,12 @@ class _AdminEncomiendasReportPanelState
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: _sectionSwitcher(),
           ),
-          const Expanded(child: AdminUserMonitoringPanel()),
+          Expanded(
+            child: AdminUserMonitoringPanel(
+              presenceRequest:
+                  MainShellTabController.adminPresenceRequest.value,
+            ),
+          ),
         ],
       );
     }
@@ -1073,7 +1115,8 @@ class _AdminEncomiendasReportPanelState
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(_error!, textAlign: TextAlign.center),
-                    TextButton(onPressed: _load, child: const Text('Reintentar')),
+                    TextButton(
+                        onPressed: _load, child: const Text('Reintentar')),
                   ],
                 ),
               ),
@@ -1143,11 +1186,10 @@ class _AdminEncomiendasReportPanelState
                             ),
                             const SizedBox(height: 8),
                             FilledButton.tonalIcon(
-                              onPressed: (_filtered.isEmpty ||
-                                      _exporting ||
-                                      _loading)
-                                  ? null
-                                  : _exportExcel,
+                              onPressed:
+                                  (_filtered.isEmpty || _exporting || _loading)
+                                      ? null
+                                      : _exportExcel,
                               icon: _exporting
                                   ? const SizedBox(
                                       width: 18,
@@ -1252,19 +1294,28 @@ class _AdminEncomiendasReportPanelState
                       ],
                     ),
                     const SizedBox(height: 8),
-                    if (_filtered.isEmpty)
+                    if (_filtered.isEmpty && _loading)
+                      const SizedBox(
+                        height: 320,
+                        child: AdminListSkeleton(
+                          itemCount: 4,
+                          padding: EdgeInsets.zero,
+                        ),
+                      )
+                    else if (_filtered.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Center(
                           child: Text(
-                            _loading ? 'Cargando…' : 'Sin resultados',
+                            'Sin resultados',
                             style: TextStyle(color: AppColors.textSecondary),
                           ),
                         ),
                       )
                     else
-                      PagedItems(
+                      PagedItems<TransactionRequestModel>(
                         items: _filtered,
+                        itemKey: (r) => r.id,
                         embedded: true,
                         separator: 8,
                         itemBuilder: _detailTile,
@@ -1449,9 +1500,8 @@ class _MiniChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = highlighted ? AppColors.brandAccent : AppColors.textPrimary;
-    final bg = highlighted
-        ? AppColors.brandBlueContainer
-        : AppColors.surfaceTinted;
+    final bg =
+        highlighted ? AppColors.brandBlueContainer : AppColors.surfaceTinted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

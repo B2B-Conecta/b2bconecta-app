@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
+
+import 'upload_file_guard.dart';
 import 'web_native_file_pick.dart';
 
 /// Archivo elegido por cámara, galería o selector de documentos.
@@ -36,6 +39,35 @@ Future<PickedDocumentBytes?> pickKycDocumentFromCamera() => _pickFromCamera();
 Future<PickedDocumentBytes?> pickKycDocumentFromGallery() => _pickFromGallery();
 
 Future<PickedDocumentBytes?> pickKycDocumentFromFile() => _pickFromFiles();
+
+/// Valida tipo y tamaño antes de devolver el archivo. Si no pasa, avisa con
+/// un SnackBar global y devuelve null, igual que una cancelación.
+Future<PickedDocumentBytes?> _guarded(
+  Future<PickedDocumentBytes?> pick,
+  UploadKind kind,
+) async {
+  final picked = await pick;
+  if (picked == null) return null;
+  try {
+    final checked = UploadFileGuard.check(
+      picked.bytes,
+      picked.fileName,
+      kind: kind,
+    );
+    return PickedDocumentBytes(
+      bytes: checked.bytes,
+      fileName: checked.fileName,
+    );
+  } on UploadRejectedException catch (e) {
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(e.message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return null;
+  }
+}
 
 /// Muestra cámara / galería / archivo y devuelve bytes listos para subir.
 Future<PickedDocumentBytes?> pickKycDocumentBytes(BuildContext context) async {
@@ -155,7 +187,19 @@ Future<PickedDocumentBytes?> pickSpreadsheetFile() async {
   return _fromPlatformFile(res, fallbackName: 'catalogo.xlsx');
 }
 
-Future<PickedDocumentBytes?> _pickFromCamera() async {
+Future<PickedDocumentBytes?> _pickFromCamera() =>
+    _guarded(_rawPickFromCamera(), UploadKind.image);
+
+Future<PickedDocumentBytes?> _pickFromGallery() =>
+    _guarded(_rawPickFromGallery(), UploadKind.image);
+
+Future<PickedDocumentBytes?> _pickFromFiles() =>
+    _guarded(_rawPickFromFiles(), UploadKind.imageOrPdf);
+
+Future<PickedDocumentBytes?> _pickImageFromFiles() =>
+    _guarded(_rawPickImageFromFiles(), UploadKind.image);
+
+Future<PickedDocumentBytes?> _rawPickFromCamera() async {
   if (kIsWeb) {
     // No `capture`: Safari muestra Cámara / Fototeca / Archivos.
     return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesOnly));
@@ -172,7 +216,7 @@ Future<PickedDocumentBytes?> _pickFromCamera() async {
   }
 }
 
-Future<PickedDocumentBytes?> _pickFromGallery() async {
+Future<PickedDocumentBytes?> _rawPickFromGallery() async {
   if (kIsWeb) {
     return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesOnly));
   }
@@ -188,7 +232,7 @@ Future<PickedDocumentBytes?> _pickFromGallery() async {
   }
 }
 
-Future<PickedDocumentBytes?> _pickFromFiles() async {
+Future<PickedDocumentBytes?> _rawPickFromFiles() async {
   if (kIsWeb) {
     return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesAndPdf));
   }
@@ -200,7 +244,7 @@ Future<PickedDocumentBytes?> _pickFromFiles() async {
   return _fromPlatformFile(res, fallbackName: 'documento.pdf');
 }
 
-Future<PickedDocumentBytes?> _pickImageFromFiles() async {
+Future<PickedDocumentBytes?> _rawPickImageFromFiles() async {
   if (kIsWeb) {
     return _fromWeb(await pickWebNativeFile(accept: kWebAcceptImagesOnly));
   }

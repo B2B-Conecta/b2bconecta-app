@@ -21,7 +21,10 @@ class AdminDesktopShell extends StatelessWidget {
     this.onMessagesTap,
     this.unreadMessages = 0,
     required this.onOpenSettings,
+    this.railStatusBuilder,
   });
+
+  final Widget Function(bool extended)? railStatusBuilder;
 
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
@@ -48,6 +51,7 @@ class AdminDesktopShell extends StatelessWidget {
       unreadMessages: unreadMessages,
       onOpenSettings: onOpenSettings,
       railBadgeLabel: 'Panel administrador',
+      railStatusBuilder: railStatusBuilder,
     );
   }
 }

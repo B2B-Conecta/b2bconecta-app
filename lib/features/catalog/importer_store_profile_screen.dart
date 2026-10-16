@@ -14,6 +14,8 @@ import 'package:motolink_pro_app/features/catalog/favorite_heart_button.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_share_link.dart';
+import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 import 'package:motolink_pro_app/features/catalog/product_warranty_seal.dart';
@@ -342,6 +344,16 @@ class _ImporterStoreProfileScreenState
       appBar: AppBar(
         title: Text(_profile?.displayName ?? 'Mayorista'),
         actions: [
+          IconButton(
+            tooltip: 'Compartir QR',
+            onPressed: () => showShareQrSheet(
+              context,
+              title: _profile?.displayName ?? 'Vitrina',
+              url: ImporterStoreShareLink.urlFor(widget.importerId),
+              subtitle: 'Vitrina del proveedor',
+            ),
+            icon: const Icon(Icons.qr_code_2),
+          ),
           if (_profile != null && _canMessageSupplier)
             IconButton(
               key: const Key('store-supplier-chat'),

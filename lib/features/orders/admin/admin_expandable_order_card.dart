@@ -27,6 +27,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
     required this.request,
     this.checkoutGroupLines,
     required this.expanded,
+    this.highlighted = false,
     required this.onToggle,
     required this.statusLabel,
     this.expandedFooter,
@@ -36,6 +37,9 @@ class AdminExpandableOrderCard extends StatelessWidget {
   final TransactionRequestModel request;
   final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
+
+  /// Fila elegida en el master-detail de escritorio.
+  final bool highlighted;
   final VoidCallback onToggle;
   final String statusLabel;
   final Widget? expandedFooter;
@@ -71,6 +75,16 @@ class AdminExpandableOrderCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.hardEdge,
+      color: highlighted ? AppColors.brandBlueContainer : null,
+      shape: highlighted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: AppColors.brandAccent.withOpacity(0.7),
+                width: 1.5,
+              ),
+            )
+          : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

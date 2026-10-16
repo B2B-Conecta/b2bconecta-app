@@ -28,6 +28,7 @@ import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.da
 import 'package:motolink_pro_app/core/notifications/kyc_notification_match.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice_banner.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
@@ -683,6 +684,7 @@ class _MainShellState extends State<MainShell> {
     required List<ShellDestination> destinations,
     required String railBadgeLabel,
     List<Widget> trailingActions = const [],
+    Widget Function(bool extended)? railStatusBuilder,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -712,6 +714,7 @@ class _MainShellState extends State<MainShell> {
             onOpenSettings: _openAccountSettings,
             railBadgeLabel: railBadgeLabel,
             trailingActions: trailingActions,
+            railStatusBuilder: railStatusBuilder,
           ),
         ),
       ],
@@ -822,6 +825,9 @@ class _MainShellState extends State<MainShell> {
             role: AppHomeRole.importador,
             destinations: _importadorDestinations,
             railBadgeLabel: 'Panel importador',
+            railStatusBuilder: (extended) => ImporterStoreCountCard(
+              extended: extended,
+            ),
           );
         }
         return _buildB2bMobileShell(
@@ -891,15 +897,15 @@ class _OrdersTab extends StatelessWidget {
       appBar: embedInDesktopShell
           ? null
           : MotolinkAppBar(
-        currentUserProfile: profile,
-        logoHeight: homeRole == AppHomeRole.aliado
-            ? MotolinkAppBarLogoSizes.aliado
-            : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: onNotificationTap,
-        unreadNotifications: unreadNotifications,
-        onMessagesTap: onMessagesTap,
-        unreadMessages: unreadMessages,
-      ),
+              currentUserProfile: profile,
+              logoHeight: homeRole == AppHomeRole.aliado
+                  ? MotolinkAppBarLogoSizes.aliado
+                  : MotolinkAppBarLogoSizes.importador,
+              onNotificationTap: onNotificationTap,
+              unreadNotifications: unreadNotifications,
+              onMessagesTap: onMessagesTap,
+              unreadMessages: unreadMessages,
+            ),
       body: switch (homeRole) {
         AppHomeRole.importador => const ImporterActiveOrdersPanel(),
         AppHomeRole.administrador => const SizedBox.shrink(),
@@ -1112,28 +1118,28 @@ class _ProfileTabState extends State<_ProfileTab> {
       appBar: widget.embedInDesktopShell
           ? null
           : MotolinkAppBar(
-        currentUserProfile: widget.profile,
-        logoHeight: widget.homeRole == AppHomeRole.aliado
-            ? MotolinkAppBarLogoSizes.aliado
-            : MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: widget.onNotificationTap,
-        unreadNotifications: widget.unreadNotifications,
-        onMessagesTap: widget.onMessagesTap,
-        unreadMessages: widget.unreadMessages,
-        extraActions: [
-          HeaderIconButton(
-            tooltip: 'Ajustes',
-            icon: Icons.settings_outlined,
-            onPressed: () {
-              Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AccountSettingsScreen(),
+              currentUserProfile: widget.profile,
+              logoHeight: widget.homeRole == AppHomeRole.aliado
+                  ? MotolinkAppBarLogoSizes.aliado
+                  : MotolinkAppBarLogoSizes.importador,
+              onNotificationTap: widget.onNotificationTap,
+              unreadNotifications: widget.unreadNotifications,
+              onMessagesTap: widget.onMessagesTap,
+              unreadMessages: widget.unreadMessages,
+              extraActions: [
+                HeaderIconButton(
+                  tooltip: 'Ajustes',
+                  icon: Icons.settings_outlined,
+                  onPressed: () {
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AccountSettingsScreen(),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ],
-      ),
+              ],
+            ),
       body: SafeArea(
         top: !widget.embedInDesktopShell,
         child: SingleChildScrollView(
@@ -1154,35 +1160,35 @@ class _ProfileTabState extends State<_ProfileTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              ProfileB2BForm(
-                key: ValueKey<Object>(
-                  '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
-                ),
-                initial: widget.profile,
-                onRelatedDataChanged: widget.onProfileSaved,
-                onSaved: () {
-                  widget.onProfileSaved();
-                },
-                beforeSignOut: showSupportEntry &&
-                        widget.homeRole == AppHomeRole.aliado
-                    ? _buildSupportEntryCard()
-                    : null,
-                afterReputation: showSupportEntry &&
-                        widget.homeRole == AppHomeRole.importador
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildCarriersEntryCard(),
-                          const SizedBox(height: 12),
-                          _buildSupportEntryCard(),
-                        ],
-                      )
-                    : showSupportEntry &&
+                  ProfileB2BForm(
+                    key: ValueKey<Object>(
+                      '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
+                    ),
+                    initial: widget.profile,
+                    onRelatedDataChanged: widget.onProfileSaved,
+                    onSaved: () {
+                      widget.onProfileSaved();
+                    },
+                    beforeSignOut: showSupportEntry &&
                             widget.homeRole == AppHomeRole.aliado
                         ? _buildSupportEntryCard()
                         : null,
-              ),
-            ],
+                    afterReputation: showSupportEntry &&
+                            widget.homeRole == AppHomeRole.importador
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildCarriersEntryCard(),
+                              const SizedBox(height: 12),
+                              _buildSupportEntryCard(),
+                            ],
+                          )
+                        : showSupportEntry &&
+                                widget.homeRole == AppHomeRole.aliado
+                            ? _buildSupportEntryCard()
+                            : null,
+                  ),
+                ],
               ),
             ),
           ),

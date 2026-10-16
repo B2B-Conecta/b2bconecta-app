@@ -28,6 +28,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     required this.request,
     this.checkoutGroupLines,
     required this.expanded,
+    this.highlighted = false,
     required this.onToggle,
     required this.statusLabel,
     this.operationalHeadline,
@@ -49,6 +50,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final TransactionRequestModel request;
   final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
+
+  /// Fila elegida en el master-detail de escritorio.
+  final bool highlighted;
   final VoidCallback onToggle;
   final String statusLabel;
   final String? operationalHeadline;
@@ -115,9 +119,13 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
+      color: highlighted ? AppColors.brandBlueContainer : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.borderSubtle),
+        side: BorderSide(
+          color: highlighted ? AppColors.brand : AppColors.borderSubtle,
+          width: highlighted ? 1.4 : 1,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

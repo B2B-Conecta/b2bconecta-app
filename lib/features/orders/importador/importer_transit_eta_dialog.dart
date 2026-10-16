@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_actions_flow_copy.dart';
 
 /// Pide al importador el tiempo de llegada antes de marcar el pedido en tránsito.
@@ -8,10 +9,10 @@ import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_ac
 Future<({int days, int hours})?> showImporterTransitEtaDialog(
   BuildContext context,
 ) async {
-  return showDialog<({int days, int hours})?>(
+  return showAdaptiveAdminSheet<({int days, int hours})?>(
     context: context,
-    barrierDismissible: false,
-    builder: (ctx) => const _ImporterTransitEtaDialog(),
+    isDismissible: false,
+    builder: (ctx, _) => const _ImporterTransitEtaDialog(),
   );
 }
 
@@ -60,12 +61,22 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text(OrderActionsFlowCopy.transitEtaTitulo),
-      content: Column(
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20, 4, 20, 16 + bottom),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            OrderActionsFlowCopy.transitEtaTitulo,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
             OrderActionsFlowCopy.transitEtaIntro,
             style: TextStyle(
@@ -97,7 +108,7 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
             ),
             child: Text(
               _preview,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.brand,
               ),
@@ -114,18 +125,23 @@ class _ImporterTransitEtaDialogState extends State<_ImporterTransitEtaDialog> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Cancelar'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _submit,
+                child: const Text(OrderActionsFlowCopy.transitEtaConfirmar),
+              ),
+            ],
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, null),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text(OrderActionsFlowCopy.transitEtaConfirmar),
-        ),
-      ],
     );
   }
 }

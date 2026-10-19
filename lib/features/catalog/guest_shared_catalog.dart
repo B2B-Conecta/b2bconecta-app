@@ -446,15 +446,6 @@ class _GuestStoreProductCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: EnvioPoliticaBadge(
-                    tipo: part.ownerEnvioTipo,
-                    compact: true,
-                  ),
-                ),
-                if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo))
-                  const SizedBox(height: 6),
                 Text(
                   part.nombre,
                   maxLines: 2,
@@ -489,6 +480,15 @@ class _GuestStoreProductCard extends StatelessWidget {
                   showPromotionChips: false,
                 ),
                 const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: EnvioPoliticaBadge(
+                    tipo: part.ownerEnvioTipo,
+                    compact: true,
+                  ),
+                ),
+                if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo))
+                  const SizedBox(height: 6),
                 Text(
                   '${part.stockForSale} en stock · ${part.minOrderQtyLabelEs}',
                   maxLines: 1,

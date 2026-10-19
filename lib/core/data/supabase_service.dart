@@ -970,10 +970,12 @@ class SupabaseService {
   static Future<int> adminDeletePedido({
     required String transactionRequestId,
     bool deleteCheckoutGroup = false,
+    String? motivo,
   }) =>
       OrdersService.adminDeletePedido(
         transactionRequestId: transactionRequestId,
         deleteCheckoutGroup: deleteCheckoutGroup,
+        motivo: motivo,
       );
 
   static Future<void> adminAnulaPedidoPorMotolink({

@@ -37,10 +37,68 @@ Future<bool> confirmAdminDeletePedido(
   ).then((value) => value == true);
 }
 
+/// Motivo obligatorio para borrar un pedido que ya está entregado.
+Future<String?> askAdminDeleteEntregadoMotivo(BuildContext context) async {
+  final ctrl = TextEditingController();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Motivo de la eliminación'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Este pedido ya está entregado. Al eliminarlo deja de contar en los reportes. '
+            'Indique por qué, por ejemplo un pedido de prueba. No se puede deshacer. '
+            'El inventario no vuelve y una factura de comisión ya emitida no cambia.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            maxLines: 4,
+            maxLength: 500,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Motivo (obligatorio)',
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.red.shade800),
+          onPressed: () {
+            if (ctrl.text.trim().length < 3) return;
+            Navigator.pop(ctx, true);
+          },
+          child: const Text('Eliminar'),
+        ),
+      ],
+    ),
+  );
+  final motivo = ctrl.text.trim();
+  ctrl.dispose();
+  if (ok != true || motivo.length < 3) return null;
+  return motivo;
+}
+
 /// Segunda confirmación cuando el carrito tiene otras líneas.
 Future<AdminDeletePedidoScope?> confirmAdminDeletePedidoGroup(
   BuildContext context, {
   required List<TransactionRequestModel> siblings,
+  bool includesDelivered = false,
 }) {
   return showDialog<AdminDeletePedidoScope>(
     context: context,
@@ -56,6 +114,17 @@ Future<AdminDeletePedidoScope?> confirmAdminDeletePedidoGroup(
                 : 'Además de esta línea, el carrito incluye ${siblings.length} pedidos. Puedes borrar solo esta o todo el carrito.',
             style: TextStyle(color: AppColors.textPrimary, height: 1.35),
           ),
+          if (includesDelivered) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Hay líneas entregadas. Borrar el carrito completo pide un motivo y las quita de los reportes.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           for (final line in siblings.take(8))
             Padding(

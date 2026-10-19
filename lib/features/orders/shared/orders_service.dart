@@ -1463,15 +1463,19 @@ class OrdersService {
   }
 
   /// Admin: borra la línea. Con [deleteCheckoutGroup] borra el carrito completo.
+  /// [motivo] es obligatorio si alguna línea está entregada.
   static Future<int> adminDeletePedido({
     required String transactionRequestId,
     bool deleteCheckoutGroup = false,
+    String? motivo,
   }) async {
+    final note = motivo?.trim();
     final raw = await SupabaseAccess.client.rpc(
       'admin_delete_pedido',
       params: <String, dynamic>{
         'p_request_id': transactionRequestId,
         'p_delete_checkout_group': deleteCheckoutGroup,
+        if (note != null && note.isNotEmpty) 'p_motivo': note,
       },
     );
     if (raw is int) return raw;

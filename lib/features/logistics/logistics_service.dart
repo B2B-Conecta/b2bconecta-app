@@ -566,4 +566,19 @@ class LogisticsService {
       params: {'p_driver_id': driverId.trim()},
     );
   }
+
+  static Future<void> importadorSetEnvioPolitica({
+    required String tipo,
+    double? montoMinimo,
+    required List<String> transportistas,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'importador_set_envio_politica',
+      params: <String, dynamic>{
+        'p_tipo': tipo,
+        'p_monto_minimo': montoMinimo,
+        'p_transportistas': transportistas,
+      },
+    );
+  }
 }

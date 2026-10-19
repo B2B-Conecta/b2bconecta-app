@@ -46,6 +46,32 @@ class _ProfileGateState extends State<ProfileGate> {
     trackCompleteRegistration(userId: profile.id);
   }
 
+  /// El primer frame en web puede medir la vista en 1×1. Un [Column] ahí
+  /// desborda; en ese caso no se pinta nada hasta que haya espacio real.
+  Widget _gateScaffold({required List<Widget> children}) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 48 || constraints.maxHeight < 48) {
+            return const SizedBox.expand();
+          }
+          return SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: children,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   AppHomeRole _homeRoleFor(ProfileModel profile) {
     switch (profile.role?.trim().toLowerCase()) {
       case 'aliado':
@@ -63,62 +89,44 @@ class _ProfileGateState extends State<ProfileGate> {
       future: _profileFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: AppColors.background,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: AppColors.brand),
-                  SizedBox(height: 16),
-                  Text(
-                    'Cargando perfil...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+          return _gateScaffold(
+            children: [
+              const CircularProgressIndicator(color: AppColors.brand),
+              const SizedBox(height: 16),
+              Text(
+                'Cargando perfil...',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
+            ],
           );
         }
 
         if (snapshot.hasError) {
-          return Scaffold(
-            backgroundColor: AppColors.background,
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline,
-                        size: 48, color: Colors.red.shade700),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No se pudo cargar el perfil.',
-                      textAlign: TextAlign.center,
-                      style:
-                          TextStyle(color: AppColors.textPrimary, fontSize: 16),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _profileLoadHint(snapshot.error),
-                      textAlign: TextAlign.center,
-                      style:
-                          TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _reloadProfile,
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
+          return _gateScaffold(
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red.shade700),
+              const SizedBox(height: 12),
+              Text(
+                'No se pudo cargar el perfil.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                _profileLoadHint(snapshot.error),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _reloadProfile,
+                child: const Text('Reintentar'),
+              ),
+            ],
           );
         }
 

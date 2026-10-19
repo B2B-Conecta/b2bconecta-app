@@ -58,17 +58,7 @@ class ExcelInventoryRow {
     bool pagoSoloDivisas = false,
     Map<String, dynamic>? preserveVolumeTiersFrom,
   }) {
-    var tiers = parseProductVolumeTiers(
-      parseVolumeTiersJsonCell(tramosVolumenJson),
-    );
-    if (tiers.isEmpty && preserveVolumeTiersFrom != null) {
-      tiers = parseProductVolumeTiers(preserveVolumeTiersFrom);
-    }
-    return buildProductDiscountRules(
-      volumeTiers: tiers,
-      usdPaymentDiscountPct:
-          pagoSoloDivisas ? null : usdPaymentDiscountPct,
-    );
+    return null;
   }
 }
 
@@ -85,7 +75,6 @@ class ExcelCatalogService {
     'descripcion (opcional)',
     'precio',
     'precio_oferta_usd (opcional)',
-    'descuento_pago_usd_pct (opcional)',
     'stock',
     'cantidad_minima',
     'categoria (opcional)',
@@ -99,7 +88,6 @@ class ExcelCatalogService {
     'Descripción opcional',
     '12.50',
     '10.99',
-    '2',
     '10',
     '5',
     'Motor',

@@ -20,7 +20,13 @@ import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 
-enum _KycQueueFilter { solicitudesIngreso, enRevision, conPendientes, todos }
+enum _KycQueueFilter {
+  solicitudesIngreso,
+  enRevision,
+  conPendientes,
+  activas,
+  todos,
+}
 
 enum _KycRoleFilter { todos, aliados, mayoristas }
 
@@ -144,11 +150,19 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   }
 
   bool _profileNeedsAttention(ProfileModel p) {
+    final access = p.accountAccessStatus?.trim();
+    if (access == AccountAccessStatus.draft ||
+        access == AccountAccessStatus.pendingReview) {
+      return true;
+    }
     final ks = p.kycStatus?.trim();
-    if (ks == KycStatus.enRevision) return true;
+    if (ks == KycStatus.enRevision ||
+        ks == KycStatus.pendiente ||
+        ks == KycStatus.rechazado) {
+      return true;
+    }
     final docs = _docsByProfile[p.id];
-    if (docs == null)
-      return ks == KycStatus.pendiente || ks == KycStatus.rechazado;
+    if (docs == null) return false;
     return docs.any((d) {
       if (!d.isCurrent) return false;
       final st = d.reviewStatus?.trim();
@@ -176,26 +190,27 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
           break;
       }
       if (q.isNotEmpty && !ownerAccountMatchesQuery(p, q)) return false;
-      switch (_filter) {
-        case _KycQueueFilter.todos:
-          return true;
-        case _KycQueueFilter.solicitudesIngreso:
-          return p.accountAccessStatus?.trim() ==
-              AccountAccessStatus.pendingReview;
-        case _KycQueueFilter.enRevision:
-          if (_isImportador(p)) {
-            return p.accountAccessStatus?.trim() ==
-                AccountAccessStatus.pendingReview;
-          }
-          return p.kycStatus?.trim() == KycStatus.enRevision;
-        case _KycQueueFilter.conPendientes:
-          if (_isImportador(p)) {
-            return p.accountAccessStatus?.trim() ==
-                    AccountAccessStatus.pendingReview ||
-                p.accountAccessStatus?.trim() == AccountAccessStatus.rejected;
-          }
-          return _profileNeedsAttention(p);
-      }
+      final access = p.accountAccessStatus?.trim();
+      final inQueue = switch (_filter) {
+        _KycQueueFilter.todos => true,
+        _KycQueueFilter.solicitudesIngreso =>
+          access == AccountAccessStatus.pendingReview ||
+              access == AccountAccessStatus.draft,
+        _KycQueueFilter.enRevision => _isImportador(p)
+            ? access == AccountAccessStatus.pendingReview ||
+                access == AccountAccessStatus.draft
+            : p.kycStatus?.trim() == KycStatus.enRevision ||
+                access == AccountAccessStatus.draft,
+        _KycQueueFilter.conPendientes => access == AccountAccessStatus.draft ||
+            access == AccountAccessStatus.pendingReview ||
+            (_isImportador(p)
+                ? access == AccountAccessStatus.rejected
+                : _profileNeedsAttention(p)),
+        _KycQueueFilter.activas =>
+          access == AccountAccessStatus.active && !p.isDeactivated,
+      };
+      if (inQueue) return true;
+      return p.id == _expandedProfileId;
     }).toList();
   }
 
@@ -542,6 +557,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                 selectedIndex: _KycRoleFilter.values.indexOf(_roleFilter),
                 onSelected: (index) => setState(() {
                   _roleFilter = _KycRoleFilter.values[index];
+                  _expandedProfileId = null;
                   _pageIndex = 0;
                 }),
               ),
@@ -555,6 +571,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
                 selectedIndex: _KycQueueFilter.values.indexOf(_filter),
                 onSelected: (index) => setState(() {
                   _filter = _KycQueueFilter.values[index];
+                  _expandedProfileId = null;
                   _pageIndex = 0;
                 }),
               ),
@@ -1144,6 +1161,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       _KycQueueFilter.solicitudesIngreso => 'Solicitudes',
       _KycQueueFilter.enRevision => 'En revisión',
       _KycQueueFilter.conPendientes => 'Con pendientes',
+      _KycQueueFilter.activas => 'Activas',
       _KycQueueFilter.todos => 'Todos los estados',
     };
   }

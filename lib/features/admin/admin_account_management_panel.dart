@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/features/admin/incomplete_signup_row.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_delete_dialog.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier_form.dart';
@@ -14,9 +17,13 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 
+enum _AccountListMode { cuentas, incompletos }
+
 enum _AccountRoleFilter { todos, aliados, importadores, administracion }
 
-enum _AccountStateFilter { todos, activas, bloqueadas, eliminadas }
+enum _AccountStateFilter { todos, activas, borrador, revision, bloqueadas, eliminadas }
+
+enum _IncompleteFilter { todos, sinConfirmar, confirmados }
 
 /// Administración: alta, expediente, bloqueo, baja lógica y borrado de Auth.
 /// Cambiar rol y el catálogo del mayorista siguen reservados al propietario.
@@ -36,8 +43,14 @@ class AdminAccountManagementPanel extends StatefulWidget {
 class _AdminAccountManagementPanelState
     extends State<AdminAccountManagementPanel> {
   List<ProfileModel> _rows = const [];
+  List<IncompleteSignupRow> _incomplete = const [];
   bool _loading = true;
+  bool _incompleteLoading = false;
+  bool _incompleteLoaded = false;
   String? _error;
+  String? _incompleteError;
+  _AccountListMode _mode = _AccountListMode.cuentas;
+  _IncompleteFilter _incompleteFilter = _IncompleteFilter.todos;
   String? _busyId;
   _AccountRoleFilter _roleFilter = _AccountRoleFilter.todos;
   _AccountStateFilter _stateFilter = _AccountStateFilter.todos;
@@ -81,6 +94,61 @@ class _AdminAccountManagementPanelState
     }
   }
 
+  Future<void> _loadIncomplete() async {
+    setState(() {
+      _incompleteLoading = true;
+      _incompleteError = null;
+    });
+    try {
+      final rows = await SupabaseService.listIncompleteSignups();
+      if (!mounted) return;
+      setState(() {
+        _incomplete = rows;
+        _incompleteLoading = false;
+        _incompleteLoaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _incompleteError = e.toString();
+        _incompleteLoading = false;
+        _incompleteLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _selectMode(_AccountListMode mode) async {
+    if (_mode == mode) return;
+    _searchCtrl.clear();
+    setState(() {
+      _mode = mode;
+      _pageIndex = 0;
+    });
+    if (mode == _AccountListMode.incompletos && !_incompleteLoaded) {
+      await _loadIncomplete();
+    }
+    if (_listScroll.hasClients) _listScroll.jumpTo(0);
+  }
+
+  List<IncompleteSignupRow> get _incompleteFiltered {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    return _incomplete.where((row) {
+      switch (_incompleteFilter) {
+        case _IncompleteFilter.sinConfirmar:
+          if (row.email == null || row.emailConfirmed) return false;
+        case _IncompleteFilter.confirmados:
+          if (!row.emailConfirmed) return false;
+        case _IncompleteFilter.todos:
+          break;
+      }
+      if (q.isEmpty) return true;
+      final name = (row.displayName ?? '').toLowerCase();
+      final email = (row.email ?? '').toLowerCase();
+      final phone = (row.phone ?? '').toLowerCase();
+      return name.contains(q) || email.contains(q) || phone.contains(q);
+    }).toList();
+  }
+
   List<ProfileModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
     return _rows.where((p) {
@@ -95,15 +163,22 @@ class _AdminAccountManagementPanelState
         case _AccountRoleFilter.todos:
           break;
       }
+      final access = p.accountAccessStatus?.trim();
       switch (_stateFilter) {
         case _AccountStateFilter.activas:
-          if (p.isDeactivated ||
-              p.accountAccessStatus?.trim() == AccountAccessStatus.rejected) {
+          if (p.isDeactivated || access != AccountAccessStatus.active) {
+            return false;
+          }
+        case _AccountStateFilter.borrador:
+          if (p.isDeactivated || access != AccountAccessStatus.draft) {
+            return false;
+          }
+        case _AccountStateFilter.revision:
+          if (p.isDeactivated || access != AccountAccessStatus.pendingReview) {
             return false;
           }
         case _AccountStateFilter.bloqueadas:
-          if (p.isDeactivated) return false;
-          if (p.accountAccessStatus?.trim() != AccountAccessStatus.rejected) {
+          if (p.isDeactivated || access != AccountAccessStatus.rejected) {
             return false;
           }
         case _AccountStateFilter.eliminadas:
@@ -385,13 +460,13 @@ class _AdminAccountManagementPanelState
 
   @override
   Widget build(BuildContext context) {
-    if (_loading && _rows.isEmpty) {
+    if (_mode == _AccountListMode.cuentas && _loading && _rows.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.brand),
       );
     }
 
-    if (_error != null && _rows.isEmpty) {
+    if (_mode == _AccountListMode.cuentas && _error != null && _rows.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -414,12 +489,25 @@ class _AdminAccountManagementPanelState
       pageSize: _pageSize,
     );
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _mode == _AccountListMode.incompletos ? _loadIncomplete : _load,
       color: AppColors.brand,
       child: ListView(
         controller: _listScroll,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          SegmentedFilterBar(
+            labels: const ['Cuentas', 'Registro incompleto'],
+            selectedIndex: _mode == _AccountListMode.cuentas ? 0 : 1,
+            onSelected: (index) => _selectMode(
+              index == 0
+                  ? _AccountListMode.cuentas
+                  : _AccountListMode.incompletos,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_mode == _AccountListMode.incompletos)
+            ..._incompleteSection()
+          else ...[
           Text(
             'Ficha completa (correo, teléfono y datos fiscales). '
             'Puede crear cuentas y cargarles el expediente. '
@@ -522,6 +610,7 @@ class _AdminAccountManagementPanelState
             ),
             ...page.map(
               (p) => Padding(
+                key: ValueKey<String>('cuenta-${p.id}'),
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _AccountCard(
                   profile: p,
@@ -548,9 +637,118 @@ class _AdminAccountManagementPanelState
               ),
             ),
           ],
+          ],
         ],
       ),
     );
+  }
+
+  List<Widget> _incompleteSection() {
+    final filtered = _incompleteFiltered;
+    final page = sliceListPage(
+      items: filtered,
+      pageIndex: _pageIndex,
+      pageSize: _pageSize,
+    );
+    return [
+      Text(
+        'Personas que crearon la cuenta y no guardaron la ficha del negocio. '
+        'El correo sirve para contactarlas. No tienen avisos dentro de la app.',
+        style: TextStyle(fontSize: 13, height: 1.35, color: AppColors.textSecondary),
+      ),
+      const SizedBox(height: 12),
+      SegmentedFilterBar(
+        labels: const ['Todos', 'Sin confirmar', 'Confirmados'],
+        selectedIndex: _IncompleteFilter.values.indexOf(_incompleteFilter),
+        onSelected: (index) => setState(() {
+          _incompleteFilter = _IncompleteFilter.values[index];
+          _pageIndex = 0;
+        }),
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: _searchCtrl,
+        decoration: InputDecoration(
+          hintText: 'Buscar por nombre, correo o teléfono…',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (_incompleteLoading)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.brand,
+              ),
+            ),
+          ),
+        ),
+      if (_incompleteError != null)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            children: [
+              Text(
+                _incompleteError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: _loadIncomplete,
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        )
+      else if (!_incompleteLoading && filtered.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: Text(
+              _incomplete.isEmpty
+                  ? 'No hay registros incompletos.'
+                  : 'Ningún registro coincide con la búsqueda.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+          ),
+        )
+      else if (filtered.isNotEmpty) ...[
+        ListPageBar(
+          total: filtered.length,
+          pageIndex: _pageIndex,
+          pageSize: _pageSize,
+          alwaysShow: true,
+          onPageIndex: (index) {
+            setState(() => _pageIndex = index);
+            if (_listScroll.hasClients) _listScroll.jumpTo(0);
+          },
+          onPageSize: (size) {
+            setState(() {
+              _pageSize = size;
+              _pageIndex = 0;
+            });
+            if (_listScroll.hasClients) _listScroll.jumpTo(0);
+          },
+        ),
+        ...page.map(
+          (row) => Padding(
+            key: ValueKey<String>('incompleto-${row.userId}'),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _IncompleteSignupCard(row: row),
+          ),
+        ),
+      ],
+    ];
   }
 
   static String _roleFilterLabel(_AccountRoleFilter f) {
@@ -564,8 +762,10 @@ class _AdminAccountManagementPanelState
 
   static String _stateFilterLabel(_AccountStateFilter f) {
     return switch (f) {
-      _AccountStateFilter.todos => 'Todos los estados',
+      _AccountStateFilter.todos => 'Todos',
       _AccountStateFilter.activas => 'Activas',
+      _AccountStateFilter.borrador => 'Borrador',
+      _AccountStateFilter.revision => 'Revisión',
       _AccountStateFilter.bloqueadas => 'Bloqueadas',
       _AccountStateFilter.eliminadas => 'Eliminadas',
     };
@@ -606,8 +806,6 @@ class _AccountCard extends StatefulWidget {
 }
 
 class _AccountCardState extends State<_AccountCard> {
-  bool _expanded = false;
-
   @override
   Widget build(BuildContext context) {
     final profile = widget.profile;
@@ -629,7 +827,6 @@ class _AccountCardState extends State<_AccountCard> {
         child: ExpansionTile(
           tilePadding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          onExpansionChanged: (open) => setState(() => _expanded = open),
           title: Row(
             children: [
               Expanded(
@@ -647,23 +844,21 @@ class _AccountCardState extends State<_AccountCard> {
               _StatusChip(label: status, deactivated: profile.isDeactivated),
             ],
           ),
-          subtitle: _expanded
-              ? null
-              : Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    [
-                      ProfileRoleLabels.labelEs(profile.role),
-                      if (profile.email != null) profile.email,
-                      if (profile.phone != null) profile.phone,
-                      if (isSelf) 'Su cuenta',
-                    ].join(' · '),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              [
+                ProfileRoleLabels.labelEs(profile.role),
+                if (profile.email != null) profile.email,
+                if (profile.phone != null) profile.phone,
+                if (isSelf) 'Su cuenta',
+              ].join(' · '),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
           children: [
             OwnerAccountDossier(
               profile: profile,
@@ -860,6 +1055,144 @@ class _AccountActions extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _IncompleteSignupCard extends StatefulWidget {
+  const _IncompleteSignupCard({required this.row});
+
+  final IncompleteSignupRow row;
+
+  @override
+  State<_IncompleteSignupCard> createState() => _IncompleteSignupCardState();
+}
+
+class _IncompleteSignupCardState extends State<_IncompleteSignupCard> {
+  Future<void> _copyEmail() async {
+    final email = widget.row.email;
+    if (email == null || email.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: email));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Correo copiado.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final row = widget.row;
+    final status = row.email == null
+        ? 'Sin correo'
+        : row.emailConfirmed
+            ? 'Sin perfil'
+            : 'Correo sin confirmar';
+    final subtitle = [
+      if (row.displayName != null && row.email != null) row.email,
+      if (row.phone != null) row.phone,
+      if (row.createdAt != null) 'Registro ${formatEsShortDateTime(row.createdAt)}',
+    ].join(' · ');
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  row.title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              _StatusChip(label: status, deactivated: false),
+            ],
+          ),
+          subtitle: subtitle.isEmpty
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+          children: [
+            _IncompleteLine(label: 'Correo', value: row.email ?? 'No indicado'),
+            _IncompleteLine(label: 'Teléfono', value: row.phone ?? 'No indicado'),
+            _IncompleteLine(
+              label: 'Registro',
+              value: formatEsShortDateTime(row.createdAt),
+            ),
+            _IncompleteLine(
+              label: 'Último ingreso',
+              value: row.lastSignInAt == null
+                  ? 'Nunca ingresó'
+                  : formatEsShortDateTime(row.lastSignInAt),
+            ),
+            _IncompleteLine(
+              label: 'Correo confirmado',
+              value: row.emailConfirmed
+                  ? formatEsShortDateTime(row.emailConfirmedAt)
+                  : 'Pendiente',
+            ),
+            if (row.email != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _copyEmail,
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  label: const Text('Copiar correo'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IncompleteLine extends StatelessWidget {
+  const _IncompleteLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 13, height: 1.35, color: AppColors.textPrimary),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/admin/admin_catalog_coverage.dart';
+import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_monitoring_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_presence_section.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
@@ -184,7 +185,14 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: AdminUserMonitoringPanel(
-            loadRows: ({role, required period}) async => const [],
+            loadRows: ({role, required period}) async => const [
+              AdminUserActivityRowModel(
+                profileId: '1',
+                businessName: 'Taller Norte',
+                role: 'aliado',
+                loginCountToday: 1,
+              ),
+            ],
             loadCatalogCoverage: () async => AdminCatalogCoverage.empty,
             loadPresence: () async => const [
               AdminUserPresenceRow(
@@ -201,13 +209,13 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Presencia en línea'), findsNothing);
+    expect(find.text('Ingresaron hoy'), findsNothing);
     await tester.tap(find.text('Ingresos (últimos 7 días)'));
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Presencia en línea'), findsOneWidget);
-    expect(find.text('Taller Norte'), findsOneWidget);
+    expect(find.text('Ingresaron hoy'), findsOneWidget);
+    expect(find.text('Taller Norte'), findsWidgets);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });

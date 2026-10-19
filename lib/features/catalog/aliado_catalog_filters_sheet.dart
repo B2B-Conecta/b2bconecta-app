@@ -519,13 +519,12 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   ],
                 ),
                 _sectionHeader(
-                  'Descuentos',
+                  'Promoción',
                   icon: Icons.local_offer_outlined,
-                  hint:
-                      'Oferta directa, volumen o % extra en la línea USD (Zelle/divisas).',
+                  hint: 'Productos con precio USD de promoción.',
                 ),
                 _choiceChip(
-                  label: 'Solo con descuentos',
+                  label: 'Solo con promoción USD',
                   selected: _onlyWithCommercialDiscount,
                   onTap: () => setState(
                     () => _onlyWithCommercialDiscount =

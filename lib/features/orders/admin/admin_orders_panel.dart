@@ -492,7 +492,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     TransactionRequestModel r,
   ) async {
     if (_deletePedidoBusyId != null) return;
-    if (r.status == TransactionRequestStatus.entregado) return;
     List<TransactionRequestModel> lines;
     try {
       lines = await OrdersService.fetchCheckoutGroupLinesForTransactionRequest(
@@ -510,13 +509,23 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     final anySiblingDelivered = siblings.any(
       (line) => line.status == TransactionRequestStatus.entregado,
     );
-    if (siblings.isNotEmpty && !anySiblingDelivered) {
+    if (siblings.isNotEmpty) {
       final scope = await confirmAdminDeletePedidoGroup(
         context,
         siblings: siblings,
+        includesDelivered: anySiblingDelivered ||
+            r.status == TransactionRequestStatus.entregado,
       );
       if (scope == null || !context.mounted) return;
       deleteGroup = scope == AdminDeletePedidoScope.checkoutGroup;
+    }
+
+    final touchesDelivered = r.status == TransactionRequestStatus.entregado ||
+        (deleteGroup && anySiblingDelivered);
+    String? motivo;
+    if (touchesDelivered) {
+      motivo = await askAdminDeleteEntregadoMotivo(context);
+      if (motivo == null || !context.mounted) return;
     }
 
     setState(() => _deletePedidoBusyId = r.id);
@@ -524,6 +533,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       final deleted = await SupabaseService.adminDeletePedido(
         transactionRequestId: r.id,
         deleteCheckoutGroup: deleteGroup,
+        motivo: motivo,
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

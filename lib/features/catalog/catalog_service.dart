@@ -169,7 +169,7 @@ class CatalogService {
     final embed = _catalogNeedsProfileInner(filters)
         ? '$_ownerProfileEmbed!inner'
         : _ownerProfileEmbed;
-    return '$embed(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, $rep)';
+    return '$embed(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, envio_tipo, monto_minimo_envio_gratis, transportistas_habilitados, $rep)';
   }
 
   static Future<List<PromoCampaignModel>>
@@ -767,9 +767,10 @@ class CatalogService {
       );
     }
     if (filters.onlyWithCommercialDiscount) {
-      q = q.or(
-        'sale_price_usd.not.is.null,discount_rules->volume_tiers.neq.[],discount_rules->usd_payment_discount_pct.gt.0',
-      );
+      q = q.gt('sale_price_usd', 0);
+    }
+    if (filters.onlyUsdPromotion) {
+      q = q.gt('sale_price_usd', 0);
     }
     // Catálogo B2B (aliados): ocultar sin inventario o por debajo del mínimo de pedido.
     q = q.eq('stock_covers_min_order', true);

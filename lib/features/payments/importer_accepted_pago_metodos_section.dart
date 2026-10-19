@@ -130,9 +130,7 @@ class _ImporterAcceptedPagoMetodosSectionState
         builder: (ctx) => AlertDialog(
           title: const Text('Solo pagos en divisas (USD)'),
           content: const Text(
-            'Las tiendas minoristas ya no podrán pagar en bolívares (Pago Móvil ni transferencia en Bs). '
-            'Se quitarán los descuentos línea USD de todos sus productos; '
-            'los descuentos por volumen se mantienen.\n\n¿Continuar?',
+            'Las tiendas minoristas ya no podrán pagar en bolívares (Pago Móvil ni transferencia en Bs).\n\n¿Continuar?',
           ),
           actions: [
             TextButton(
@@ -292,8 +290,7 @@ class _ImporterAcceptedPagoMetodosSectionState
                       title: 'Solo pagos en divisas',
                       message:
                           'Si lo activa, las tiendas minoristas solo podrán pagar en Zelle, Binance, USDT o efectivo. '
-                          'Se ocultan Pago Móvil y transferencia en Bs y no podrá ofrecer descuento línea USD; '
-                          'los descuentos por volumen se mantienen.',
+                          'Se ocultan Pago Móvil y transferencia en Bs.',
                     ),
                   ],
                 ),

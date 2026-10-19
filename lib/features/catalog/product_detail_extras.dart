@@ -226,7 +226,6 @@ class _RelatedProductCard extends StatelessWidget {
                   catalogGrid: true,
                   compact: true,
                   showPromotionChips: false,
-                  ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                 ),
               ],
             ),

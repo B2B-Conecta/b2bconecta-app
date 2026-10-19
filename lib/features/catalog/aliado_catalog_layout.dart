@@ -33,7 +33,7 @@ abstract final class AliadoCatalogLayout {
   static const cardTitleHeight = 34.0;
   static const cardCategoryHeight = 20.0;
   static const cardSupplierHeight = 18.0;
-  static const cardPriceHeight = 20.0;
+  static const cardPriceHeight = 52.0;
   static const cardOfferHeight = 26.0;
   static const cardStockHeight = 16.0;
   static const cardCustomFieldsHeight = 20.0;

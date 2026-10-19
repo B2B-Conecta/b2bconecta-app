@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'catalog_product_price_display.dart';
 import 'part_model.dart';
 import 'promo_campaign_model.dart';
@@ -929,8 +931,14 @@ class _PromoProductPickTile extends StatelessWidget {
                       catalogGrid: true,
                       compact: true,
                       showPromotionChips: true,
-                      ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                     ),
+                    if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
+                      const SizedBox(height: 6),
+                      EnvioPoliticaBadge(
+                        tipo: part.ownerEnvioTipo,
+                        compact: true,
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/catalog/product_warranty_seal.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'importer_store_share_link.dart';
@@ -439,6 +440,18 @@ class _GuestStoreProductCard extends StatelessWidget {
                             left: 6,
                             child: ProductWarrantySeal(compact: true),
                           ),
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          right: 6,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: EnvioPoliticaBadge(
+                              tipo: part.ownerEnvioTipo,
+                              compact: true,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -476,7 +489,6 @@ class _GuestStoreProductCard extends StatelessWidget {
                   catalogGrid: true,
                   compact: true,
                   showPromotionChips: false,
-                  ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                 ),
                 const SizedBox(height: 6),
                 Text(

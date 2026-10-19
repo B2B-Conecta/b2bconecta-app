@@ -12,10 +12,11 @@ import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
-import 'product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'product_warranty_seal.dart';
 import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
@@ -660,32 +661,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               discountRules: part.discountRules,
               campaignDiscountPercent: part.activeCampaignDiscountPercent,
               showPromotionChips: true,
-              ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
             ),
           ),
         ),
       ),
-      if (ProductCatalogPricing.volumeIncentiveBadgeEs(part.discountRules) !=
-          null) ...[
+      if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
         const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.brandBlueContainer,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.borderSubtle),
-          ),
-          child: Text(
-            ProductCatalogPricing.volumeIncentiveBadgeEs(part.discountRules)!,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: EnvioPoliticaBadge(tipo: part.ownerEnvioTipo),
+        ),
+        if (part.ownerTransportistas.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Transportistas: ${part.ownerTransportistas.join(', ')}',
             style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
+              fontSize: desktop ? 13 : 12.5,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: AppColors.textSecondary,
             ),
           ),
-        ),
+        ],
       ],
       const SizedBox(height: 12),
       _buildStockBadge(desktop: desktop),

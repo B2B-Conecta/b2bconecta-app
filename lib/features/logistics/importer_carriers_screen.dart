@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'importer_carrier_form.dart';
+import 'importer_envio_politica_panel.dart';
 import 'importer_pickup_locations_panel.dart';
 
 /// Importador: gestión de empresas de transporte y conductores.
@@ -87,6 +88,47 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
     await _load();
   }
 
+  Future<void> _activateCarrier(ImporterCarrierModel carrier) async {
+    try {
+      await SupabaseService.updateImporterCarrier(
+        carrierId: carrier.id,
+        companyName: carrier.companyName,
+        contactPhone: carrier.contactPhone,
+        contactName: carrier.contactName,
+        contactEmail: carrier.contactEmail,
+        contactWhatsapp: carrier.contactWhatsapp,
+        coverageEstados: carrier.coverageEstados,
+        coverageCiudades: carrier.coverageCiudades,
+        coverageNotes: carrier.coverageNotes,
+        baseEstado: carrier.baseEstado,
+        baseCiudad: carrier.baseCiudad,
+        baseLatitude: carrier.baseLatitude,
+        baseLongitude: carrier.baseLongitude,
+        baseMapsUrl: carrier.baseMapsUrl,
+        acceptedPagoMetodos: carrier.acceptedPagoMetodos,
+        pagoMetodoInstrucciones: carrier.pagoMetodoInstrucciones,
+        fletePagoModo: carrier.fletePagoModo,
+        etaBaseHours: carrier.etaBaseHours,
+        etaHoursPerKm: carrier.etaHoursPerKm,
+        maxCoverageKm: carrier.maxCoverageKm,
+        flatFeeUsd: carrier.flatFeeUsd,
+        pricePerKmUsd: carrier.pricePerKmUsd,
+        notes: carrier.notes,
+        isActive: true,
+        sortOrder: carrier.sortOrder,
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo activar el transportista.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= AppBreakpoints.formMaxWidth;
@@ -118,6 +160,8 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
                         88,
                       ),
                       children: [
+                        const ImporterEnvioPoliticaPanel(),
+                        const SizedBox(height: 16),
                         const ImporterPickupLocationsPanel(),
                         const SizedBox(height: 20),
                         _EmptyCarriersState(onCreate: () => _openCarrierForm()),
@@ -135,14 +179,17 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
                             isWide ? 24 : 16,
                             88,
                           ),
-                          itemCount: _carriers.length + 1,
+                          itemCount: _carriers.length + 2,
                           separatorBuilder: (_, index) =>
                               SizedBox(height: index == 0 ? 16 : 12),
                           itemBuilder: (context, index) {
                             if (index == 0) {
+                              return const ImporterEnvioPoliticaPanel();
+                            }
+                            if (index == 1) {
                               return const ImporterPickupLocationsPanel();
                             }
-                            final c = _carriers[index - 1];
+                            final c = _carriers[index - 2];
                             return _CarrierCard(
                               carrier: c,
                               onEdit: () => _openCarrierForm(c),
@@ -150,6 +197,9 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
                               onDeactivate: c.isActive
                                   ? () => _deactivateCarrier(c)
                                   : null,
+                              onActivate: c.isActive
+                                  ? null
+                                  : () => _activateCarrier(c),
                             );
                           },
                         ),
@@ -209,18 +259,35 @@ class _EmptyCarriersState extends StatelessWidget {
   }
 }
 
+String _tarifaLabel(ImporterCarrierModel carrier) {
+  final flat = carrier.flatFeeUsd;
+  final perKm = carrier.pricePerKmUsd;
+  if (flat != null && flat <= 0 && (perKm == null || perKm <= 0)) {
+    return 'Envío gratis';
+  }
+  if (flat != null && flat > 0 && (perKm == null || perKm <= 0)) {
+    return 'Tarifa fija ${flat.toStringAsFixed(2)} USD';
+  }
+  if (perKm != null && perKm > 0) {
+    return 'Según distancia';
+  }
+  return 'Según tarifa de la agencia';
+}
+
 class _CarrierCard extends StatelessWidget {
   const _CarrierCard({
     required this.carrier,
     required this.onEdit,
     required this.onDrivers,
     this.onDeactivate,
+    this.onActivate,
   });
 
   final ImporterCarrierModel carrier;
   final VoidCallback onEdit;
   final VoidCallback onDrivers;
   final VoidCallback? onDeactivate;
+  final VoidCallback? onActivate;
 
   @override
   Widget build(BuildContext context) {
@@ -324,19 +391,12 @@ class _CarrierCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (carrier.flatFeeUsd != null || carrier.pricePerKmUsd != null) ...[
-              const SizedBox(height: 8),
-              _InfoRow(
-                icon: Icons.attach_money,
-                label: 'Tarifa',
-                value: [
-                  if (carrier.flatFeeUsd != null)
-                    'Fija USD ${carrier.flatFeeUsd}',
-                  if (carrier.pricePerKmUsd != null)
-                    'USD/km ${carrier.pricePerKmUsd}',
-                ].join(' · '),
-              ),
-            ],
+            const SizedBox(height: 8),
+            _InfoRow(
+              icon: Icons.attach_money,
+              label: 'Tarifa',
+              value: _tarifaLabel(carrier),
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -361,6 +421,12 @@ class _CarrierCard extends StatelessWidget {
                       'Desactivar',
                       style: TextStyle(color: Colors.red.shade700),
                     ),
+                  ),
+                if (onActivate != null)
+                  FilledButton.icon(
+                    onPressed: onActivate,
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Activar'),
                   ),
               ],
             ),
@@ -468,65 +534,73 @@ class _CarrierDriversScreenState extends State<_CarrierDriversScreen> {
     _load();
   }
 
-  Future<void> _addDriver() async {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final licenseCtrl = TextEditingController();
-    final isWide = MediaQuery.sizeOf(context).width >= 600;
+  List<ImporterCarrierDriverModel> get _orderedDrivers {
+    final rows = [..._drivers];
+    rows.sort((a, b) {
+      if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
+      return a.driverName.toLowerCase().compareTo(b.driverName.toLowerCase());
+    });
+    return rows;
+  }
 
-    final ok = await showDialog<bool>(
+  Future<void> _openDriverForm([ImporterCarrierDriverModel? existing]) async {
+    final draft = await showDialog<_DriverDraft>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nuevo conductor'),
-        content: SizedBox(
-          width: isWide ? 420 : null,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre *',
-                  filled: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: phoneCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Teléfono',
-                  filled: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: licenseCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Licencia / cédula',
-                  filled: true,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _DriverEditorDialog(existing: existing),
     );
-    if (ok != true || nameCtrl.text.trim().isEmpty) return;
-    await SupabaseService.createImporterCarrierDriver(
-      carrierId: widget.carrier.id,
-      driverName: nameCtrl.text.trim(),
-      contactPhone: phoneCtrl.text.trim(),
-      licenseId: licenseCtrl.text.trim(),
+    if (draft == null) return;
+    if (existing == null) {
+      await SupabaseService.createImporterCarrierDriver(
+        carrierId: widget.carrier.id,
+        driverName: draft.name,
+        contactPhone: draft.phone,
+        licenseId: draft.license,
+      );
+    } else {
+      await SupabaseService.updateImporterCarrierDriver(
+        driverId: existing.id,
+        driverName: draft.name,
+        contactPhone: draft.phone,
+        licenseId: draft.license,
+        notes: existing.notes,
+        isActive: existing.isActive,
+        sortOrder: existing.sortOrder,
+      );
+    }
+    await _load();
+  }
+
+  Future<void> _setActive(ImporterCarrierDriverModel driver, bool active) async {
+    if (!active) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Desactivar conductor'),
+          content: Text(
+            '¿Desactivar a ${driver.driverName}? Deja de aparecer al coordinar el retiro.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Desactivar'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    await SupabaseService.updateImporterCarrierDriver(
+      driverId: driver.id,
+      driverName: driver.driverName,
+      contactPhone: driver.contactPhone,
+      licenseId: driver.licenseId,
+      notes: driver.notes,
+      isActive: active,
+      sortOrder: driver.sortOrder,
     );
     await _load();
   }
@@ -541,7 +615,8 @@ class _CarrierDriversScreenState extends State<_CarrierDriversScreen> {
         title: Text('Conductores · ${widget.carrier.companyName}'),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addDriver,
+        onPressed: () => _openDriverForm(),
+        backgroundColor: AppColors.brand,
         icon: const Icon(Icons.person_add_outlined),
         label: const Text('Agregar'),
       ),
@@ -553,74 +628,380 @@ class _CarrierDriversScreenState extends State<_CarrierDriversScreen> {
                   maxWidth: isWide ? 720 : double.infinity,
                 ),
                 child: _drivers.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Agregue conductores de confianza para este transportista.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ),
-                      )
+                    ? _DriversEmpty(onAdd: () => _openDriverForm())
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-                        itemCount: _drivers.length,
+                        itemCount: _orderedDrivers.length + 1,
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
-                          final d = _drivers[index];
-                          return DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.brandBlueContainer,
-                                child: Text(
-                                  d.driverName.isNotEmpty
-                                      ? d.driverName[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    color: AppColors.brandBlue,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                d.driverName,
-                                style: const TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                              subtitle: Text(
-                                [
-                                  if (d.contactPhone?.isNotEmpty == true)
-                                    d.contactPhone!,
-                                  if (d.licenseId?.isNotEmpty == true)
-                                    'Lic. ${d.licenseId}',
-                                ].join(' · '),
-                              ),
-                              trailing: d.isActive
-                                  ? IconButton(
-                                      tooltip: 'Desactivar',
-                                      icon: const Icon(Icons.delete_outline),
-                                      onPressed: () async {
-                                        await SupabaseService
-                                            .deleteImporterCarrierDriver(d.id);
-                                        await _load();
-                                      },
-                                    )
-                                  : const _StatusChip(
-                                      label: 'Inactivo',
-                                      color: Colors.grey,
-                                      background: Color(0xFFECEFF1),
-                                    ),
-                            ),
+                          if (index == 0) return const _DriversIntro();
+                          final d = _orderedDrivers[index - 1];
+                          return _DriverCard(
+                            driver: d,
+                            onEdit: () => _openDriverForm(d),
+                            onToggle: () => _setActive(d, !d.isActive),
                           );
                         },
                       ),
               ),
             ),
+    );
+  }
+}
+
+class _DriversIntro extends StatelessWidget {
+  const _DriversIntro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        'Personas de este transportista. Sirven al coordinar quién retira o entrega.',
+        style: TextStyle(
+          fontSize: 13,
+          height: 1.35,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _DriversEmpty extends StatelessWidget {
+  const _DriversEmpty({required this.onAdd});
+
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.badge_outlined,
+            size: 52,
+            color: AppColors.brandBlue.withOpacity(0.55),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Sin conductores',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Agregue quién retira o entrega con este transportista.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.person_add_outlined),
+            label: const Text('Agregar conductor'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverCard extends StatelessWidget {
+  const _DriverCard({
+    required this.driver,
+    required this.onEdit,
+    required this.onToggle,
+  });
+
+  final ImporterCarrierDriverModel driver;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = driver.contactPhone?.trim() ?? '';
+    final license = driver.licenseId?.trim() ?? '';
+    final initial = driver.driverName.trim().isEmpty
+        ? '?'
+        : driver.driverName.trim()[0].toUpperCase();
+    return Opacity(
+      opacity: driver.isActive ? 1 : 0.72,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: AppColors.brandBlueContainer,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: AppColors.brandBlue,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      driver.driverName,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                  ),
+                  _StatusChip(
+                    label: driver.isActive ? 'Activo' : 'Inactivo',
+                    color: driver.isActive
+                        ? AppColors.successGreen
+                        : AppColors.textSecondary,
+                    background: driver.isActive
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFECEFF1),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _DriverLine(
+                icon: Icons.phone_outlined,
+                text: phone.isEmpty ? 'Sin teléfono' : phone,
+                muted: phone.isEmpty,
+              ),
+              const SizedBox(height: 4),
+              _DriverLine(
+                icon: Icons.badge_outlined,
+                text: license.isEmpty ? 'Sin licencia o cédula' : license,
+                muted: license.isEmpty,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Editar'),
+                  ),
+                  TextButton.icon(
+                    onPressed: onToggle,
+                    icon: Icon(
+                      driver.isActive
+                          ? Icons.person_off_outlined
+                          : Icons.person_outline,
+                      size: 18,
+                    ),
+                    label: Text(driver.isActive ? 'Desactivar' : 'Activar'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverLine extends StatelessWidget {
+  const _DriverLine({
+    required this.icon,
+    required this.text,
+    required this.muted,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: muted ? AppColors.textSecondary : AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DriverDraft {
+  const _DriverDraft({
+    required this.name,
+    required this.phone,
+    required this.license,
+  });
+
+  final String name;
+  final String phone;
+  final String license;
+}
+
+class _DriverEditorDialog extends StatefulWidget {
+  const _DriverEditorDialog({this.existing});
+
+  final ImporterCarrierDriverModel? existing;
+
+  @override
+  State<_DriverEditorDialog> createState() => _DriverEditorDialogState();
+}
+
+class _DriverEditorDialogState extends State<_DriverEditorDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+  late final TextEditingController _license;
+  String? _nameError;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _name = TextEditingController(text: e?.driverName ?? '');
+    _phone = TextEditingController(text: e?.contactPhone ?? '');
+    _license = TextEditingController(text: e?.licenseId ?? '');
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _license.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _field({
+    required String label,
+    String? hint,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: AppColors.textSecondary),
+      filled: true,
+      fillColor: AppColors.fieldFill,
+      errorText: label.startsWith('Nombre') ? _nameError : null,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+      ),
+    );
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.length < 2) {
+      setState(() => _nameError = 'Indique el nombre');
+      return;
+    }
+    Navigator.pop(
+      context,
+      _DriverDraft(
+        name: name,
+        phone: _phone.text.trim(),
+        license: _license.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.existing != null;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                editing ? 'Editar conductor' : 'Nuevo conductor',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Nombre y un teléfono bastan para guardarlo.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _name,
+                textCapitalization: TextCapitalization.words,
+                autofocus: true,
+                decoration: _field(
+                  label: 'Nombre *',
+                  icon: Icons.person_outline,
+                ),
+                onChanged: (_) {
+                  if (_nameError != null) setState(() => _nameError = null);
+                },
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                decoration: _field(
+                  label: 'Teléfono',
+                  hint: 'Opcional',
+                  icon: Icons.phone_outlined,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _license,
+                textCapitalization: TextCapitalization.characters,
+                decoration: _field(
+                  label: 'Licencia o cédula',
+                  hint: 'Opcional',
+                  icon: Icons.badge_outlined,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _save,
+                    child: const Text('Guardar'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

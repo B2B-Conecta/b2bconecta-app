@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/app/config/terms_config.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
@@ -48,6 +49,9 @@ class ProfileModel {
     this.acceptedPagoMetodos,
     this.pagoMetodoInstrucciones = const {},
     this.pagoSoloDivisas = false,
+    this.envioTipo = EnvioPolitica.noDefinido,
+    this.montoMinimoEnvioGratis,
+    this.transportistasHabilitados = const [],
     this.minOrderAmountRef = 0,
     this.minOrderCurrency = 'ref',
     this.catalogFeaturedUntil,
@@ -171,6 +175,15 @@ class ProfileModel {
 
   /// Importador: solo pagos en divisas/USD; sin descuento línea USD en productos.
   final bool pagoSoloDivisas;
+
+  /// `profiles.envio_tipo`. `NO_DEFINIDO` no aparece en la vitrina.
+  final String envioTipo;
+
+  /// `profiles.monto_minimo_envio_gratis`.
+  final double? montoMinimoEnvioGratis;
+
+  /// `profiles.transportistas_habilitados`.
+  final List<String> transportistasHabilitados;
 
   /// Piso de compra por importador en REF (`profiles.min_order_amount_ref`). 0 = sin mínimo.
   final double minOrderAmountRef;
@@ -491,6 +504,11 @@ class ProfileModel {
       pagoMetodoInstrucciones:
           PagoMetodoInstrucciones.parseMap(json['pago_metodo_instrucciones']),
       pagoSoloDivisas: _parseBool(json['pago_solo_divisas']),
+      envioTipo: EnvioPolitica.normalize(json['envio_tipo']),
+      montoMinimoEnvioGratis:
+          _asDoubleNullable(json['monto_minimo_envio_gratis']),
+      transportistasHabilitados:
+          EnvioPolitica.parseNombres(json['transportistas_habilitados']),
       minOrderAmountRef: _asDoubleNullable(json['min_order_amount_ref']) ?? 0,
       minOrderCurrency: _text(json['min_order_currency']) ?? 'ref',
       catalogFeaturedUntil: json['catalog_featured_until'] != null

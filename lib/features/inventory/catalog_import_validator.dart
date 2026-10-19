@@ -4,7 +4,6 @@ import 'catalog_import/catalog_import_result.dart';
 import 'excel_catalog_service.dart';
 import 'product_custom_fields.dart';
 import 'product_min_order_qty.dart';
-import 'product_volume_tiers.dart';
 
 /// Fila normalizada lista para enviar al RPC `importador_bulk_upsert_products`.
 class CatalogImportNormalizedRow {
@@ -229,20 +228,6 @@ class CatalogImportValidator {
         ? null
         : parseImportNumber(saleRaw);
 
-    final usdPctRaw =
-        readUntransformed(CatalogImportField.usdPaymentDiscountPct.key);
-    final tiersRaw = readField(CatalogImportField.volumeTiersJson.key);
-    double? usdPct;
-    if (usdPctRaw != null && usdPctRaw.trim().isNotEmpty) {
-      usdPct = parseImportNumber(usdPctRaw);
-      if (usdPct == 0) usdPct = null;
-    }
-
-    final discountRules = _buildDiscountRules(
-      usdPct: mapping.options.pagoSoloDivisas ? null : usdPct,
-      tiersJson: tiersRaw,
-    );
-
     final customFields = <String, dynamic>{};
 
     bool hasWarranty = false;
@@ -298,23 +283,9 @@ class CatalogImportValidator {
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,
       hasWarranty: hasWarranty,
-      discountRules: discountRules,
       customFields: customFieldsPayload,
       priceColumn: priceBinding?.source,
       priceRaw: priceRaw,
-    );
-  }
-
-  static Map<String, dynamic>? _buildDiscountRules({
-    double? usdPct,
-    String? tiersJson,
-  }) {
-    final tiers = parseProductVolumeTiers(
-      parseVolumeTiersJsonCell(tiersJson),
-    );
-    return buildProductDiscountRules(
-      volumeTiers: tiers,
-      usdPaymentDiscountPct: usdPct,
     );
   }
 

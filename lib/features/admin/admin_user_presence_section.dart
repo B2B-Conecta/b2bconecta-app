@@ -6,14 +6,25 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 
 /// Lista de presencia, de 10 en 10 (máximo 20), dentro de Ingresos.
 class AdminUserPresenceSection extends StatefulWidget {
-  const AdminUserPresenceSection({super.key, this.loadRows});
+  const AdminUserPresenceSection({
+    super.key,
+    this.loadRows,
+    this.onlyLoggedInToday = false,
+    this.loadTodayLogins,
+  });
 
   final Future<List<AdminUserPresenceRow>> Function()? loadRows;
+
+  /// Si es true, la lista son las cuentas con un ingreso hoy (medianoche Caracas).
+  final bool onlyLoggedInToday;
+
+  final Future<List<AdminUserActivityRowModel>> Function()? loadTodayLogins;
 
   @override
   State<AdminUserPresenceSection> createState() =>
@@ -22,6 +33,7 @@ class AdminUserPresenceSection extends StatefulWidget {
 
 class _AdminUserPresenceSectionState extends State<AdminUserPresenceSection> {
   List<AdminUserPresenceRow> _rows = const [];
+  int _loggedToday = 0;
   bool _loading = true;
   String? _error;
   Timer? _timer;
@@ -51,10 +63,15 @@ class _AdminUserPresenceSectionState extends State<AdminUserPresenceSection> {
       });
     }
     try {
-      final rows = await (widget.loadRows ?? SupabaseService.listAdminUserPresence)();
+      final rows =
+          await (widget.loadRows ?? SupabaseService.listAdminUserPresence)();
+      final shown = widget.onlyLoggedInToday
+          ? await _rowsLoggedInToday(rows)
+          : rows;
       if (!mounted) return;
       setState(() {
-        _rows = _sorted(rows);
+        _loggedToday = widget.onlyLoggedInToday ? shown.length : 0;
+        _rows = _sorted(shown);
         _pageIndex = clampListPageIndex(
           pageIndex: _pageIndex,
           total: _rows.length,
@@ -70,6 +87,33 @@ class _AdminUserPresenceSectionState extends State<AdminUserPresenceSection> {
         _error = 'No se pudo cargar la presencia.';
       });
     }
+  }
+
+  Future<List<AdminUserPresenceRow>> _rowsLoggedInToday(
+    List<AdminUserPresenceRow> presence,
+  ) async {
+    final activity = await (widget.loadTodayLogins ??
+        () => SupabaseService.listAdminUserActivityMonitoring(
+              period: 'day',
+            ))();
+    final byId = {for (final row in presence) row.profileId: row};
+    final today = <AdminUserPresenceRow>[];
+    for (final row in activity) {
+      if (row.loginCountToday <= 0 || row.profileId.isEmpty) continue;
+      final seen = byId[row.profileId];
+      final name = row.businessName?.trim();
+      today.add(
+        seen ??
+            AdminUserPresenceRow(
+              profileId: row.profileId,
+              displayName: (name == null || name.isEmpty) ? 'Usuario' : name,
+              businessName: row.businessName,
+              role: row.role,
+              lastSeenAt: row.lastLoginAt,
+            ),
+      );
+    }
+    return today;
   }
 
   List<AdminUserPresenceRow> _sorted(List<AdminUserPresenceRow> rows) {
@@ -101,7 +145,7 @@ class _AdminUserPresenceSectionState extends State<AdminUserPresenceSection> {
           children: [
             Expanded(
               child: Text(
-                'Presencia en línea',
+                widget.onlyLoggedInToday ? 'Ingresaron hoy' : 'Presencia en línea',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
@@ -120,7 +164,9 @@ class _AdminUserPresenceSectionState extends State<AdminUserPresenceSection> {
         ),
         const SizedBox(height: 2),
         Text(
-          'Actividad de los últimos 5 minutos. Una cuenta, una fila.',
+          widget.onlyLoggedInToday
+              ? '$_loggedToday ${_loggedToday == 1 ? 'cuenta' : 'cuentas'} desde la medianoche (Caracas). En línea: actividad de los últimos 5 minutos.'
+              : 'Actividad de los últimos 5 minutos. Una cuenta, una fila.',
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'importer_pickup_location_model.dart';
-import 'pickup_location_mode.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_pickup_flow_copy.dart';
@@ -286,6 +285,64 @@ class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDi
     super.dispose();
   }
 
+  static const _estadosVenezuela = <String>[
+    'Amazonas',
+    'Anzoátegui',
+    'Apure',
+    'Aragua',
+    'Barinas',
+    'Bolívar',
+    'Carabobo',
+    'Cojedes',
+    'Delta Amacuro',
+    'Distrito Capital',
+    'Falcón',
+    'Guárico',
+    'La Guaira',
+    'Lara',
+    'Mérida',
+    'Miranda',
+    'Monagas',
+    'Nueva Esparta',
+    'Portuguesa',
+    'Sucre',
+    'Táchira',
+    'Trujillo',
+    'Yaracuy',
+    'Zulia',
+  ];
+
+  InputDecoration _field({
+    required String label,
+    String? hint,
+    IconData? icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon == null ? null : Icon(icon, color: AppColors.textSecondary),
+      filled: true,
+      fillColor: AppColors.fieldFill,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: AppColors.borderSubtle),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+      ),
+    );
+  }
+
+  List<String> get _estados {
+    final actual = _estado.text.trim();
+    if (actual.isEmpty || _estadosVenezuela.contains(actual)) {
+      return _estadosVenezuela;
+    }
+    return [actual, ..._estadosVenezuela];
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -313,87 +370,118 @@ class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDi
 
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 560;
+    final lugar = wide
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _estadoField()),
+              const SizedBox(width: 10),
+              Expanded(child: _ciudadField()),
+            ],
+          )
+        : Column(
+            children: [
+              _estadoField(),
+              const SizedBox(height: 10),
+              _ciudadField(),
+            ],
+          );
     return AlertDialog(
+      scrollable: true,
       title: Text(widget.existing == null ? 'Nueva ubicación' : 'Editar ubicación'),
-      content: SingleChildScrollView(
+      content: SizedBox(
+        width: 460,
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text(
+                'Punto distinto al almacén, para cuando retiren el pedido en otra dirección.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _label,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre *',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: _field(
+                  label: 'Nombre *',
+                  hint: 'Depósito norte',
+                  icon: Icons.place_outlined,
                 ),
                 validator: (v) =>
                     (v ?? '').trim().length < 2 ? 'Indique un nombre' : null,
               ),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _estado,
-                decoration: const InputDecoration(
-                  labelText: 'Estado',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _ciudad,
-                decoration: const InputDecoration(
-                  labelText: 'Ciudad',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
+              lugar,
               const SizedBox(height: 10),
               TextFormField(
                 controller: _direccion,
-                decoration: const InputDecoration(
-                  labelText: 'Dirección *',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                textCapitalization: TextCapitalization.sentences,
+                minLines: 2,
+                maxLines: 3,
+                decoration: _field(
+                  label: 'Dirección *',
+                  hint: 'Calle, edificio, referencia',
+                  icon: Icons.signpost_outlined,
                 ),
                 validator: (v) =>
                     (v ?? '').trim().length < 5 ? 'Indique la dirección' : null,
               ),
               const SizedBox(height: 10),
               TextFormField(
-                controller: _mapsUrl,
-                decoration: const InputDecoration(
-                  labelText: 'Enlace de mapas (opcional)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
                 controller: _contactName,
-                decoration: const InputDecoration(
-                  labelText: 'Contacto (opcional)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: _field(
+                  label: 'Quién recibe',
+                  hint: 'Opcional',
+                  icon: Icons.person_outline,
                 ),
               ),
               const SizedBox(height: 10),
               TextFormField(
                 controller: _contactPhone,
-                decoration: const InputDecoration(
-                  labelText: 'Teléfono de contacto (opcional)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                keyboardType: TextInputType.phone,
+                decoration: _field(
+                  label: 'Teléfono',
+                  hint: 'Opcional',
+                  icon: Icons.phone_outlined,
                 ),
               ),
-              CheckboxListTile(
-                value: _isDefault,
-                onChanged: (v) => setState(() => _isDefault = v == true),
-                title: Text(PickupLocationMode.labelEs(PickupLocationMode.alternate)),
-                subtitle: const Text('Usar como ubicación alterna por defecto'),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _mapsUrl,
+                keyboardType: TextInputType.url,
+                decoration: _field(
+                  label: 'Enlace de mapas',
+                  hint: 'Opcional',
+                  icon: Icons.map_outlined,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
+                value: _isDefault,
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _isDefault = value),
+                title: const Text(
+                  'Sugerir al confirmar el retiro',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+                subtitle: Text(
+                  'Queda marcada como la otra ubicación por defecto.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
             ],
           ),
@@ -410,11 +498,39 @@ class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDi
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Text('Guardar'),
         ),
       ],
+    );
+  }
+
+  Widget _estadoField() {
+    final actual = _estado.text.trim();
+    return DropdownButtonFormField<String>(
+      value: actual.isEmpty ? null : actual,
+      isExpanded: true,
+      decoration: _field(label: 'Estado', icon: Icons.map_outlined),
+      hint: const Text('Opcional'),
+      items: [
+        for (final estado in _estados)
+          DropdownMenuItem(value: estado, child: Text(estado)),
+      ],
+      onChanged: _saving
+          ? null
+          : (value) => setState(() => _estado.text = value ?? ''),
+    );
+  }
+
+  Widget _ciudadField() {
+    return TextFormField(
+      controller: _ciudad,
+      textCapitalization: TextCapitalization.words,
+      decoration: _field(label: 'Ciudad', hint: 'Opcional', icon: Icons.location_city_outlined),
     );
   }
 }

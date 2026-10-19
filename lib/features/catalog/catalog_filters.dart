@@ -17,6 +17,7 @@ class CatalogFilters {
     this.minOwnerRatingAvg,
     this.minOwnerRatingCount,
     this.onlyWithCommercialDiscount = false,
+    this.onlyUsdPromotion = false,
     this.category,
     this.categoryAnyOf = const [],
   });
@@ -62,6 +63,9 @@ class CatalogFilters {
   /// Solo productos con oferta directa (`sale_price_usd`) o tramos por volumen.
   final bool onlyWithCommercialDiscount;
 
+  /// Solo productos con precio USD de promoción (`sale_price_usd` > 0).
+  final bool onlyUsdPromotion;
+
   /// Categoría exacta de `products.category` (vitrina de un mayorista).
   final String? category;
 
@@ -105,6 +109,7 @@ class CatalogFilters {
         maxPrice != null ||
         hasReputationThreshold ||
         onlyWithCommercialDiscount ||
+        onlyUsdPromotion ||
         (category != null && category!.trim().isNotEmpty) ||
         categoryAnyOf.isNotEmpty ||
         sortMode != CatalogSortMode.defaultMode;
@@ -134,6 +139,7 @@ class CatalogFilters {
     double? minOwnerRatingAvg,
     int? minOwnerRatingCount,
     bool? onlyWithCommercialDiscount,
+    bool? onlyUsdPromotion,
     String? category,
     List<String>? categoryAnyOf,
     bool clearSortReference = false,
@@ -163,6 +169,7 @@ class CatalogFilters {
           : (minOwnerRatingCount ?? this.minOwnerRatingCount),
       onlyWithCommercialDiscount:
           onlyWithCommercialDiscount ?? this.onlyWithCommercialDiscount,
+      onlyUsdPromotion: onlyUsdPromotion ?? this.onlyUsdPromotion,
       category: clearCategory ? null : (category ?? this.category),
       categoryAnyOf:
           clearCategory ? const [] : (categoryAnyOf ?? this.categoryAnyOf),

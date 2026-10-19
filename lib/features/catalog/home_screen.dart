@@ -17,10 +17,10 @@ import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
 import 'catalog_product_price_display.dart';
-import 'product_catalog_pricing.dart';
 import 'product_warranty_seal.dart';
 import 'importer_catalog_logo.dart';
 import 'importer_catalog_seals.dart';
@@ -28,6 +28,7 @@ import 'importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'favorite_heart_button.dart';
 import 'product_detail_screen.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
@@ -121,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   double? _minOwnerRatingAvg;
   int? _minOwnerRatingCount;
   bool _onlyWithCommercialDiscount = false;
+  bool _usdPromotionView = false;
   double? _allySortLat;
   double? _allySortLng;
 
@@ -212,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       minOwnerRatingAvg: _minOwnerRatingAvg,
       minOwnerRatingCount: _minOwnerRatingCount,
       onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
+      onlyUsdPromotion: _usdPromotionView,
     );
   }
 
@@ -236,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _minOwnerRatingAvg = null;
       _minOwnerRatingCount = null;
       _onlyWithCommercialDiscount = false;
+      _usdPromotionView = false;
       final la = widget.profile.latitude;
       final lo = widget.profile.longitude;
       _allySortLat = la;
@@ -815,7 +819,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     if (draft.hasCommercialDiscountFilter) {
       chips.add(_activeFilterChip(
-        label: 'Con descuentos',
+        label: 'Promoción USD',
         onDeleted: () {
           setState(() => _onlyWithCommercialDiscount = false);
           _applyFiltersFromUi();
@@ -1057,6 +1061,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                           ),
                   ),
+                  if (widget.homeRole == AppHomeRole.aliado)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 4),
+                      child: SegmentedFilterBar(
+                        labels: const ['Precio REF', 'USD promoción'],
+                        selectedIndex: _usdPromotionView ? 1 : 0,
+                        onSelected: (index) {
+                          final next = index == 1;
+                          if (next == _usdPromotionView) return;
+                          setState(() => _usdPromotionView = next);
+                          _applyFiltersFromUi();
+                        },
+                      ),
+                    ),
                   if (activeFilterChips != null) activeFilterChips,
                   if (_catalogSortMode == CatalogSortMode.featured &&
                       widget.homeRole == AppHomeRole.aliado)
@@ -1266,6 +1284,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                             profile: widget.profile,
                                             compact: true,
                                             showDistanceChips: showDistance,
+                                            usdPromotionView: _usdPromotionView,
                                             onTap: () {
                                               CatalogRouteLock.push(
                                                 context,
@@ -1366,6 +1385,7 @@ class _ProductGridCard extends StatelessWidget {
     required this.profile,
     this.compact = false,
     this.showDistanceChips = false,
+    this.usdPromotionView = false,
     this.onTap,
     this.onImporterTap,
   });
@@ -1374,6 +1394,7 @@ class _ProductGridCard extends StatelessWidget {
   final ProfileModel profile;
   final bool compact;
   final bool showDistanceChips;
+  final bool usdPromotionView;
   final VoidCallback? onTap;
   final VoidCallback? onImporterTap;
 
@@ -1388,13 +1409,6 @@ class _ProductGridCard extends StatelessWidget {
     final stockDetail = part.hasOwnerMinOrderAmount
         ? '${part.minOrderQtyLabelEs} · ${part.ownerMinOrderAmountLabelEs}'
         : part.minOrderQtyLabelEs;
-    final refUnit = ProductCatalogPricing.aliadoUnitUsd(
-      listPriceUsd: part.precio,
-      salePriceUsd: part.salePriceUsd,
-      discountRules: part.discountRules,
-      campaignDiscountPercent: part.activeCampaignDiscountPercent,
-    );
-
     return Material(
       color: AppColors.card,
       borderRadius: BorderRadius.circular(16),
@@ -1462,6 +1476,18 @@ class _ProductGridCard extends StatelessWidget {
                               compact: true,
                             ),
                           ),
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          right: 40,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: EnvioPoliticaBadge(
+                              tipo: part.ownerEnvioTipo,
+                              compact: true,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1594,7 +1620,7 @@ class _ProductGridCard extends StatelessWidget {
                     catalogGrid: true,
                     compact: true,
                     showPromotionChips: false,
-                    ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                    usdPromotionView: usdPromotionView,
                   ),
                 ),
                 SizedBox(
@@ -1605,9 +1631,7 @@ class _ProductGridCard extends StatelessWidget {
                     discountRules: part.discountRules,
                     campaignDiscountPercent:
                         part.activeCampaignDiscountPercent,
-                    refUnitUsd: refUnit,
                     compact: true,
-                    ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                   ),
                 ),
                 const SizedBox(height: AliadoCatalogLayout.cardGapSection),

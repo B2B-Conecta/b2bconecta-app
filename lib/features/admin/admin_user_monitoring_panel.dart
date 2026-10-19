@@ -441,6 +441,16 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                   child: AdminUserPresenceSection(
                     loadRows: widget.loadPresence,
+                    onlyLoggedInToday: true,
+                    loadTodayLogins: () {
+                      final custom = widget.loadRows;
+                      if (custom != null) {
+                        return custom(role: null, period: 'day');
+                      }
+                      return SupabaseService.listAdminUserActivityMonitoring(
+                        period: 'day',
+                      );
+                    },
                   ),
                 ),
               ),

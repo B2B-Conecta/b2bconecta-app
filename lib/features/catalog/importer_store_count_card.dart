@@ -58,7 +58,8 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
     final count = _count;
     if (!_ready || count == null) return const SizedBox.shrink();
     final label = count == 1 ? 'tienda activa' : 'tiendas activas';
-    final tooltip = 'Hay $count $label en la app';
+    final tooltip = 'Hay $count $label: tiendas minoristas con '
+        'verificación aprobada, cuenta activa y RIF distinto.';
 
     if (!widget.extended && !widget.inline) {
       return Padding(

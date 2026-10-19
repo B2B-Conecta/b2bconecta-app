@@ -5,6 +5,8 @@ import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
 import 'package:motolink_pro_app/features/catalog/favorite_heart_button.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -247,8 +249,14 @@ class _FavoriteRow extends StatelessWidget {
                         catalogGrid: true,
                         compact: true,
                         showPromotionChips: false,
-                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                       ),
+                      if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
+                        const SizedBox(height: 4),
+                        EnvioPoliticaBadge(
+                          tipo: part.ownerEnvioTipo,
+                          compact: true,
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         _availability,

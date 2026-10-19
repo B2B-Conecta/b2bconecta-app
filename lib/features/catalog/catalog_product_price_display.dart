@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'product_catalog_pricing.dart';
 
 /// Precios aliado en catálogo y ficha (REF principal; divisas solo si aplica).
@@ -14,9 +16,8 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.quantity = 1,
     this.compact = false,
     this.catalogGrid = false,
-    this.showUsd = true,
     this.showPromotionChips = true,
-    this.ownerPagoSoloDivisas = false,
+    this.usdPromotionView = false,
   });
 
   final double listPriceUsd;
@@ -26,20 +27,15 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final int quantity;
   final bool compact;
   final bool catalogGrid;
-  final bool showUsd;
   final bool showPromotionChips;
-  final bool ownerPagoSoloDivisas;
 
-  bool get _onSale {
-    final unit = ProductCatalogPricing.aliadoUnitUsd(
-      listPriceUsd: listPriceUsd,
-      salePriceUsd: salePriceUsd,
-      discountRules: discountRules,
-      quantity: quantity,
-      campaignDiscountPercent: campaignDiscountPercent,
-    );
-    return unit < listPriceUsd - 0.0001;
-  }
+  /// Catálogo aliado: muestra el precio USD de promoción en lugar del REF.
+  final bool usdPromotionView;
+
+  bool get _hasUsdPromo => ProductCatalogPricing.hasDirectSale(
+        listPriceUsd: listPriceUsd,
+        salePriceUsd: salePriceUsd,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -48,30 +44,38 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   }
 
   Widget _buildGrid(BuildContext context) {
-    final refUnit = ProductCatalogPricing.aliadoUnitUsd(
-      listPriceUsd: listPriceUsd,
-      salePriceUsd: salePriceUsd,
-      discountRules: discountRules,
-      quantity: quantity,
-      campaignDiscountPercent: campaignDiscountPercent,
-    );
-    final strikeRef = _onSale
-        ? ProductCatalogPricing.aliadoUnitRegularListUsd(
-            listPriceUsd: listPriceUsd,
-            discountRules: discountRules,
-            quantity: quantity,
-          )
-        : null;
-
+    final showUsd = usdPromotionView && _hasUsdPromo;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _refPriceRow(
-          refUnit: refUnit,
-          strikeRef: strikeRef,
-          refSize: compact ? 14 : 16,
-          strikeSize: compact ? 9 : 10,
+        if (showUsd)
+          Text(
+            '${salePriceUsd!.toStringAsFixed(2)} USD',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: compact ? 14 : 16,
+              fontWeight: FontWeight.w900,
+              color: AppColors.successGreen,
+              height: 1.05,
+            ),
+          ),
+        Text(
+          '${listPriceUsd.toStringAsFixed(2)} REF',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: showUsd ? (compact ? 11 : 12) : (compact ? 14 : 16),
+            fontWeight: showUsd ? FontWeight.w700 : FontWeight.w900,
+            color: showUsd ? AppColors.textSecondary : AppColors.brandAccent,
+            height: 1.05,
+          ),
+        ),
+        _BasePriceBsLine(
+          refUsd: listPriceUsd,
+          fontSize: compact ? 11 : 12,
+          compact: true,
         ),
         if (showPromotionChips)
           CatalogProductOfferChips(
@@ -80,45 +84,19 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             discountRules: discountRules,
             campaignDiscountPercent: campaignDiscountPercent,
             quantity: quantity,
-            refUnitUsd: refUnit,
             compact: compact,
-            ownerPagoSoloDivisas: ownerPagoSoloDivisas,
           ),
       ],
     );
   }
 
   Widget _buildDetail(BuildContext context) {
-    final refUnit = ProductCatalogPricing.aliadoUnitUsd(
-      listPriceUsd: listPriceUsd,
-      salePriceUsd: salePriceUsd,
-      discountRules: discountRules,
-      quantity: quantity,
-      campaignDiscountPercent: campaignDiscountPercent,
-    );
-    final strikeRef = _onSale
-        ? ProductCatalogPricing.aliadoUnitRegularListUsd(
-            listPriceUsd: listPriceUsd,
-            discountRules: discountRules,
-            quantity: quantity,
-          )
-        : null;
-    final usdPct = ProductCatalogPricing.effectiveUsdPaymentDiscountPct(
-      discountRules: discountRules,
-      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
-    );
-    final usdUnit = ProductCatalogPricing.aliadoUnitUsdPaymentLine(
-      refUnitUsd: refUnit,
-      discountRules: discountRules,
-      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Precio',
+          'Precio REF',
           style: TextStyle(
             fontSize: compact ? 11 : 12,
             fontWeight: FontWeight.w700,
@@ -127,60 +105,61 @@ class CatalogProductPriceDisplay extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        _refPriceRow(
-          refUnit: refUnit,
-          strikeRef: strikeRef,
-          refSize: compact ? 20 : 22,
-          strikeSize: compact ? 13 : 14,
+        Text(
+          '${listPriceUsd.toStringAsFixed(2)} REF',
+          style: TextStyle(
+            fontSize: compact ? 20 : 22,
+            fontWeight: FontWeight.w900,
+            color: AppColors.brandAccent,
+            height: 1.05,
+          ),
         ),
-        if (showUsd && usdPct != null) ...[
+        if (_hasUsdPromo) ...[
           const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.successGreen.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.successGreen.withOpacity(0.35),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.payments_outlined,
-                  size: 18,
-                  color: AppColors.successGreen,
+          Row(
+            children: [
+              Text(
+                'Precio USD',
+                style: TextStyle(
+                  fontSize: compact ? 11 : 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.2,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'USD',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${usdUnit.toStringAsFixed(2)} · ${usdPct.toStringAsFixed(usdPct.truncateToDouble() == usdPct ? 0 : 1)} % menos que REF',
-                        style: TextStyle(
-                          fontSize: compact ? 14 : 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.successGreen.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Promoción',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.successGreen,
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${salePriceUsd!.toStringAsFixed(2)} USD',
+            style: TextStyle(
+              fontSize: compact ? 18 : 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.successGreen,
+              height: 1.05,
             ),
           ),
         ],
+        _BasePriceBsLine(
+          refUsd: listPriceUsd,
+          fontSize: compact ? 14 : 16,
+        ),
         if (showPromotionChips) ...[
           const SizedBox(height: 8),
           CatalogProductOfferChips(
@@ -189,47 +168,9 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             discountRules: discountRules,
             campaignDiscountPercent: campaignDiscountPercent,
             quantity: quantity,
-            refUnitUsd: refUnit,
             compact: false,
-            ownerPagoSoloDivisas: ownerPagoSoloDivisas,
           ),
         ],
-      ],
-    );
-  }
-
-  Widget _refPriceRow({
-    required double refUnit,
-    required double? strikeRef,
-    required double refSize,
-    required double strikeSize,
-  }) {
-    final hasStrike = strikeRef != null && (strikeRef - refUnit).abs() > 0.001;
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.end,
-      spacing: 6,
-      runSpacing: 2,
-      children: [
-        if (hasStrike)
-          Text(
-            '${strikeRef.toStringAsFixed(2)} REF',
-            style: TextStyle(
-              fontSize: strikeSize,
-              decoration: TextDecoration.lineThrough,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-              height: 1.1,
-            ),
-          ),
-        Text(
-          '${refUnit.toStringAsFixed(2)} REF',
-          style: TextStyle(
-            fontSize: refSize,
-            fontWeight: FontWeight.w900,
-            color: hasStrike ? AppColors.successGreen : AppColors.brandAccent,
-            height: 1.05,
-          ),
-        ),
       ],
     );
   }
@@ -244,9 +185,7 @@ class CatalogProductOfferChips extends StatelessWidget {
     this.discountRules,
     this.campaignDiscountPercent,
     this.quantity = 1,
-    required this.refUnitUsd,
     this.compact = false,
-    this.ownerPagoSoloDivisas = false,
   });
 
   final double listPriceUsd;
@@ -254,31 +193,11 @@ class CatalogProductOfferChips extends StatelessWidget {
   final Map<String, dynamic>? discountRules;
   final double? campaignDiscountPercent;
   final int quantity;
-  final double refUnitUsd;
   final bool compact;
-  final bool ownerPagoSoloDivisas;
 
   @override
   Widget build(BuildContext context) {
     final chips = <_OfferChipData>[];
-    final volumeActive = ProductCatalogPricing.volumePathActive(
-      discountRules,
-      quantity,
-    );
-
-    if (ProductCatalogPricing.hasDirectSale(
-      listPriceUsd: listPriceUsd,
-      salePriceUsd: salePriceUsd,
-    )) {
-      chips.add(
-        _OfferChipData(
-          label: 'Oferta',
-          bg: AppColors.brandBlueContainer,
-          fg: AppColors.brandAccent,
-          border: AppColors.brandAccent.withOpacity(0.35),
-        ),
-      );
-    }
 
     final promoChip = ProductCatalogPricing.campaignDiscountChipEs(
       campaignDiscountPercent,
@@ -292,57 +211,6 @@ class CatalogProductOfferChips extends StatelessWidget {
           bg: const Color(0xFFFFF6E5),
           fg: const Color(0xFF8A5A00),
           border: const Color(0xFFE8A317).withOpacity(0.45),
-        ),
-      );
-    }
-
-    if (volumeActive) {
-      final applied = ProductCatalogPricing.volumeDiscountPercent(
-        discountRules,
-        quantity,
-      );
-      final pctLabel = applied == applied.roundToDouble()
-          ? applied.toStringAsFixed(0)
-          : applied.toStringAsFixed(1);
-      chips.add(
-        _OfferChipData(
-          label: 'Volumen −$pctLabel%',
-          bg: AppColors.brandBlueContainer,
-          fg: AppColors.textPrimary,
-          border: AppColors.borderSubtle,
-        ),
-      );
-    }
-
-    final vol = volumeActive
-        ? null
-        : ProductCatalogPricing.volumeIncentiveChipEs(
-            discountRules,
-            currentQuantity: quantity,
-          );
-    if (vol != null) {
-      chips.add(
-        _OfferChipData(
-          label: vol,
-          bg: AppColors.brandBlueContainer,
-          fg: AppColors.textPrimary,
-          border: AppColors.borderSubtle,
-        ),
-      );
-    }
-
-    final zelle = ProductCatalogPricing.usdPaymentChipEs(
-      refUnitUsd: refUnitUsd,
-      discountRules: discountRules,
-      ownerPagoSoloDivisas: ownerPagoSoloDivisas,
-    );
-    if (zelle != null) {
-      chips.add(
-        _OfferChipData(
-          label: zelle,
-          bg: AppColors.successGreen.withOpacity(0.12),
-          fg: AppColors.textPrimary,
-          border: AppColors.successGreen.withOpacity(0.35),
         ),
       );
     }
@@ -417,6 +285,58 @@ class _OfferChip extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: data.fg,
           height: 1.15,
+        ),
+      ),
+    );
+  }
+}
+
+/// Bs del precio base REF con la tasa BCV vigente.
+class _BasePriceBsLine extends StatefulWidget {
+  const _BasePriceBsLine({
+    required this.refUsd,
+    required this.fontSize,
+    this.compact = false,
+  });
+
+  /// Siempre el precio REF, no la oferta.
+  final double refUsd;
+  final double fontSize;
+  final bool compact;
+
+  @override
+  State<_BasePriceBsLine> createState() => _BasePriceBsLineState();
+}
+
+class _BasePriceBsLineState extends State<_BasePriceBsLine> {
+  double? _rate;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rate = await BcvBasePrice.currentRate();
+    if (!mounted) return;
+    setState(() => _rate = rate);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bs = BcvBasePrice.bsForRef(widget.refUsd, _rate);
+    if (bs == null) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: widget.compact ? 2 : 4),
+      child: Text(
+        formatBsLabel(bs),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: widget.fontSize,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
         ),
       ),
     );

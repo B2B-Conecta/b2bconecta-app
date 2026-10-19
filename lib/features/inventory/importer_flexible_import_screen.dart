@@ -86,8 +86,6 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.compatibility,
     CatalogImportField.imageUrl,
     CatalogImportField.hasWarranty,
-    CatalogImportField.usdPaymentDiscountPct,
-    CatalogImportField.volumeTiersJson,
   ];
 
   static const _fieldHintsVe = <CatalogImportField, String>{
@@ -113,10 +111,6 @@ class _ImporterFlexibleImportScreenState
         'Enlace público a la foto del repuesto.',
     CatalogImportField.hasWarranty:
         'Usa si/no, o días numéricos del ERP (ej. 30, 90 días).',
-    CatalogImportField.usdPaymentDiscountPct:
-        '% de descuento adicional si la tienda minorista paga en divisas.',
-    CatalogImportField.volumeTiersJson:
-        'Tramos por volumen en JSON (configuración avanzada).',
   };
 
   static String _labelVe(CatalogImportField field) => switch (field) {

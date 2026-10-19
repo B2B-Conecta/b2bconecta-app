@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/core/notifications/in_app_notification_model.dart';
 import 'package:motolink_pro_app/core/notifications/notifications_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_service.dart';
+import 'package:motolink_pro_app/features/admin/incomplete_signup_row.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
@@ -1156,6 +1157,9 @@ class SupabaseService {
 
   static Future<List<ProfileModel>> ownerListProfilesWithDossier() =>
       AdminService.ownerListProfilesWithDossier();
+
+  static Future<List<IncompleteSignupRow>> listIncompleteSignups() =>
+      AdminService.listIncompleteSignups();
 
   static Future<Map<String, String>> ownerAuthEmailsByProfileId() =>
       AdminService.ownerAuthEmailsByProfileId();

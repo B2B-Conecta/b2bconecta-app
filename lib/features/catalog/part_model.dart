@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/payments/broker_pricing.dart';
@@ -38,11 +39,15 @@ class PartModel {
     this.ownerMinOrderCurrency = MinOrderCurrency.ref,
     this.ownerCatalogFeaturedUntil,
     this.ownerCatalogVerifiedAt,
+    this.priceBs,
     this.salePriceUsd,
     this.discountRules,
     this.activeCampaignDiscountPercent,
     this.activePromoCampaignId,
     this.ownerPagoSoloDivisas = false,
+    this.ownerEnvioTipo = EnvioPolitica.noDefinido,
+    this.ownerEnvioGratisMinimo,
+    this.ownerTransportistas = const [],
     this.hasWarranty = false,
     this.customFields = const {},
   });
@@ -66,8 +71,17 @@ class PartModel {
   final String? descripcion;
   final String? compatibilidad;
 
-  /// Precio mayorista USD cargado por el importador (`products.price_usd`).
+  /// Precio base REF (`products.price_usd`). El Bs de catálogo sale solo de este monto.
   final double precio;
+
+  /// Bs de solo lectura: `precio` × tasa BCV. La oferta USD no entra en la fórmula.
+  double? precioBsConTasa(double? tasaBcv) {
+    if (tasaBcv == null || tasaBcv <= 0) return null;
+    return precio * tasaBcv;
+  }
+
+  /// Reservado. El Bs de la ficha no se guarda: sale de [precioBsConTasa].
+  final double? priceBs;
   final int stock;
 
   /// Unidades apartadas para un cambio. El catálogo vende [stockForSale].
@@ -147,6 +161,15 @@ class PartModel {
   /// Importador dueño: solo acepta pagos en divisas (sin descuento línea USD).
   final bool ownerPagoSoloDivisas;
 
+  /// Política de flete del proveedor (`profiles.envio_tipo`).
+  final String ownerEnvioTipo;
+
+  /// Monto opcional de envío gratis (`profiles.monto_minimo_envio_gratis`).
+  final double? ownerEnvioGratisMinimo;
+
+  /// Agencias que el proveedor ofrece.
+  final List<String> ownerTransportistas;
+
   /// Importador habilitó garantía en este producto (`products.has_warranty`).
   final bool hasWarranty;
 
@@ -221,6 +244,7 @@ class PartModel {
     final featuredUntil = _ownerFeaturedUntilFromProfiles(json['profiles']);
     final verifiedAt = _ownerVerifiedAtFromProfiles(json['profiles']);
     final soloDivisas = _ownerPagoSoloDivisasFromProfiles(json['profiles']);
+    final ownerProfile = _profilesMap(json['profiles']);
 
     final isActiveRaw = json['is_active'];
     final isActive = isActiveRaw is bool
@@ -249,10 +273,16 @@ class PartModel {
       ownerCatalogFeaturedUntil: featuredUntil,
       ownerCatalogVerifiedAt: verifiedAt,
       ownerPagoSoloDivisas: soloDivisas,
+      ownerEnvioTipo: EnvioPolitica.normalize(ownerProfile?['envio_tipo']),
+      ownerEnvioGratisMinimo:
+          _asNullableDouble(ownerProfile?['monto_minimo_envio_gratis']),
+      ownerTransportistas:
+          EnvioPolitica.parseNombres(ownerProfile?['transportistas_habilitados']),
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
       precio: _asDouble(precioRaw),
+      priceBs: _asNullableDouble(json['price_bs']),
       salePriceUsd: _asNullableDouble(saleRaw),
       discountRules: _discountRulesFromJson(json['discount_rules']),
       stock: _asInt(json['stock']),
@@ -283,6 +313,7 @@ class PartModel {
     String? descripcion,
     String? compatibilidad,
     double? precio,
+    double? priceBs,
     int? stock,
     int? stockReserved,
     int? minOrderQty,
@@ -306,6 +337,9 @@ class PartModel {
     double? activeCampaignDiscountPercent,
     String? activePromoCampaignId,
     bool? ownerPagoSoloDivisas,
+    String? ownerEnvioTipo,
+    double? ownerEnvioGratisMinimo,
+    List<String>? ownerTransportistas,
     bool? hasWarranty,
     Map<String, dynamic>? customFields,
   }) {
@@ -321,6 +355,7 @@ class PartModel {
       descripcion: descripcion ?? this.descripcion,
       compatibilidad: compatibilidad ?? this.compatibilidad,
       precio: precio ?? this.precio,
+      priceBs: priceBs ?? this.priceBs,
       stock: stock ?? this.stock,
       stockReserved: stockReserved ?? this.stockReserved,
       minOrderQty: minOrderQty ?? this.minOrderQty,
@@ -353,6 +388,10 @@ class PartModel {
           activePromoCampaignId ?? this.activePromoCampaignId,
       ownerPagoSoloDivisas:
           ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
+      ownerEnvioTipo: ownerEnvioTipo ?? this.ownerEnvioTipo,
+      ownerEnvioGratisMinimo:
+          ownerEnvioGratisMinimo ?? this.ownerEnvioGratisMinimo,
+      ownerTransportistas: ownerTransportistas ?? this.ownerTransportistas,
       hasWarranty: hasWarranty ?? this.hasWarranty,
       customFields: customFields ?? this.customFields,
     );

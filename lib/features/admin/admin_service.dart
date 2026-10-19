@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
+import 'package:motolink_pro_app/features/admin/incomplete_signup_row.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -102,6 +103,21 @@ class AdminService {
         .map(
           (e) => ProfileModel.fromJson(Map<String, dynamic>.from(e as Map)),
         )
+        .toList();
+  }
+
+  /// Administrador: Auth sin ficha de negocio, del registro más reciente al más antiguo.
+  static Future<List<IncompleteSignupRow>> listIncompleteSignups() async {
+    final res =
+        await SupabaseAccess.client.rpc('list_admin_incomplete_signups');
+    if (res is! List) return const [];
+    return res
+        .map(
+          (e) => IncompleteSignupRow.fromJson(
+            Map<String, dynamic>.from(e as Map),
+          ),
+        )
+        .where((row) => row.userId.isNotEmpty)
         .toList();
   }
 

@@ -1,7 +1,6 @@
 -- Recepción exclusiva de stock Profit. Tablas vacías, instalaciones deshabilitadas
 -- por defecto. No cambia precios, políticas de compra ni datos de otro mayorista.
--- Candidata NO aplicada: 20261118120000 ya identifica postventa en DEV.
--- Revalidar versión libre y esquema inmediatamente antes de integrar/desplegar.
+-- Versión 20261129120000: 20261126120000 ya es la moneda del carrito.
 do $$
 begin
   if to_regclass('public.order_postventa_casos') is null or

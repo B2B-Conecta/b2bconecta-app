@@ -85,12 +85,14 @@ class ListPageBar extends StatelessWidget {
     final end = math.min(start + size - 1, total);
     final lastPage = total <= 0 ? 0 : ((total - 1) / size).floor();
     final showSizes = options.length > 1;
+    final wideArrows = MediaQuery.sizeOf(context).width >= 900;
     final pager = _pager(
       label: '$start–$end de $total',
       canBack: index > 0,
       canForward: index < lastPage || hasMore,
       onBack: () => onPageIndex(index - 1),
       onForward: () => onPageIndex(index + 1),
+      wideArrows: wideArrows,
     );
 
     return Padding(
@@ -136,6 +138,7 @@ class ListPageBar extends StatelessWidget {
     required bool canForward,
     required VoidCallback onBack,
     required VoidCallback onForward,
+    required bool wideArrows,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -144,11 +147,12 @@ class ListPageBar extends StatelessWidget {
           icon: Icons.chevron_left,
           tooltip: 'Anterior',
           onPressed: canBack ? onBack : null,
+          wide: wideArrows,
         ),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: wideArrows ? 13 : 12,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
@@ -157,6 +161,7 @@ class ListPageBar extends StatelessWidget {
           icon: Icons.chevron_right,
           tooltip: 'Siguiente',
           onPressed: canForward ? onForward : null,
+          wide: wideArrows,
         ),
       ],
     );
@@ -203,21 +208,26 @@ class _StepButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.wide = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
-      visualDensity: VisualDensity.compact,
+      visualDensity: wide ? VisualDensity.standard : VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-      icon: Icon(icon, size: 20, color: AppColors.brand),
+      constraints: BoxConstraints(
+        minWidth: wide ? 44 : 28,
+        minHeight: wide ? 44 : 28,
+      ),
+      icon: Icon(icon, size: wide ? 30 : 20, color: AppColors.brand),
     );
   }
 }

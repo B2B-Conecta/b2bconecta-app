@@ -6,7 +6,7 @@ import 'carrier_flete_pago_modo.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
-import 'carrier_pago_metodos_editor.dart';
+import 'package:flutter/services.dart';
 
 /// Abre el formulario de transportista (diálogo en web, sheet en móvil).
 Future<bool?> showImporterCarrierForm(
@@ -64,25 +64,69 @@ class _ImporterCarrierForm extends StatefulWidget {
   State<_ImporterCarrierForm> createState() => _ImporterCarrierFormState();
 }
 
+enum _TarifaModo { fija, agencia, gratis }
+
+class _EtaOpcion {
+  const _EtaOpcion(this.key, this.horas, this.label);
+  final String key;
+  final double horas;
+  final String label;
+}
+
+const _etaOpciones = <_EtaOpcion>[
+  _EtaOpcion('24_48', 24, '24 a 48 horas'),
+  _EtaOpcion('2_3', 48, '2 a 3 días'),
+  _EtaOpcion('3_5', 72, '3 a 5 días'),
+  _EtaOpcion('5_7', 120, '5 a 7 días'),
+];
+
+const _estadosVenezuela = <String>[
+  'Amazonas',
+  'Anzoátegui',
+  'Apure',
+  'Aragua',
+  'Barinas',
+  'Bolívar',
+  'Carabobo',
+  'Cojedes',
+  'Delta Amacuro',
+  'Distrito Capital',
+  'Falcón',
+  'Guárico',
+  'La Guaira',
+  'Lara',
+  'Mérida',
+  'Miranda',
+  'Monagas',
+  'Nueva Esparta',
+  'Portuguesa',
+  'Sucre',
+  'Táchira',
+  'Trujillo',
+  'Yaracuy',
+  'Zulia',
+];
+
 class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
   final _company = TextEditingController();
   final _contactName = TextEditingController();
   final _phone = TextEditingController();
   final _email = TextEditingController();
   final _whatsapp = TextEditingController();
-  final _estados = TextEditingController();
-  final _ciudades = TextEditingController();
   final _baseEstado = TextEditingController();
   final _baseCiudad = TextEditingController();
-  final _etaBase = TextEditingController(text: '24');
-  final _etaPerKm = TextEditingController(text: '0.15');
-  final _maxKm = TextEditingController();
   final _flatFee = TextEditingController();
-  final _pricePerKm = TextEditingController();
   final _notes = TextEditingController();
   late Set<String> _pagoMetodos;
   late Map<String, TextEditingController> _instruccionesControllers;
   late String _fletePagoModo;
+  late _TarifaModo _tarifa;
+  late String _etaKey;
+  bool _todoElPais = true;
+  final Set<String> _estados = {};
+  List<String> _ciudades = const [];
+  double? _maxCoverageKm;
+  int _step = 0;
   bool _saving = false;
 
   @override
@@ -95,25 +139,57 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
       _phone.text = e.contactPhone;
       _email.text = e.contactEmail ?? '';
       _whatsapp.text = e.contactWhatsapp ?? '';
-      _estados.text = e.coverageEstados.join(', ');
-      _ciudades.text = e.coverageCiudades.join(', ');
       _baseEstado.text = e.baseEstado ?? '';
       _baseCiudad.text = e.baseCiudad ?? '';
-      _etaBase.text = e.etaBaseHours.toString();
-      _etaPerKm.text = e.etaHoursPerKm.toString();
-      _maxKm.text = e.maxCoverageKm?.toString() ?? '';
-      _flatFee.text = e.flatFeeUsd?.toString() ?? '';
-      _pricePerKm.text = e.pricePerKmUsd?.toString() ?? '';
       _notes.text = e.notes ?? '';
+      _ciudades = List<String>.from(e.coverageCiudades);
+      _maxCoverageKm = e.maxCoverageKm;
+      _todoElPais = e.coverageEstados.isEmpty && e.coverageCiudades.isEmpty;
+      for (final raw in e.coverageEstados) {
+        final match = _matchEstado(raw);
+        _estados.add(match ?? raw.trim());
+      }
+      _tarifa = _tarifaFrom(e);
+      _etaKey = _etaKeyFromHours(e.etaBaseHours);
+      if (_tarifa == _TarifaModo.fija && e.flatFeeUsd != null) {
+        _flatFee.text = e.flatFeeUsd!.toStringAsFixed(2);
+      }
       _pagoMetodos = e.acceptedPagoMetodos.toSet();
       _fletePagoModo = e.fletePagoModo;
     } else {
-      _pagoMetodos = {'efectivo', 'zelle_divisas'};
+      _tarifa = _TarifaModo.agencia;
+      _etaKey = _etaOpciones.first.key;
+      _pagoMetodos = {'zelle_divisas'};
       _fletePagoModo = CarrierFletePagoModo.incluidoFactura;
     }
     _instruccionesControllers = _buildInstruccionesControllers(
       widget.existing?.pagoMetodoInstrucciones ?? const {},
     );
+  }
+
+  String? _matchEstado(String raw) {
+    final key = raw.trim().toLowerCase();
+    for (final estado in _estadosVenezuela) {
+      if (estado.toLowerCase() == key) return estado;
+    }
+    return null;
+  }
+
+  _TarifaModo _tarifaFrom(ImporterCarrierModel carrier) {
+    final flat = carrier.flatFeeUsd;
+    final perKm = carrier.pricePerKmUsd;
+    if (flat != null && flat <= 0 && (perKm == null || perKm <= 0)) {
+      return _TarifaModo.gratis;
+    }
+    if (flat != null && flat > 0) return _TarifaModo.fija;
+    return _TarifaModo.agencia;
+  }
+
+  String _etaKeyFromHours(double hours) {
+    if (hours <= 36) return '24_48';
+    if (hours <= 60) return '2_3';
+    if (hours <= 96) return '3_5';
+    return '5_7';
   }
 
   Map<String, TextEditingController> _buildInstruccionesControllers(
@@ -133,15 +209,9 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
     _phone.dispose();
     _email.dispose();
     _whatsapp.dispose();
-    _estados.dispose();
-    _ciudades.dispose();
     _baseEstado.dispose();
     _baseCiudad.dispose();
-    _etaBase.dispose();
-    _etaPerKm.dispose();
-    _maxKm.dispose();
     _flatFee.dispose();
-    _pricePerKm.dispose();
     _notes.dispose();
     for (final c in _instruccionesControllers.values) {
       c.dispose();
@@ -173,18 +243,48 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
     );
   }
 
-  List<String> _splitCsv(String raw) {
-    return raw
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-  }
-
   double? _parseOpt(String raw) {
     final t = raw.trim();
     if (t.isEmpty) return null;
     return double.tryParse(t.replaceAll(',', '.'));
+  }
+
+  _EtaOpcion get _etaElegida =>
+      _etaOpciones.firstWhere((e) => e.key == _etaKey, orElse: () => _etaOpciones.first);
+
+  bool _datosEsencialesOk() {
+    if (_company.text.trim().length < 2 || _phone.text.trim().length < 6) {
+      _snack('Complete nombre de empresa y teléfono.');
+      return false;
+    }
+    if (_tarifa == _TarifaModo.fija) {
+      final monto = _parseOpt(_flatFee.text);
+      if (monto == null || monto <= 0) {
+        _snack('Indique la tarifa fija en USD.');
+        return false;
+      }
+    }
+    if (!_todoElPais && _estados.isEmpty) {
+      _snack('Elija al menos un estado o marque todo el país.');
+      return false;
+    }
+    return true;
+  }
+
+  void _siguiente() {
+    if (!_datosEsencialesOk()) return;
+    setState(() => _step = 1);
+  }
+
+  ({double? fija, double? porKm}) _tarifasParaGuardar() {
+    switch (_tarifa) {
+      case _TarifaModo.fija:
+        return (fija: _parseOpt(_flatFee.text), porKm: null);
+      case _TarifaModo.gratis:
+        return (fija: 0, porKm: 0);
+      case _TarifaModo.agencia:
+        return (fija: null, porKm: null);
+    }
   }
 
   Map<String, String> _instruccionesToSave() {
@@ -197,46 +297,30 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
   }
 
   Future<void> _save() async {
-    if (_company.text.trim().length < 2 || _phone.text.trim().length < 6) {
-      _snack('Complete nombre de empresa y teléfono.');
-      return;
-    }
-    if (_pagoMetodos.isEmpty) {
-      _snack('Seleccione al menos un método de pago.');
-      return;
-    }
-
-    final sinDatos = _pagoMetodos.where((code) {
-      final t = _instruccionesControllers[code]?.text.trim() ?? '';
-      return t.isEmpty;
-    }).toList();
-    if (sinDatos.isNotEmpty) {
-      final labels = sinDatos.map(PagoMetodo.labelEs).join(', ');
-      _snack(
-        'Complete los datos de pago para: $labels.',
-        duration: const Duration(seconds: 4),
-      );
+    if (!_datosEsencialesOk()) {
+      setState(() => _step = 0);
       return;
     }
 
     setState(() => _saving = true);
     try {
       final instrucciones = _instruccionesToSave();
+      final tarifas = _tarifasParaGuardar();
       final common = (
         companyName: _company.text.trim(),
         contactPhone: _phone.text.trim(),
         contactName: _contactName.text.trim(),
         contactEmail: _email.text.trim(),
         contactWhatsapp: _whatsapp.text.trim(),
-        coverageEstados: _splitCsv(_estados.text),
-        coverageCiudades: _splitCsv(_ciudades.text),
+        coverageEstados: _todoElPais ? const <String>[] : _estados.toList(),
+        coverageCiudades: _todoElPais ? const <String>[] : _ciudades,
         baseEstado: _baseEstado.text.trim(),
         baseCiudad: _baseCiudad.text.trim(),
-        etaBaseHours: double.tryParse(_etaBase.text.trim()) ?? 24,
-        etaHoursPerKm: double.tryParse(_etaPerKm.text.trim()) ?? 0.15,
-        maxCoverageKm: _parseOpt(_maxKm.text),
-        flatFeeUsd: _parseOpt(_flatFee.text),
-        pricePerKmUsd: _parseOpt(_pricePerKm.text),
+        etaBaseHours: _etaElegida.horas,
+        etaHoursPerKm: 0.0,
+        maxCoverageKm: _maxCoverageKm,
+        flatFeeUsd: tarifas.fija,
+        pricePerKmUsd: tarifas.porKm,
         notes: _notes.text.trim(),
         acceptedPagoMetodos: _pagoMetodos.toList(),
         pagoMetodoInstrucciones: instrucciones,
@@ -286,9 +370,9 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
           flatFeeUsd: common.flatFeeUsd,
           pricePerKmUsd: common.pricePerKmUsd,
           notes: common.notes,
-        acceptedPagoMetodos: common.acceptedPagoMetodos,
-        pagoMetodoInstrucciones: common.pagoMetodoInstrucciones,
-        fletePagoModo: _fletePagoModo,
+          acceptedPagoMetodos: common.acceptedPagoMetodos,
+          pagoMetodoInstrucciones: common.pagoMetodoInstrucciones,
+          fletePagoModo: _fletePagoModo,
         );
       }
 
@@ -305,35 +389,6 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
   void _snack(String message, {Duration duration = const Duration(seconds: 3)}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: duration),
-    );
-  }
-
-  Widget _section({
-    required String title,
-    String? subtitle,
-    required List<Widget> children,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: AppColors.brandBlue,
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
-          ),
-        ],
-        const SizedBox(height: 10),
-        ...children,
-      ],
     );
   }
 
@@ -394,254 +449,474 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: _pasos(),
+          ),
           Expanded(
             child: SingleChildScrollView(
               controller: widget.scrollController,
-              padding: EdgeInsets.fromLTRB(
-                20,
-                8,
-                20,
-                MediaQuery.viewInsetsOf(context).bottom + 16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _section(
-                    title: 'Empresa y contacto',
-                    children: [
-                      TextField(
-                        controller: _company,
-                        decoration: _fieldDecoration(
-                          label: 'Empresa *',
-                          icon: Icons.business_outlined,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _twoCol(
-                        left: TextField(
-                          controller: _contactName,
-                          decoration: _fieldDecoration(
-                            label: 'Persona de contacto',
-                            icon: Icons.person_outline,
-                          ),
-                        ),
-                        right: TextField(
-                          controller: _phone,
-                          keyboardType: TextInputType.phone,
-                          decoration: _fieldDecoration(
-                            label: 'Teléfono *',
-                            icon: Icons.phone_outlined,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _twoCol(
-                        left: TextField(
-                          controller: _email,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: _fieldDecoration(
-                            label: 'Correo',
-                            icon: Icons.email_outlined,
-                          ),
-                        ),
-                        right: TextField(
-                          controller: _whatsapp,
-                          keyboardType: TextInputType.phone,
-                          decoration: _fieldDecoration(
-                            label: 'WhatsApp',
-                            icon: Icons.chat_outlined,
-                          ),
-                        ),
-                      ),
-                    ],
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: _step == 0 ? _pasoDatos() : _pasoPago(),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              MediaQuery.viewInsetsOf(context).bottom + 16,
+            ),
+            child: Row(
+              children: [
+                if (_step == 1)
+                  OutlinedButton(
+                    onPressed: _saving ? null : () => setState(() => _step = 0),
+                    child: const Text('Atrás'),
                   ),
-                  const SizedBox(height: 20),
-                  _section(
-                    title: 'Cobertura y base operativa',
-                    subtitle:
-                        'Separe estados y ciudades con comas. Deje vacío para cubrir todo el país.',
-                    children: [
-                      TextField(
-                        controller: _estados,
-                        decoration: _fieldDecoration(
-                          label: 'Estados cubiertos',
-                          hint: 'Distrito Capital, Miranda',
-                          icon: Icons.map_outlined,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _ciudades,
-                        decoration: _fieldDecoration(
-                          label: 'Ciudades cubiertas',
-                          hint: 'Caracas, Los Teques',
-                          icon: Icons.location_city_outlined,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _twoCol(
-                        left: TextField(
-                          controller: _baseEstado,
-                          decoration: _fieldDecoration(label: 'Base — estado'),
-                        ),
-                        right: TextField(
-                          controller: _baseCiudad,
-                          decoration: _fieldDecoration(label: 'Base — ciudad'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _section(
-                    title: 'Tiempos y tarifas',
-                    subtitle:
-                        'Se usan para estimar el tiempo de llegada y el costo de envío en el checkout de la tienda minorista.',
-                    children: [
-                      _twoCol(
-                        left: TextField(
-                          controller: _etaBase,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: _fieldDecoration(
-                            label: 'Tiempo base (horas)',
-                            icon: Icons.schedule_outlined,
-                          ),
-                        ),
-                        right: TextField(
-                          controller: _etaPerKm,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: _fieldDecoration(label: 'Horas por km'),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _twoCol(
-                        left: TextField(
-                          controller: _flatFee,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: _fieldDecoration(
-                            label: 'Tarifa fija USD',
-                            icon: Icons.attach_money,
-                          ),
-                        ),
-                        right: TextField(
-                          controller: _pricePerKm,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: _fieldDecoration(label: 'USD por km'),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _maxKm,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: _fieldDecoration(
-                          label: 'Radio máximo (km)',
-                          hint: 'Opcional',
-                          icon: Icons.radar_outlined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _section(
-                    title: 'Pago del flete',
-                    subtitle:
-                        'Indique a la tienda minorista si el envío va en su factura o se paga aparte al transportista.',
-                    children: [
-                      ...CarrierFletePagoModo.values.map(
-                        (mode) => RadioListTile<String>(
-                          value: mode,
-                          groupValue: _fletePagoModo,
-                          onChanged: _saving
-                              ? null
-                              : (v) {
-                                  if (v == null) return;
-                                  setState(() => _fletePagoModo = v);
-                                },
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          title: Text(
-                            CarrierFletePagoModo.labelEs(mode),
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _section(
-                    title: 'Métodos de pago aceptados',
-                    children: [
-                      CarrierPagoMetodosEditor(
-                        selected: _pagoMetodos,
-                        controllers: _instruccionesControllers,
-                        saving: _saving,
-                        onSelectionChanged: (code, checked) {
-                          setState(() {
-                            if (checked) {
-                              _pagoMetodos.add(code);
-                            } else {
-                              _pagoMetodos.remove(code);
-                            }
-                          });
-                        },
-                        onInstructionsChanged: () => setState(() {}),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _section(
-                    title: 'Notas internas',
-                    subtitle: 'Opcional. No se muestran a la tienda minorista en checkout.',
-                    children: [
-                      TextField(
-                        controller: _notes,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: _fieldDecoration(
-                          label: 'Notas',
-                          icon: Icons.notes_outlined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.brand,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                const Spacer(),
+                FilledButton(
+                  onPressed: _saving ? null : (_step == 0 ? _siguiente : _save),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.brand,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 14,
                     ),
-                    child: _saving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Guardar transportista',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
                   ),
-                ],
-              ),
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _step == 0 ? 'Siguiente' : 'Guardar transportista',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _pasos() {
+    return Row(
+      children: [
+        _pasoMarca(1, 'Datos', _step == 0),
+        Expanded(
+          child: Container(
+            height: 2,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            color: _step == 1 ? AppColors.brand : AppColors.borderSubtle,
+          ),
+        ),
+        _pasoMarca(2, 'Pago', _step == 1),
+      ],
+    );
+  }
+
+  Widget _pasoMarca(int numero, String label, bool activo) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircleAvatar(
+          radius: 12,
+          backgroundColor: activo ? AppColors.brand : AppColors.brandBlueContainer,
+          child: Text(
+            '$numero',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: activo ? Colors.white : AppColors.brand,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: activo ? AppColors.brand : AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pasoDatos() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Transportista',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.brandBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _company,
+          textCapitalization: TextCapitalization.words,
+          decoration: _fieldDecoration(
+            label: 'Empresa *',
+            icon: Icons.business_outlined,
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          decoration: _fieldDecoration(
+            label: 'Teléfono *',
+            icon: Icons.phone_outlined,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Cobertura',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.brandBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilterChip(
+              label: const Text('Todo el país'),
+              selected: _todoElPais,
+              showCheckmark: false,
+              selectedColor: AppColors.brand,
+              labelStyle: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: _todoElPais ? Colors.white : AppColors.textPrimary,
+              ),
+              side: BorderSide(
+                color: _todoElPais ? AppColors.brand : AppColors.borderSubtle,
+              ),
+              onSelected: (_) => setState(() {
+                _todoElPais = true;
+                _estados.clear();
+              }),
+            ),
+            FilterChip(
+              label: const Text('Estados'),
+              selected: !_todoElPais,
+              showCheckmark: false,
+              selectedColor: AppColors.brand,
+              labelStyle: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: !_todoElPais ? Colors.white : AppColors.textPrimary,
+              ),
+              side: BorderSide(
+                color: !_todoElPais ? AppColors.brand : AppColors.borderSubtle,
+              ),
+              onSelected: (_) => setState(() => _todoElPais = false),
+            ),
+          ],
+        ),
+        if (!_todoElPais) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final estado in _estadosVisibles)
+                FilterChip(
+                  label: Text(estado),
+                  selected: _estados.contains(estado),
+                  showCheckmark: false,
+                  visualDensity: VisualDensity.compact,
+                  selectedColor: AppColors.brandBlueContainer,
+                  labelStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  onSelected: (selected) => setState(() {
+                    if (selected) {
+                      _estados.add(estado);
+                    } else {
+                      _estados.remove(estado);
+                    }
+                  }),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _etaKey,
+          decoration: _fieldDecoration(label: 'Tiempo estimado'),
+          items: [
+            for (final opcion in _etaOpciones)
+              DropdownMenuItem(value: opcion.key, child: Text(opcion.label)),
+          ],
+          onChanged: _saving
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  setState(() => _etaKey = value);
+                },
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Tarifa',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.brandBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<_TarifaModo>(
+          style: _segmentedStyle(),
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: _TarifaModo.fija, label: Text('Fija')),
+            ButtonSegment(value: _TarifaModo.agencia, label: Text('Agencia')),
+            ButtonSegment(value: _TarifaModo.gratis, label: Text('Gratis')),
+          ],
+          selected: {_tarifa},
+          onSelectionChanged: _saving
+              ? null
+              : (value) => setState(() => _tarifa = value.first),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _tarifaAyuda,
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.35,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        if (_tarifa == _TarifaModo.fija) ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _flatFee,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+            ],
+            decoration: _fieldDecoration(
+              label: 'Monto fijo (USD)',
+              hint: '5.00',
+              icon: Icons.attach_money,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<String> get _estadosVisibles {
+    final extra = _estados.where((e) => !_estadosVenezuela.contains(e));
+    return [..._estadosVenezuela, ...extra];
+  }
+
+  String get _tarifaAyuda {
+    switch (_tarifa) {
+      case _TarifaModo.fija:
+        return 'La tienda ve un monto fijo, por ejemplo 5.00 USD.';
+      case _TarifaModo.agencia:
+        return 'Según tarifa de la agencia, con cobro en destino. No se estima por kilómetro.';
+      case _TarifaModo.gratis:
+        return 'El envío no suma tarifa en el pedido.';
+    }
+  }
+
+  Widget _pasoPago() {
+    final tieneExtra = _contactName.text.trim().isNotEmpty ||
+        _email.text.trim().isNotEmpty ||
+        _whatsapp.text.trim().isNotEmpty ||
+        _notes.text.trim().isNotEmpty ||
+        _baseEstado.text.trim().isNotEmpty ||
+        _baseCiudad.text.trim().isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Pago del flete',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.brandBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          style: _segmentedStyle(),
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(
+              value: CarrierFletePagoModo.incluidoFactura,
+              label: Text('En la factura'),
+            ),
+            ButtonSegment(
+              value: CarrierFletePagoModo.pagoSeparado,
+              label: Text('Pago aparte'),
+            ),
+          ],
+          selected: {_fletePagoModo},
+          onSelectionChanged: _saving
+              ? null
+              : (value) => setState(() => _fletePagoModo = value.first),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _fletePagoModo == CarrierFletePagoModo.incluidoFactura
+              ? 'El flete va en la factura del proveedor.'
+              : 'La tienda paga el flete directo al transportista.',
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.35,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Métodos de pago',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.brandBlue,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Opcional. Si indica datos de cuenta, la tienda los ve al elegir este transportista.',
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.35,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final code in PagoMetodo.valuesMotoconecta)
+              FilterChip(
+                label: Text(PagoMetodo.labelEs(code)),
+                selected: _pagoMetodos.contains(code),
+                showCheckmark: false,
+                selectedColor: AppColors.brand,
+                labelStyle: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: _pagoMetodos.contains(code)
+                      ? Colors.white
+                      : AppColors.textPrimary,
+                ),
+                side: BorderSide(
+                  color: _pagoMetodos.contains(code)
+                      ? AppColors.brand
+                      : AppColors.borderSubtle,
+                ),
+                onSelected: _saving
+                    ? null
+                    : (selected) => setState(() {
+                          if (selected) {
+                            _pagoMetodos.add(code);
+                          } else {
+                            _pagoMetodos.remove(code);
+                          }
+                        }),
+              ),
+          ],
+        ),
+        for (final code in PagoMetodo.valuesMotoconecta)
+          if (_pagoMetodos.contains(code)) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _instruccionesControllers[code],
+              minLines: 1,
+              maxLines: 3,
+              decoration: _fieldDecoration(
+                label: 'Datos de ${PagoMetodo.labelEs(code)}',
+                hint: 'Opcional',
+              ),
+            ),
+          ],
+        const SizedBox(height: 8),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          initiallyExpanded: tieneExtra,
+          title: const Text(
+            'Contacto y notas',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          subtitle: Text(
+            'Opcional. No hace falta para guardar.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          children: [
+            TextField(
+              controller: _contactName,
+              decoration: _fieldDecoration(label: 'Persona de contacto'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: _fieldDecoration(label: 'Correo'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _whatsapp,
+              keyboardType: TextInputType.phone,
+              decoration: _fieldDecoration(label: 'WhatsApp'),
+            ),
+            const SizedBox(height: 10),
+            _twoCol(
+              left: TextField(
+                controller: _baseEstado,
+                decoration: _fieldDecoration(label: 'Base — estado'),
+              ),
+              right: TextField(
+                controller: _baseCiudad,
+                decoration: _fieldDecoration(label: 'Base — ciudad'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notes,
+              minLines: 2,
+              maxLines: 3,
+              decoration: _fieldDecoration(label: 'Notas internas'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ],
+    );
+  }
+
+  ButtonStyle _segmentedStyle() {
+    return ButtonStyle(
+      visualDensity: VisualDensity.compact,
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return AppColors.brand;
+      }),
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppColors.brand;
+        return AppColors.brandBlueContainer;
+      }),
+      side: WidgetStateProperty.all(
+        BorderSide(color: AppColors.borderSubtle),
       ),
     );
   }

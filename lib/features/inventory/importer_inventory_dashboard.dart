@@ -19,15 +19,13 @@ import 'importer_bulk_photos_screen.dart';
 import 'importer_flexible_import_screen.dart';
 import 'product_custom_fields_section.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'importer_inventory_layout.dart';
-import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
-import 'product_volume_tiers.dart';
-import 'importer_bulk_usd_discount_dialog.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'importer_sales_snapshot.dart';
@@ -210,9 +208,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         pageSize: _productPageSize,
       );
     });
-    if (_inventoryScrollController.hasClients) {
-      _inventoryScrollController.jumpTo(0);
-    }
   }
 
   Future<void> _loadMoreInventory() async {
@@ -252,41 +247,97 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         deleteOnly: _selectionMode == _InventorySelectionMode.delete,
       );
 
+  String _productDeleteLabel(PartModel part) {
+    final name = part.nombre.trim();
+    if (name.isNotEmpty) return name;
+    final sku = part.sku?.trim();
+    if (sku != null && sku.isNotEmpty) return sku;
+    return 'Producto';
+  }
+
   Future<bool> _confirmDeleteDialog({
-    required int count,
-    String? productName,
+    required List<PartModel> products,
   }) async {
-    final result = await showDialog<bool>(
+    if (products.isEmpty) return false;
+    final count = products.length;
+    final names = products.take(6).map(_productDeleteLabel).toList();
+    final extra = count - names.length;
+    final result = await showAdaptiveAdminSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(count == 1 ? 'Eliminar producto' : 'Eliminar productos'),
-        content: Text(
-          count == 1
-              ? '¿Eliminar «${productName ?? 'este producto'}»? '
-                  'Esta acción no se puede deshacer.'
-              : '¿Eliminar $count productos seleccionados? '
-                  'Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+      builder: (ctx, _) {
+        final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(20, 4, 20, 12 + bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                count == 1
+                    ? 'Eliminar producto'
+                    : 'Eliminar $count productos',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Se quitan del inventario y del catálogo. No se puede deshacer.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final name in names)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              if (extra > 0)
+                Text(
+                  'y $extra más',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              const SizedBox(height: 16),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(count == 1 ? 'Eliminar' : 'Eliminar $count'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(count == 1 ? 'Eliminar' : 'Eliminar $count'),
-          ),
-        ],
-      ),
+        );
+      },
     );
     return result ?? false;
   }
 
+  List<PartModel> _partsByIds(Iterable<String> ids) {
+    final byId = {for (final part in _loadedParts) part.id: part};
+    return [
+      for (final id in ids)
+        if (byId[id] != null) byId[id]!,
+    ];
+  }
+
   Future<void> _deleteSingle(PartModel part) async {
-    final ok = await _confirmDeleteDialog(count: 1, productName: part.nombre);
+    final ok = await _confirmDeleteDialog(products: [part]);
     if (!ok || !mounted) return;
     try {
       await SupabaseService.deleteProduct(productId: part.id);
@@ -308,9 +359,11 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
 
   Future<void> _deleteSelectedBulk() async {
     if (_selectedIds.isEmpty) return;
-    final ids = _selectedIds.toList();
-    final ok = await _confirmDeleteDialog(count: ids.length);
+    final products = _partsByIds(_selectedIds);
+    if (products.isEmpty) return;
+    final ok = await _confirmDeleteDialog(products: products);
     if (!ok || !mounted) return;
+    final ids = products.map((part) => part.id).toList();
     try {
       await SupabaseService.deleteProductsBulk(productIds: ids);
       if (!mounted) return;
@@ -381,14 +434,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         backgroundColor: AppColors.brandBlue,
         foregroundColor: Colors.white,
       ),
-      if (!_pagoSoloDivisas)
-        _inventoryToolbarIcon(
-          icon: Icons.percent_outlined,
-          tooltip: 'Actualizar descuentos USD (masivo)',
-          onPressed: _openBulkUsdDiscountDialog,
-          backgroundColor: AppColors.brand.withOpacity(0.92),
-          foregroundColor: Colors.white,
-        ),
     ];
   }
 
@@ -862,107 +907,12 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
   }
 
-  Future<void> _openBulkUsdDiscountDialog() async {
-    if (_pagoSoloDivisas) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Con pagos solo en USD no puede configurar descuentos línea USD. '
-            'Use descuentos por volumen u oferta.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    await _openBulkUsdDiscountDialogImpl();
-  }
-
   String? _commercialTermsLine(PartModel p) {
     final parts = <String>[];
-    if (p.tieneOfertaDirecta) parts.add('Oferta');
+    if (p.tieneOfertaDirecta) parts.add('Promoción USD');
     parts.add(p.minOrderQtyLabelEs);
-    final vol = ProductCatalogPricing.volumeIncentiveChipEs(p.discountRules);
-    if (vol != null) parts.add(vol);
-    if (_pagoSoloDivisas) {
-      if (parts.isEmpty) return null;
-      return parts.join(' · ');
-    }
-    final usdPct = parseUsdPaymentDiscountPct(p.discountRules);
-    if (usdPct != null) {
-      parts.add(
-        'USD ${usdPct.toStringAsFixed(usdPct.truncateToDouble() == usdPct ? 0 : 1)}% dto.',
-      );
-    }
     if (parts.isEmpty) return null;
     return parts.join(' · ');
-  }
-
-  Future<void> _openBulkUsdDiscountDialogImpl() async {
-    final input = await ImporterBulkUsdDiscountDialog.show(context);
-    if (input == null || !mounted) return;
-
-    final scope = switch (input.scope) {
-      ImporterBulkUsdDiscountScope.conDescuento => 'con_descuento',
-      ImporterBulkUsdDiscountScope.todos => 'todos',
-    };
-
-    final scopeLabel = input.scope == ImporterBulkUsdDiscountScope.todos
-        ? 'todos los productos'
-        : 'productos con descuento USD previo';
-
-    final pctLabel = input.pct.toStringAsFixed(
-      input.pct.truncateToDouble() == input.pct ? 0 : 1,
-    );
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar actualización'),
-        content: Text(
-          input.pct == 0
-              ? 'Se quitará el descuento USD de $scopeLabel. '
-                  'Las tiendas minoristas ya no verán precio USD rebajado en esos productos.\n\n¿Continuar?'
-              : 'Se aplicará $pctLabel % de descuento USD a $scopeLabel.\n\n¿Continuar?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí, actualizar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    try {
-      final count = await SupabaseService.importadorBulkSetUsdPaymentDiscount(
-        pct: input.pct,
-        scope: scope,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            count > 0
-                ? input.pct == 0
-                    ? 'Descuento USD eliminado en $count producto${count == 1 ? '' : 's'}.'
-                    : 'Descuento USD actualizado en $count producto${count == 1 ? '' : 's'}.'
-                : 'Ningún producto coincidió con el alcance elegido.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      if (count > 0) _reload();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
   }
 
   Future<void> _openEditor(PartModel? part) async {
@@ -990,15 +940,21 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     });
   }
 
-  void _toggleSelectAllVisible() {
-    final page = _pageParts;
-    if (page.isEmpty) return;
+  Future<void> _toggleSelectAllProducts() async {
+    while (mounted && _hasMoreInventory) {
+      final before = _loadedParts.length;
+      await _loadMoreInventory();
+      if (!mounted || _loadedParts.length == before) break;
+    }
+    if (!mounted || _loadedParts.isEmpty) return;
     setState(() {
-      final allSelected = page.every((p) => _selectedIds.contains(p.id));
+      final ids = _loadedParts.map((part) => part.id);
+      final allSelected =
+          _loadedParts.every((part) => _selectedIds.contains(part.id));
       if (allSelected) {
-        _selectedIds.removeAll(page.map((p) => p.id));
+        _selectedIds.removeAll(ids);
       } else {
-        _selectedIds.addAll(page.map((p) => p.id));
+        _selectedIds.addAll(ids);
       }
     });
   }
@@ -1180,7 +1136,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
-              '${p.precio.toStringAsFixed(2)} USD lista',
+              '${p.precio.toStringAsFixed(2)} REF',
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 color: AppColors.brand,
@@ -1400,9 +1356,25 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     size: 22,
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Eliminar producto',
-                  onPressed: () => _deleteSingle(p),
+                PopupMenuButton<String>(
+                  tooltip: 'Eliminar',
+                  onSelected: (value) {
+                    if (value == 'one') _deleteSingle(p);
+                    if (value == 'many') _enterDeleteSelection(initial: p);
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'one',
+                      child: Text(
+                        'Eliminar este',
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'many',
+                      child: Text('Elegir varios'),
+                    ),
+                  ],
                   icon: Icon(
                     Icons.delete_outline,
                     color: Colors.red.shade700,
@@ -1832,7 +1804,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     ),
                     label: Text(
                       _selectionMode == _InventorySelectionMode.delete
-                          ? 'Cancelar eliminación'
+                          ? 'Cancelar'
                           : 'Eliminar varios',
                       style: TextStyle(color: Colors.red.shade700),
                     ),
@@ -1988,11 +1960,12 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   }
 
   Widget _buildSelectionBottomBar({required bool isDesktop}) {
-    final allSelected = _pageParts.isNotEmpty &&
-        _pageParts.every((p) => _selectedIds.contains(p.id));
+    final allSelected = _loadedParts.isNotEmpty &&
+        !_hasMoreInventory &&
+        _loadedParts.every((p) => _selectedIds.contains(p.id));
     final isDelete = _selectionMode == _InventorySelectionMode.delete;
     final hint = isDelete
-        ? 'Toca filas o mantén pulsado para elegir productos a eliminar.'
+        ? 'Marca los productos. También puedes mantener pulsada una fila.'
         : 'Toca filas o casillas para cambiar visibilidad.';
 
     return Positioned(
@@ -2034,10 +2007,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                           ),
                         ),
                       ),
-                      if (_pageParts.isNotEmpty)
+                      if (_loadedParts.isNotEmpty)
                         TextButton(
-                          onPressed: _toggleSelectAllVisible,
-                          child: Text(allSelected ? 'Quitar todo' : 'Seleccionar todo'),
+                          onPressed: _loadingMoreInventory
+                              ? null
+                              : _toggleSelectAllProducts,
+                          child: Text(
+                            allSelected ? 'Quitar todo' : 'Seleccionar todo',
+                          ),
                         ),
                     ],
                   ),

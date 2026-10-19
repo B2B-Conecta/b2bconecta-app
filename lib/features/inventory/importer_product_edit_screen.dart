@@ -4,15 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'product_min_order_qty.dart';
-import 'product_volume_tiers.dart';
-import 'importer_product_commercial_terms_section.dart';
 import 'product_custom_fields_section.dart';
 import 'product_image_gallery_editor.dart';
 import 'importer_product_price_preview.dart';
-import 'product_usd_payment_discount_field.dart';
 
 /// Crear o editar un producto del inventario (importador).
 class ImporterProductEditScreen extends StatefulWidget {
@@ -32,18 +32,17 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _descController;
   late final TextEditingController _priceController;
+  late final TextEditingController _bsPriceController;
+  double? _tasaBcv;
   late final TextEditingController _salePriceController;
-  late final TextEditingController _usdPaymentDiscountController;
   late final TextEditingController _stockController;
   late final TextEditingController _minOrderQtyController;
-  List<ProductVolumeTier> _volumeTiers = [];
   late final TextEditingController _categoryController;
   late final TextEditingController _compatController;
   List<ProductImageEditSlot> _imageSlots = [];
   bool _isActive = true;
   bool _hasWarranty = false;
   bool _saving = false;
-  bool _pagoSoloDivisas = false;
   Map<String, dynamic> _customFields = const {};
 
   bool get _isEdit => widget.initial != null && widget.initial!.id.isNotEmpty;
@@ -58,14 +57,10 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _priceController = TextEditingController(
       text: p != null ? p.precio.toStringAsFixed(2) : '',
     );
+    _bsPriceController = TextEditingController();
     _salePriceController = TextEditingController(
       text: p?.salePriceUsd != null ? p!.salePriceUsd!.toStringAsFixed(2) : '',
     );
-    final usdPct = parseUsdPaymentDiscountPct(p?.discountRules);
-    _usdPaymentDiscountController = TextEditingController(
-      text: usdPct != null ? usdPct.toStringAsFixed(1) : '',
-    );
-    _volumeTiers = p?.volumeTiers ?? [];
     _stockController = TextEditingController(
       text: p != null ? '${p.stock}' : '',
     );
@@ -86,24 +81,38 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     for (final controller in [
       _priceController,
       _salePriceController,
-      _usdPaymentDiscountController,
       _minOrderQtyController,
     ]) {
       controller.addListener(_onPreviewChanged);
     }
-    _loadImporterPagoPolicy();
+    _loadTasaBcv();
   }
 
   void _onPreviewChanged() {
+    _syncBsPrice();
     if (mounted) setState(() {});
   }
 
-  Future<void> _loadImporterPagoPolicy() async {
-    try {
-      final profile = await SupabaseService.fetchMyProfile();
-      if (!mounted) return;
-      setState(() => _pagoSoloDivisas = profile?.pagoSoloDivisas ?? false);
-    } catch (_) {}
+  Future<void> _loadTasaBcv() async {
+    final rate = await BcvBasePrice.currentRate();
+    if (!mounted) return;
+    setState(() => _tasaBcv = rate);
+    _syncBsPrice();
+  }
+
+  void _syncBsPrice() {
+    final next = _bsTextFor(parsePreviewMoney(_priceController.text));
+    if (_bsPriceController.text == next) return;
+    _bsPriceController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+  }
+
+  String _bsTextFor(double? refUsd) {
+    final bs = BcvBasePrice.bsForRef(refUsd, _tasaBcv);
+    if (bs == null) return '';
+    return formatVesAmount(bs);
   }
 
   @override
@@ -111,7 +120,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     for (final controller in [
       _priceController,
       _salePriceController,
-      _usdPaymentDiscountController,
       _minOrderQtyController,
     ]) {
       controller.removeListener(_onPreviewChanged);
@@ -120,8 +128,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _nameController.dispose();
     _descController.dispose();
     _priceController.dispose();
+    _bsPriceController.dispose();
     _salePriceController.dispose();
-    _usdPaymentDiscountController.dispose();
     _stockController.dispose();
     _minOrderQtyController.dispose();
     _categoryController.dispose();
@@ -164,7 +172,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       salePrice = double.tryParse(saleRaw.replaceAll(',', '.'));
       if (salePrice == null || salePrice <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Precio oferta inválido.')),
+          const SnackBar(content: Text('Precio USD inválido.')),
         );
         return;
       }
@@ -172,35 +180,13 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'El precio oferta debe ser menor que el precio lista.',
+              'El precio USD debe ser menor que el precio REF.',
             ),
           ),
         );
         return;
       }
     }
-    final usdPctRaw = _pagoSoloDivisas
-        ? ''
-        : _usdPaymentDiscountController.text.trim();
-    double? usdPaymentDiscountPct;
-    if (usdPctRaw.isNotEmpty) {
-      usdPaymentDiscountPct = parseUsdPaymentDiscountPctField(usdPctRaw);
-      if (usdPaymentDiscountPct == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Descuento línea USD inválido: use un % entre 0 y 100.',
-            ),
-          ),
-        );
-        return;
-      }
-    }
-    final discountRules = buildProductDiscountRules(
-      volumeTiers: _volumeTiers,
-      usdPaymentDiscountPct: usdPaymentDiscountPct,
-    );
-
     setState(() => _saving = true);
     try {
       final imageUrls = await resolveProductImageEditSlots(
@@ -222,8 +208,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           priceUsd: price,
           salePriceUsd: salePrice,
           clearSalePrice: salePrice == null,
-          discountRules: discountRules,
-          clearDiscountRules: discountRules == null,
+          clearDiscountRules: true,
           stock: stock,
           minOrderQty: minOrderQty,
           category: _categoryController.text.trim(),
@@ -240,7 +225,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           description: _descController.text.trim(),
           priceUsd: price,
           salePriceUsd: salePrice,
-          discountRules: discountRules,
           stock: stock,
           minOrderQty: minOrderQty,
           category: _categoryController.text.trim(),
@@ -268,27 +252,57 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     final name = _nameController.text.trim().isNotEmpty
         ? _nameController.text.trim()
         : widget.initial!.nombre;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveAdminSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar producto'),
-        content: Text(
-          '¿Eliminar «$name» del inventario? Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+      builder: (ctx, _) {
+        final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(20, 4, 20, 12 + bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Eliminar producto',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Se quita del inventario y del catálogo. No se puede deshacer.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Eliminar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
 
@@ -414,24 +428,46 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         const SizedBox(height: 12),
         TextFormField(
           controller: _priceController,
-          decoration: _dec('Precio (USD / REF)'),
+          decoration: _dec('Precio REF'),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
           ],
         ),
         const SizedBox(height: 12),
+        TextFormField(
+          controller: _salePriceController,
+          enabled: !_saving,
+          decoration: _dec(
+            'Precio USD',
+            hint: 'Opcional · promoción, menor que el REF',
+          ).copyWith(
+            helperText: 'Precio de promoción. Si lo dejas vacío, la tienda solo ve el REF.',
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _bsPriceController,
+          readOnly: true,
+          enableInteractiveSelection: true,
+          decoration: _dec(
+            'Precio (Bs)',
+            hint: _tasaBcv == null ? 'No disponible' : null,
+          ).copyWith(
+            helperText:
+                'Solo lectura. Se calcula sobre el precio REF. La promoción USD no entra.',
+          ),
+        ),
+        const SizedBox(height: 12),
         ImporterProductPricePreview(
           listPriceUsd: parsePreviewMoney(_priceController.text),
           salePriceUsd: parsePreviewMoney(_salePriceController.text),
-          volumeTiers: _volumeTiers,
-          usdPaymentDiscountPct: parsePreviewUsdDiscount(
-            _usdPaymentDiscountController.text,
-            pagoSoloDivisas: _pagoSoloDivisas,
-          ),
           quantity: int.tryParse(_minOrderQtyController.text.trim()) ??
               ProductMinOrderQty.platformFloor,
-          ownerPagoSoloDivisas: _pagoSoloDivisas,
         ),
         const SizedBox(height: 12),
         TextFormField(
@@ -460,8 +496,11 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         const SizedBox(height: 8),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(top: 12),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          clipBehavior: Clip.none,
           title: const Text(
-            'Compatibilidad, descuentos y descripción',
+            'Compatibilidad y descripción',
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
           subtitle: const Text(
@@ -473,15 +512,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               controller: _descController,
               decoration: _dec('Descripción'),
               maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            ImporterProductCommercialTermsSection(
-              salePriceController: _salePriceController,
-              usdPaymentDiscountController: _usdPaymentDiscountController,
-              volumeTiers: _volumeTiers,
-              onVolumeTiersChanged: (t) => setState(() => _volumeTiers = t),
-              enabled: !_saving,
-              showUsdPaymentDiscount: !_pagoSoloDivisas,
             ),
             const SizedBox(height: 12),
             TextFormField(

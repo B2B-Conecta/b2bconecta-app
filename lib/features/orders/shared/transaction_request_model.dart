@@ -98,6 +98,10 @@ class TransactionRequestModel {
     this.aliadoExperienceComment,
     this.aliadoExperienceSubmittedAt,
     this.tasaBcvSnapshot,
+    this.metodoPagoMoneda,
+    this.tasaBcvAplicada,
+    this.totalRef,
+    this.totalBs,
     this.importerViewOrderItems = const <OrderItemModel>[],
     this.facturaUrl,
     this.checkoutGroupId,
@@ -347,6 +351,18 @@ class TransactionRequestModel {
 
   /// Tasa BCV fijada al confirmar el pedido (VES por unidad REF). Cálculos de negocio en REF.
   final double? tasaBcvSnapshot;
+
+  /// Moneda elegida en el carrito: `DIVISAS` o `BOLIVARES`.
+  final String? metodoPagoMoneda;
+
+  /// Tasa BCV congelada al confirmar (`transaction_requests.tasa_bcv_aplicada`).
+  final double? tasaBcvAplicada;
+
+  /// Total REF de la línea. Coincide con [precioTotal] / `precio_total_usd`.
+  final double? totalRef;
+
+  /// Total en bolívares congelado: precio REF de la línea × [tasaBcvAplicada].
+  final double? totalBs;
 
   final List<OrderItemModel> importerViewOrderItems;
 
@@ -614,9 +630,13 @@ class TransactionRequestModel {
   /// Entregado con pago aún no aprobado (morosidad operativa).
   bool get esPedidoMoroso => pagoMotolinkPendienteTrasEntrega;
 
-  /// Total pedido en bolívares (solo presentación UI). Fuente de verdad: [precioTotal] en REF.
-  double? get precioTotalBsUi =>
-      tasaBcvSnapshot != null ? precioTotal * tasaBcvSnapshot! : null;
+  /// Total en bolívares. Si el pedido congeló [totalBs], ese monto manda.
+  double? get precioTotalBsUi {
+    if (totalBs != null) return totalBs;
+    final rate = tasaBcvAplicada ?? tasaBcvSnapshot;
+    if (rate == null) return null;
+    return precioTotal * rate;
+  }
 
   /// Aliado: puede cancelar mientras el pedido sigue pendiente de gestión del importador.
   bool get aliadoPuedeCancelarAntesDeGestionImportadores =>
@@ -1183,6 +1203,10 @@ class TransactionRequestModel {
       aliadoExperienceSubmittedAt:
           _parseDate(json['aliado_experience_submitted_at']),
       tasaBcvSnapshot: _asNullableDouble(json['tasa_bcv_snapshot']),
+      metodoPagoMoneda: _nullableText(json['metodo_pago_moneda']),
+      tasaBcvAplicada: _asNullableDouble(json['tasa_bcv_aplicada']),
+      totalRef: _asNullableDouble(json['total_ref']),
+      totalBs: _asNullableDouble(json['total_bs']),
       importerViewOrderItems:
           _parseImporterViewOrderItems(json['_importer_view_order_items']),
       facturaUrl: _nullableText(json['factura_url']),

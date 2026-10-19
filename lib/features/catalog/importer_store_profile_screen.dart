@@ -19,6 +19,7 @@ import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 import 'package:motolink_pro_app/features/catalog/product_warranty_seal.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
@@ -875,23 +876,20 @@ class _StoreProductCard extends StatelessWidget {
                               compact: true,
                             ),
                           ),
-                        Positioned(
-                          left: 6,
-                          bottom: 6,
-                          right: showHeart ? 40 : 6,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: EnvioPoliticaBadge(
-                              tipo: part.ownerEnvioTipo,
-                              compact: true,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: EnvioPoliticaBadge(
+                    tipo: part.ownerEnvioTipo,
+                    compact: true,
+                  ),
+                ),
+                if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo))
+                  const SizedBox(height: 6),
                 Text(
                   part.nombre,
                   maxLines: 2,

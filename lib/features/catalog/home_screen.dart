@@ -1476,23 +1476,22 @@ class _ProductGridCard extends StatelessWidget {
                               compact: true,
                             ),
                           ),
-                        Positioned(
-                          left: 6,
-                          bottom: 6,
-                          right: 40,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: EnvioPoliticaBadge(
-                              tipo: part.ownerEnvioTipo,
-                              compact: true,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: AliadoCatalogLayout.cardGapImage),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardEnvioBadgeHeight,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: EnvioPoliticaBadge(
+                      tipo: part.ownerEnvioTipo,
+                      compact: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
                 SizedBox(
                   height: AliadoCatalogLayout.cardTitleHeight,
                   child: Text(

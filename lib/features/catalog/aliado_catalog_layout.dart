@@ -54,8 +54,6 @@ abstract final class AliadoCatalogLayout {
         cardPadBottom +
         image +
         cardGapImage +
-        cardEnvioBadgeHeight +
-        cardGapTight +
         cardTitleHeight +
         cardGapTight +
         cardCategoryHeight +
@@ -64,7 +62,9 @@ abstract final class AliadoCatalogLayout {
         cardGapSection +
         cardPriceHeight +
         cardOfferHeight +
-        cardGapSection +
+        cardGapTight +
+        cardEnvioBadgeHeight +
+        cardGapTight +
         cardStockHeight +
         cardGapTight +
         cardCustomFieldsHeight +

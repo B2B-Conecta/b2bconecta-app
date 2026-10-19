@@ -1482,17 +1482,6 @@ class _ProductGridCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AliadoCatalogLayout.cardGapImage),
                 SizedBox(
-                  height: AliadoCatalogLayout.cardEnvioBadgeHeight,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: EnvioPoliticaBadge(
-                      tipo: part.ownerEnvioTipo,
-                      compact: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
-                SizedBox(
                   height: AliadoCatalogLayout.cardTitleHeight,
                   child: Text(
                     part.nombre,
@@ -1633,7 +1622,18 @@ class _ProductGridCard extends StatelessWidget {
                     compact: true,
                   ),
                 ),
-                const SizedBox(height: AliadoCatalogLayout.cardGapSection),
+                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
+                SizedBox(
+                  height: AliadoCatalogLayout.cardEnvioBadgeHeight,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: EnvioPoliticaBadge(
+                      tipo: part.ownerEnvioTipo,
+                      compact: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AliadoCatalogLayout.cardGapTight),
                 SizedBox(
                   height: AliadoCatalogLayout.cardStockHeight,
                   child: Text.rich(

@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 
-/// Reportes: catálogo publicado de un mayorista. Solo lectura.
+/// Reportes: catálogo de un mayorista. El admin puede ocultarlo de las tiendas.
 class AdminPublishedCatalogsSection extends StatefulWidget {
   const AdminPublishedCatalogsSection({
     super.key,
     this.loadImporters,
     this.loadProducts,
+    this.loadCatalog,
+    this.setProductActive,
     this.focusImporter,
     this.onCloseFocus,
   });
@@ -24,6 +27,12 @@ class AdminPublishedCatalogsSection extends StatefulWidget {
     required int limit,
     required int offset,
   })? loadProducts;
+  final Future<List<PartModel>> Function({required String importerId})?
+      loadCatalog;
+  final Future<int> Function({
+    required List<String> productIds,
+    required bool isActive,
+  })? setProductActive;
 
   /// Abre directo el catálogo de un mayorista, sin el buscador de todos.
   final ImporterOption? focusImporter;
@@ -48,6 +57,8 @@ class _AdminPublishedCatalogsSectionState
   bool _loadingMore = false;
   bool _hasMore = false;
   String? _productsError;
+  bool _showHidden = false;
+  String? _busyProductId;
 
   @override
   void initState() {
@@ -122,8 +133,82 @@ class _AdminPublishedCatalogsSectionState
       _products.clear();
       _hasMore = true;
       _productsError = null;
+      _showHidden = false;
     });
     await _loadProducts(reset: true);
+  }
+
+  Future<void> _selectVisibility(bool hidden) async {
+    if (_showHidden == hidden) return;
+    setState(() => _showHidden = hidden);
+    await _loadProducts(reset: true);
+  }
+
+  Future<List<PartModel>> _fetchCatalog(String importerId) {
+    final custom = widget.loadCatalog;
+    if (custom != null) return custom(importerId: importerId);
+    return SupabaseService.ownerListImporterCatalog(importerId: importerId);
+  }
+
+  Future<int> _setActive({
+    required List<String> productIds,
+    required bool isActive,
+  }) {
+    final custom = widget.setProductActive;
+    if (custom != null) {
+      return custom(productIds: productIds, isActive: isActive);
+    }
+    return SupabaseService.ownerSetImporterProductsActive(
+      productIds: productIds,
+      isActive: isActive,
+    );
+  }
+
+  Future<void> _toggleVisibility(PartModel part) async {
+    if (_busyProductId != null) return;
+    final hide = part.isActive;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(hide ? 'Ocultar producto' : 'Mostrar producto'),
+        content: Text(
+          hide
+              ? '«${part.nombre}» deja de verse en el catálogo de las tiendas. '
+                  'El proveedor conserva el SKU.'
+              : '«${part.nombre}» vuelve a verse en el catálogo de las tiendas.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(hide ? 'Ocultar' : 'Mostrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busyProductId = part.id);
+    try {
+      await _setActive(productIds: [part.id], isActive: !hide);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(hide ? 'Producto oculto.' : 'Producto visible.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _loadProducts(reset: true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyProductId = null);
+    }
   }
 
   Future<void> _loadProducts({required bool reset}) async {
@@ -141,15 +226,22 @@ class _AdminPublishedCatalogsSectionState
       setState(() => _loadingMore = true);
     }
     try {
-      final batch = await _fetchProducts(
-        importerId: selected.id,
-        limit: AdminPublishedCatalogsSection.pageSize,
-        offset: reset ? 0 : _products.length,
-      );
+      final List<PartModel> batch;
+      if (_showHidden) {
+        final rows = await _fetchCatalog(selected.id);
+        batch = rows.where((part) => !part.isActive).toList();
+      } else {
+        batch = await _fetchProducts(
+          importerId: selected.id,
+          limit: AdminPublishedCatalogsSection.pageSize,
+          offset: reset ? 0 : _products.length,
+        );
+      }
       if (!mounted) return;
       setState(() {
         _products.addAll(batch);
-        _hasMore = batch.length >= AdminPublishedCatalogsSection.pageSize;
+        _hasMore = !_showHidden &&
+            batch.length >= AdminPublishedCatalogsSection.pageSize;
         _loadingProducts = false;
         _loadingMore = false;
       });
@@ -281,11 +373,20 @@ class _AdminPublishedCatalogsSectionState
                     _selected = null;
                     _products.clear();
                     _productsError = null;
+                    _showHidden = false;
                   });
                 },
                 child: Text(widget.onCloseFocus != null ? 'Volver' : 'Cambiar'),
               ),
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: SegmentedFilterBar(
+            labels: const ['Publicados', 'Ocultos'],
+            selectedIndex: _showHidden ? 1 : 0,
+            onSelected: (index) => _selectVisibility(index == 1),
           ),
         ),
         Expanded(child: _productBody()),
@@ -308,12 +409,14 @@ class _AdminPublishedCatalogsSectionState
       );
     }
     if (_products.isEmpty) {
-      return const Center(
-        key: Key('admin-catalogs-empty'),
+      return Center(
+        key: const Key('admin-catalogs-empty'),
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Text(
-            'Este mayorista no tiene productos publicados.',
+            _showHidden
+                ? 'Este mayorista no tiene productos ocultos.'
+                : 'Este mayorista no tiene productos publicados.',
             textAlign: TextAlign.center,
           ),
         ),
@@ -328,6 +431,9 @@ class _AdminPublishedCatalogsSectionState
       itemBuilder: (part) => _PublishedProductTile(
         part: part,
         importerName: _selected?.businessName ?? '',
+        busy: _busyProductId == part.id,
+        enabled: _busyProductId == null,
+        onToggleVisibility: () => _toggleVisibility(part),
       ),
     );
   }
@@ -361,10 +467,16 @@ class _PublishedProductTile extends StatelessWidget {
   const _PublishedProductTile({
     required this.part,
     required this.importerName,
+    required this.busy,
+    required this.enabled,
+    required this.onToggleVisibility,
   });
 
   final PartModel part;
   final String importerName;
+  final bool busy;
+  final bool enabled;
+  final VoidCallback onToggleVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -453,7 +565,21 @@ class _PublishedProductTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.brand),
+            Column(
+              children: [
+                const Icon(Icons.chevron_right, color: AppColors.brand),
+                TextButton(
+                  onPressed: enabled ? onToggleVisibility : null,
+                  child: busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(part.isActive ? 'Ocultar' : 'Mostrar'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

@@ -101,12 +101,10 @@ class _ImporterThirdPartyAdsCarouselState
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
         }
-        final banners = (snapshot.data ?? const <PromoCampaignModel>[])
-            .where((c) => c.isBanner)
-            .toList();
-        if (banners.isEmpty) return const SizedBox.shrink();
+        final ads = snapshot.data ?? const <PromoCampaignModel>[];
+        if (ads.isEmpty) return const SizedBox.shrink();
         return AliadoPromoBannerCarousel(
-          campaigns: banners,
+          campaigns: ads,
           padding: widget.padding,
         );
       },

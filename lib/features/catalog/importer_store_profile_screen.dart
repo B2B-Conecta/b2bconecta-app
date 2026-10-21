@@ -847,7 +847,7 @@ class _StoreProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AspectRatio(
-                  aspectRatio: 1.7,
+                  aspectRatio: AliadoCatalogLayout.cardImageAspect,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Stack(

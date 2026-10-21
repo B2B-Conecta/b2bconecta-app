@@ -965,8 +965,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           final promos = bootstrapSnapshot.data != null
               ? bootstrapSnapshot.data![1] as List<PromoCampaignModel>
               : const <PromoCampaignModel>[];
-          final bannerPromos =
-              promos.where((p) => p.isBanner).toList(growable: false);
           final popupPromos =
               promos.where((p) => p.isPopup).toList(growable: false);
 
@@ -1184,9 +1182,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         if (parts.isEmpty) {
                           return ListView(
                             children: [
-                              if (bannerPromos.isNotEmpty)
+                              if (promos.isNotEmpty)
                                 AliadoPromoBannerCarousel(
-                                  campaigns: bannerPromos,
+                                  campaigns: promos,
                                   onPromoCampaignSelected:
                                       _onPromoCampaignSelected,
                                   compact: isDesktopCatalog,
@@ -1221,10 +1219,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             CustomScrollView(
                                 controller: _catalogScrollController,
                                 slivers: [
-                                  if (bannerPromos.isNotEmpty)
+                                  if (promos.isNotEmpty)
                                     SliverToBoxAdapter(
                                       child: AliadoPromoBannerCarousel(
-                                        campaigns: bannerPromos,
+                                        campaigns: promos,
                                         onPromoCampaignSelected:
                                             _onPromoCampaignSelected,
                                         compact: isDesktopCatalog,
@@ -1609,17 +1607,6 @@ class _ProductGridCard extends StatelessWidget {
                     compact: true,
                     showPromotionChips: false,
                     usdPromotionView: usdPromotionView,
-                  ),
-                ),
-                SizedBox(
-                  height: AliadoCatalogLayout.cardOfferHeight,
-                  child: CatalogProductOfferChips(
-                    listPriceUsd: part.precio,
-                    salePriceUsd: part.salePriceUsd,
-                    discountRules: part.discountRules,
-                    campaignDiscountPercent:
-                        part.activeCampaignDiscountPercent,
-                    compact: true,
                   ),
                 ),
                 const SizedBox(height: AliadoCatalogLayout.cardGapTight),

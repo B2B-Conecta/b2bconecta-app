@@ -24,23 +24,22 @@ abstract final class AliadoCatalogLayout {
 
   static double gridSpacing(double width) => isDesktop(width) ? 14 : 10;
 
-  /// Foto ancha y baja, igual en todas las fichas del catálogo.
-  static const cardImageAspect = 1.85;
+  /// Foto casi cuadrada, igual en todas las fichas del catálogo.
+  static const cardImageAspect = 1.15;
 
-  static const cardPadTop = 8.0;
-  static const cardPadBottom = 10.0;
+  static const cardPadTop = 6.0;
+  static const cardPadBottom = 6.0;
   static const cardPadH = 8.0;
-  static const cardTitleHeight = 34.0;
-  static const cardCategoryHeight = 20.0;
+  static const cardTitleHeight = 32.0;
+  static const cardCategoryHeight = 16.0;
   static const cardSupplierHeight = 18.0;
-  static const cardPriceHeight = 52.0;
-  static const cardOfferHeight = 26.0;
+  static const cardPriceHeight = 42.0;
   static const cardStockHeight = 16.0;
-  static const cardCustomFieldsHeight = 20.0;
-  static const cardGapImage = 6.0;
-  static const cardEnvioBadgeHeight = 22.0;
-  static const cardGapTight = 4.0;
-  static const cardGapSection = 6.0;
+  static const cardCustomFieldsHeight = 16.0;
+  static const cardGapImage = 4.0;
+  static const cardEnvioBadgeHeight = 20.0;
+  static const cardGapTight = 3.0;
+  static const cardGapSection = 4.0;
   static const cardDistanceHeight = 18.0;
 
   /// Alto de la ficha para [tileWidth], con cada bloque ya reservado.
@@ -61,7 +60,6 @@ abstract final class AliadoCatalogLayout {
         cardSupplierHeight +
         cardGapSection +
         cardPriceHeight +
-        cardOfferHeight +
         cardGapTight +
         cardEnvioBadgeHeight +
         cardGapTight +

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -193,7 +195,56 @@ Future<void> launchPromoCampaignExternalUrl(
   }
 }
 
-/// Carrusel de banners promocionales (E1.2) en catálogo aliado.
+/// Creativo de valla. Alto fijo en el padre: en móvil la imagen sin medida
+/// colapsa a 0 mientras carga y el pop-up queda en blanco.
+class PromoCreativeImage extends StatelessWidget {
+  const PromoCreativeImage({
+    super.key,
+    required this.url,
+    this.fit = BoxFit.contain,
+  });
+
+  final String url;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final logicalWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final cacheWidth = (logicalWidth * dpr).clamp(480.0, 1440.0).round();
+        return Image.network(
+          url,
+          width: double.infinity,
+          height: double.infinity,
+          fit: fit,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.medium,
+          cacheWidth: cacheWidth,
+          gaplessPlayback: true,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => const Center(
+            child: Icon(Icons.broken_image_outlined, size: 40),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Carrusel de vallas publicadas (banner y pop-up) en el catálogo.
 class AliadoPromoBannerCarousel extends StatefulWidget {
   const AliadoPromoBannerCarousel({
     super.key,
@@ -215,18 +266,41 @@ class AliadoPromoBannerCarousel extends StatefulWidget {
 
 class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
   late final PageController _pageController;
+  Timer? _autoplay;
   int _page = 0;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _autoplay = Timer.periodic(const Duration(seconds: 4), (_) => _advance());
+  }
+
+  @override
+  void didUpdateWidget(covariant AliadoPromoBannerCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.campaigns.length == oldWidget.campaigns.length) return;
+    if (_page < widget.campaigns.length) return;
+    _page = 0;
+    if (_pageController.hasClients) _pageController.jumpToPage(0);
   }
 
   @override
   void dispose() {
+    _autoplay?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _advance() {
+    if (!mounted || widget.campaigns.length <= 1) return;
+    if (!_pageController.hasClients) return;
+    final next = (_page + 1) % widget.campaigns.length;
+    _pageController.animateToPage(
+      next,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOut,
+    );
   }
 
   Future<void> _onTap(PromoCampaignModel c) async {
@@ -269,6 +343,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                   controller: _pageController,
                   itemCount: items.length,
                   // Evita que el PageView “robe” el scroll vertical del catálogo.
+                  allowImplicitScrolling: true,
                   physics: items.length <= 1
                       ? const NeverScrollableScrollPhysics()
                       : const PageScrollPhysics(),
@@ -284,17 +359,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.network(
-                              c.imagePublicUrl,
-                              fit: BoxFit.contain,
-                              alignment: Alignment.center,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: AppColors.fieldFill,
-                                alignment: Alignment.center,
-                                child:
-                                    const Icon(Icons.broken_image_outlined),
-                              ),
-                            ),
+                            ColoredBox(color: AppColors.fieldFill),
+                            PromoCreativeImage(url: c.imagePublicUrl),
                             Positioned(
                               left: 8,
                               top: 8,
@@ -405,30 +471,19 @@ Future<void> showAliadoPromoPopupDialog({
         contentPadding: EdgeInsets.zero,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
+        content: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(ctx).height * 0.48,
-                ),
+              child: SizedBox(
+                height: (MediaQuery.sizeOf(ctx).height * 0.42).clamp(180.0, 320.0),
+                width: double.infinity,
                 child: ColoredBox(
                   color: AppColors.fieldFill,
-                  child: Image.network(
-                    campaign.imagePublicUrl,
-                    fit: BoxFit.contain,
-                    width: double.infinity,
-                    alignment: Alignment.center,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 180,
-                      color: AppColors.fieldFill,
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.broken_image_outlined, size: 40),
-                    ),
-                  ),
+                  child: PromoCreativeImage(url: campaign.imagePublicUrl),
                 ),
               ),
             ),
@@ -537,6 +592,7 @@ Future<void> showAliadoPromoPopupDialog({
               ),
             ),
           ],
+        ),
         ),
       );
     },
@@ -652,16 +708,15 @@ Future<void> showAliadoActivePromotionsSheet({
                               borderRadius: const BorderRadius.horizontal(
                                 left: Radius.circular(11),
                               ),
-                              child: Image.network(
-                                c.imagePublicUrl,
+                              child: SizedBox(
                                 width: 72,
                                 height: 72,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 72,
-                                  height: 72,
+                                child: ColoredBox(
                                   color: AppColors.fieldFill,
-                                  child: const Icon(Icons.image_outlined),
+                                  child: PromoCreativeImage(
+                                    url: c.imagePublicUrl,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
                             ),

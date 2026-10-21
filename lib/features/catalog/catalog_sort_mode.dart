@@ -12,7 +12,10 @@ enum CatalogSortMode {
   nearest,
 
   /// Primero proveedores con sello Destacado (admin, máx. 3).
-  featured;
+  featured,
+
+  /// Mejor calificación del proveedor primero.
+  reputation;
 
   static const CatalogSortMode defaultMode = category;
 }
@@ -28,6 +31,8 @@ extension CatalogSortModeLabel on CatalogSortMode {
         return 'Más cercanos';
       case CatalogSortMode.featured:
         return 'Destacados';
+      case CatalogSortMode.reputation:
+        return 'Mayor reputación';
     }
   }
 
@@ -41,6 +46,8 @@ extension CatalogSortModeLabel on CatalogSortMode {
         return 'Ordena por distancia a tu ubicación (GPS).';
       case CatalogSortMode.featured:
         return 'Primero proveedores con sello Destacado.';
+      case CatalogSortMode.reputation:
+        return 'Primero los proveedores mejor valorados.';
     }
   }
 
@@ -54,6 +61,8 @@ extension CatalogSortModeLabel on CatalogSortMode {
         return Icons.near_me_rounded;
       case CatalogSortMode.featured:
         return Icons.star_rounded;
+      case CatalogSortMode.reputation:
+        return Icons.stars_rounded;
     }
   }
 }

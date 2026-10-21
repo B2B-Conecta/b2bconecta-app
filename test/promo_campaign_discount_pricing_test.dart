@@ -69,4 +69,34 @@ void main() {
       'Promo −5%',
     );
   });
+
+  test('chip de precio USD promocional frente al REF', () {
+    expect(
+      ProductCatalogPricing.directSaleDiscountChipEs(
+        listPriceUsd: 100,
+        salePriceUsd: 90,
+      ),
+      '-10%',
+    );
+    expect(
+      ProductCatalogPricing.directSaleDiscountChipEs(
+        listPriceUsd: 80,
+        salePriceUsd: 76,
+      ),
+      '-5%',
+    );
+    expect(
+      ProductCatalogPricing.directSaleDiscountChipEs(
+        listPriceUsd: 100,
+        salePriceUsd: 100,
+      ),
+      isNull,
+    );
+    expect(
+      ProductCatalogPricing.directSaleDiscountChipEs(
+        listPriceUsd: 100,
+      ),
+      isNull,
+    );
+  });
 }

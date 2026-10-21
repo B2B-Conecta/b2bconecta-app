@@ -53,10 +53,27 @@ int comparePartsForSortMode(PartModel a, PartModel b, CatalogSortMode mode) {
       return comparePartsByCategoryThenName(a, b);
     case CatalogSortMode.featured:
       return comparePartsForCatalogFeatured(a, b);
+    case CatalogSortMode.reputation:
+      return comparePartsByOwnerReputation(a, b);
     case CatalogSortMode.recommended:
     case CatalogSortMode.nearest:
       return comparePartsForCatalogBoost(a, b);
   }
+}
+
+/// Mayor reputación primero. Sin valoración queda al final.
+int comparePartsByOwnerReputation(PartModel a, PartModel b) {
+  final ra = a.ownerRatingAvg;
+  final rb = b.ownerRatingAvg;
+  if (ra == null && rb != null) return 1;
+  if (ra != null && rb == null) return -1;
+  if (ra != null && rb != null) {
+    final byAvg = rb.compareTo(ra);
+    if (byAvg != 0) return byAvg;
+  }
+  final byCount = (b.ownerRatingCount ?? 0).compareTo(a.ownerRatingCount ?? 0);
+  if (byCount != 0) return byCount;
+  return a.id.compareTo(b.id);
 }
 
 /// Orden: Destacados primero, luego reputación y ventas.

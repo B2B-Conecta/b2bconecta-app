@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
@@ -157,11 +158,16 @@ class CatalogService {
     return (sq != null && sq.isNotEmpty) ||
         (oe != null && oe.isNotEmpty) ||
         (oc != null && oc.isNotEmpty) ||
-        filters.hasReputationThreshold;
+        filters.hasReputationThreshold ||
+        filters.onlyEnvioIncluido;
   }
 
   /// Favoritos también une `products` con `profiles`. Hay que nombrar la FK del dueño.
   static const _ownerProfileEmbed = 'profiles!products_owner_id_fkey';
+
+  /// En el filtro el `!` no va: PostgREST lo lee como NOT y busca la columna
+  /// `products.profiles`. La pista de la FK queda solo en el `select`.
+  static const _ownerProfileFilter = 'profiles';
 
   static String _catalogProfileSelect(CatalogFilters filters) {
     const rep =
@@ -713,14 +719,14 @@ class CatalogService {
     if (est != null && est.isNotEmpty) {
       final s = SupabaseAccess.sanitizeIlike(est);
       if (s.isNotEmpty) {
-        q = q.filter('$_ownerProfileEmbed.estado', 'ilike', '%$s%');
+        q = q.filter('$_ownerProfileFilter.estado', 'ilike', '%$s%');
       }
     }
     final ciu = filters.ownerCiudad?.trim();
     if (ciu != null && ciu.isNotEmpty) {
       final s = SupabaseAccess.sanitizeIlike(ciu);
       if (s.isNotEmpty) {
-        q = q.filter('$_ownerProfileEmbed.ciudad', 'ilike', '%$s%');
+        q = q.filter('$_ownerProfileFilter.ciudad', 'ilike', '%$s%');
       }
     }
     final ownerIds = filters.effectiveOwnerIds;
@@ -753,7 +759,7 @@ class CatalogService {
     final minAvg = filters.minOwnerRatingAvg;
     if (minAvg != null && minAvg > 0) {
       q = q.filter(
-        '$_ownerProfileEmbed.rating_avg_received_rolling100',
+        '$_ownerProfileFilter.rating_avg_received_rolling100',
         'gte',
         minAvg,
       );
@@ -761,7 +767,7 @@ class CatalogService {
     final minCnt = filters.minOwnerRatingCount;
     if (minCnt != null && minCnt > 0) {
       q = q.filter(
-        '$_ownerProfileEmbed.rating_count_received_rolling100',
+        '$_ownerProfileFilter.rating_count_received_rolling100',
         'gte',
         minCnt,
       );
@@ -771,6 +777,9 @@ class CatalogService {
     }
     if (filters.onlyUsdPromotion) {
       q = q.gt('sale_price_usd', 0);
+    }
+    if (filters.onlyEnvioIncluido) {
+      q = q.eq('$_ownerProfileFilter.envio_tipo', EnvioPolitica.incluido);
     }
     // Catálogo B2B (aliados): ocultar sin inventario o por debajo del mínimo de pedido.
     q = q.eq('stock_covers_min_order', true);

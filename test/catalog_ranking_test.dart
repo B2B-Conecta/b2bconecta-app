@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_sort_mode.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 
 PartModel _part({
@@ -8,6 +9,8 @@ PartModel _part({
   String? category,
   int? paidOrders,
   DateTime? featuredUntil,
+  double? ratingAvg,
+  int? ratingCount,
 }) {
   return PartModel(
     id: id,
@@ -17,6 +20,8 @@ PartModel _part({
     category: category,
     ownerCatalogPaidOrders30d: paidOrders,
     ownerCatalogFeaturedUntil: featuredUntil,
+    ownerRatingAvg: ratingAvg,
+    ownerRatingCount: ratingCount,
   );
 }
 
@@ -68,5 +73,15 @@ void main() {
     );
     final sorted = [plain, featured]..sort(comparePartsForCatalogFeatured);
     expect(sorted.first.id, 'f');
+  });
+
+  test('mayor reputación pone primero la mejor calificación', () {
+    final low = _part(id: 'l', nombre: 'Bajo', ratingAvg: 3.2, ratingCount: 20);
+    final high = _part(id: 'h', nombre: 'Alto', ratingAvg: 4.8, ratingCount: 4);
+    final none = _part(id: 'n', nombre: 'Sin nota');
+    final sorted = [low, none, high]..sort(
+          (a, b) => comparePartsForSortMode(a, b, CatalogSortMode.reputation),
+        );
+    expect(sorted.map((p) => p.id).toList(), ['h', 'l', 'n']);
   });
 }

@@ -1,6 +1,7 @@
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 
 /// Ficha pública de un mayorista activo (`aliado_importer_store_profile`).
@@ -153,6 +154,10 @@ List<PartModel> constrainCatalogPartsToFilters(
     }
     if (filters.onlyActiveProducts && !p.isActive) return false;
     if (cat != null && cat.isNotEmpty && (p.category ?? '').trim() != cat) {
+      return false;
+    }
+    if (filters.onlyEnvioIncluido &&
+        EnvioPolitica.normalize(p.ownerEnvioTipo) != EnvioPolitica.incluido) {
       return false;
     }
     return true;

@@ -17,7 +17,6 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.compact = false,
     this.catalogGrid = false,
     this.showPromotionChips = true,
-    this.usdPromotionView = false,
   });
 
   final double listPriceUsd;
@@ -28,9 +27,6 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool compact;
   final bool catalogGrid;
   final bool showPromotionChips;
-
-  /// Catálogo aliado: muestra el precio USD de promoción en lugar del REF.
-  final bool usdPromotionView;
 
   bool get _hasUsdPromo => ProductCatalogPricing.hasDirectSale(
         listPriceUsd: listPriceUsd,
@@ -44,34 +40,52 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   }
 
   Widget _buildGrid(BuildContext context) {
-    final showUsd = usdPromotionView && _hasUsdPromo;
+    final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
+      listPriceUsd: listPriceUsd,
+      salePriceUsd: salePriceUsd,
+    );
+    final refSize = compact ? 14.0 : 16.0;
+    final usdSize = compact ? 12.0 : 13.5;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (showUsd)
-          Text(
-            '${salePriceUsd!.toStringAsFixed(2)} USD',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: compact ? 14 : 16,
-              fontWeight: FontWeight.w900,
-              color: AppColors.successGreen,
-              height: 1.05,
-            ),
-          ),
         Text(
           '${listPriceUsd.toStringAsFixed(2)} REF',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: showUsd ? (compact ? 11 : 12) : (compact ? 14 : 16),
-            fontWeight: showUsd ? FontWeight.w700 : FontWeight.w900,
-            color: showUsd ? AppColors.textSecondary : AppColors.brandAccent,
+            fontSize: refSize,
+            fontWeight: FontWeight.w900,
+            color: AppColors.brandAccent,
             height: 1.05,
           ),
         ),
+        if (_hasUsdPromo)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    '${salePriceUsd!.toStringAsFixed(2)} USD',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: usdSize,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.successGreen,
+                      height: 1.05,
+                    ),
+                  ),
+                ),
+                if (discountLabel != null) ...[
+                  const SizedBox(width: 4),
+                  _UsdDiscountChip(label: discountLabel),
+                ],
+              ],
+            ),
+          ),
         _BasePriceBsLine(
           refUsd: listPriceUsd,
           fontSize: compact ? 11 : 12,
@@ -91,6 +105,10 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   }
 
   Widget _buildDetail(BuildContext context) {
+    final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
+      listPriceUsd: listPriceUsd,
+      salePriceUsd: salePriceUsd,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -134,9 +152,9 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                   color: AppColors.successGreen.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'Promoción',
-                  style: TextStyle(
+                child: Text(
+                  discountLabel ?? 'Promoción',
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     color: AppColors.successGreen,
@@ -246,6 +264,32 @@ class CatalogProductOfferChips extends StatelessWidget {
   }
 }
 
+class _UsdDiscountChip extends StatelessWidget {
+  const _UsdDiscountChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: AppColors.successGreen.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.successGreen,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
 class _OfferChipData {
   const _OfferChipData({
     required this.label,
@@ -318,9 +362,14 @@ class _BasePriceBsLineState extends State<_BasePriceBsLine> {
   }
 
   Future<void> _load() async {
-    final rate = await BcvBasePrice.currentRate();
-    if (!mounted) return;
-    setState(() => _rate = rate);
+    try {
+      final rate = await BcvBasePrice.currentRate();
+      if (!mounted) return;
+      setState(() => _rate = rate);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _rate = null);
+    }
   }
 
   @override

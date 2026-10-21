@@ -68,6 +68,22 @@ abstract final class ProductCatalogPricing {
     return sale != null && sale > 0 && sale < listPriceUsd;
   }
 
+  /// Chip `-10%` del precio USD promocional frente al REF. `null` si no hay oferta.
+  static String? directSaleDiscountChipEs({
+    required double listPriceUsd,
+    double? salePriceUsd,
+  }) {
+    if (!hasDirectSale(listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd)) {
+      return null;
+    }
+    if (listPriceUsd <= 0) return null;
+    final pct = (1 - salePriceUsd! / listPriceUsd) * 100;
+    if (pct < 0.5) return null;
+    final rounded = pct.round();
+    if (rounded <= 0) return null;
+    return '-$rounded%';
+  }
+
   static bool hasCampaignDiscount(double? campaignDiscountPercent) {
     final pct = campaignDiscountPercent;
     return pct != null && pct > 0 && pct < 100;

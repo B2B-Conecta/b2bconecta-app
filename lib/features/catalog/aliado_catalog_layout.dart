@@ -33,11 +33,11 @@ abstract final class AliadoCatalogLayout {
   static const cardTitleHeight = 32.0;
   static const cardCategoryHeight = 16.0;
   static const cardSupplierHeight = 18.0;
-  static const cardPriceHeight = 42.0;
-  static const cardStockHeight = 16.0;
+  static const cardRadius = 12.0;
+  static const cardPriceHeight = 58.0;
+  static const cardStockHeight = 18.0;
   static const cardCustomFieldsHeight = 16.0;
   static const cardGapImage = 4.0;
-  static const cardEnvioBadgeHeight = 20.0;
   static const cardGapTight = 3.0;
   static const cardGapSection = 4.0;
   static const cardDistanceHeight = 18.0;
@@ -60,8 +60,6 @@ abstract final class AliadoCatalogLayout {
         cardSupplierHeight +
         cardGapSection +
         cardPriceHeight +
-        cardGapTight +
-        cardEnvioBadgeHeight +
         cardGapTight +
         cardStockHeight +
         cardGapTight +

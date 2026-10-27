@@ -86,6 +86,11 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.compatibility,
     CatalogImportField.imageUrl,
     CatalogImportField.hasWarranty,
+    CatalogImportField.isActive,
+    CatalogImportField.parentSku,
+    CatalogImportField.variantAttributeName,
+    CatalogImportField.variantAttributeValue,
+    CatalogImportField.variantAttributes,
   ];
 
   static const _fieldHintsVe = <CatalogImportField, String>{
@@ -102,15 +107,25 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.stock:
         'Unidades en almacén. Si no mapeas esta columna, queda en 0.',
     CatalogImportField.minOrderQty:
-        'Unidades mínimas por pedido (piso 5). Si no mapeas la columna, los productos nuevos quedan en 5.',
+        'Unidades mínimas por pedido. Si el proveedor la define, esa cantidad manda (mínimo 1). Si no mapeas la columna, los productos nuevos quedan en 5.',
     CatalogImportField.category:
         'Familia o línea (Motor, Frenos, Eléctrico, etc.).',
     CatalogImportField.compatibility:
         'Modelos de moto compatibles (ej. CG150, Bera 150).',
     CatalogImportField.imageUrl:
         'Enlace público a la foto del repuesto.',
+    CatalogImportField.parentSku:
+        'Mismo código en las filas que son variantes de un producto. Vacío = producto simple.',
+    CatalogImportField.variantAttributeName:
+        'Un solo eje: Presentación, Medida, Color. Si usas varios, deja vacío y usa Atributos.',
+    CatalogImportField.variantAttributeValue:
+        'Valor de un solo eje: 4 Litros, Rojo. Obligatorio si hay SKU padre y no usas Atributos.',
+    CatalogImportField.variantAttributes:
+        'Varios ejes en una celda: Tamaño:M|Color:Rojo (o JSON). Cada combinación = una fila/SKU.',
     CatalogImportField.hasWarranty:
         'Usa si/no, o días numéricos del ERP (ej. 30, 90 días).',
+    CatalogImportField.isActive:
+        'si = visible en catálogo; no = pausado. Vacío: nuevos siguen el selector de la importación; existentes no cambian.',
   };
 
   static String _labelVe(CatalogImportField field) => switch (field) {
@@ -124,7 +139,12 @@ class _ImporterFlexibleImportScreenState
         CatalogImportField.category => 'Categoría',
         CatalogImportField.compatibility => 'Compatibilidad',
         CatalogImportField.imageUrl => 'URL de imagen',
+        CatalogImportField.parentSku => 'SKU padre',
+        CatalogImportField.variantAttributeName => 'Atributo de la variante',
+        CatalogImportField.variantAttributeValue => 'Valor de la variante',
+        CatalogImportField.variantAttributes => 'Atributos (varios)',
         CatalogImportField.hasWarranty => 'Garantía',
+        CatalogImportField.isActive => 'Activo / visible',
         CatalogImportField.usdPaymentDiscountPct => 'Descuento pago en USD (%)',
         CatalogImportField.volumeTiersJson => 'Tramos por volumen (JSON)',
       };
@@ -254,7 +274,8 @@ class _ImporterFlexibleImportScreenState
         if (_decimalCommaOnPrice) {
           transform = CatalogImportTransform.decimalComma;
         }
-      } else if (field == CatalogImportField.hasWarranty) {
+      } else if (field == CatalogImportField.hasWarranty ||
+          field == CatalogImportField.isActive) {
         transform = CatalogImportTransform.booleanSiNo;
       }
 

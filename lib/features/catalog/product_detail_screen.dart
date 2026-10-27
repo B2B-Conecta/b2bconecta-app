@@ -22,7 +22,8 @@ import 'importer_store_profile_screen.dart';
 import 'product_share_sheet.dart';
 import 'store_supplier_chat.dart';
 import 'product_photo_gallery.dart';
-import 'package:motolink_pro_app/features/inventory/product_images.dart';
+import 'product_variants.dart';
+import 'product_variant_selector.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -51,17 +52,40 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ProfileModel? _profile;
   List<PartModel> _related = const [];
+  late PartModel _selected;
+  late List<PartModel> _family;
 
-  PartModel get part => widget.part;
+  PartModel get part => _selected;
 
   List<String> get _galleryUrls =>
-      parseProductImageUrlsJson(part.imageUrls, legacyImageUrl: part.imagenUrl);
+      variantGalleryUrls(selected: part, opened: widget.part, family: _family);
 
   @override
   void initState() {
     super.initState();
+    _selected = widget.part;
+    _family = widget.part.variantChoices;
     _loadProfile();
     _loadRelated();
+    _loadVariantFamily();
+  }
+
+  Future<void> _loadVariantFamily() async {
+    if (!widget.part.hasVariantFamily) return;
+    try {
+      final family = await CatalogService.fetchVariantFamily(widget.part);
+      if (!mounted || family.length < 2) return;
+      final selected = family.where((option) => option.id == _selected.id);
+      setState(() {
+        _family = family;
+        _selected = selected.isEmpty ? family.first : selected.first;
+      });
+    } catch (_) {}
+  }
+
+  void _selectVariant(PartModel option) {
+    if (option.id == _selected.id) return;
+    setState(() => _selected = option);
   }
 
   Future<void> _loadRelated() async {
@@ -358,10 +382,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildHeroImageContent() => ProductPhotoGallery(
       urls: _galleryUrls,
       productName: part.nombre,
-      heroTag: ProductDetailScreen.heroImageTag(part));
+      heroTag: ProductDetailScreen.heroImageTag(widget.part));
 
   List<Widget> _buildInfoSections({bool desktop = false}) => [
         ProductDetailHeading(part: part, desktop: desktop),
+        if (_family.length > 1) ...[
+          const SizedBox(height: 12),
+          ProductVariantSelector(
+              options: _family, selected: part, onSelected: _selectVariant),
+        ],
         const SizedBox(height: 12),
         ProductDetailPurchaseSummary(part: part),
         if (part.hasOwnerMinOrderAmount) ...[
@@ -477,6 +506,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     if (!_canOrder) return const SizedBox.shrink();
     return ProductDetailPurchaseControls(
+        key: ValueKey(part.id),
         part: part,
         profile: _profile!,
         compact: compact,

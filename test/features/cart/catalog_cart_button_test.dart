@@ -19,6 +19,30 @@ const product = PartModel(
     ownerId: 'supplier');
 
 void main() {
+  testWidgets('variant family opens options without adding a default SKU',
+      (tester) async {
+    final cart = CartService();
+    var choosing = false;
+    final family = product.copyWith(variants: [
+      product.copyWith(id: 'small', minOrderQty: 1),
+      product.copyWith(id: 'large', minOrderQty: 2),
+    ]);
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SizedBox(
+                width: 156,
+                child: CatalogCartButton(
+                    part: family,
+                    profile: buyer,
+                    cart: cart,
+                    onChooseVariant: () => choosing = true)))));
+    await tester.tap(find.text('Elegir opciones'));
+    await tester.pump();
+    expect(choosing, isTrue);
+    expect(cart.isEmpty, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'quick add becomes an editable quantity picker with minimum and stock limits',
       (tester) async {

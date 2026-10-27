@@ -50,6 +50,33 @@ Future<void> pumpControls(WidgetTester tester, CartService cart,
 }
 
 void main() {
+  testWidgets('switching SKU keeps separate quantities and supplier minimums',
+      (tester) async {
+    final cart = CartService();
+    final first = part.copyWith(id: 'variant-two', minOrderQty: 2);
+    final second = part.copyWith(id: 'variant-one', minOrderQty: 1);
+    await pumpControls(tester, cart, product: first, compact: true);
+    await tester.tap(find.byKey(const Key('product-purchase-action')));
+    await tester.pumpAndSettle();
+    expect(cart.itemCount, 2);
+    await tester.enterText(find.byType(TextField), '9');
+    await pumpControls(tester, cart, product: second, compact: true);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.byKey(const Key('product-purchase-action')));
+    await tester.pumpAndSettle();
+    expect(
+        cart.lines.singleWhere((line) => line.part.id == first.id).quantity, 2);
+    expect(cart.lines.singleWhere((line) => line.part.id == second.id).quantity,
+        1);
+    await pumpControls(tester, cart, product: first, compact: true);
+    await tester.pumpAndSettle();
+    expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text, '2');
+    expect(cart.itemCount, 3);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scenario in [
     (size: const Size(390, 844), scale: 1.0),
     (size: const Size(320, 640), scale: 1.6),

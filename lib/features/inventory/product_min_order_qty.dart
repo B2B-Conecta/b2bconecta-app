@@ -1,12 +1,19 @@
-/// Piso de plataforma y helpers de cantidad mínima de pedido (MOQ).
+/// Cantidad mínima de pedido (MOQ) por SKU.
 ///
-/// Cada importador define el mínimo por SKU. No se acepta menos de
-/// [platformFloor] (acuerdo comercial: no se vende de a 1).
+/// Si el proveedor no indica un mínimo, se usa [platformDefault] (5).
+/// Si lo define, ese valor manda, con piso absoluto [absoluteFloor] (1).
 abstract final class ProductMinOrderQty {
-  static const platformFloor = 5;
+  /// Valor por defecto cuando el proveedor no define MOQ.
+  static const platformDefault = 5;
+
+  /// Alias histórico de [platformDefault].
+  static const platformFloor = platformDefault;
+
+  /// Unidades mínimas permitidas cuando el proveedor sí define MOQ.
+  static const absoluteFloor = 1;
 
   static int resolve(int? raw) {
-    if (raw == null || raw < platformFloor) return platformFloor;
+    if (raw == null || raw < absoluteFloor) return platformDefault;
     return raw;
   }
 

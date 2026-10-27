@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'part_model.dart';
+import 'product_detail_screen.dart';
 
 class CatalogCartButton extends StatelessWidget {
   const CatalogCartButton(
@@ -13,11 +14,13 @@ class CatalogCartButton extends StatelessWidget {
       required this.part,
       required this.profile,
       this.cart,
-      this.onOpenCart});
+      this.onOpenCart,
+      this.onChooseVariant});
   final PartModel part;
   final ProfileModel profile;
   final CartService? cart;
   final VoidCallback? onOpenCart;
+  final VoidCallback? onChooseVariant;
 
   void _openCart(BuildContext context) {
     if (onOpenCart != null) {
@@ -51,6 +54,22 @@ class CatalogCartButton extends StatelessWidget {
     return ListenableBuilder(
         listenable: service,
         builder: (context, _) {
+          if (part.variantChoices.isNotEmpty) {
+            return FilledButton.icon(
+                onPressed: onChooseVariant ??
+                    () => Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => ProductDetailScreen(part: part))),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: const Text('Elegir opciones'));
+          }
           final line = CartProductActions.lineFor(part, service);
           final blocked = CartProductActions.blockReason(
               part: part, profile: profile, cart: service);

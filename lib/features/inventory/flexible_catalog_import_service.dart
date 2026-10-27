@@ -140,14 +140,33 @@ class FlexibleCatalogImportService {
         CatalogImportField.minOrderQty.key: CatalogImportColumnBinding(
           source: 'cantidad_minima',
         ),
+        CatalogImportField.parentSku.key: CatalogImportColumnBinding(
+          source: 'parent_sku (opcional)',
+        ),
+        CatalogImportField.variantAttributeName.key: CatalogImportColumnBinding(
+          source: 'atributo (opcional)',
+        ),
+        CatalogImportField.variantAttributeValue.key: CatalogImportColumnBinding(
+          source: 'valor_atributo (opcional)',
+        ),
+        CatalogImportField.variantAttributes.key: CatalogImportColumnBinding(
+          source: 'atributos (opcional)',
+        ),
         CatalogImportField.category.key: CatalogImportColumnBinding(
           source: 'categoria (opcional)',
         ),
         CatalogImportField.compatibility.key: CatalogImportColumnBinding(
           source: 'compatibilidad (opcional)',
         ),
+        CatalogImportField.imageUrl.key: CatalogImportColumnBinding(
+          source: 'url_imagen (opcional)',
+        ),
         CatalogImportField.hasWarranty.key: CatalogImportColumnBinding(
           source: 'garantia (opcional)',
+          transform: CatalogImportTransform.booleanSiNo,
+        ),
+        CatalogImportField.isActive.key: CatalogImportColumnBinding(
+          source: 'activo (opcional)',
           transform: CatalogImportTransform.booleanSiNo,
         ),
         CatalogImportField.usdPaymentDiscountPct.key: CatalogImportColumnBinding(

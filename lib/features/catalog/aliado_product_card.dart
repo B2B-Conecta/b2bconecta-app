@@ -193,7 +193,10 @@ class AliadoProductCard extends StatelessWidget {
                                   ])))),
                       if (profile.isAliado) ...[
                         const SizedBox(height: 4),
-                        CatalogCartButton(part: part, profile: profile),
+                        CatalogCartButton(
+                            part: part,
+                            profile: profile,
+                            onChooseVariant: onTap),
                       ] else if (onTap != null) ...[
                         const SizedBox(height: 4),
                         FilledButton(
@@ -269,7 +272,8 @@ class AliadoProductCard extends StatelessWidget {
                                                       child:
                                                           ProductWarrantySeal(
                                                               compact: true))),
-                                            if (shippingIncluded)
+                                            if (shippingIncluded ||
+                                                part.variantChoices.isNotEmpty)
                                               Positioned(
                                                   left: 6,
                                                   right: 6,
@@ -278,6 +282,12 @@ class AliadoProductCard extends StatelessWidget {
                                                       spacing: 4,
                                                       runSpacing: 4,
                                                       children: [
+                                                        if (part.variantChoices
+                                                            .isNotEmpty)
+                                                          _VariantOptionsChip(
+                                                              count: part
+                                                                  .variantChoices
+                                                                  .length),
                                                         if (shippingIncluded)
                                                           const _ShippingIncludedChip(),
                                                       ])),
@@ -334,6 +344,35 @@ class _PhotoPlaceholder extends StatelessWidget {
                         height: 1.2,
                         color: AppColors.textSecondary)),
               ]))));
+}
+
+class _VariantOptionsChip extends StatelessWidget {
+  const _VariantOptionsChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Text(
+        '$count opciones',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
 }
 
 class _ShippingIncludedChip extends StatelessWidget {

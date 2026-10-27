@@ -609,7 +609,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       }
       final bytes = ExcelCatalogService.buildInventoryExportBytes(parts);
       final result = await saveExcelForExport(
-        name: 'motolink_inventario_actual',
+        name: 'b2bconecta_inventario',
         bytes: bytes,
       );
       if (!mounted) return;
@@ -639,104 +639,209 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   Future<void> _showHelpDialog() async {
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Carga masiva de inventario'),
-        content: SingleChildScrollView(
-          child: Column(
+      builder: (ctx) {
+        final maxH = MediaQuery.sizeOf(ctx).height * 0.72;
+        return AlertDialog(
+          titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+          title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              _helpStep(
-                n: '1',
-                title: 'Usa tu Excel/CSV o la plantilla',
-                body:
-                    'Puedes subir el listado de tu ERP tal cual (Profit, Saint, '
-                    'hoja de cálculo). Si prefieres un formato fijo, toca '
-                    '«Descargar plantilla» (.xlsx o .csv con coma).',
+              const Text(
+                'Carga masiva, en 4 pasos',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
               ),
-              _helpStep(
-                n: '2',
-                title: 'Sube y confirma columnas',
-                body:
-                    'Toca «Elegir archivo». B2B Conecta sugiere automáticamente qué '
-                    'columna es SKU, nombre, precio y stock. Revisa el mapeo y '
-                    'ajusta si hace falta. Las demás columnas pueden guardarse '
-                    'como datos internos.',
-              ),
-              _helpStep(
-                n: '3',
-                title: 'Importa',
-                body:
-                    'Elige si los productos nuevos entran Pausados o Publicados '
-                    'para las tiendas, y confirma. Un producto pausado se oculta '
-                    'de inmediato del catálogo. Los códigos existentes se '
-                    'actualizan según la regla que elijas (todo el producto o '
-                    'solo precio y stock).',
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.brandBlueContainer.withOpacity(0.4),
-                  borderRadius: AppDecorations.radius12,
+              const SizedBox(height: 6),
+              Text(
+                'Sube tu listado, revisa las columnas y publica. '
+                'Las tiendas verán el catálogo al instante.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
                 ),
-                child: const Text(
-                  'Tip: usa «Exportar inventario» para descargar tu catálogo '
-                  'actual, editarlo y volver a subirlo.',
-                  style: TextStyle(fontSize: 12.5, height: 1.4),
-                ),
-              ),
-              _helpStep(
-                n: '4',
-                title: 'Fotos en lote (opcional)',
-                body:
-                    'Comprime las fotos en un ZIP nombrado por SKU: ABC123.jpg, '
-                    'ABC123_2.jpg, ABC123_3.jpg (máx. 3 por producto).',
-              ),
-              const SizedBox(height: 12),
-              _helpStep(
-                n: '·',
-                title: 'Visibilidad en la app',
-                body:
-                    'Publica o pausa productos con el interruptor de cada fila. '
-                    'Pausado se oculta de inmediato del catálogo de las tiendas.',
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Entendido'),
+          content: SizedBox(
+            width: 440,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxH),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _helpGuideStep(
+                      step: '1',
+                      icon: Icons.upload_file_outlined,
+                      title: 'Elige tu archivo',
+                      body:
+                          'Sube el Excel o CSV de tu ERP (Profit, Saint, etc.) '
+                          'o descarga la plantilla lista para llenar.',
+                    ),
+                    _helpGuideStep(
+                      step: '2',
+                      icon: Icons.view_column_outlined,
+                      title: 'Confirma las columnas',
+                      body:
+                          'B2B Conecta propone SKU, nombre, precio y stock. '
+                          'Revisa el mapeo; el resto puede quedar como dato interno.',
+                    ),
+                    _helpGuideStep(
+                      step: '3',
+                      icon: Icons.storefront_outlined,
+                      title: 'Importa y decide la visibilidad',
+                      body:
+                          'Los productos nuevos pueden entrar pausados o visibles. '
+                          'Los SKU que ya existen se actualizan según la regla '
+                          'que elijas (todo el producto, o solo precio y stock).',
+                    ),
+                    _helpGuideStep(
+                      step: '4',
+                      icon: Icons.photo_library_outlined,
+                      title: 'Añade fotos (opcional)',
+                      body:
+                          'ZIP con el nombre del SKU de cada producto: '
+                          'ACE-4.jpg, ACE-4_2.jpg, ACE-4_3.jpg (máx. 3). '
+                          'En variantes, usa el SKU de cada opción.',
+                      isLast: true,
+                    ),
+                    _helpCallout(
+                      icon: Icons.layers_outlined,
+                      title: 'Varias presentaciones, una ficha',
+                      body:
+                          'Mismo parent_sku en varias filas, con atributo y '
+                          'valor_atributo distintos (ej. Presentación / 4 Litros). '
+                          'En la vitrina sale una sola tarjeta con selector.',
+                    ),
+                    const SizedBox(height: 10),
+                    _helpCallout(
+                      icon: Icons.download_outlined,
+                      title: 'Edita lo que ya tienes',
+                      body:
+                          '«Exportar inventario» descarga b2bconecta_inventario.xlsx '
+                          'con cantidad_minima, variantes e imagen. Edítalo y '
+                          'vuelve a cargarlo.',
+                    ),
+                    const SizedBox(height: 10),
+                    _helpCallout(
+                      icon: Icons.tune_outlined,
+                      title: 'Pedido mínimo a tu medida',
+                      body:
+                          'Si dejas cantidad_minima vacía, queda en 5. '
+                          'Si pones 1, 2 u otro valor, esa cantidad manda.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Listo'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _helpGuideStep({
+    required String step,
+    required IconData icon,
+    required String title,
+    required String body,
+    bool isLast = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 14 : 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.brandBlue.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, size: 20, color: AppColors.brandBlue),
+                Positioned(
+                  right: 2,
+                  top: 2,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.brandBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      step,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _helpStep({
-    required String n,
+  Widget _helpCallout({
+    required IconData icon,
     required String title,
     required String body,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.brandBlueContainer.withOpacity(0.35),
+        borderRadius: AppDecorations.radius12,
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 13,
-            backgroundColor: AppColors.brandBlue,
-            child: Text(
-              n,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
+          Icon(icon, size: 20, color: AppColors.brandBlue),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -744,13 +849,16 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   body,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     height: 1.4,
                     color: AppColors.textPrimary,
                   ),
@@ -781,13 +889,17 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             ListTile(
               leading: const Icon(Icons.table_chart_outlined),
               title: const Text('Excel (.xlsx)'),
-              subtitle: const Text('Cabeceras sku, nombre, precio, stock'),
+              subtitle: const Text(
+                'Incluye mínimo, variantes e imagen',
+              ),
               onTap: () => Navigator.pop(ctx, 'xlsx'),
             ),
             ListTile(
               leading: const Icon(Icons.description_outlined),
               title: const Text('CSV (.csv)'),
-              subtitle: const Text('Separado por coma (estándar B2B Conecta)'),
+              subtitle: const Text(
+                'Mismo layout, separado por coma',
+              ),
               onTap: () => Navigator.pop(ctx, 'csv'),
             ),
             const SizedBox(height: 8),

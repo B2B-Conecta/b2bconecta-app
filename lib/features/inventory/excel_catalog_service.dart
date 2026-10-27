@@ -66,7 +66,7 @@ class ExcelInventoryRow {
 class ExcelCatalogService {
   ExcelCatalogService._();
 
-  /// Cabeceras exportadas en la plantilla (orden fijo).
+  /// Cabeceras exportadas en la plantilla y en el inventario (orden fijo).
   /// Obligatorias en cada fila de datos: sku, nombre, precio, stock.
   /// El resto se etiqueta como "(opcional)" para guiar la carga masiva.
   static const templateHeaders = [
@@ -77,21 +77,29 @@ class ExcelCatalogService {
     'precio_oferta_usd (opcional)',
     'stock',
     'cantidad_minima',
+    'parent_sku (opcional)',
+    'atributo (opcional)',
+    'valor_atributo (opcional)',
     'categoria (opcional)',
     'compatibilidad (opcional)',
+    'url_imagen (opcional)',
     'garantia (opcional)',
   ];
 
   static const templateExampleRow = [
     'EJEMPLO-001',
-    'Repuesto de muestra (puede borrar esta fila)',
+    'Aceite 4T (puede borrar esta fila)',
     'Descripción opcional',
     '12.50',
     '10.99',
     '10',
     '5',
+    'EJEMPLO-ACEITE',
+    'Presentación',
+    '1 Litro',
     'Motor',
     'CG150 CG125',
+    '',
     'si',
   ];
 
@@ -137,30 +145,14 @@ class ExcelCatalogService {
     );
 
     for (final p in parts) {
-      final usdPct = parseUsdPaymentDiscountPct(p.discountRules);
-      sheet.appendRow(
-        [
-          TextCellValue((p.sku ?? '').trim()),
-          TextCellValue(p.nombre),
-          TextCellValue(p.descripcion ?? ''),
-          TextCellValue(p.precio.toStringAsFixed(2)),
-          TextCellValue(
-            p.salePriceUsd == null ? '' : p.salePriceUsd!.toStringAsFixed(2),
-          ),
-          TextCellValue(
-            usdPct == null
-                ? ''
-                : usdPct.toStringAsFixed(
-                    usdPct.truncateToDouble() == usdPct ? 0 : 1,
-                  ),
-          ),
-          TextCellValue('${p.stock}'),
-          TextCellValue('${p.minOrderQtyEffective}'),
-          TextCellValue(p.category ?? ''),
-          TextCellValue(p.compatibilidad ?? ''),
-          TextCellValue(p.hasWarranty ? 'si' : 'no'),
-        ],
-      );
+      final row = inventoryExportCells(p);
+      if (row.length != templateHeaders.length) {
+        throw StateError(
+          'Exportación desalineada: ${row.length} celdas vs '
+          '${templateHeaders.length} columnas.',
+        );
+      }
+      sheet.appendRow(row.map((cell) => TextCellValue(cell)).toList());
     }
 
     final bytes = excel.encode();
@@ -168,6 +160,26 @@ class ExcelCatalogService {
       throw StateError('No se pudo generar el archivo Excel de inventario.');
     }
     return Uint8List.fromList(bytes);
+  }
+
+  /// Celdas de una fila de inventario, en el mismo orden que [templateHeaders].
+  static List<String> inventoryExportCells(PartModel p) {
+    return [
+      (p.sku ?? '').trim(),
+      p.nombre,
+      p.descripcion ?? '',
+      p.precio.toStringAsFixed(2),
+      p.salePriceUsd == null ? '' : p.salePriceUsd!.toStringAsFixed(2),
+      '${p.stock}',
+      '${p.minOrderQtyEffective}',
+      p.parentSku?.trim() ?? '',
+      p.variantAttributeName?.trim() ?? '',
+      p.variantAttributeValue?.trim() ?? '',
+      p.category ?? '',
+      p.compatibilidad ?? '',
+      p.coverImageUrl?.trim() ?? '',
+      p.hasWarranty ? 'si' : 'no',
+    ];
   }
 
   /// Lee filas de datos (omite la fila de cabecera).

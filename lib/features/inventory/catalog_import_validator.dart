@@ -1,3 +1,4 @@
+import '../catalog/product_variants.dart';
 import 'catalog_import/catalog_import_field.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
@@ -20,6 +21,13 @@ class CatalogImportNormalizedRow {
     this.imageUrl,
     this.salePriceUsd,
     this.hasWarranty = false,
+    this.isActive,
+    this.isActiveInvalid = false,
+    this.parentSku,
+    this.variantAttributeName,
+    this.variantAttributeValue,
+    this.variantAttributes = const {},
+    this.variantAttributesInvalid = false,
     this.discountRules,
     this.customFields = const {},
     this.priceColumn,
@@ -38,6 +46,15 @@ class CatalogImportNormalizedRow {
   final String? imageUrl;
   final double? salePriceUsd;
   final bool hasWarranty;
+
+  /// `null` = celda vacía / columna no mapeada (no cambia visibilidad).
+  final bool? isActive;
+  final bool isActiveInvalid;
+  final String? parentSku;
+  final String? variantAttributeName;
+  final String? variantAttributeValue;
+  final Map<String, String> variantAttributes;
+  final bool variantAttributesInvalid;
   final Map<String, dynamic>? discountRules;
   final Map<String, dynamic> customFields;
 
@@ -60,6 +77,17 @@ class CatalogImportNormalizedRow {
     if (compatibility != null) payload['compatibility'] = compatibility;
     if (imageUrl != null) payload['image_url'] = imageUrl;
     if (salePriceUsd != null) payload['sale_price_usd'] = salePriceUsd;
+    if (parentSku != null) payload['parent_sku'] = parentSku;
+    if (variantAttributeName != null) {
+      payload['variant_attribute_name'] = variantAttributeName;
+    }
+    if (variantAttributeValue != null) {
+      payload['variant_attribute_value'] = variantAttributeValue;
+    }
+    if (variantAttributes.isNotEmpty) {
+      payload['variant_attributes'] = variantAttributes;
+    }
+    if (isActive != null) payload['is_active'] = isActive;
     if (discountRules != null) payload['discount_rules'] = discountRules;
     if (customFields.isNotEmpty) payload['custom_fields'] = customFields;
     return payload;
@@ -150,18 +178,54 @@ class CatalogImportValidator {
       }
 
       if (row.minOrderQty != null &&
-          row.minOrderQty! < ProductMinOrderQty.platformFloor) {
+          row.minOrderQty! < ProductMinOrderQty.absoluteFloor) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
           sku: sku,
           code: 'INVALID_MIN_ORDER_QTY',
           message:
-              'La cantidad mínima de pedido debe ser ${ProductMinOrderQty.platformFloor} o más',
+              'La cantidad mínima de pedido debe ser ${ProductMinOrderQty.absoluteFloor} o más',
         ));
         continue;
       }
 
       final sale = row.salePriceUsd;
+      final parent = row.parentSku?.trim() ?? '';
+      final variantValue = row.variantAttributeValue?.trim() ?? '';
+      final hasAttrs = row.variantAttributes.isNotEmpty;
+      if (row.isActiveInvalid) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'INVALID_IS_ACTIVE',
+          message:
+              'Visibilidad inválida. Use si/no, activo/pausado o visible/oculto',
+        ));
+        continue;
+      }
+      if (row.variantAttributesInvalid) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'INVALID_VARIANT_ATTRIBUTES',
+          message:
+              'Atributos inválidos. Use Tamaño:M|Color:Rojo o JSON '
+              '{"Tamaño":"M","Color":"Rojo"}',
+        ));
+        continue;
+      }
+      if (parent.isNotEmpty && variantValue.isEmpty && !hasAttrs) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'REQUIRED_VARIANT_VALUE',
+          message:
+              'La variante necesita un valor o atributos '
+              '(ej. Tamaño:M|Color:Rojo)',
+        ));
+        continue;
+      }
+
       if (sale != null && (sale <= 0 || sale >= row.priceUsd)) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
@@ -244,6 +308,18 @@ class CatalogImportValidator {
       }
     }
 
+    bool? isActive;
+    var isActiveInvalid = false;
+    final activeRaw = readField(CatalogImportField.isActive.key);
+    if (activeRaw != null && activeRaw.trim().isNotEmpty) {
+      final parsed = ExcelCatalogService.parseActivoCell(activeRaw);
+      if (parsed == null) {
+        isActiveInvalid = true;
+      } else {
+        isActive = parsed;
+      }
+    }
+
     for (final key in mapping.customFieldsMap.keys) {
       final v = readCustom(key);
       if (v != null && v.trim().isNotEmpty) {
@@ -270,6 +346,28 @@ class CatalogImportValidator {
       aliadoVisibleKeys: mapping.aliadoVisibleCustomFieldKeys,
     );
 
+    final parentSku = _nullable(readField(CatalogImportField.parentSku.key));
+    var attrName =
+        _nullable(readField(CatalogImportField.variantAttributeName.key));
+    var attrValue =
+        _nullable(readField(CatalogImportField.variantAttributeValue.key));
+    final attrsRaw =
+        readField(CatalogImportField.variantAttributes.key)?.trim();
+    var attrs = const <String, String>{};
+    var attrsInvalid = false;
+    if (attrsRaw != null && attrsRaw.isNotEmpty) {
+      final parsed = parseVariantAttributesCell(attrsRaw);
+      if (parsed == null) {
+        attrsInvalid = true;
+      } else {
+        attrs = parsed;
+        attrName ??= joinAttributeNames(parsed);
+        attrValue ??= joinAttributeValues(parsed);
+      }
+    } else if (attrName != null && attrValue != null) {
+      attrs = {attrName: attrValue};
+    }
+
     return CatalogImportNormalizedRow(
       rowIndex: rowIndex,
       sku: sku,
@@ -283,6 +381,13 @@ class CatalogImportValidator {
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,
       hasWarranty: hasWarranty,
+      isActive: isActive,
+      isActiveInvalid: isActiveInvalid,
+      parentSku: parentSku,
+      variantAttributeName: attrName,
+      variantAttributeValue: attrValue,
+      variantAttributes: attrs,
+      variantAttributesInvalid: attrsInvalid,
       customFields: customFieldsPayload,
       priceColumn: priceBinding?.source,
       priceRaw: priceRaw,

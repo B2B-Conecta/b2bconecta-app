@@ -321,7 +321,10 @@ class InventoryService {
     }).eq('id', productId);
   }
 
-  /// Activa o pausa visibilidad de varios productos del inventario actual (RLS).
+  /// Activa o pausa visibilidad de varios productos del inventario actual.
+  ///
+  /// El RPC actualiza en una sola sentencia y avisa el catálogo una vez.
+  /// Un `inFilter` con todos los ids alarga la URL y dispara un aviso por fila.
   static Future<void> setProductsActiveBulk({
     required List<String> productIds,
     required bool isActive,
@@ -329,9 +332,13 @@ class InventoryService {
     final ids = productIds.where((id) => id.isNotEmpty).toList();
     if (ids.isEmpty) return;
 
-    await SupabaseAccess.client.from('products').update({
-      'is_active': isActive,
-    }).inFilter('id', ids);
+    await SupabaseAccess.client.rpc(
+      'importador_set_products_active',
+      params: <String, dynamic>{
+        'p_ids': ids,
+        'p_active': isActive,
+      },
+    );
   }
 
   /// Elimina un producto del inventario del importador (RLS: owner).

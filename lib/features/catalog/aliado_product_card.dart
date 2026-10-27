@@ -135,6 +135,17 @@ class AliadoProductCard extends StatelessWidget {
                               right: 6,
                               child: ProductWarrantySeal(compact: true),
                             ),
+                          if (part.variantChoices.isNotEmpty)
+                            Positioned(
+                              left: 6,
+                              top: part.isCatalogVerified ||
+                                      part.isCatalogFeatured
+                                  ? 32
+                                  : 6,
+                              child: _VariantOptionsChip(
+                                count: part.variantChoices.length,
+                              ),
+                            ),
                           if (shippingIncluded)
                             const Positioned(
                               left: 6,
@@ -372,6 +383,35 @@ class _StockLine extends StatelessWidget {
       ),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+class _VariantOptionsChip extends StatelessWidget {
+  const _VariantOptionsChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Text(
+        '$count opciones',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+          height: 1.1,
+        ),
+      ),
     );
   }
 }

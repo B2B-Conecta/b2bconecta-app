@@ -86,10 +86,43 @@ class CatalogImportHeaderGuess {
       'foto',
       'image',
     ],
+    CatalogImportField.parentSku: [
+      'parent_sku',
+      'sku_padre',
+      'codigo_padre',
+      'producto_padre',
+    ],
+    CatalogImportField.variantAttributeName: [
+      'atributo',
+      'nombre_atributo',
+      'presentacion',
+      'medida',
+      'talla',
+    ],
+    CatalogImportField.variantAttributeValue: [
+      'valor_atributo',
+      'atributo_valor',
+      'opcion',
+      'variante',
+    ],
+    CatalogImportField.variantAttributes: [
+      'atributos',
+      'variant_attributes',
+      'multi_atributos',
+      'atributos_variante',
+    ],
     CatalogImportField.hasWarranty: [
       'garantia',
       'warranty',
       'has_warranty',
+    ],
+    CatalogImportField.isActive: [
+      'activo',
+      'is_active',
+      'visible',
+      'visibilidad',
+      'publicado',
+      'pausado',
     ],
     CatalogImportField.usdPaymentDiscountPct: [
       'descuento_usd',
@@ -135,12 +168,22 @@ class CatalogImportHeaderGuess {
         if (field == CatalogImportField.stock && _looksLikeMinOrderQty(entry.key)) {
           continue;
         }
+        if ((field == CatalogImportField.sku ||
+                field == CatalogImportField.name) &&
+            _looksLikeParentSku(entry.key)) {
+          continue;
+        }
         if (entry.key == pattern || entry.key.contains(pattern)) {
           return entry.header;
         }
       }
     }
     return null;
+  }
+
+  static bool _looksLikeParentSku(String normalizedHeader) {
+    return normalizedHeader.contains('parent') ||
+        normalizedHeader.contains('padre');
   }
 
   static bool _looksLikeMinOrderQty(String normalizedHeader) {

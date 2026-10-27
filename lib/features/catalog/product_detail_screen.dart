@@ -6,6 +6,7 @@ import 'catalog_service.dart';
 import 'favorite_heart_button.dart';
 import 'part_model.dart';
 import 'product_detail_extras.dart';
+import 'product_variants.dart';
 import 'related_products.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
@@ -52,21 +53,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   List<PartModel> _related = const [];
   final PageController _imagePageController = PageController();
   int _imagePageIndex = 0;
+  late PartModel _selected;
+  late List<PartModel> _family;
 
-  PartModel get part => widget.part;
+  PartModel get part => _selected;
 
-  List<String> get _galleryUrls {
-    if (part.imageUrls.isNotEmpty) return part.imageUrls;
-    final cover = part.coverImageUrl;
-    if (cover != null && cover.isNotEmpty) return [cover];
-    return const [];
-  }
+  List<String> get _galleryUrls => variantGalleryUrls(
+        selected: part,
+        opened: widget.part,
+        family: _family,
+      );
 
   @override
   void initState() {
     super.initState();
+    _selected = widget.part;
+    _family = widget.part.variantChoices;
     _loadProfile();
     _loadRelated();
+    _loadVariantFamily();
+  }
+
+  Future<void> _loadVariantFamily() async {
+    if (!widget.part.hasVariantFamily) return;
+    try {
+      final family = await CatalogService.fetchVariantFamily(widget.part);
+      if (!mounted || family.length < 2) return;
+      final selected = family.where((option) => option.id == _selected.id);
+      setState(() {
+        _family = family;
+        _selected = selected.isEmpty ? family.first : selected.first;
+      });
+    } catch (_) {}
+  }
+
+  void _selectVariant(PartModel option) {
+    if (option.id == _selected.id) return;
+    setState(() {
+      _selected = option;
+      _imagePageIndex = 0;
+    });
+    if (_imagePageController.hasClients) {
+      _imagePageController.jumpToPage(0);
+    }
   }
 
   Future<void> _loadRelated() async {
@@ -460,19 +489,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildHeroImageContent() {
     final urls = _galleryUrls;
-    if (urls.isEmpty) {
-      return _imagePlaceholder();
-    }
+    final galleryKey = urls.isEmpty ? 'empty' : urls.join('|');
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: KeyedSubtree(
+        key: ValueKey<String>(galleryKey),
+        child: _variantGallery(urls),
+      ),
+    );
+  }
+
+  Widget _variantGallery(List<String> urls) {
+    if (urls.isEmpty) return _imagePlaceholder();
+
+    final opened = productGalleryUrls(widget.part);
+    final useHero = urls.length == 1 &&
+        opened.length == 1 &&
+        urls.first == opened.first;
 
     if (urls.length == 1) {
+      final image = Image.network(
+        urls.first,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        errorBuilder: (_, __, ___) => _imagePlaceholderInner(),
+      );
+      if (!useHero) return image;
       return Hero(
-        tag: ProductDetailScreen.heroImageTag(part),
-        child: Image.network(
-          urls.first,
-          fit: BoxFit.contain,
-          width: double.infinity,
-          errorBuilder: (_, __, ___) => _imagePlaceholderInner(),
-        ),
+        tag: ProductDetailScreen.heroImageTag(widget.part),
+        child: image,
       );
     }
 
@@ -644,6 +691,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       ),
       SizedBox(height: desktop ? 16 : 8),
+      if (_family.length > 1) ...[
+        _VariantSelector(
+          options: _family,
+          selected: _selected,
+          onSelected: _selectVariant,
+        ),
+        const SizedBox(height: 12),
+      ],
       Material(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
@@ -938,7 +993,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _imagePlaceholder() {
     return Hero(
-      tag: ProductDetailScreen.heroImageTag(part),
+      tag: ProductDetailScreen.heroImageTag(widget.part),
       child: _imagePlaceholderInner(),
     );
   }
@@ -991,6 +1046,130 @@ class _AlertBanner extends StatelessWidget {
           height: 1.3,
         ),
       ),
+    );
+  }
+}
+
+class _VariantSelector extends StatelessWidget {
+  const _VariantSelector({
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<PartModel> options;
+  final PartModel selected;
+  final ValueChanged<PartModel> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final axes = variantAttributeAxes(options);
+    if (axes.length <= 1) {
+      return _SingleAxisVariantSelector(
+        options: options,
+        selectedId: selected.id,
+        onSelected: onSelected,
+      );
+    }
+
+    final selection = selectionFromVariant(selected);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < axes.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          Text(
+            axes[i],
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final value in availableAttributeValues(
+                options: options,
+                axis: axes[i],
+                selection: selection,
+              ))
+                FilterChip(
+                  label: Text(value),
+                  selected: selection[axes[i]] == value,
+                  showCheckmark: false,
+                  onSelected: (_) {
+                    final next = Map<String, String>.from(selection)
+                      ..[axes[i]] = value;
+                    onSelected(
+                      pickVariantForAttributes(
+                        options: options,
+                        selection: next,
+                        preferredAxis: axes[i],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SingleAxisVariantSelector extends StatelessWidget {
+  const _SingleAxisVariantSelector({
+    required this.options,
+    required this.selectedId,
+    required this.onSelected,
+  });
+
+  final List<PartModel> options;
+  final String selectedId;
+  final ValueChanged<PartModel> onSelected;
+
+  String get _heading {
+    final axes = variantAttributeAxes(options);
+    if (axes.length == 1) return axes.first;
+    final names = options
+        .map((option) => option.variantAttributeName?.trim() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toSet();
+    if (names.length == 1) return names.first;
+    return 'Opciones';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _heading,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in options)
+              FilterChip(
+                label: Text(option.variantOptionLabel),
+                selected: option.id == selectedId,
+                showCheckmark: false,
+                onSelected: (_) => onSelected(option),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

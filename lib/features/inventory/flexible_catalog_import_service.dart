@@ -165,6 +165,10 @@ class FlexibleCatalogImportService {
           source: 'garantia (opcional)',
           transform: CatalogImportTransform.booleanSiNo,
         ),
+        CatalogImportField.isActive.key: CatalogImportColumnBinding(
+          source: 'activo (opcional)',
+          transform: CatalogImportTransform.booleanSiNo,
+        ),
         CatalogImportField.usdPaymentDiscountPct.key: CatalogImportColumnBinding(
           source: 'descuento_pago_usd_pct (opcional)',
           transform: CatalogImportTransform.decimalComma,

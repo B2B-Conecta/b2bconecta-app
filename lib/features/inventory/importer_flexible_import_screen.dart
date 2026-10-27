@@ -86,6 +86,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.compatibility,
     CatalogImportField.imageUrl,
     CatalogImportField.hasWarranty,
+    CatalogImportField.isActive,
     CatalogImportField.parentSku,
     CatalogImportField.variantAttributeName,
     CatalogImportField.variantAttributeValue,
@@ -123,6 +124,8 @@ class _ImporterFlexibleImportScreenState
         'Varios ejes en una celda: Tamaño:M|Color:Rojo (o JSON). Cada combinación = una fila/SKU.',
     CatalogImportField.hasWarranty:
         'Usa si/no, o días numéricos del ERP (ej. 30, 90 días).',
+    CatalogImportField.isActive:
+        'si = visible en catálogo; no = pausado. Vacío: nuevos siguen el selector de la importación; existentes no cambian.',
   };
 
   static String _labelVe(CatalogImportField field) => switch (field) {
@@ -141,6 +144,7 @@ class _ImporterFlexibleImportScreenState
         CatalogImportField.variantAttributeValue => 'Valor de la variante',
         CatalogImportField.variantAttributes => 'Atributos (varios)',
         CatalogImportField.hasWarranty => 'Garantía',
+        CatalogImportField.isActive => 'Activo / visible',
         CatalogImportField.usdPaymentDiscountPct => 'Descuento pago en USD (%)',
         CatalogImportField.volumeTiersJson => 'Tramos por volumen (JSON)',
       };
@@ -270,7 +274,8 @@ class _ImporterFlexibleImportScreenState
         if (_decimalCommaOnPrice) {
           transform = CatalogImportTransform.decimalComma;
         }
-      } else if (field == CatalogImportField.hasWarranty) {
+      } else if (field == CatalogImportField.hasWarranty ||
+          field == CatalogImportField.isActive) {
         transform = CatalogImportTransform.booleanSiNo;
       }
 

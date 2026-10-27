@@ -15,6 +15,7 @@ enum CatalogImportField {
   variantAttributeValue,
   variantAttributes,
   hasWarranty,
+  isActive,
   usdPaymentDiscountPct,
   volumeTiersJson,
 }
@@ -36,6 +37,7 @@ extension CatalogImportFieldX on CatalogImportField {
         CatalogImportField.variantAttributeValue => 'variant_attribute_value',
         CatalogImportField.variantAttributes => 'variant_attributes',
         CatalogImportField.hasWarranty => 'has_warranty',
+        CatalogImportField.isActive => 'is_active',
         CatalogImportField.usdPaymentDiscountPct => 'usd_payment_discount_pct',
         CatalogImportField.volumeTiersJson => 'volume_tiers_json',
       };
@@ -65,6 +67,7 @@ extension CatalogImportFieldX on CatalogImportField {
         CatalogImportField.variantAttributes =>
           'Atributos (varios: Tamaño:M|Color:Rojo)',
         CatalogImportField.hasWarranty => 'Garantía',
+        CatalogImportField.isActive => 'Activo / visible en catálogo',
         CatalogImportField.usdPaymentDiscountPct => 'Descuento pago USD (%)',
         CatalogImportField.volumeTiersJson => 'Tramos volumen (JSON)',
       };

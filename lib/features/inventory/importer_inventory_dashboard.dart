@@ -693,9 +693,9 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                       icon: Icons.storefront_outlined,
                       title: 'Importa y decide la visibilidad',
                       body:
-                          'Los productos nuevos pueden entrar pausados o visibles. '
-                          'Los SKU que ya existen se actualizan según la regla '
-                          'que elijas (todo el producto, o solo precio y stock).',
+                          'Puedes elegir pausados o visibles para códigos nuevos, '
+                          'o fijarlo fila a fila con la columna activo (si/no). '
+                          'Vacío en un SKU existente no cambia su visibilidad.',
                     ),
                     _helpGuideStep(
                       step: '4',

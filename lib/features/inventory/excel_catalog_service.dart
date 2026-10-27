@@ -86,6 +86,7 @@ class ExcelCatalogService {
     'compatibilidad (opcional)',
     'url_imagen (opcional)',
     'garantia (opcional)',
+    'activo (opcional)',
   ];
 
   static const templateExampleRow = [
@@ -103,6 +104,7 @@ class ExcelCatalogService {
     'Motor',
     'CG150 CG125',
     '',
+    'si',
     'si',
   ];
 
@@ -183,6 +185,7 @@ class ExcelCatalogService {
       p.compatibilidad ?? '',
       p.coverImageUrl?.trim() ?? '',
       p.hasWarranty ? 'si' : 'no',
+      p.isActive ? 'si' : 'no',
     ];
   }
 
@@ -432,6 +435,40 @@ class ExcelCatalogService {
       rowIndex: rowIndex,
       sku: sku,
     ).hasWarranty;
+  }
+
+  /// Visibilidad de catálogo. `null` = celda vacía o valor no reconocido.
+  /// Acepta si/no, activo/pausado, visible/oculto, true/false, 1/0.
+  static bool? parseActivoCell(String? raw) {
+    final t = (raw ?? '').trim().toLowerCase().replaceAll('\u00A0', ' ');
+    if (t.isEmpty) return null;
+    const yes = {
+      'si',
+      'sí',
+      'yes',
+      'true',
+      '1',
+      'x',
+      'activo',
+      'activa',
+      'visible',
+      'publicado',
+      'publicada',
+    };
+    const no = {
+      'no',
+      'false',
+      '0',
+      'pausado',
+      'pausada',
+      'inactivo',
+      'inactiva',
+      'oculto',
+      'oculta',
+    };
+    if (yes.contains(t)) return true;
+    if (no.contains(t)) return false;
+    return null;
   }
 
   static int? _parseWarrantyDays(String raw) {

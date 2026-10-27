@@ -40,6 +40,7 @@ void main() {
     expect(cells[10], 'Presentación:4 Litros');
     expect(cells[13], 'https://cdn.example/aceite.jpg');
     expect(cells[14], 'si');
+    expect(cells[15], 'si');
   });
 
   test('las cabeceras incluyen variantes e imagen', () {
@@ -49,6 +50,7 @@ void main() {
     expect(headers, contains('valor_atributo (opcional)'));
     expect(headers, contains('atributos (opcional)'));
     expect(headers, contains('url_imagen (opcional)'));
+    expect(headers, contains('activo (opcional)'));
     expect(headers, contains('cantidad_minima'));
   });
 }

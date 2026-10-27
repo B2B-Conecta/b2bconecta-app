@@ -285,4 +285,38 @@ void main() {
       {'Tamaño': 'M', 'Color': 'Rojo'},
     );
   });
+
+  test('la carga manda is_active solo si la fila lo define', () {
+    const withVisibility = CatalogImportNormalizedRow(
+      rowIndex: 5,
+      sku: 'ACE-1',
+      name: 'Aceite',
+      priceUsd: 8,
+      stock: 4,
+      isActive: true,
+    );
+    const withoutVisibility = CatalogImportNormalizedRow(
+      rowIndex: 6,
+      sku: 'ACE-2',
+      name: 'Aceite',
+      priceUsd: 9,
+      stock: 4,
+    );
+
+    expect(withVisibility.toRpcJson()['is_active'], isTrue);
+    expect(withoutVisibility.toRpcJson().containsKey('is_active'), isFalse);
+
+    final bad = CatalogImportValidator.validateBatch(const [
+      CatalogImportNormalizedRow(
+        rowIndex: 7,
+        sku: 'ACE-3',
+        name: 'Aceite',
+        priceUsd: 9,
+        stock: 1,
+        isActiveInvalid: true,
+      ),
+    ]);
+    expect(bad.validRows, isEmpty);
+    expect(bad.errors.single.code, 'INVALID_IS_ACTIVE');
+  });
 }

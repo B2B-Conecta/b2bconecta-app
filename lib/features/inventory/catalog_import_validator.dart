@@ -21,6 +21,8 @@ class CatalogImportNormalizedRow {
     this.imageUrl,
     this.salePriceUsd,
     this.hasWarranty = false,
+    this.isActive,
+    this.isActiveInvalid = false,
     this.parentSku,
     this.variantAttributeName,
     this.variantAttributeValue,
@@ -44,6 +46,10 @@ class CatalogImportNormalizedRow {
   final String? imageUrl;
   final double? salePriceUsd;
   final bool hasWarranty;
+
+  /// `null` = celda vacía / columna no mapeada (no cambia visibilidad).
+  final bool? isActive;
+  final bool isActiveInvalid;
   final String? parentSku;
   final String? variantAttributeName;
   final String? variantAttributeValue;
@@ -81,6 +87,7 @@ class CatalogImportNormalizedRow {
     if (variantAttributes.isNotEmpty) {
       payload['variant_attributes'] = variantAttributes;
     }
+    if (isActive != null) payload['is_active'] = isActive;
     if (discountRules != null) payload['discount_rules'] = discountRules;
     if (customFields.isNotEmpty) payload['custom_fields'] = customFields;
     return payload;
@@ -186,6 +193,16 @@ class CatalogImportValidator {
       final parent = row.parentSku?.trim() ?? '';
       final variantValue = row.variantAttributeValue?.trim() ?? '';
       final hasAttrs = row.variantAttributes.isNotEmpty;
+      if (row.isActiveInvalid) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'INVALID_IS_ACTIVE',
+          message:
+              'Visibilidad inválida. Use si/no, activo/pausado o visible/oculto',
+        ));
+        continue;
+      }
       if (row.variantAttributesInvalid) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
@@ -291,6 +308,18 @@ class CatalogImportValidator {
       }
     }
 
+    bool? isActive;
+    var isActiveInvalid = false;
+    final activeRaw = readField(CatalogImportField.isActive.key);
+    if (activeRaw != null && activeRaw.trim().isNotEmpty) {
+      final parsed = ExcelCatalogService.parseActivoCell(activeRaw);
+      if (parsed == null) {
+        isActiveInvalid = true;
+      } else {
+        isActive = parsed;
+      }
+    }
+
     for (final key in mapping.customFieldsMap.keys) {
       final v = readCustom(key);
       if (v != null && v.trim().isNotEmpty) {
@@ -352,6 +381,8 @@ class CatalogImportValidator {
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,
       hasWarranty: hasWarranty,
+      isActive: isActive,
+      isActiveInvalid: isActiveInvalid,
       parentSku: parentSku,
       variantAttributeName: attrName,
       variantAttributeValue: attrValue,

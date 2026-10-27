@@ -116,6 +116,14 @@ class CatalogImportHeaderGuess {
       'warranty',
       'has_warranty',
     ],
+    CatalogImportField.isActive: [
+      'activo',
+      'is_active',
+      'visible',
+      'visibilidad',
+      'publicado',
+      'pausado',
+    ],
     CatalogImportField.usdPaymentDiscountPct: [
       'descuento_usd',
       'usd_discount',

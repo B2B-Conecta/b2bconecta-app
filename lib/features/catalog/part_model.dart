@@ -53,6 +53,7 @@ class PartModel {
     this.parentSku,
     this.variantAttributeName,
     this.variantAttributeValue,
+    this.variantAttributes = const {},
     this.variants = const [],
   });
 
@@ -185,10 +186,16 @@ class PartModel {
   final String? parentSku;
 
   /// Nombre del atributo (Presentación, Medida, Color).
+  /// Con varios ejes: nombres unidos con ` / ` (p. ej. Tamaño / Color).
   final String? variantAttributeName;
 
   /// Valor visible en el selector (4 Litros, +0.50mm).
+  /// Con varios ejes: valores unidos con ` / ` (p. ej. M / Rojo).
   final String? variantAttributeValue;
+
+  /// Mapa de atributos independientes (`products.variant_attributes`).
+  /// Ejemplo: `{Tamaño: M, Color: Rojo}`. Vacío = usar nombre/valor legados.
+  final Map<String, String> variantAttributes;
 
   /// Hermanas de catálogo, incluida esta fila, cuando hay más de una opción.
   final List<PartModel> variants;
@@ -343,6 +350,7 @@ class PartModel {
       parentSku: _nullableText(json['parent_sku']),
       variantAttributeName: _nullableText(json['variant_attribute_name']),
       variantAttributeValue: _nullableText(json['variant_attribute_value']),
+      variantAttributes: _variantAttributesFromJson(json['variant_attributes']),
     );
   }
 
@@ -389,6 +397,7 @@ class PartModel {
     String? parentSku,
     String? variantAttributeName,
     String? variantAttributeValue,
+    Map<String, String>? variantAttributes,
     List<PartModel>? variants,
   }) {
     return PartModel(
@@ -446,8 +455,22 @@ class PartModel {
       variantAttributeName: variantAttributeName ?? this.variantAttributeName,
       variantAttributeValue:
           variantAttributeValue ?? this.variantAttributeValue,
+      variantAttributes: variantAttributes ?? this.variantAttributes,
       variants: variants ?? this.variants,
     );
+  }
+
+  static Map<String, String> _variantAttributesFromJson(dynamic raw) {
+    if (raw == null) return const {};
+    if (raw is! Map) return const {};
+    final out = <String, String>{};
+    for (final entry in raw.entries) {
+      final key = entry.key.toString().trim();
+      final value = entry.value?.toString().trim() ?? '';
+      if (key.isEmpty || value.isEmpty) continue;
+      out[key] = value;
+    }
+    return out;
   }
 
   static double? _asNullableDouble(dynamic v) {

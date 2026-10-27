@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:excel/excel.dart';
 
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/product_variants.dart';
 import 'product_volume_tiers.dart';
 
 /// Interpretación de una celda de garantía (booleano o días desde ERP).
@@ -80,6 +81,7 @@ class ExcelCatalogService {
     'parent_sku (opcional)',
     'atributo (opcional)',
     'valor_atributo (opcional)',
+    'atributos (opcional)',
     'categoria (opcional)',
     'compatibilidad (opcional)',
     'url_imagen (opcional)',
@@ -97,6 +99,7 @@ class ExcelCatalogService {
     'EJEMPLO-ACEITE',
     'Presentación',
     '1 Litro',
+    '',
     'Motor',
     'CG150 CG125',
     '',
@@ -175,6 +178,7 @@ class ExcelCatalogService {
       p.parentSku?.trim() ?? '',
       p.variantAttributeName?.trim() ?? '',
       p.variantAttributeValue?.trim() ?? '',
+      formatVariantAttributesCell(variantAttributesOf(p)),
       p.category ?? '',
       p.compatibilidad ?? '',
       p.coverImageUrl?.trim() ?? '',

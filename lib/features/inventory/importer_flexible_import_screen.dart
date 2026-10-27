@@ -89,6 +89,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.parentSku,
     CatalogImportField.variantAttributeName,
     CatalogImportField.variantAttributeValue,
+    CatalogImportField.variantAttributes,
   ];
 
   static const _fieldHintsVe = <CatalogImportField, String>{
@@ -115,9 +116,11 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.parentSku:
         'Mismo código en las filas que son variantes de un producto. Vacío = producto simple.',
     CatalogImportField.variantAttributeName:
-        'Qué cambia entre variantes: Presentación, Medida, Color.',
+        'Un solo eje: Presentación, Medida, Color. Si usas varios, deja vacío y usa Atributos.',
     CatalogImportField.variantAttributeValue:
-        'Valor de esa variante: 4 Litros, +0.50mm, Rojo. Obligatorio si hay SKU padre.',
+        'Valor de un solo eje: 4 Litros, Rojo. Obligatorio si hay SKU padre y no usas Atributos.',
+    CatalogImportField.variantAttributes:
+        'Varios ejes en una celda: Tamaño:M|Color:Rojo (o JSON). Cada combinación = una fila/SKU.',
     CatalogImportField.hasWarranty:
         'Usa si/no, o días numéricos del ERP (ej. 30, 90 días).',
   };
@@ -136,6 +139,7 @@ class _ImporterFlexibleImportScreenState
         CatalogImportField.parentSku => 'SKU padre',
         CatalogImportField.variantAttributeName => 'Atributo de la variante',
         CatalogImportField.variantAttributeValue => 'Valor de la variante',
+        CatalogImportField.variantAttributes => 'Atributos (varios)',
         CatalogImportField.hasWarranty => 'Garantía',
         CatalogImportField.usdPaymentDiscountPct => 'Descuento pago en USD (%)',
         CatalogImportField.volumeTiersJson => 'Tramos por volumen (JSON)',

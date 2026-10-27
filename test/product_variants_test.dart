@@ -15,6 +15,7 @@ PartModel _part({
   String? parentSku,
   String? attribute,
   String? value,
+  Map<String, String> attributes = const {},
 }) {
   return PartModel(
     id: id,
@@ -26,6 +27,7 @@ PartModel _part({
     parentSku: parentSku,
     variantAttributeName: attribute,
     variantAttributeValue: value,
+    variantAttributes: attributes,
   );
 }
 
@@ -174,6 +176,7 @@ void main() {
       parentSku: 'aceite',
       variantAttributeName: 'Presentación',
       variantAttributeValue: '4 Litros',
+      variantAttributes: {'Presentación': '4 Litros'},
     );
 
     expect(row.toRpcJson(), {
@@ -187,6 +190,99 @@ void main() {
       'parent_sku': 'aceite',
       'variant_attribute_name': 'Presentación',
       'variant_attribute_value': '4 Litros',
+      'variant_attributes': {'Presentación': '4 Litros'},
     });
+  });
+
+  test('parsea varios atributos desde la celda Excel', () {
+    expect(
+      parseVariantAttributesCell('Tamaño:M|Color:Rojo'),
+      {'Tamaño': 'M', 'Color': 'Rojo'},
+    );
+    expect(
+      parseVariantAttributesCell('{"Tamaño":"L","Color":"Negro"}'),
+      {'Tamaño': 'L', 'Color': 'Negro'},
+    );
+    expect(parseVariantAttributesCell('sin-formato'), isNull);
+  });
+
+  test('varios ejes eligen la combinación exacta o la más cercana', () {
+    final options = [
+      _part(
+        id: 'm-rojo',
+        sku: 'C-M-R',
+        price: 10,
+        parentSku: 'casco',
+        attribute: 'Tamaño / Color',
+        value: 'M / Rojo',
+        attributes: {'Tamaño': 'M', 'Color': 'Rojo'},
+      ),
+      _part(
+        id: 'm-azul',
+        sku: 'C-M-A',
+        price: 10,
+        parentSku: 'casco',
+        attribute: 'Tamaño / Color',
+        value: 'M / Azul',
+        attributes: {'Tamaño': 'M', 'Color': 'Azul'},
+      ),
+      _part(
+        id: 'l-rojo',
+        sku: 'C-L-R',
+        price: 12,
+        parentSku: 'casco',
+        attribute: 'Tamaño / Color',
+        value: 'L / Rojo',
+        attributes: {'Tamaño': 'L', 'Color': 'Rojo'},
+      ),
+    ];
+
+    expect(variantAttributeAxes(options), ['Tamaño', 'Color']);
+    expect(
+      availableAttributeValues(
+        options: options,
+        axis: 'Color',
+        selection: {'Tamaño': 'M', 'Color': 'Rojo'},
+      ),
+      ['Rojo', 'Azul'],
+    );
+    expect(
+      pickVariantForAttributes(
+        options: options,
+        selection: {'Tamaño': 'L', 'Color': 'Rojo'},
+      ).id,
+      'l-rojo',
+    );
+    expect(
+      pickVariantForAttributes(
+        options: options,
+        selection: {'Tamaño': 'L', 'Color': 'Azul'},
+        preferredAxis: 'Color',
+      ).id,
+      'm-azul',
+    );
+  });
+
+  test('la carga acepta atributos multi-eje sin valor_atributo suelto', () {
+    const row = CatalogImportNormalizedRow(
+      rowIndex: 4,
+      sku: 'C-M-R',
+      name: 'Casco',
+      priceUsd: 40,
+      stock: 3,
+      parentSku: 'casco',
+      variantAttributeName: 'Tamaño / Color',
+      variantAttributeValue: 'M / Rojo',
+      variantAttributes: {'Tamaño': 'M', 'Color': 'Rojo'},
+    );
+
+    final batch = CatalogImportValidator.validateBatch([row]);
+
+    expect(batch.errors, isEmpty);
+    expect(batch.validRows, hasLength(1));
+    expect(
+      batch.validRows.single.toRpcJson()['variant_attributes'],
+      {'Tamaño': 'M', 'Color': 'Rojo'},
+    );
   });
 }

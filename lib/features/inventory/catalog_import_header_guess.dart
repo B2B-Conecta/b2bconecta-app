@@ -105,6 +105,12 @@ class CatalogImportHeaderGuess {
       'opcion',
       'variante',
     ],
+    CatalogImportField.variantAttributes: [
+      'atributos',
+      'variant_attributes',
+      'multi_atributos',
+      'atributos_variante',
+    ],
     CatalogImportField.hasWarranty: [
       'garantia',
       'warranty',

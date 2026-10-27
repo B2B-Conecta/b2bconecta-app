@@ -711,9 +711,10 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                       icon: Icons.layers_outlined,
                       title: 'Varias presentaciones, una ficha',
                       body:
-                          'Mismo parent_sku en varias filas, con atributo y '
-                          'valor_atributo distintos (ej. Presentación / 4 Litros). '
-                          'En la vitrina sale una sola tarjeta con selector.',
+                          'Mismo parent_sku en varias filas. Un eje: atributo + '
+                          'valor_atributo. Varios ejes (talla y color): columna '
+                          'atributos, ej. Tamaño:M|Color:Rojo. Cada combinación '
+                          'es un SKU; en la vitrina sale una tarjeta con selectores.',
                     ),
                     const SizedBox(height: 10),
                     _helpCallout(

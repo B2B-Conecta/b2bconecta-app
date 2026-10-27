@@ -1,3 +1,4 @@
+import '../catalog/product_variants.dart';
 import 'catalog_import/catalog_import_field.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
@@ -23,6 +24,8 @@ class CatalogImportNormalizedRow {
     this.parentSku,
     this.variantAttributeName,
     this.variantAttributeValue,
+    this.variantAttributes = const {},
+    this.variantAttributesInvalid = false,
     this.discountRules,
     this.customFields = const {},
     this.priceColumn,
@@ -44,6 +47,8 @@ class CatalogImportNormalizedRow {
   final String? parentSku;
   final String? variantAttributeName;
   final String? variantAttributeValue;
+  final Map<String, String> variantAttributes;
+  final bool variantAttributesInvalid;
   final Map<String, dynamic>? discountRules;
   final Map<String, dynamic> customFields;
 
@@ -72,6 +77,9 @@ class CatalogImportNormalizedRow {
     }
     if (variantAttributeValue != null) {
       payload['variant_attribute_value'] = variantAttributeValue;
+    }
+    if (variantAttributes.isNotEmpty) {
+      payload['variant_attributes'] = variantAttributes;
     }
     if (discountRules != null) payload['discount_rules'] = discountRules;
     if (customFields.isNotEmpty) payload['custom_fields'] = customFields;
@@ -177,13 +185,26 @@ class CatalogImportValidator {
       final sale = row.salePriceUsd;
       final parent = row.parentSku?.trim() ?? '';
       final variantValue = row.variantAttributeValue?.trim() ?? '';
-      if (parent.isNotEmpty && variantValue.isEmpty) {
+      final hasAttrs = row.variantAttributes.isNotEmpty;
+      if (row.variantAttributesInvalid) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'INVALID_VARIANT_ATTRIBUTES',
+          message:
+              'Atributos inválidos. Use Tamaño:M|Color:Rojo o JSON '
+              '{"Tamaño":"M","Color":"Rojo"}',
+        ));
+        continue;
+      }
+      if (parent.isNotEmpty && variantValue.isEmpty && !hasAttrs) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
           sku: sku,
           code: 'REQUIRED_VARIANT_VALUE',
           message:
-              'La variante necesita un valor (presentación, medida, color)',
+              'La variante necesita un valor o atributos '
+              '(ej. Tamaño:M|Color:Rojo)',
         ));
         continue;
       }
@@ -296,6 +317,28 @@ class CatalogImportValidator {
       aliadoVisibleKeys: mapping.aliadoVisibleCustomFieldKeys,
     );
 
+    final parentSku = _nullable(readField(CatalogImportField.parentSku.key));
+    var attrName =
+        _nullable(readField(CatalogImportField.variantAttributeName.key));
+    var attrValue =
+        _nullable(readField(CatalogImportField.variantAttributeValue.key));
+    final attrsRaw =
+        readField(CatalogImportField.variantAttributes.key)?.trim();
+    var attrs = const <String, String>{};
+    var attrsInvalid = false;
+    if (attrsRaw != null && attrsRaw.isNotEmpty) {
+      final parsed = parseVariantAttributesCell(attrsRaw);
+      if (parsed == null) {
+        attrsInvalid = true;
+      } else {
+        attrs = parsed;
+        attrName ??= joinAttributeNames(parsed);
+        attrValue ??= joinAttributeValues(parsed);
+      }
+    } else if (attrName != null && attrValue != null) {
+      attrs = {attrName: attrValue};
+    }
+
     return CatalogImportNormalizedRow(
       rowIndex: rowIndex,
       sku: sku,
@@ -309,11 +352,11 @@ class CatalogImportValidator {
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,
       hasWarranty: hasWarranty,
-      parentSku: _nullable(readField(CatalogImportField.parentSku.key)),
-      variantAttributeName:
-          _nullable(readField(CatalogImportField.variantAttributeName.key)),
-      variantAttributeValue:
-          _nullable(readField(CatalogImportField.variantAttributeValue.key)),
+      parentSku: parentSku,
+      variantAttributeName: attrName,
+      variantAttributeValue: attrValue,
+      variantAttributes: attrs,
+      variantAttributesInvalid: attrsInvalid,
       customFields: customFieldsPayload,
       priceColumn: priceBinding?.source,
       priceRaw: priceRaw,

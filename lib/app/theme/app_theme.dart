@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 /// - Tono claro `#0C47FA`
 /// - Negro `#000000` / Blanco `#FFFFFF`
 ///
-/// Claros/oscuros derivan de esos cuatro (opacidad o mezcla), sin grises ni naranjas ajenos.
+/// Claros/oscuros derivan de esos cuatro. Verde y ámbar se reservan para
+/// estados funcionales y valoraciones, sin sustituir los colores de marca.
 class AppColors {
   AppColors._();
 
@@ -56,9 +57,7 @@ class AppColors {
       : Color.lerp(white, brandBlue, 0.04)!;
 
   /// Tarjetas / paneles elevados sobre el fondo.
-  static Color get card => _dark
-      ? Color.lerp(black, brandBlue, 0.30)!
-      : white;
+  static Color get card => _dark ? Color.lerp(black, brandBlue, 0.30)! : white;
 
   static Color get borderSubtle =>
       _dark ? white.withOpacity(0.28) : brandBlue.withOpacity(0.18);
@@ -74,6 +73,10 @@ class AppColors {
 
   /// Éxito funcional (no es color de marca; se mantiene para estados OK).
   static const successGreen = Color(0xFF2E7D32);
+
+  /// Atención funcional y estrella de valoración; legibles en ambos temas.
+  static const warningAmber = Color(0xFF946200);
+  static const warningAmberOnDark = Color(0xFFF2C66D);
 }
 
 class AppDecorations {
@@ -128,7 +131,8 @@ ThemeData buildAppTheme() {
         side: BorderSide(color: primary.withOpacity(0.10)),
       ),
     ),
-    dividerTheme: DividerThemeData(color: primary.withOpacity(0.12), thickness: 1),
+    dividerTheme:
+        DividerThemeData(color: primary.withOpacity(0.12), thickness: 1),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Color.lerp(AppColors.white, primary, 0.05)!,

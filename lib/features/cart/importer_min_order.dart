@@ -7,10 +7,12 @@ class ImporterMinOrderProgress {
     required this.importerName,
     required this.currentRef,
     required this.minRef,
+    this.importerId,
     this.currency = MinOrderCurrency.ref,
   });
 
   final String importerName;
+  final String? importerId;
   final double currentRef;
   final double minRef;
   final MinOrderCurrency currency;
@@ -47,7 +49,12 @@ List<ImporterMinOrderProgress> importerMinOrderProgressFor(
         .map((l) => l.part.ownerMinOrderAmountRef)
         .fold<double>(0, (a, b) => a > b ? a : b);
     return ImporterMinOrderProgress(
-      importerName: entry.key,
+      importerId: lines.isEmpty ? null : lines.first.part.ownerId,
+      importerName: lines.isEmpty
+          ? entry.key
+          : (lines.first.part.ownerBusinessName?.trim().isNotEmpty == true
+              ? lines.first.part.ownerBusinessName!.trim()
+              : 'Importador'),
       currentRef: cartLinesSubtotalRef(lines),
       minRef: minRef,
       currency: lines.isEmpty

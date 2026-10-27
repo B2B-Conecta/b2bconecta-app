@@ -438,9 +438,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: i == _page
-                            ? AppColors.brand
-                            : Colors.grey.shade400,
+                        color:
+                            i == _page ? AppColors.brand : Colors.grey.shade400,
                       ),
                     ),
                   ),
@@ -473,126 +472,128 @@ Future<void> showAliadoPromoPopupDialog({
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: SingleChildScrollView(
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: SizedBox(
-                height: (MediaQuery.sizeOf(ctx).height * 0.42).clamp(180.0, 320.0),
-                width: double.infinity,
-                child: ColoredBox(
-                  color: AppColors.fieldFill,
-                  child: PromoCreativeImage(url: campaign.imagePublicUrl),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: SizedBox(
+                  height: (MediaQuery.sizeOf(ctx).height * 0.42)
+                      .clamp(180.0, 320.0),
+                  width: double.infinity,
+                  child: ColoredBox(
+                    color: AppColors.fieldFill,
+                    child: PromoCreativeImage(url: campaign.imagePublicUrl),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.brand.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          campaign.badgeLabel,
-                          style: TextStyle(
-                            color: campaign.isThirdParty
-                                ? AppColors.brandBlue
-                                : AppColors.brand,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 11,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.brand.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            campaign.badgeLabel,
+                            style: TextStyle(
+                              color: campaign.isThirdParty
+                                  ? AppColors.brandBlue
+                                  : AppColors.brand,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        campaign.isPopup ? 'Pop-up' : 'Banner',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
+                        const SizedBox(width: 8),
+                        Text(
+                          campaign.isPopup ? 'Pop-up' : 'Banner',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    campaign.promoLabel,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  PromoActivePeriodChip(
-                    startsAt: campaign.startsAt,
-                    endsAt: campaign.endsAt,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    promoPeriodFootnote(campaign),
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Cerrar'),
-                    ),
-                  ),
-                  if (campaign.filtersImporter ||
-                      campaign.opensStore ||
-                      campaign.opensProduct) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          onFilterImporter?.call();
-                        },
-                        child: Text(campaign.destinationCtaLabel),
+                    const SizedBox(height: 8),
+                    Text(
+                      campaign.promoLabel,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
                       ),
                     ),
-                  ] else if (campaign.opensExternalUrl) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          Navigator.of(ctx).pop();
-                          await launchPromoCampaignExternalUrl(
-                            context,
-                            campaign,
-                          );
-                        },
-                        child: const Text('Más información'),
+                    const SizedBox(height: 8),
+                    PromoActivePeriodChip(
+                      startsAt: campaign.startsAt,
+                      endsAt: campaign.endsAt,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      promoPeriodFootnote(campaign),
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cerrar'),
+                      ),
+                    ),
+                    if (campaign.filtersImporter ||
+                        campaign.opensStore ||
+                        campaign.opensProduct) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            onFilterImporter?.call();
+                          },
+                          child: Text(campaign.destinationCtaLabel),
+                        ),
+                      ),
+                    ] else if (campaign.opensExternalUrl) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.of(ctx).pop();
+                            await launchPromoCampaignExternalUrl(
+                              context,
+                              campaign,
+                            );
+                          },
+                          child: const Text('Más información'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     },
@@ -667,7 +668,8 @@ Future<void> showAliadoActivePromotionsSheet({
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
                 'Puede volver a ver las campañas publicitarias cuando quiera.',
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                style:
+                    TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
               ),
             ),
             ConstrainedBox(
@@ -722,7 +724,8 @@ Future<void> showAliadoActivePromotionsSheet({
                             ),
                             Expanded(
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 10, 12, 10),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -980,6 +983,8 @@ class _PromoProductPickTile extends StatelessWidget {
                     CatalogProductPriceDisplay(
                       listPriceUsd: part.precio,
                       salePriceUsd: part.salePriceUsd,
+                      quantity: part.minOrderQtyEffective,
+                      ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                       discountRules: part.discountRules,
                       campaignDiscountPercent:
                           part.activeCampaignDiscountPercent,
@@ -998,7 +1003,7 @@ class _PromoProductPickTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(
+              const Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.brand,
               ),

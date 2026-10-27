@@ -18,6 +18,7 @@ import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_share_link.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_link.dart';
 import 'package:motolink_pro_app/features/ads/marketing_consent_host.dart';
+import 'package:motolink_pro_app/features/cart/cart_account_session.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +65,7 @@ void main() async {
       detectSessionInUri: true,
     ),
   );
+  CartAccountSession.start(url);
   runApp(MyApp(launchUri: launchUri));
   // After the first frame the activity is resumed, so Android can show the
   // POST_NOTIFICATIONS prompt. Awaiting FCM here freezes the native splash.

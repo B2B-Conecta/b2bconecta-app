@@ -33,7 +33,8 @@ class GuestSharedProductScreen extends StatefulWidget {
 }
 
 class _GuestSharedProductScreenState extends State<GuestSharedProductScreen> {
-  late final Future<PartModel?> _product = CatalogService.fetchPublicSharedProduct(
+  late final Future<PartModel?> _product =
+      CatalogService.fetchPublicSharedProduct(
     widget.productId,
   );
 
@@ -119,131 +120,135 @@ class _GuestSupplierStoreScreenState extends State<GuestSupplierStoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(future: _store, builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) {
-        return const _GuestWait(title: 'Vitrina');
-      }
-      final store = snapshot.data;
-      if (snapshot.hasError || store == null) {
-        return _GuestUnavailable(
-          message: 'No se pudo abrir la vitrina del proveedor.',
-          onRegister: widget.onRegister,
-        );
-      }
-      final place = [
-        store.estado?.trim(),
-        store.ciudad?.trim(),
-      ].where((s) => s != null && s.isNotEmpty).join(' · ');
-      final categories = <String>[];
-      for (final part in store.products) {
-        final category = part.category?.trim() ?? '';
-        if (category.isNotEmpty && !categories.contains(category)) {
-          categories.add(category);
-        }
-      }
-      final selected = categories.contains(_category) ? _category : null;
-      final visible = selected == null
-          ? store.products
-          : store.products
-              .where((part) => (part.category ?? '').trim() == selected)
-              .toList();
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: Text(store.name),
-          actions: [
-            IconButton(
-              tooltip: 'Compartir QR',
-              onPressed: () => showShareQrSheet(
-                context,
-                title: store.name,
-                url: ImporterStoreShareLink.urlFor(widget.importerId),
-                subtitle: 'Vitrina del proveedor',
-              ),
-              icon: const Icon(Icons.qr_code_2),
-            ),
-            TextButton(
-              onPressed: widget.onRegister,
-              child: const Text('Regístrate'),
-            ),
-          ],
-        ),
-        body: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-              children: [
-                _GuestStoreHeader(
-                  name: store.name,
-                  place: place,
-                  logoStoragePath: store.logoStoragePath,
-                  productCount: store.products.length,
+    return FutureBuilder(
+        future: _store,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const _GuestWait(title: 'Vitrina');
+          }
+          final store = snapshot.data;
+          if (snapshot.hasError || store == null) {
+            return _GuestUnavailable(
+              message: 'No se pudo abrir la vitrina del proveedor.',
+              onRegister: widget.onRegister,
+            );
+          }
+          final place = [
+            store.estado?.trim(),
+            store.ciudad?.trim(),
+          ].where((s) => s != null && s.isNotEmpty).join(' · ');
+          final categories = <String>[];
+          for (final part in store.products) {
+            final category = part.category?.trim() ?? '';
+            if (category.isNotEmpty && !categories.contains(category)) {
+              categories.add(category);
+            }
+          }
+          final selected = categories.contains(_category) ? _category : null;
+          final visible = selected == null
+              ? store.products
+              : store.products
+                  .where((part) => (part.category ?? '').trim() == selected)
+                  .toList();
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: Text(store.name),
+              actions: [
+                IconButton(
+                  tooltip: 'Compartir QR',
+                  onPressed: () => showShareQrSheet(
+                    context,
+                    title: store.name,
+                    url: ImporterStoreShareLink.urlFor(widget.importerId),
+                    subtitle: 'Vitrina del proveedor',
+                  ),
+                  icon: const Icon(Icons.qr_code_2),
                 ),
-                const SizedBox(height: 12),
-                FilledButton(
+                TextButton(
                   onPressed: widget.onRegister,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: const Text('Regístrate para pedir'),
+                  child: const Text('Regístrate'),
                 ),
-                if (categories.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: const Text('Todos'),
-                            selected: selected == null,
-                            onSelected: (_) => setState(() => _category = null),
-                          ),
-                        ),
-                        for (final category in categories)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(formatCatalogCategoryLabel(category)),
-                              selected: selected == category,
-                              onSelected: (_) =>
-                                  setState(() => _category = category),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 14),
-                if (visible.isEmpty)
-                  Text(
-                    'Este proveedor no tiene productos publicados.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  )
-                else
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      return AliadoCatalogCardWrap(
-                        maxWidth: constraints.maxWidth,
-                        itemCount: visible.length,
-                        itemBuilder: (context, index) {
-                          return _GuestStoreProductCard(
-                            part: visible[index],
-                            onTap: () => _openProduct(visible[index]),
-                          );
-                        },
-                      );
-                    },
-                  ),
               ],
             ),
-          ),
-        ),
-      );
-    });
+            body: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                  children: [
+                    _GuestStoreHeader(
+                      name: store.name,
+                      place: place,
+                      logoStoragePath: store.logoStoragePath,
+                      productCount: store.products.length,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: widget.onRegister,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Regístrate para pedir'),
+                    ),
+                    if (categories.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: const Text('Todos'),
+                                selected: selected == null,
+                                onSelected: (_) =>
+                                    setState(() => _category = null),
+                              ),
+                            ),
+                            for (final category in categories)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(
+                                      formatCatalogCategoryLabel(category)),
+                                  selected: selected == category,
+                                  onSelected: (_) =>
+                                      setState(() => _category = category),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    if (visible.isEmpty)
+                      Text(
+                        'Este proveedor no tiene productos publicados.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      )
+                    else
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          return AliadoCatalogCardWrap(
+                            maxWidth: constraints.maxWidth,
+                            itemCount: visible.length,
+                            itemBuilder: (context, index) {
+                              return _GuestStoreProductCard(
+                                part: visible[index],
+                                onTap: () => _openProduct(visible[index]),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        });
   }
 }
 
@@ -257,7 +262,8 @@ class _GuestWait extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text(title)),
-      body: Center(child: CircularProgressIndicator(color: AppColors.brand)),
+      body: const Center(
+          child: CircularProgressIndicator(color: AppColors.brand)),
     );
   }
 }
@@ -344,7 +350,8 @@ class _GuestStoreHeader extends StatelessWidget {
                   color: AppColors.surfaceTinted,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.storefront_outlined, color: AppColors.brand),
+                child: const Icon(Icons.storefront_outlined,
+                    color: AppColors.brand),
               ),
             ),
             const SizedBox(width: 12),
@@ -474,6 +481,8 @@ class _GuestStoreProductCard extends StatelessWidget {
                 CatalogProductPriceDisplay(
                   listPriceUsd: part.precio,
                   salePriceUsd: part.salePriceUsd,
+                  quantity: part.minOrderQtyEffective,
+                  ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                   discountRules: part.discountRules,
                   catalogGrid: true,
                   compact: true,

@@ -13,6 +13,7 @@ import 'promo_campaign_model.dart';
 import 'part_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
+import 'package:motolink_pro_app/features/cart/catalog_cart_bar.dart';
 import 'package:motolink_pro_app/features/profile/geolocator_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_catalog_coverage.dart';
@@ -26,12 +27,7 @@ import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
-
-String _aliadoGreeting(String? businessName) {
-  final name = businessName?.trim();
-  if (name == null || name.isEmpty) return 'Hola';
-  return 'Hola, $name';
-}
+import 'sliver_catalog_card_rows.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -88,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _promoPopupOpen = false;
   bool _leftApp = false;
   List<PromoCampaignModel> _popupPromos = const [];
-
 
   CatalogSortMode _catalogSortMode = CatalogSortMode.defaultMode;
   double? _minOwnerRatingAvg;
@@ -440,10 +435,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         context: context,
         campaign: campaign,
         onDismissed: () {},
-        onFilterImporter:
-            campaign.filtersImporter || campaign.opensStore || campaign.opensProduct
-                ? () => _onPromoCampaignSelected(campaign)
-                : null,
+        onFilterImporter: campaign.filtersImporter ||
+                campaign.opensStore ||
+                campaign.opensProduct
+            ? () => _onPromoCampaignSelected(campaign)
+            : null,
       );
     } finally {
       _promoPopupOpen = false;
@@ -479,8 +475,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted) return false;
     if (pos == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
+        const SnackBar(
+          content: Text(
             'Active el GPS y conceda permiso de ubicación para ordenar por cercanía.',
           ),
           backgroundColor: AppColors.brandBlue,
@@ -688,9 +684,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               backgroundColor: AppColors.brand,
               child: Icon(
                 Icons.tune,
-                color: filterBadge > 0
-                    ? AppColors.brand
-                    : AppColors.textSecondary,
+                color:
+                    filterBadge > 0 ? AppColors.brand : AppColors.textSecondary,
               ),
             ),
           ),
@@ -701,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     return InputDecoration(
-      hintText: 'Buscar repuesto…',
+      hintText: 'Nombre, marca o código…',
       hintStyle: TextStyle(color: AppColors.textSecondary),
       prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
       filled: true,
@@ -751,7 +746,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       chips.add(_activeFilterChip(
         label: draft.categoryLabel,
         onDeleted: () {
-          setState(() => _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel);
+          setState(
+              () => _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel);
           _applyFiltersFromUi();
         },
       ));
@@ -884,42 +880,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final appBar = widget.embedInDesktopShell
         ? null
         : MotolinkAppBar(
-      currentUserProfile: widget.profile,
-      logoHeight: widget.homeRole == AppHomeRole.aliado
-          ? MotolinkAppBarLogoSizes.aliado
-          : MotolinkAppBarLogoSizes.importador,
-      onNotificationTap: widget.onNotificationTap,
-      unreadNotifications: widget.unreadNotifications,
-      onMessagesTap: widget.onMessagesTap,
-      unreadMessages: widget.unreadMessages,
-      extraActions: widget.homeRole == AppHomeRole.aliado
-          ? [
-              ListenableBuilder(
-                listenable: CartService.instance,
-                builder: (context, _) {
-                  final n = CartService.instance.itemCount;
-                  return HeaderIconButton(
-                    tooltip: 'Carrito',
-                    count: n,
-                    icon: n > 0
-                        ? Icons.shopping_cart
-                        : Icons.shopping_cart_outlined,
-                    onPressed: () {
-                      Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => CartScreen(
-                            profile: widget.profile,
-                            liveTasaBcv: null,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ]
-          : null,
-    );
+            currentUserProfile: widget.profile,
+            logoHeight: widget.homeRole == AppHomeRole.aliado
+                ? MotolinkAppBarLogoSizes.aliado
+                : MotolinkAppBarLogoSizes.importador,
+            onNotificationTap: widget.onNotificationTap,
+            unreadNotifications: widget.unreadNotifications,
+            onMessagesTap: widget.onMessagesTap,
+            unreadMessages: widget.unreadMessages,
+            extraActions: widget.homeRole == AppHomeRole.aliado
+                ? [
+                    ListenableBuilder(
+                      listenable: CartService.instance,
+                      builder: (context, _) {
+                        final n = CartService.instance.itemCount;
+                        return HeaderIconButton(
+                          tooltip: 'Carrito',
+                          count: n,
+                          icon: n > 0
+                              ? Icons.shopping_cart
+                              : Icons.shopping_cart_outlined,
+                          onPressed: () {
+                            Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => CartScreen(
+                                  profile: widget.profile,
+                                  liveTasaBcv: null,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ]
+                : null,
+          );
 
     if (widget.homeRole == AppHomeRole.administrador) {
       return Scaffold(
@@ -1005,10 +1001,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final catalogWidth = constraints.maxWidth;
               final isDesktopCatalog =
                   AliadoCatalogLayout.isDesktop(catalogWidth);
-              final crossAxisCount =
-                  AliadoCatalogLayout.crossAxisCount(catalogWidth);
-              final hPad =
-                  AliadoCatalogLayout.horizontalPadding(catalogWidth);
+              final crossAxisCount = AliadoCatalogLayout.crossAxisCount(
+                  catalogWidth,
+                  textScale: MediaQuery.textScalerOf(context).scale(14) / 14);
+              final hPad = AliadoCatalogLayout.horizontalPadding(catalogWidth);
               _catalogCrossAxisCount = crossAxisCount;
 
               return Column(
@@ -1018,7 +1014,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Padding(
                       padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
                       child: Text(
-                        _aliadoGreeting(widget.profile.businessName),
+                        'Catálogo de repuestos',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
@@ -1027,7 +1023,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ),
                   Padding(
-                    padding: EdgeInsets.fromLTRB(hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
+                    padding: EdgeInsets.fromLTRB(
+                        hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
                     child: isDesktopCatalog
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1040,7 +1037,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   decoration: _searchDecoration(
                                     onOpenFilters: bootstrapSnapshot.hasError
                                         ? null
-                                        : () => _openCatalogFiltersSheet(importers),
+                                        : () =>
+                                            _openCatalogFiltersSheet(importers),
                                     filterBadge: filterBadge,
                                     showFilterButton: false,
                                   ),
@@ -1064,7 +1062,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     horizontal: 16,
                                     vertical: 14,
                                   ),
-                                  side: BorderSide(color: AppColors.borderSubtle),
+                                  side:
+                                      BorderSide(color: AppColors.borderSubtle),
                                 ),
                               ),
                             ],
@@ -1154,7 +1153,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: FutureBuilder<List<PartModel>>(
                       future: _partsFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting &&
+                        if (snapshot.connectionState ==
+                                ConnectionState.waiting &&
                             _loadedParts.isEmpty) {
                           return CatalogGridSkeleton(
                             maxWidth: catalogWidth,
@@ -1216,12 +1216,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               Center(
                                 child: Text(
                                   _activeFilters.hasAnyFilter
-                                      ? 'No hay resultados con esos filtros.'
+                                      ? 'No encontramos repuestos con esa búsqueda.'
                                       : 'No hay repuestos disponibles.',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary),
+                                  style:
+                                      TextStyle(color: AppColors.textSecondary),
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              Center(
+                                  child: TextButton.icon(
+                                onPressed: _clearFilters,
+                                icon: const Icon(Icons.restart_alt),
+                                label: const Text('Ver todos los repuestos'),
+                              )),
                             ],
                           );
                         }
@@ -1235,129 +1242,119 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           });
                         }
                         return CustomScrollView(
-                                controller: _catalogScrollController,
-                                slivers: [
-                                  if (promos.isNotEmpty)
-                                    SliverToBoxAdapter(
-                                      child: AliadoPromoBannerCarousel(
-                                        campaigns: promos,
-                                        onPromoCampaignSelected:
-                                            _onPromoCampaignSelected,
-                                        compact: isDesktopCatalog,
-                                      ),
-                                    ),
-                                  SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: EdgeInsets.fromLTRB(
-                                        hPad,
-                                        4,
-                                        hPad,
-                                        0,
-                                      ),
-                                      child: Text(
-                                        resultsLabel,
-                                        style: resultsStyle,
-                                      ),
-                                    ),
-                                  ),
-                                  SliverPadding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      hPad,
-                                      0,
-                                      hPad,
-                                      16,
-                                    ),
-                                    sliver: SliverLayoutBuilder(
-                                      builder: (context, sliverConstraints) {
-                                        final spacing =
-                                            AliadoCatalogLayout.gridSpacing(
-                                          catalogWidth,
-                                        );
-                                        final extent =
-                                            sliverConstraints.crossAxisExtent;
-                                        final tile = (extent -
-                                                spacing * (crossAxisCount - 1)) /
-                                            crossAxisCount;
-                                        final showDistance = _activeFilters
-                                            .sortByDistanceFromReference;
-                                        return SliverGrid(
-                                          gridDelegate:
-                                              SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: crossAxisCount,
-                                            mainAxisSpacing: spacing,
-                                            crossAxisSpacing: spacing,
-                                            childAspectRatio: AliadoCatalogLayout
-                                                .childAspectRatio(
-                                              tileWidth: tile,
-                                              showDistance: showDistance,
+                          controller: _catalogScrollController,
+                          slivers: [
+                            if (promos.isNotEmpty)
+                              SliverToBoxAdapter(
+                                child: AliadoPromoBannerCarousel(
+                                  campaigns: promos,
+                                  onPromoCampaignSelected:
+                                      _onPromoCampaignSelected,
+                                  compact: isDesktopCatalog,
+                                ),
+                              ),
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  hPad,
+                                  4,
+                                  hPad,
+                                  0,
+                                ),
+                                child: Text(
+                                  resultsLabel,
+                                  style: resultsStyle,
+                                ),
+                              ),
+                            ),
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                hPad,
+                                0,
+                                hPad,
+                                16,
+                              ),
+                              sliver: SliverLayoutBuilder(
+                                builder: (context, sliverConstraints) {
+                                  final spacing =
+                                      AliadoCatalogLayout.gridSpacing(
+                                    catalogWidth,
+                                  );
+                                  final showDistance = _activeFilters
+                                      .sortByDistanceFromReference;
+                                  return SliverCatalogCardRows(
+                                    columns: crossAxisCount,
+                                    spacing: spacing,
+                                    itemCount: parts.length,
+                                    itemBuilder: (context, index) {
+                                      final p = parts[index];
+                                      return AliadoProductCard(
+                                        part: p,
+                                        profile: widget.profile,
+                                        compact: true,
+                                        showDistanceChips: showDistance,
+                                        onTap: () {
+                                          CatalogRouteLock.push(
+                                            context,
+                                            MaterialPageRoute<void>(
+                                              builder: (ctx) =>
+                                                  ProductDetailScreen(
+                                                part: p,
+                                              ),
                                             ),
-                                          ),
-                                          delegate: SliverChildBuilderDelegate(
-                                            (context, index) {
-                                              final p = parts[index];
-                                              return AliadoProductCard(
-                                            part: p,
-                                            profile: widget.profile,
-                                            compact: true,
-                                            showDistanceChips: showDistance,
-                                            onTap: () {
-                                              CatalogRouteLock.push(
-                                                context,
-                                                MaterialPageRoute<void>(
-                                                  builder: (ctx) =>
-                                                      ProductDetailScreen(
-                                                    part: p,
+                                          );
+                                        },
+                                        onImporterTap: (p.ownerId
+                                                    ?.trim()
+                                                    .isNotEmpty ??
+                                                false)
+                                            ? () {
+                                                CatalogRouteLock.push(
+                                                  context,
+                                                  MaterialPageRoute<void>(
+                                                    builder: (_) =>
+                                                        ImporterStoreProfileScreen(
+                                                      importerId:
+                                                          p.ownerId!.trim(),
+                                                      viewer: widget.profile,
+                                                    ),
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                            onImporterTap: (p.ownerId
-                                                        ?.trim()
-                                                        .isNotEmpty ??
-                                                    false)
-                                                ? () {
-                                                    CatalogRouteLock.push(
-                                                      context,
-                                                      MaterialPageRoute<void>(
-                                                        builder: (_) =>
-                                                            ImporterStoreProfileScreen(
-                                                          importerId:
-                                                              p.ownerId!.trim(),
-                                                          viewer: widget.profile,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                : null,
-                                              );
-                                            },
-                                            childCount: parts.length,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  if (_isLoadingMore)
-                                    const SliverToBoxAdapter(
-                                      child: Padding(
-                                        padding: EdgeInsets.only(bottom: 24),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 22,
-                                            height: 22,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.5,
-                                              color: AppColors.brand,
-                                            ),
-                                          ),
-                                        ),
+                                                );
+                                              }
+                                            : null,
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            if (_isLoadingMore)
+                              const SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom: 24),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: AppColors.brand,
                                       ),
                                     ),
-                                ],
-                              );
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
                       },
                     ),
                   ),
+                  CatalogCartBar(
+                      onOpen: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    CartScreen(profile: widget.profile)),
+                          )),
                 ],
               );
             },

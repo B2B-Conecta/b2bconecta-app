@@ -6,10 +6,12 @@ import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 abstract final class AliadoCatalogLayout {
   static bool isDesktop(double width) => width >= AppBreakpoints.b2bDesktop;
 
-  static int crossAxisCount(double width) {
+  static int crossAxisCount(double width, {double textScale = 1}) {
+    width /= textScale < 1 ? 1 : textScale;
     if (width >= 1320) return 5;
     if (width >= 1040) return 4;
     if (width >= 720) return 3;
+    if (width < 360) return 1;
     return 2;
   }
 
@@ -19,62 +21,40 @@ abstract final class AliadoCatalogLayout {
 
   static int pageSize(double width) => pageSizeForCount(crossAxisCount(width));
 
-  static double horizontalPadding(double width) =>
-      isDesktop(width) ? 0 : 16;
+  static double horizontalPadding(double width) => isDesktop(width) ? 0 : 16;
 
   static double gridSpacing(double width) => isDesktop(width) ? 14 : 10;
 
   /// Foto casi cuadrada, igual en todas las fichas del catálogo.
-  static const cardImageAspect = 1.15;
+  static const cardImageAspect = 1.2;
 
   static const cardPadTop = 6.0;
   static const cardPadBottom = 6.0;
   static const cardPadH = 8.0;
-  static const cardTitleHeight = 32.0;
-  static const cardCategoryHeight = 16.0;
-  static const cardSupplierHeight = 18.0;
-  static const cardRadius = 12.0;
-  static const cardPriceHeight = 58.0;
-  static const cardStockHeight = 18.0;
-  static const cardCustomFieldsHeight = 16.0;
-  static const cardGapImage = 4.0;
-  static const cardGapTight = 3.0;
-  static const cardGapSection = 4.0;
-  static const cardDistanceHeight = 18.0;
+  static const cardRadius = 16.0;
 
   /// Alto de la ficha para [tileWidth], con cada bloque ya reservado.
   static double cardHeight({
     required double tileWidth,
     bool showDistance = false,
+    double textScale = 1,
   }) {
-    final inner = (tileWidth - cardPadH * 2 - 2).clamp(1.0, tileWidth);
+    final inner = (tileWidth - 16).clamp(1.0, tileWidth);
     final image = inner / cardImageAspect;
-    return cardPadTop +
-        cardPadBottom +
-        image +
-        cardGapImage +
-        cardTitleHeight +
-        cardGapTight +
-        cardCategoryHeight +
-        cardGapTight +
-        cardSupplierHeight +
-        cardGapSection +
-        cardPriceHeight +
-        cardGapTight +
-        cardStockHeight +
-        cardGapTight +
-        cardCustomFieldsHeight +
-        (showDistance ? cardGapTight + cardDistanceHeight : 0) +
-        2 +
-        6;
+    // Space for the full price, stock, ERP fields and supplier actions.
+    final scale = textScale < 1 ? 1.0 : textScale;
+    return 8 + image + 70 + 224 * scale + (showDistance ? 20 * scale : 0);
   }
 
   static double childAspectRatio({
     required double tileWidth,
     bool showDistance = false,
+    double textScale = 1,
   }) {
     final width = tileWidth <= 0 ? 1.0 : tileWidth;
-    return width / cardHeight(tileWidth: width, showDistance: showDistance);
+    return width /
+        cardHeight(
+            tileWidth: width, showDistance: showDistance, textScale: textScale);
   }
 }
 
@@ -93,11 +73,11 @@ class AliadoCatalogCardWrap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cols = AliadoCatalogLayout.crossAxisCount(maxWidth);
+    final cols = AliadoCatalogLayout.crossAxisCount(maxWidth,
+        textScale: MediaQuery.textScalerOf(context).scale(14) / 14);
     final spacing = AliadoCatalogLayout.gridSpacing(maxWidth);
-    final tileWidth = cols <= 1
-        ? maxWidth
-        : (maxWidth - spacing * (cols - 1)) / cols;
+    final tileWidth =
+        cols <= 1 ? maxWidth : (maxWidth - spacing * (cols - 1)) / cols;
 
     return Wrap(
       spacing: spacing,

@@ -5,7 +5,7 @@ import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'product_catalog_pricing.dart';
 
-/// Precios aliado en catálogo y ficha (REF principal; divisas solo si aplica).
+/// Published prices: promotional USD first, original REF and its Bs equivalent.
 class CatalogProductPriceDisplay extends StatelessWidget {
   const CatalogProductPriceDisplay({
     super.key,
@@ -17,8 +17,10 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.compact = false,
     this.catalogGrid = false,
     this.showPromotionChips = true,
+    this.prominent = false,
+    this.ownerPagoSoloDivisas = false,
+    this.bcvRate,
   });
-
   final double listPriceUsd;
   final double? salePriceUsd;
   final Map<String, dynamic>? discountRules;
@@ -27,170 +29,70 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool compact;
   final bool catalogGrid;
   final bool showPromotionChips;
-
-  bool get _hasUsdPromo => ProductCatalogPricing.hasDirectSale(
-        listPriceUsd: listPriceUsd,
-        salePriceUsd: salePriceUsd,
-      );
+  final bool prominent;
+  final bool ownerPagoSoloDivisas;
+  final double? bcvRate;
 
   @override
   Widget build(BuildContext context) {
-    if (catalogGrid) return _buildGrid(context);
-    return _buildDetail(context);
-  }
-
-  Widget _buildGrid(BuildContext context) {
+    // Keep the published prices distinct. Cart discounts must not relabel the
+    // USD offer as REF or replace the base used for the Bs equivalent.
+    final ref = listPriceUsd;
+    final hasUsdPrice = ProductCatalogPricing.hasDirectSale(
+        listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd);
     final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
-      listPriceUsd: listPriceUsd,
-      salePriceUsd: salePriceUsd,
-    );
-    final refSize = compact ? 14.0 : 16.0;
-    final usdSize = compact ? 12.0 : 13.5;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '${listPriceUsd.toStringAsFixed(2)} REF',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: refSize,
-            fontWeight: FontWeight.w900,
-            color: AppColors.brandAccent,
-            height: 1.05,
-          ),
-        ),
-        if (_hasUsdPromo)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    '${salePriceUsd!.toStringAsFixed(2)} USD',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: usdSize,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.successGreen,
-                      height: 1.05,
-                    ),
-                  ),
-                ),
-                if (discountLabel != null) ...[
-                  const SizedBox(width: 4),
-                  _UsdDiscountChip(label: discountLabel),
-                ],
-              ],
-            ),
-          ),
-        _BasePriceBsLine(
-          refUsd: listPriceUsd,
-          fontSize: compact ? 11 : 12,
-          compact: true,
-        ),
-        if (showPromotionChips)
-          CatalogProductOfferChips(
-            listPriceUsd: listPriceUsd,
-            salePriceUsd: salePriceUsd,
-            discountRules: discountRules,
-            campaignDiscountPercent: campaignDiscountPercent,
-            quantity: quantity,
-            compact: compact,
-          ),
-      ],
-    );
-  }
+        listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd);
+    final mainSize = catalogGrid
+        ? (prominent ? 20.0 : (compact ? 14.0 : 16.0))
+        : (compact ? 20.0 : 22.0);
 
-  Widget _buildDetail(BuildContext context) {
-    final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
-      listPriceUsd: listPriceUsd,
-      salePriceUsd: salePriceUsd,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Precio REF',
-          style: TextStyle(
-            fontSize: compact ? 11 : 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-            letterSpacing: 0.2,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${listPriceUsd.toStringAsFixed(2)} REF',
-          style: TextStyle(
-            fontSize: compact ? 20 : 22,
-            fontWeight: FontWeight.w900,
-            color: AppColors.brandAccent,
-            height: 1.05,
-          ),
-        ),
-        if (_hasUsdPromo) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                'Precio USD',
+    Widget amount(double value, String currency, double size, Color color) =>
+        Tooltip(
+            message: '${value.toStringAsFixed(2)} $currency por unidad',
+            excludeFromSemantics: true,
+            child: Text('${value.toStringAsFixed(2)} $currency',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: compact ? 11 : 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.successGreen.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  discountLabel ?? 'Promoción',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.successGreen,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${salePriceUsd!.toStringAsFixed(2)} USD',
-            style: TextStyle(
-              fontSize: compact ? 18 : 20,
-              fontWeight: FontWeight.w900,
-              color: AppColors.successGreen,
-              height: 1.05,
-            ),
-          ),
-        ],
-        _BasePriceBsLine(
-          refUsd: listPriceUsd,
-          fontSize: compact ? 14 : 16,
-        ),
-        if (showPromotionChips) ...[
-          const SizedBox(height: 8),
-          CatalogProductOfferChips(
-            listPriceUsd: listPriceUsd,
-            salePriceUsd: salePriceUsd,
-            discountRules: discountRules,
-            campaignDiscountPercent: campaignDiscountPercent,
-            quantity: quantity,
-            compact: false,
-          ),
-        ],
-      ],
-    );
+                    fontSize: size,
+                    height: 1.15,
+                    fontWeight: FontWeight.w700,
+                    color: color)));
+
+    return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasUsdPrice) ...[
+            Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  amount(
+                      salePriceUsd!, 'USD', mainSize, AppColors.successGreen),
+                  if (discountLabel != null)
+                    _UsdDiscountChip(label: discountLabel),
+                ]),
+            const SizedBox(height: 4),
+            amount(ref, 'REF', compact || catalogGrid ? 13 : 16,
+                AppColors.textSecondary),
+          ] else
+            amount(ref, 'REF', mainSize, AppColors.textPrimary),
+          _BasePriceBsLine(
+              refUsd: ref,
+              fontSize: compact || catalogGrid ? 11 : 12,
+              compact: true,
+              rate: bcvRate),
+          if (showPromotionChips)
+            CatalogProductOfferChips(
+                listPriceUsd: listPriceUsd,
+                salePriceUsd: salePriceUsd,
+                discountRules: discountRules,
+                campaignDiscountPercent: campaignDiscountPercent,
+                quantity: quantity,
+                compact: compact),
+        ]);
   }
 }
 
@@ -341,12 +243,14 @@ class _BasePriceBsLine extends StatefulWidget {
     required this.refUsd,
     required this.fontSize,
     this.compact = false,
+    this.rate,
   });
 
-  /// Siempre el precio REF, no la oferta.
+  /// Original published REF, before any cart discounts.
   final double refUsd;
   final double fontSize;
   final bool compact;
+  final double? rate;
 
   @override
   State<_BasePriceBsLine> createState() => _BasePriceBsLineState();
@@ -361,9 +265,15 @@ class _BasePriceBsLineState extends State<_BasePriceBsLine> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(covariant _BasePriceBsLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rate != widget.rate) _load();
+  }
+
   Future<void> _load() async {
     try {
-      final rate = await BcvBasePrice.currentRate();
+      final rate = widget.rate ?? await BcvBasePrice.currentRate();
       if (!mounted) return;
       setState(() => _rate = rate);
     } catch (_) {

@@ -7,11 +7,11 @@ import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 
 void main() {
   group('ProductMinOrderQty', () {
-    test('piso de plataforma es 5', () {
+    test('sin valor del proveedor queda en 5; si lo define, ese manda', () {
       expect(ProductMinOrderQty.resolve(null), 5);
       expect(ProductMinOrderQty.resolve(0), 5);
-      expect(ProductMinOrderQty.resolve(1), 5);
-      expect(ProductMinOrderQty.resolve(4), 5);
+      expect(ProductMinOrderQty.resolve(1), 1);
+      expect(ProductMinOrderQty.resolve(4), 4);
       expect(ProductMinOrderQty.resolve(5), 5);
       expect(ProductMinOrderQty.resolve(12), 12);
     });
@@ -26,6 +26,10 @@ void main() {
         isFalse,
       );
       expect(
+        ProductMinOrderQty.stockCovers(stock: 2, minOrderQty: 1),
+        isTrue,
+      );
+      expect(
         ProductMinOrderQty.stockCovers(stock: 12, minOrderQty: 6),
         isTrue,
       );
@@ -33,7 +37,7 @@ void main() {
   });
 
   group('PartModel min_order_qty', () {
-    test('fromJson usa 5 si falta o viene bajo el piso', () {
+    test('fromJson usa 5 si falta; respeta el mínimo del proveedor', () {
       final missing = PartModel.fromJson({
         'id': 'p1',
         'name': 'Caucho',
@@ -43,15 +47,25 @@ void main() {
       expect(missing.minOrderQtyEffective, 5);
       expect(missing.stockCoversMinOrder, isTrue);
 
-      final low = PartModel.fromJson({
+      final supplierOne = PartModel.fromJson({
         'id': 'p2',
         'name': 'Caucho',
         'price_usd': 10,
         'stock': 3,
         'min_order_qty': 1,
       });
-      expect(low.minOrderQtyEffective, 5);
-      expect(low.stockCoversMinOrder, isFalse);
+      expect(supplierOne.minOrderQtyEffective, 1);
+      expect(supplierOne.stockCoversMinOrder, isTrue);
+
+      final belowStock = PartModel.fromJson({
+        'id': 'p3',
+        'name': 'Caucho',
+        'price_usd': 10,
+        'stock': 2,
+        'min_order_qty': 3,
+      });
+      expect(belowStock.minOrderQtyEffective, 3);
+      expect(belowStock.stockCoversMinOrder, isFalse);
     });
   });
 
@@ -86,6 +100,22 @@ void main() {
 
     cart.setQuantity('p1', 8);
     expect(cart.lines.first.quantity, 8);
+    cart.clear();
+  });
+
+  test('carrito respeta un MOQ de 1 definido por el proveedor', () {
+    final part = PartModel(
+      id: 'p1b',
+      nombre: 'Filtro',
+      precio: 3,
+      stock: 10,
+      minOrderQty: 1,
+    );
+    final cart = CartService.instance;
+    cart.clear();
+    cart.addOrIncrement(part, precioUnitarioAliadoRef: 3, delta: 1);
+    expect(cart.lines, hasLength(1));
+    expect(cart.lines.first.quantity, 1);
     cart.clear();
   });
 

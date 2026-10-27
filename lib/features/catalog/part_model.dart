@@ -50,6 +50,10 @@ class PartModel {
     this.ownerTransportistas = const [],
     this.hasWarranty = false,
     this.customFields = const {},
+    this.parentSku,
+    this.variantAttributeName,
+    this.variantAttributeValue,
+    this.variants = const [],
   });
 
   final String id;
@@ -92,7 +96,8 @@ class PartModel {
     return free < 0 ? 0 : free;
   }
 
-  /// Unidades mínimas para crear un pedido (`products.min_order_qty`, piso 5).
+  /// Unidades mínimas para crear un pedido (`products.min_order_qty`).
+  /// Sin valor del proveedor, la plataforma usa 5; si lo define, ese valor manda.
   final int minOrderQty;
 
   final String? imagenUrl;
@@ -176,6 +181,18 @@ class PartModel {
   /// Campos ERP adicionales (`products.custom_fields`).
   final Map<String, dynamic> customFields;
 
+  /// Agrupa variantes del mismo maestro (`products.parent_sku`). Vacío = producto simple.
+  final String? parentSku;
+
+  /// Nombre del atributo (Presentación, Medida, Color).
+  final String? variantAttributeName;
+
+  /// Valor visible en el selector (4 Litros, +0.50mm).
+  final String? variantAttributeValue;
+
+  /// Hermanas de catálogo, incluida esta fila, cuando hay más de una opción.
+  final List<PartModel> variants;
+
   /// URL de portada para listados (compat legacy + multi-foto).
   String? get coverImageUrl =>
       productCoverImageUrl(imageUrls, legacy: imagenUrl);
@@ -205,6 +222,30 @@ class PartModel {
       );
 
   String get minOrderQtyLabelEs => 'Mín. $minOrderQtyEffective uds';
+
+  bool get hasVariantFamily =>
+      parentSku != null && parentSku!.trim().isNotEmpty;
+
+  /// Opciones para el selector. Una sola fila no abre el selector.
+  List<PartModel> get variantChoices =>
+      variants.length > 1 ? variants : const [];
+
+  String get variantOptionLabel {
+    final value = variantAttributeValue?.trim();
+    if (value != null && value.isNotEmpty) return value;
+    final code = sku?.trim();
+    if (code != null && code.isNotEmpty) return code;
+    return nombre;
+  }
+
+  String get variantAttributeHeading {
+    final names = variantChoices
+        .map((option) => option.variantAttributeName?.trim() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toSet();
+    if (names.length == 1) return names.first;
+    return 'Opciones';
+  }
 
   /// Precio unitario para aliado sin markup broker (legacy; preferir [precioUnitarioParaAliado]).
   double get precioFinalUnitario => BrokerPricing.finalUnitPrice(precio);
@@ -299,6 +340,9 @@ class PartModel {
       distanceKmFromReference: null,
       hasWarranty: hasWarranty,
       customFields: parseProductCustomFieldsJson(json['custom_fields']),
+      parentSku: _nullableText(json['parent_sku']),
+      variantAttributeName: _nullableText(json['variant_attribute_name']),
+      variantAttributeValue: _nullableText(json['variant_attribute_value']),
     );
   }
 
@@ -342,6 +386,10 @@ class PartModel {
     List<String>? ownerTransportistas,
     bool? hasWarranty,
     Map<String, dynamic>? customFields,
+    String? parentSku,
+    String? variantAttributeName,
+    String? variantAttributeValue,
+    List<PartModel>? variants,
   }) {
     return PartModel(
       id: id ?? this.id,
@@ -394,6 +442,11 @@ class PartModel {
       ownerTransportistas: ownerTransportistas ?? this.ownerTransportistas,
       hasWarranty: hasWarranty ?? this.hasWarranty,
       customFields: customFields ?? this.customFields,
+      parentSku: parentSku ?? this.parentSku,
+      variantAttributeName: variantAttributeName ?? this.variantAttributeName,
+      variantAttributeValue:
+          variantAttributeValue ?? this.variantAttributeValue,
+      variants: variants ?? this.variants,
     );
   }
 

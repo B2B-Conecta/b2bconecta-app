@@ -156,11 +156,12 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       return;
     }
     final minOrderQty = int.tryParse(_minOrderQtyController.text.trim());
-    if (minOrderQty == null || minOrderQty < ProductMinOrderQty.platformFloor) {
+    if (minOrderQty == null ||
+        minOrderQty < ProductMinOrderQty.absoluteFloor) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'La cantidad mínima de pedido es obligatoria y no puede ser menor a 5.',
+            'La cantidad mínima de pedido es obligatoria y no puede ser menor a ${ProductMinOrderQty.absoluteFloor}.',
           ),
         ),
       );
@@ -481,14 +482,18 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           controller: _minOrderQtyController,
           decoration: _dec(
             'Pedido mínimo / MOQ',
-            hint: 'Mínimo 5 unidades',
+            hint: 'Su mínimo (vacío → 5)',
+          ).copyWith(
+            helperText:
+                'Si define un mínimo, esa cantidad manda (mínimo ${ProductMinOrderQty.absoluteFloor}). '
+                'Si no lo define, la plataforma usa ${ProductMinOrderQty.platformDefault}.',
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           validator: (v) {
             final n = int.tryParse(v?.trim() ?? '');
-            if (n == null || n < ProductMinOrderQty.platformFloor) {
-              return 'Obligatorio · mínimo ${ProductMinOrderQty.platformFloor}';
+            if (n == null || n < ProductMinOrderQty.absoluteFloor) {
+              return 'Obligatorio · mínimo ${ProductMinOrderQty.absoluteFloor}';
             }
             return null;
           },

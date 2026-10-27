@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
+import 'package:motolink_pro_app/features/catalog/product_variants.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/core/utils/haversine.dart';
 
@@ -221,16 +222,52 @@ class CatalogService {
     Map<String, ({String campaignId, double percent})> discounts,
   ) {
     if (discounts.isEmpty || parts.isEmpty) return parts;
-    return parts
-        .map((p) {
-          final hit = discounts[p.id];
-          if (hit == null) return p;
-          return p.copyWith(
+    return parts.map((p) => _applyPromoDiscount(p, discounts)).toList();
+  }
+
+  static PartModel _applyPromoDiscount(
+    PartModel part,
+    Map<String, ({String campaignId, double percent})> discounts,
+  ) {
+    final hit = discounts[part.id];
+    final priced = hit == null
+        ? part
+        : part.copyWith(
             activeCampaignDiscountPercent: hit.percent,
             activePromoCampaignId: hit.campaignId,
           );
-        })
+    if (priced.variants.isEmpty) return priced;
+    return priced.copyWith(
+      variants: priced.variants
+          .map((option) => _applyPromoDiscount(option, discounts))
+          .toList(),
+    );
+  }
+
+  /// Hermanas activas del mismo `parent_sku`. Una fila simple devuelve vacío.
+  static Future<List<PartModel>> fetchVariantFamily(PartModel seed) async {
+    final parent = seed.parentSku?.trim();
+    final owner = seed.ownerId?.trim();
+    if (parent == null || parent.isEmpty || owner == null || owner.isEmpty) {
+      return seed.variantChoices;
+    }
+
+    final embed = _catalogProfileSelect(CatalogFilters.empty);
+    final response = await SupabaseAccess.client
+        .from('products')
+        .select('*, $embed')
+        .eq('owner_id', owner)
+        .eq('parent_sku', parent.toLowerCase())
+        .eq('is_active', true);
+    final rows = response as List<dynamic>;
+    final parts = rows
+        .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
+        .where((part) => part.id.isNotEmpty)
         .toList();
+    if (parts.length < 2) return seed.variantChoices;
+    final options = sortVariantOptions(parts);
+    final discounts = await fetchActivePromoProductDiscounts();
+    return applyPromoDiscountsToParts(options, discounts);
   }
 
   static Future<List<PromoCampaignModel>>
@@ -469,19 +506,21 @@ class CatalogService {
           return p.copyWith(distanceKmFromReference: km);
         }),
         f,
-      )..sort(distanceCompare);
-      if (offset >= withDist.length) return [];
-      final end = (offset + limit).clamp(0, withDist.length);
+      );
+      final grouped = collapseProductVariants(withDist)..sort(distanceCompare);
+      if (offset >= grouped.length) return [];
+      final end = (offset + limit).clamp(0, grouped.length);
       return applyPromoDiscountsToParts(
-        withDist.sublist(offset, end),
+        grouped.sublist(offset, end),
         promoDiscounts,
       );
     }
 
-    final parts = constrainCatalogPartsToFilters(
+    final filtered = constrainCatalogPartsToFilters(
       list.map((row) => PartModel.fromJson(row as Map<String, dynamic>)),
       f,
     );
+    final parts = collapseProductVariants(filtered);
     if (searchPlan.productScores.isNotEmpty) {
       // Con búsqueda textual: priorizar relevancia RPC, el modo de orden como desempate.
       parts.sort((a, b) {

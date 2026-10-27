@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_verification_exception.dart';
 import 'package:motolink_pro_app/features/profile/profile_location_exception.dart';
+import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 import 'package:motolink_pro_app/features/orders/shared/stock_insufficient_exception.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_suspendidos_morosidad_exception.dart';
 import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
@@ -514,10 +515,10 @@ class OrdersService {
       );
     }
     final minRaw = prodMap['min_order_qty'];
-    final minQty = minRaw is int
+    final minParsed = minRaw is int
         ? minRaw
-        : int.tryParse(minRaw?.toString() ?? '') ?? 5;
-    final minEffective = minQty < 5 ? 5 : minQty;
+        : int.tryParse(minRaw?.toString() ?? '');
+    final minEffective = ProductMinOrderQty.resolve(minParsed);
     if (cantidad < minEffective) {
       throw StockInsufficientException(
         'Cantidad mínima de pedido: $minEffective unidad(es).',

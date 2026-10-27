@@ -86,6 +86,9 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.compatibility,
     CatalogImportField.imageUrl,
     CatalogImportField.hasWarranty,
+    CatalogImportField.parentSku,
+    CatalogImportField.variantAttributeName,
+    CatalogImportField.variantAttributeValue,
   ];
 
   static const _fieldHintsVe = <CatalogImportField, String>{
@@ -102,13 +105,19 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.stock:
         'Unidades en almacén. Si no mapeas esta columna, queda en 0.',
     CatalogImportField.minOrderQty:
-        'Unidades mínimas por pedido (piso 5). Si no mapeas la columna, los productos nuevos quedan en 5.',
+        'Unidades mínimas por pedido. Si el proveedor la define, esa cantidad manda (mínimo 1). Si no mapeas la columna, los productos nuevos quedan en 5.',
     CatalogImportField.category:
         'Familia o línea (Motor, Frenos, Eléctrico, etc.).',
     CatalogImportField.compatibility:
         'Modelos de moto compatibles (ej. CG150, Bera 150).',
     CatalogImportField.imageUrl:
         'Enlace público a la foto del repuesto.',
+    CatalogImportField.parentSku:
+        'Mismo código en las filas que son variantes de un producto. Vacío = producto simple.',
+    CatalogImportField.variantAttributeName:
+        'Qué cambia entre variantes: Presentación, Medida, Color.',
+    CatalogImportField.variantAttributeValue:
+        'Valor de esa variante: 4 Litros, +0.50mm, Rojo. Obligatorio si hay SKU padre.',
     CatalogImportField.hasWarranty:
         'Usa si/no, o días numéricos del ERP (ej. 30, 90 días).',
   };
@@ -124,6 +133,9 @@ class _ImporterFlexibleImportScreenState
         CatalogImportField.category => 'Categoría',
         CatalogImportField.compatibility => 'Compatibilidad',
         CatalogImportField.imageUrl => 'URL de imagen',
+        CatalogImportField.parentSku => 'SKU padre',
+        CatalogImportField.variantAttributeName => 'Atributo de la variante',
+        CatalogImportField.variantAttributeValue => 'Valor de la variante',
         CatalogImportField.hasWarranty => 'Garantía',
         CatalogImportField.usdPaymentDiscountPct => 'Descuento pago en USD (%)',
         CatalogImportField.volumeTiersJson => 'Tramos por volumen (JSON)',

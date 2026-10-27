@@ -20,6 +20,9 @@ class CatalogImportNormalizedRow {
     this.imageUrl,
     this.salePriceUsd,
     this.hasWarranty = false,
+    this.parentSku,
+    this.variantAttributeName,
+    this.variantAttributeValue,
     this.discountRules,
     this.customFields = const {},
     this.priceColumn,
@@ -38,6 +41,9 @@ class CatalogImportNormalizedRow {
   final String? imageUrl;
   final double? salePriceUsd;
   final bool hasWarranty;
+  final String? parentSku;
+  final String? variantAttributeName;
+  final String? variantAttributeValue;
   final Map<String, dynamic>? discountRules;
   final Map<String, dynamic> customFields;
 
@@ -60,6 +66,13 @@ class CatalogImportNormalizedRow {
     if (compatibility != null) payload['compatibility'] = compatibility;
     if (imageUrl != null) payload['image_url'] = imageUrl;
     if (salePriceUsd != null) payload['sale_price_usd'] = salePriceUsd;
+    if (parentSku != null) payload['parent_sku'] = parentSku;
+    if (variantAttributeName != null) {
+      payload['variant_attribute_name'] = variantAttributeName;
+    }
+    if (variantAttributeValue != null) {
+      payload['variant_attribute_value'] = variantAttributeValue;
+    }
     if (discountRules != null) payload['discount_rules'] = discountRules;
     if (customFields.isNotEmpty) payload['custom_fields'] = customFields;
     return payload;
@@ -150,18 +163,31 @@ class CatalogImportValidator {
       }
 
       if (row.minOrderQty != null &&
-          row.minOrderQty! < ProductMinOrderQty.platformFloor) {
+          row.minOrderQty! < ProductMinOrderQty.absoluteFloor) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
           sku: sku,
           code: 'INVALID_MIN_ORDER_QTY',
           message:
-              'La cantidad mínima de pedido debe ser ${ProductMinOrderQty.platformFloor} o más',
+              'La cantidad mínima de pedido debe ser ${ProductMinOrderQty.absoluteFloor} o más',
         ));
         continue;
       }
 
       final sale = row.salePriceUsd;
+      final parent = row.parentSku?.trim() ?? '';
+      final variantValue = row.variantAttributeValue?.trim() ?? '';
+      if (parent.isNotEmpty && variantValue.isEmpty) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'REQUIRED_VARIANT_VALUE',
+          message:
+              'La variante necesita un valor (presentación, medida, color)',
+        ));
+        continue;
+      }
+
       if (sale != null && (sale <= 0 || sale >= row.priceUsd)) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
@@ -283,6 +309,11 @@ class CatalogImportValidator {
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,
       hasWarranty: hasWarranty,
+      parentSku: _nullable(readField(CatalogImportField.parentSku.key)),
+      variantAttributeName:
+          _nullable(readField(CatalogImportField.variantAttributeName.key)),
+      variantAttributeValue:
+          _nullable(readField(CatalogImportField.variantAttributeValue.key)),
       customFields: customFieldsPayload,
       priceColumn: priceBinding?.source,
       priceRaw: priceRaw,

@@ -16,7 +16,8 @@ class ProductCustomFieldsChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final entries = productCustomFieldsDisplayEntries(customFields, limit: limit);
+    final entries =
+        productCustomFieldsDisplayEntries(customFields, limit: limit);
     if (entries.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -121,8 +122,8 @@ class ProductCustomFieldsAliadoSpecs extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final e in entries) ...[
+          if (e != entries.first) Divider(height: 1, color: AppColors.divider),
           _AliadoSpecRow(label: e.label, value: e.value),
-          const SizedBox(height: 10),
         ],
       ],
     );
@@ -137,37 +138,30 @@ class _AliadoSpecRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: AppDecorations.radius12,
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.4,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
+    final labelText = Text(label,
+        style: TextStyle(
+            fontSize: 13, height: 1.5, color: AppColors.textSecondary));
+    final valueText = SelectableText(value,
+        style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary));
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: LayoutBuilder(builder: (_, constraints) {
+        if (constraints.maxWidth / scale < 320) {
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [labelText, const SizedBox(height: 4), valueText]);
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(flex: 2, child: labelText),
+          const SizedBox(width: 16),
+          Expanded(flex: 3, child: valueText),
+        ]);
+      }),
     );
   }
 }
@@ -326,8 +320,9 @@ class _ProductCustomFieldsEditorState extends State<ProductCustomFieldsEditor> {
             runSpacing: 4,
             children: [
               OutlinedButton.icon(
-                onPressed:
-                    widget.enabled ? () => _setAllAliadoVisibility(false) : null,
+                onPressed: widget.enabled
+                    ? () => _setAllAliadoVisibility(false)
+                    : null,
                 icon: const Icon(Icons.lock_outline, size: 16),
                 label: const Text('Ocultar todos para tiendas minoristas'),
               ),

@@ -268,7 +268,7 @@ class _ImporterStoreProfileScreenState
       isActive: part.isActive,
     )) {
       final checked = await (_source.fetchVisibleProduct ??
-              SupabaseService.fetchVisibleImporterStoreProduct)(
+          SupabaseService.fetchVisibleImporterStoreProduct)(
         importerId: widget.importerId,
         productId: part.id,
       );
@@ -368,7 +368,7 @@ class _ImporterStoreProfileScreenState
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxW),
+          constraints: const BoxConstraints(maxWidth: maxW),
           child: _body(hPad),
         ),
       ),
@@ -426,114 +426,114 @@ class _ImporterStoreProfileScreenState
       pageSize: _viewPageSize,
     );
     return CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
-            sliver: SliverToBoxAdapter(child: _header(profile)),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
-            sliver: SliverToBoxAdapter(child: _categoryChips()),
-          ),
-          if (_error != null && _parts.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'No se pudo cargar el catálogo.',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: () => _loadMore(reset: true),
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (!_loadingMore && _parts.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                key: const Key('importer-store-empty'),
-                child: Text(
-                  _selectedCategory == null
-                      ? 'Este mayorista aún no tiene productos en vitrina.'
-                      : 'No hay productos en esta categoría.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
-            )
-          else ...[
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
-              sliver: SliverToBoxAdapter(
-                child: LayoutBuilder(
-                  builder: (context, gridConstraints) {
-                    return AliadoCatalogCardWrap(
-                      maxWidth: gridConstraints.maxWidth,
-                      itemCount: visibleParts.length,
-                      itemBuilder: (context, index) {
-                        final part = visibleParts[index];
-                        return _StoreProductCard(
-                          part: part,
-                          showHeart: widget.viewer.isAliado,
-                          onTap: () => _openProduct(part),
-                        );
-                      },
-                    );
-                  },
-                ),
+      controller: _scrollController,
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+          sliver: SliverToBoxAdapter(child: _header(profile)),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
+          sliver: SliverToBoxAdapter(child: _categoryChips()),
+        ),
+        if (_error != null && _parts.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'No se pudo cargar el catálogo.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () => _loadMore(reset: true),
+                    child: const Text('Reintentar'),
+                  ),
+                ],
               ),
             ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 24),
-              sliver: SliverToBoxAdapter(
-                child: ListPageBar(
-                  total: _parts.length,
-                  hasMore: _hasMore,
-                  pageIndex: _viewPage,
-                  pageSize: _viewPageSize,
-                  alwaysShow: true,
-                  onPageIndex: (index) {
-                    _openViewPage(index);
-                  },
-                  onPageSize: (size) {
-                    setState(() {
-                      _viewPageSize = size;
-                      _viewPage = 0;
-                    });
-                    if (_parts.length < size && _hasMore) {
-                      _openViewPage(0);
-                    }
-                  },
-                ),
+          )
+        else if (!_loadingMore && _parts.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              key: const Key('importer-store-empty'),
+              child: Text(
+                _selectedCategory == null
+                    ? 'Este mayorista aún no tiene productos en vitrina.'
+                    : 'No hay productos en esta categoría.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary),
               ),
             ),
-          ],
-          if (_loadingMore)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 24),
-                child: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.brand,
-                    ),
+          )
+        else ...[
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
+            sliver: SliverToBoxAdapter(
+              child: LayoutBuilder(
+                builder: (context, gridConstraints) {
+                  return AliadoCatalogCardWrap(
+                    maxWidth: gridConstraints.maxWidth,
+                    itemCount: visibleParts.length,
+                    itemBuilder: (context, index) {
+                      final part = visibleParts[index];
+                      return _StoreProductCard(
+                        part: part,
+                        showHeart: widget.viewer.isAliado,
+                        onTap: () => _openProduct(part),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 24),
+            sliver: SliverToBoxAdapter(
+              child: ListPageBar(
+                total: _parts.length,
+                hasMore: _hasMore,
+                pageIndex: _viewPage,
+                pageSize: _viewPageSize,
+                alwaysShow: true,
+                onPageIndex: (index) {
+                  _openViewPage(index);
+                },
+                onPageSize: (size) {
+                  setState(() {
+                    _viewPageSize = size;
+                    _viewPage = 0;
+                  });
+                  if (_parts.length < size && _hasMore) {
+                    _openViewPage(0);
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
+        if (_loadingMore)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 24),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.brand,
                   ),
                 ),
               ),
             ),
-        ],
+          ),
+      ],
     );
   }
 
@@ -803,7 +803,8 @@ class _StoreDetailRow extends StatelessWidget {
                 fontSize: 13,
                 height: 1.3,
                 fontWeight: FontWeight.w600,
-                color: onTap == null ? AppColors.textSecondary : AppColors.brand,
+                color:
+                    onTap == null ? AppColors.textSecondary : AppColors.brand,
               ),
             ),
           ),
@@ -910,6 +911,8 @@ class _StoreProductCard extends StatelessWidget {
                 CatalogProductPriceDisplay(
                   listPriceUsd: part.precio,
                   salePriceUsd: part.salePriceUsd,
+                  quantity: part.minOrderQtyEffective,
+                  ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                   discountRules: part.discountRules,
                   campaignDiscountPercent: part.activeCampaignDiscountPercent,
                   catalogGrid: true,

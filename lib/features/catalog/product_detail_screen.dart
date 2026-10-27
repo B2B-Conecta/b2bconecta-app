@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'aliado_catalog_categories.dart';
 import 'catalog_filters.dart';
 import 'catalog_service.dart';
 import 'favorite_heart_button.dart';
@@ -8,13 +7,13 @@ import 'part_model.dart';
 import 'product_detail_extras.dart';
 import 'related_products.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
-import 'package:motolink_pro_app/features/cart/cart_service.dart';
+import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
-import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
-import 'catalog_product_price_display.dart';
-import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
+import 'product_detail_commerce.dart';
+import 'product_detail_purchase_controls.dart';
+import 'product_detail_information.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'product_warranty_seal.dart';
@@ -22,6 +21,8 @@ import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
 import 'product_share_sheet.dart';
 import 'store_supplier_chat.dart';
+import 'product_photo_gallery.dart';
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -50,17 +51,11 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ProfileModel? _profile;
   List<PartModel> _related = const [];
-  final PageController _imagePageController = PageController();
-  int _imagePageIndex = 0;
 
   PartModel get part => widget.part;
 
-  List<String> get _galleryUrls {
-    if (part.imageUrls.isNotEmpty) return part.imageUrls;
-    final cover = part.coverImageUrl;
-    if (cover != null && cover.isNotEmpty) return [cover];
-    return const [];
-  }
+  List<String> get _galleryUrls =>
+      parseProductImageUrlsJson(part.imageUrls, legacyImageUrl: part.imagenUrl);
 
   @override
   void initState() {
@@ -89,12 +84,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     } catch (_) {}
   }
 
-  @override
-  void dispose() {
-    _imagePageController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadProfile() async {
     if (widget.guestPreview) return;
     try {
@@ -105,19 +94,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool get _pedidosSuspendidosMorosidad =>
       _profile?.pedidosSuspendidosMorosidad ?? false;
-
-  double _precioVentaUnit({int quantity = 1}) =>
-      part.precioUnitarioParaAliado(quantity: quantity);
-
-  String get _skuDisplay {
-    final sku = part.sku?.trim();
-    if (sku != null && sku.isNotEmpty) return sku;
-    final id = part.id;
-    if (id.length <= 14) return id;
-    return id.substring(0, 12);
-  }
-
-  String get _importerLine => (part.ownerBusinessName ?? '').trim().toUpperCase();
 
   bool get _canShareProduct {
     final viewer = _profile;
@@ -205,75 +181,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  String? _ownerLocationLine() {
-    final e = part.ownerEstado?.trim();
-    final c = part.ownerCiudad?.trim();
-    if ((e == null || e.isEmpty) && (c == null || c.isEmpty)) return null;
-    if (e != null && e.isNotEmpty && c != null && c.isNotEmpty) {
-      return '$e · $c';
-    }
-    return e?.isNotEmpty == true ? e : c;
-  }
-
-  bool get _cartActionsDisabled =>
-      !part.isActive ||
-      part.stockForSale < part.minOrderQtyEffective ||
-      _pedidosSuspendidosMorosidad;
-
-  String? _cartBlockReason() {
-    final ownerId = part.ownerId?.trim();
-    if (ownerId == null || ownerId.isEmpty) {
-      return 'No se pudo identificar al importador.';
-    }
-    if (_pedidosSuspendidosMorosidad) {
-      return 'B2B Conecta suspendió nuevos pedidos en su cuenta por morosidad.';
-    }
-    if (!part.isActive) return 'Este producto está pausado por el proveedor.';
-    if (part.stockForSale < 1) return 'Sin stock disponible.';
-    if (part.stockForSale < part.minOrderQtyEffective) {
-      return 'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).';
-    }
-    return null;
-  }
-
-  void _showCartBlock(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _addToCart() {
-    final block = _cartBlockReason();
-    if (block != null) {
-      _showCartBlock(block);
-      return;
-    }
-
-    final minQty = part.minOrderQtyEffective;
-    final alreadyInCart =
-        CartService.instance.lines.any((line) => line.part.id == part.id);
-    if (!alreadyInCart) {
-      CartService.instance.addOrIncrement(
-        part,
-        precioUnitarioAliadoRef: _precioVentaUnit(quantity: minQty),
-        delta: minQty,
-      );
-    }
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          alreadyInCart
-              ? 'Ya está en el carrito. Ajusta la cantidad allí.'
-              : '$minQty unidades añadidas al carrito.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _openCart() {
+    final profile = _profile;
+    if (profile == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => CartScreen(profile: profile),
+    ));
   }
 
   @override
@@ -287,6 +200,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildMobileLayout(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+            tooltip: 'Atrás',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back_rounded)),
+        title:
+            const Text('Detalle del repuesto', style: TextStyle(fontSize: 16)),
+        actions: [
+          if (_profile?.isAliado == true)
+            FavoriteHeartButton(productId: part.id),
+          if (_canShareProduct)
+            IconButton(
+                tooltip: 'Compartir producto',
+                onPressed: _shareProduct,
+                icon: const Icon(Icons.ios_share_rounded)),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -294,14 +227,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeroImage(context)),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       ..._buildInfoSections(),
                       _buildCommerceExtras(),
-                      SizedBox(
-                        height: MediaQuery.paddingOf(context).bottom + 100,
-                      ),
                     ]),
                   ),
                 ),
@@ -366,11 +296,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         ..._buildInfoSections(desktop: true),
-                        const SizedBox(height: 20),
-                        _buildActionAlerts(),
-                        const SizedBox(height: 16),
-                        _buildActionButtons(),
-                        const SizedBox(height: 20),
                         _buildCommerceExtras(),
                       ],
                     ),
@@ -385,44 +310,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildHeroImage(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        AspectRatio(
-          aspectRatio: 1,
-          child: Material(
-            color: AppColors.surfaceTinted,
-            child: _buildHeroImageContent(),
-          ),
-        ),
-        if (_profile?.isAliado == true)
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 10,
-            left: 12,
-            child: FavoriteHeartButton(
-              productId: part.id,
-              prominent: true,
-            ),
-          ),
-        if (_canShareProduct)
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 10,
-            left: 12,
-            child: _ProductBackButton(
-              label: 'Compartir',
-              icon: Icons.ios_share_rounded,
-              onPressed: _shareProduct,
-            ),
-          ),
-        Positioned(
-          top: MediaQuery.paddingOf(context).top + 10,
-          right: 12,
-          child: _ProductBackButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-      ],
-    );
+    final size = MediaQuery.sizeOf(context);
+    final height = _galleryUrls.isEmpty
+        ? (128 * MediaQuery.textScalerOf(context).scale(14) / 14)
+            .clamp(128.0, 220.0)
+        : size.width > size.height
+            ? (size.height * 0.5).clamp(140.0, 220.0)
+            : (size.height * 0.30).clamp(220.0, 300.0);
+    return SizedBox(
+        height: height,
+        child:
+            Material(color: AppColors.white, child: _buildHeroImageContent()));
   }
 
   Widget _buildDesktopImageCard() {
@@ -435,7 +333,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.borderSubtle),
-          boxShadow: AppDecorations.cardShadow,
         ),
         child: Stack(
           children: [
@@ -458,389 +355,88 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildHeroImageContent() {
-    final urls = _galleryUrls;
-    if (urls.isEmpty) {
-      return _imagePlaceholder();
-    }
+  Widget _buildHeroImageContent() => ProductPhotoGallery(
+      urls: _galleryUrls,
+      productName: part.nombre,
+      heroTag: ProductDetailScreen.heroImageTag(part));
 
-    if (urls.length == 1) {
-      return Hero(
-        tag: ProductDetailScreen.heroImageTag(part),
-        child: Image.network(
-          urls.first,
-          fit: BoxFit.contain,
-          width: double.infinity,
-          errorBuilder: (_, __, ___) => _imagePlaceholderInner(),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        Expanded(
-          child: PageView.builder(
-            controller: _imagePageController,
-            itemCount: urls.length,
-            onPageChanged: (i) => setState(() => _imagePageIndex = i),
-            itemBuilder: (context, index) {
-              return Image.network(
-                urls[index],
-                fit: BoxFit.contain,
-                width: double.infinity,
-                errorBuilder: (_, __, ___) => _imagePlaceholderInner(),
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(urls.length, (i) {
-              final active = i == _imagePageIndex;
-              return Container(
-                width: active ? 8 : 6,
-                height: active ? 8 : 6,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: active
-                      ? AppColors.brand
-                      : Colors.grey.shade400,
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildInfoSections({bool desktop = false}) {
-    final location = _ownerLocationLine();
-    return [
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          'SKU: $_skuDisplay',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ),
-      if ((part.category ?? '').trim().isNotEmpty) ...[
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Categoría: ${formatCatalogCategoryLabel(part.category!)}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.brandBlue,
-            ),
-          ),
-        ),
-      ],
-      const SizedBox(height: 8),
-      if (_importerLine.isNotEmpty) ...[
-        InkWell(
-            onTap: _canOpenImporterStore ? _openImporterStore : null,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              _importerLine,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
-                color: _canOpenImporterStore
-                    ? AppColors.brandBlue
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ),
-        if (part.isCatalogVerified || part.isCatalogFeatured) ...[
-          const SizedBox(height: 6),
-          ImporterCatalogSealsRow(
-            verified: part.isCatalogVerified,
-            featured: part.isCatalogFeatured,
-          ),
-        ],
-        const SizedBox(height: 4),
-      ],
-      if (location != null) ...[
-        Row(
-          children: [
-            Icon(Icons.location_on_outlined,
-                size: 15, color: AppColors.textSecondary),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                location,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-      ],
-      if (part.ownerRatingAvg != null && (part.ownerRatingCount ?? 0) > 0) ...[
-        Row(
-          children: [
-            Icon(Icons.star, size: 16, color: Colors.amber.shade800),
-            const SizedBox(width: 4),
-            Text(
-              '${part.ownerRatingAvg!.toStringAsFixed(1)} · '
-              '${part.ownerRatingCount} valoraciones',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-      ],
-      if (_canShareProduct) ...[
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-              onPressed: _shareProduct,
-              icon: const Icon(Icons.ios_share_rounded, size: 18),
-            label: const Text('Compartir producto'),
-          ),
-        ),
-        if (_profile?.isAdministrador == true) ...[
+  List<Widget> _buildInfoSections({bool desktop = false}) => [
+        ProductDetailHeading(part: part, desktop: desktop),
+        const SizedBox(height: 12),
+        ProductDetailPurchaseSummary(part: part),
+        if (part.hasOwnerMinOrderAmount) ...[
           const SizedBox(height: 8),
-          Text(
-            'Solo lectura. Comparte el enlace para que el proveedor promocione este producto.',
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text('${part.ownerMinOrderAmountLabelEs} por despacho.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ],
+        if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
+          const SizedBox(height: 8),
+          Align(
+              alignment: Alignment.centerLeft,
+              child: EnvioPoliticaBadge(tipo: part.ownerEnvioTipo)),
+          if (part.ownerTransportistas.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Transportistas: ${part.ownerTransportistas.join(', ')}',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          ],
+        ],
+        if (desktop) ...[
+          const SizedBox(height: 12),
+          _buildActionAlerts(),
+          _buildActionButtons(),
+        ],
+        const SizedBox(height: 6),
+        ProductDetailSupplier(
+            part: part,
+            onOpen: _canOpenImporterStore ? _openImporterStore : null),
+        if (part.isCatalogVerified || part.isCatalogFeatured) ...[
+          const SizedBox(height: 4),
+          ImporterCatalogSealsRow(
+              verified: part.isCatalogVerified,
+              featured: part.isCatalogFeatured),
         ],
         const SizedBox(height: 12),
-      ],
-      Text(
-        part.nombre,
-        style: TextStyle(
-          fontSize: desktop ? 28 : 22,
-          fontWeight: FontWeight.w800,
-          height: 1.2,
-          color: AppColors.textPrimary,
-          letterSpacing: desktop ? -0.3 : 0,
-        ),
-      ),
-      SizedBox(height: desktop ? 16 : 8),
-      Material(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderSubtle),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: CatalogProductPriceDisplay(
-              listPriceUsd: part.precio,
-              salePriceUsd: part.salePriceUsd,
-              discountRules: part.discountRules,
-              campaignDiscountPercent: part.activeCampaignDiscountPercent,
-              showPromotionChips: true,
-            ),
-          ),
-        ),
-      ),
-      if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: EnvioPoliticaBadge(tipo: part.ownerEnvioTipo),
-        ),
-        if (part.ownerTransportistas.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            'Transportistas: ${part.ownerTransportistas.join(', ')}',
-            style: TextStyle(
-              fontSize: desktop ? 13 : 12.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
+        Divider(height: 1, color: AppColors.divider),
+        const SizedBox(height: 16),
+        ProductDetailInformation(
+            part: part,
+            showInternalReference: _profile?.isAdministrador == true ||
+                _profile?.isImportador == true),
+        if (part.hasWarranty) ...[
+          const SizedBox(height: 16),
+          const Align(
+              alignment: Alignment.centerLeft, child: ProductWarrantySeal()),
         ],
-      ],
-      const SizedBox(height: 12),
-      _buildStockBadge(desktop: desktop),
-      if (part.hasOwnerMinOrderAmount) ...[
-        const SizedBox(height: 8),
-        Text(
-          '${part.ownerMinOrderAmountLabelEs} por despacho.',
-          style: TextStyle(
-            fontSize: desktop ? 13 : 12.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-      SizedBox(height: desktop ? 20 : 16),
-      if ((part.descripcion ?? '').trim().isNotEmpty)
-        _SpecBlock(
-          label: 'Descripción',
-          child: Text(
-            part.descripcion!.trim(),
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-      if ((part.descripcion ?? '').trim().isNotEmpty) const SizedBox(height: 12),
-      if ((part.compatibilidad ?? '').trim().isNotEmpty)
-        _SpecBlock(
-          label: 'Compatibilidad',
-          child: Text(
-            part.compatibilidad!.trim(),
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-      if ((part.compatibilidad ?? '').trim().isNotEmpty) const SizedBox(height: 12),
-      ProductCustomFieldsAliadoSpecs(customFields: part.customFields),
-      if (productCustomFieldsDisplayEntries(
-        part.customFields,
-        aliadoView: true,
-      ).isNotEmpty)
-        const SizedBox(height: 12),
-      _SpecBlock(
-        label: 'Referencia interna (ID)',
-        child: SelectableText(
-          part.id,
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.5,
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        'Puedes copiar el ID para soporte o seguimiento interno.',
-        style: TextStyle(
-          fontSize: 11,
-          color: AppColors.textSecondary,
-          fontStyle: FontStyle.italic,
-        ),
-      ),
-      if (part.hasWarranty) ...[
-        SizedBox(height: desktop ? 24 : 28),
-        const Center(child: ProductWarrantySeal()),
-      ],
-    ];
-  }
+      ];
 
-  Widget _buildCommerceExtras() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 20),
-        SupplierRatingBlock(
-          part: part,
-          onOpenStore: _canOpenImporterStore ? _openImporterStore : null,
-        ),
-        if (_related.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          RelatedProductsSection(
-            current: part,
-            products: _related,
-            profile: _profile,
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildStockBadge({bool desktop = false}) {
-    final inStock = part.stockForSale >= part.minOrderQtyEffective;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: desktop ? 14 : 0,
-        vertical: desktop ? 10 : 0,
-      ),
-      decoration: desktop
-          ? BoxDecoration(
-              color: inStock ? Colors.green.shade50 : AppColors.brandBlueContainer,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: inStock ? Colors.green.shade200 : AppColors.brandAccent.withOpacity(0.35),
-              ),
-            )
-          : null,
-      child: Row(
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: inStock ? AppColors.successGreen : AppColors.brandAccent,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            inStock
-                ? 'Stock: ${part.stockForSale} uds · ${part.minOrderQtyLabelEs}'
-                : part.stockForSale < 1
-                    ? 'Sin stock disponible'
-                    : 'Stock ${part.stockForSale} uds · ${part.minOrderQtyLabelEs}',
-            style: TextStyle(
-              fontSize: desktop ? 15 : 14,
-              fontWeight: FontWeight.w700,
-              color: inStock ? Colors.green.shade800 : AppColors.brandBlue,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+  Widget _buildCommerceExtras() => _related.isEmpty
+      ? const SizedBox.shrink()
+      : Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: RelatedProductsSection(
+              current: part, products: _related, profile: _profile));
   Widget _buildActionAlerts() {
+    final warning = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.warningAmberOnDark
+        : AppColors.warningAmber;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (part.stockForSale < 1)
           _AlertBanner(
             text: 'Sin stock disponible',
-            color: AppColors.brandBlue,
-            background: AppColors.brandBlueContainer,
-            border: AppColors.brandAccent.withOpacity(0.35),
+            color: AppColors.textSecondary,
+            background: AppColors.surfaceTinted,
+            border: AppColors.borderSubtle,
           )
         else if (part.stockForSale < part.minOrderQtyEffective)
           _AlertBanner(
             text:
                 'Stock insuficiente para el mínimo de pedido (${part.minOrderQtyLabelEs}).',
-            color: AppColors.brandBlue,
-            background: AppColors.brandBlueContainer,
-            border: AppColors.brandAccent.withOpacity(0.35),
+            color: warning,
+            background:
+                Color.alphaBlend(warning.withOpacity(0.08), AppColors.card),
+            border: warning.withOpacity(0.25),
           ),
         if (_pedidosSuspendidosMorosidad)
           _AlertBanner(
@@ -854,9 +450,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  bool get _showsOrderBar => widget.guestPreview || _profile == null || _canOrder;
+  bool get _showsOrderBar =>
+      widget.guestPreview || _profile == null || _canOrder;
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons({bool compact = false}) {
     if (widget.guestPreview) {
       return FilledButton(
         onPressed: widget.onRegisterToOrder,
@@ -879,27 +476,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
     }
     if (!_canOrder) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_canAskAboutProduct) ...[
-          OutlinedButton.icon(
-            key: const Key('ask-about-product'),
-            onPressed: _askAboutProduct,
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('Preguntar sobre este producto'),
-          ),
-          const SizedBox(height: 8),
-        ],
-        FilledButton(
-          onPressed: _cartActionsDisabled ? null : _addToCart,
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-          child: const Text('Agregar al carrito'),
-        ),
-      ],
-    );
+    return ProductDetailPurchaseControls(
+        part: part,
+        profile: _profile!,
+        compact: compact,
+        onOpenCart: _openCart,
+        onAsk: _canAskAboutProduct ? _askAboutProduct : null);
   }
 
   Widget _buildBottomActionBar(BuildContext context) {
@@ -907,20 +489,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
         16,
-        12,
+        10,
         16,
-        MediaQuery.paddingOf(context).bottom + 12,
+        MediaQuery.paddingOf(context).bottom + 10,
       ),
       decoration: BoxDecoration(
         color: AppColors.card,
         border: Border(top: BorderSide(color: AppColors.borderSubtle)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.black.withOpacity(0.12),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -930,28 +505,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (part.stockForSale < part.minOrderQtyEffective ||
               _pedidosSuspendidosMorosidad)
             const SizedBox(height: 8),
-          _buildActionButtons(),
+          _buildActionButtons(compact: true),
         ],
-      ),
-    );
-  }
-
-  Widget _imagePlaceholder() {
-    return Hero(
-      tag: ProductDetailScreen.heroImageTag(part),
-      child: _imagePlaceholderInner(),
-    );
-  }
-
-  Widget _imagePlaceholderInner() {
-    return ColoredBox(
-      color: Colors.grey.shade100,
-      child: Center(
-        child: Icon(
-          Icons.precision_manufacturing_outlined,
-          size: 72,
-          color: Colors.grey.shade500,
-        ),
       ),
     );
   }
@@ -989,95 +544,6 @@ class _AlertBanner extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: color,
           height: 1.3,
-        ),
-      ),
-    );
-  }
-}
-
-class _SpecBlock extends StatelessWidget {
-  const _SpecBlock({
-    required this.label,
-    required this.child,
-  });
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: AppDecorations.radius12,
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _ProductBackButton extends StatelessWidget {
-  const _ProductBackButton({
-    required this.onPressed,
-    this.label = 'Atrás',
-    this.icon = Icons.arrow_back_rounded,
-  });
-
-  final VoidCallback onPressed;
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.card.withOpacity(0.94),
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onPressed,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.borderSubtle),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 24,
-                color: AppColors.textPrimary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -22,22 +22,23 @@ class FavoriteHeartButton extends StatelessWidget {
       listenable: AliadoFavoritesService.instance,
       builder: (context, _) {
         final saved = AliadoFavoritesService.instance.contains(productId);
-        final size = prominent ? 52.0 : (compact ? 36.0 : 44.0);
-        return Material(
-          color: AppColors.card.withOpacity(0.92),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () => _toggle(context),
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: Icon(
-                saved ? Icons.favorite : Icons.favorite_border,
-                size: prominent ? 28 : (compact ? 20 : 24),
-                color: saved ? AppColors.brand : AppColors.textSecondary,
-              ),
-            ),
+        final size = prominent ? 52.0 : 44.0;
+        return IconButton(
+          onPressed: () => _toggle(context),
+          tooltip: saved ? 'Quitar de favoritos' : 'Guardar en favoritos',
+          isSelected: saved,
+          icon: const Icon(Icons.favorite_border),
+          selectedIcon: const Icon(Icons.favorite),
+          style: IconButton.styleFrom(
+            minimumSize: Size.square(size),
+            maximumSize: Size.square(size),
+            padding: const EdgeInsets.all(8),
+            shape: const CircleBorder(),
+            backgroundColor: AppColors.card.withOpacity(0.92),
+            foregroundColor: saved
+                ? Theme.of(context).colorScheme.primary
+                : AppColors.textSecondary,
+            iconSize: prominent ? 28 : (compact ? 20 : 24),
           ),
         );
       },

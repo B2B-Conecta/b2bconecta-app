@@ -17,12 +17,12 @@ class CatalogGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cols = AliadoCatalogLayout.crossAxisCount(maxWidth);
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final cols =
+        AliadoCatalogLayout.crossAxisCount(maxWidth, textScale: textScale);
     final spacing = AliadoCatalogLayout.gridSpacing(maxWidth);
     final inner = (maxWidth - horizontalPadding * 2).clamp(1.0, maxWidth);
-    final tile = cols <= 1
-        ? inner
-        : (inner - spacing * (cols - 1)) / cols;
+    final tile = cols <= 1 ? inner : (inner - spacing * (cols - 1)) / cols;
     return Semantics(
       label: 'Cargando repuestos',
       child: GridView.builder(
@@ -39,6 +39,7 @@ class CatalogGridSkeleton extends StatelessWidget {
           crossAxisSpacing: spacing,
           childAspectRatio: AliadoCatalogLayout.childAspectRatio(
             tileWidth: tile,
+            textScale: textScale,
           ),
         ),
         itemCount: cols * 2,
@@ -61,7 +62,6 @@ class _CatalogSkeletonCard extends StatelessWidget {
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AliadoCatalogLayout.cardRadius),
         border: Border.all(color: border),
-        boxShadow: AppDecorations.cardShadow,
       ),
       child: const Padding(
         padding: EdgeInsets.fromLTRB(

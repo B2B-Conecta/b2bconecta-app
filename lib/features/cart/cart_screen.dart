@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/profile/profile_location_exception.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'cart_service.dart';
+import 'cart_quantity_field.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
@@ -34,15 +34,16 @@ class CartScreen extends StatefulWidget {
 
 enum _PagoMoneda { ref, usd, bolivares }
 
-/// REF es el precio base. USD es la promoción cuando existe; si no, el precio del pedido.
+/// Every display currency starts with the same effective price as checkout.
 double _cartUnitDollars(CartLine line, _PagoMoneda modo) {
   switch (modo) {
     case _PagoMoneda.ref:
-      return line.part.precio;
-    case _PagoMoneda.usd:
-      final sale = line.part.salePriceUsd;
-      if (line.part.tieneOfertaDirecta && sale != null) return sale;
       return line.precioUnitarioAliadoRef;
+    case _PagoMoneda.usd:
+      return ProductCatalogPricing.aliadoUnitUsdPaymentLine(
+          refUnitUsd: line.precioUnitarioAliadoRef,
+          discountRules: line.part.discountRules,
+          ownerPagoSoloDivisas: line.part.ownerPagoSoloDivisas);
     case _PagoMoneda.bolivares:
       return line.precioUnitarioAliadoRef;
   }
@@ -63,6 +64,7 @@ String _cartMoney(double dollars, _PagoMoneda modo, double? tasa) {
 class _CartScreenState extends State<CartScreen> {
   final _cart = CartService.instance;
   bool _submitting = false;
+  bool _choosingDelivery = false;
   _PagoMoneda _pagoMoneda = _PagoMoneda.ref;
   double? _tasa;
   Map<String, ImporterCreditBalance> _credits = const {};
@@ -107,7 +109,7 @@ class _CartScreenState extends State<CartScreen> {
     return OrderReturnRules.cappedCredit(available, _groupSubtotal(lines));
   }
 
-  double get _appliedCredit => _cart.linesGroupedByImporterName.values.fold(
+  double get _appliedCredit => _cart.supplierGroups.values.fold(
         0,
         (sum, lines) => sum + _creditFor(lines),
       );
@@ -129,16 +131,29 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _checkout() async {
-    if (_cart.isEmpty || _submitting || !_cart.meetsAllImporterMinOrders) {
+    if (!_cart.canEdit ||
+        _cart.isEmpty ||
+        _submitting ||
+        _choosingDelivery ||
+        !_cart.meetsAllImporterMinOrders) {
       return;
     }
 
+    final accountRevision = _cart.accountRevision;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _choosingDelivery = true);
     final result = await showDialog<_DestinoEntregaResult?>(
       context: context,
       builder: (ctx) => _DestinoEntregaDialog(profile: widget.profile),
     );
 
-    if (result == null || !mounted) return;
+    if (!mounted) return;
+    setState(() => _choosingDelivery = false);
+    if (result == null ||
+        !_cart.canEdit ||
+        _cart.isEmpty ||
+        accountRevision != _cart.accountRevision ||
+        !_cart.meetsAllImporterMinOrders) return;
 
     setState(() => _submitting = true);
     if (!mounted) return;
@@ -155,9 +170,8 @@ class _CartScreenState extends State<CartScreen> {
           .toList();
 
       final appliedCredit = _appliedCredit;
-      final moneda = _pagoMoneda == _PagoMoneda.bolivares
-          ? 'BOLIVARES'
-          : 'DIVISAS';
+      final moneda =
+          _pagoMoneda == _PagoMoneda.bolivares ? 'BOLIVARES' : 'DIVISAS';
       final orderId = await SupabaseService.checkoutMultiImportadorCart(
         lines: lines,
         destinoEntregaUsaPerfil: result.useProfile,
@@ -233,6 +247,31 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  void _removeLine(CartLine line) {
+    final accountRevision = _cart.accountRevision;
+    final campaign = _cart.promoCampaignIdForImportador(line.part.ownerId);
+    _cart.removeProduct(line.part.id);
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text('${line.part.nombre} eliminado del carrito.'),
+      action: SnackBarAction(
+          label: 'Deshacer',
+          onPressed: () {
+            if (!mounted ||
+                _submitting ||
+                accountRevision != _cart.accountRevision) return;
+            if (_cart.lines.any((item) => item.part.id == line.part.id)) return;
+            _cart.addOrIncrement(line.part,
+                precioUnitarioAliadoRef: line.precioUnitarioAliadoRef,
+                delta: line.quantity);
+            if (campaign != null && line.part.ownerId != null) {
+              _cart.setPromoAttribution(
+                  importadorId: line.part.ownerId!, campaignId: campaign);
+            }
+          }),
+    ));
+  }
+
   bool _importerGroupHasPromo(List<CartLine> lines) {
     for (final line in lines) {
       if (_cart.importadorHasPromoAttribution(line.part.ownerId)) {
@@ -243,15 +282,109 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   ImporterMinOrderProgress? _progressFor(List<CartLine> lines) {
-    final name = lines.isEmpty
-        ? ''
-        : (lines.first.part.ownerBusinessName?.trim().isNotEmpty == true
-            ? lines.first.part.ownerBusinessName!.trim()
-            : 'Importador');
-    final matches = _cart
-        .importerMinOrderProgress()
-        .where((e) => e.importerName == name);
+    final ownerId = lines.isEmpty ? null : lines.first.part.ownerId;
+    final matches =
+        _cart.importerMinOrderProgress().where((e) => e.importerId == ownerId);
     return matches.isEmpty ? null : matches.first;
+  }
+
+  Widget _buildSupplierGroup(
+      MapEntry<String, List<CartLine>> entry, double? tasa) {
+    final progress = _progressFor(entry.value);
+    final ownerId = entry.value.first.part.ownerId?.trim() ?? '';
+    return _CartPanel(
+        child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Row(children: [
+            const Icon(Icons.storefront_outlined,
+                size: 20, color: AppColors.brandBlue),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(_cart.importadorDisplayName(entry.key),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: AppColors.textPrimary))),
+            if (_importerGroupHasPromo(entry.value)) ...[
+              const SizedBox(width: 8),
+              _CartOfferChip(
+                  label: 'Promoción',
+                  bg: AppColors.brandBlueContainer,
+                  fg: AppColors.brandBlue,
+                  border: AppColors.divider),
+            ],
+          ]),
+        ),
+        Divider(height: 1, color: AppColors.divider),
+        if (progress != null && progress.hasMinimum)
+          Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                        progress.meets
+                            ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
+                            : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: progress.meets
+                                ? AppColors.successGreen
+                                : AppColors.textPrimary)),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                            value: progress.fraction,
+                            minHeight: 4,
+                            backgroundColor: AppColors.divider,
+                            color: progress.meets
+                                ? AppColors.successGreen
+                                : AppColors.brandBlue)),
+                  ])),
+        if ((_credits[ownerId]?.remaining ?? 0) > 0)
+          Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: _CreditToggle(
+                lines: entry.value,
+                balance: _credits[ownerId],
+                availableLabel: _cartMoney(
+                    _credits[ownerId]?.remaining ?? 0, _pagoMoneda, tasa),
+                appliedLabel:
+                    _cartMoney(_creditFor(entry.value), _pagoMoneda, tasa),
+                optedOut: _creditOptOut.contains(ownerId),
+                onChanged: (useCredit) => setState(() {
+                  if (useCredit) {
+                    _creditOptOut.remove(ownerId);
+                  } else {
+                    _creditOptOut.add(ownerId);
+                  }
+                }),
+              )),
+        for (var i = 0; i < entry.value.length; i++) ...[
+          if (i > 0)
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Divider(height: 1, color: AppColors.divider)),
+          _CartLineCard(
+            key: ValueKey(entry.value[i].part.id),
+            line: entry.value[i],
+            modo: _pagoMoneda,
+            tasa: tasa,
+            onRemove: _submitting || !_cart.canEdit
+                ? null
+                : () => _removeLine(entry.value[i]),
+            onQuantityChanged: _submitting || !_cart.canEdit
+                ? null
+                : (qty) => _cart.setQuantity(entry.value[i].part.id, qty),
+          ),
+        ],
+      ],
+    ));
   }
 
   @override
@@ -267,300 +400,317 @@ class _CartScreenState extends State<CartScreen> {
     );
     final displayNet = displayGross - appliedCredit;
     final pagaBolivares = _pagoMoneda == _PagoMoneda.bolivares;
-    final canConfirm = !_submitting &&
+    final canConfirm = _cart.canEdit &&
+        !_submitting &&
+        !_choosingDelivery &&
         _cart.meetsAllImporterMinOrders &&
         (!pagaBolivares || totalBs != null);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surfaceTinted,
       appBar: AppBar(
         title: const Text(
           'Carrito',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      body: _cart.isEmpty
+      body: _cart.restoring || (_cart.isEmpty && !_cart.canEdit)
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.shopping_cart_outlined,
-                      size: 48,
-                      color: AppColors.textSecondary.withOpacity(0.55),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Su carrito está vacío',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Agregue repuestos desde el catálogo para armar el pedido.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        height: 1.35,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    children: [
-                      for (final entry
-                          in _cart.linesGroupedByImporterName.entries) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6, top: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  entry.key,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                    color: AppColors.brandBlue,
-                                  ),
-                                ),
-                              ),
-                              if (_importerGroupHasPromo(entry.value))
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.brand
-                                        .withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'Bajo promoción',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.brand,
-                                    ),
-                                  ),
-                                ),
-                            ],
+                  padding: const EdgeInsets.all(24),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    if (_cart.restoring) const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(_cart.storageMessage ?? 'Recuperando tu carrito…',
+                        textAlign: TextAlign.center),
+                    if (!_cart.restoring)
+                      _cart.invalidDraft
+                          ? TextButton(
+                              onPressed: _cart.discardInvalidDraft,
+                              child: const Text('Iniciar carrito nuevo'))
+                          : TextButton(
+                              onPressed: _cart.retryRestore,
+                              child: const Text('Reintentar')),
+                  ])))
+          : _cart.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.shopping_cart_outlined,
+                          size: 48,
+                          color: AppColors.textSecondary.withOpacity(0.55),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Su carrito está vacío',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                        Builder(
-                          builder: (context) {
-                            final progress = _progressFor(entry.value);
-                            if (progress == null || !progress.hasMinimum) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    progress.meets
-                                        ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
-                                        : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: progress.meets
-                                          ? Colors.green.shade800
-                                          : AppColors.brandBlue,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: progress.fraction,
-                                      minHeight: 6,
-                                      backgroundColor: AppColors.borderSubtle,
-                                      color: progress.meets
-                                          ? Colors.green.shade600
-                                          : AppColors.brandAccent,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                        _CreditToggle(
-                          lines: entry.value,
-                          balance: _credits[entry.value.first.part.ownerId?.trim() ?? ''],
-                          availableLabel: _cartMoney(
-                            _credits[entry.value.first.part.ownerId?.trim() ?? '']
-                                    ?.remaining ??
-                                0,
-                            _pagoMoneda,
-                            tasa,
-                          ),
-                          appliedLabel: _cartMoney(
-                            _creditFor(entry.value),
-                            _pagoMoneda,
-                            tasa,
-                          ),
-                          optedOut: _creditOptOut.contains(
-                            entry.value.first.part.ownerId?.trim(),
-                          ),
-                          onChanged: (useCredit) {
-                            final id = entry.value.first.part.ownerId?.trim();
-                            if (id == null || id.isEmpty) return;
-                            setState(() {
-                              if (useCredit) {
-                                _creditOptOut.remove(id);
-                              } else {
-                                _creditOptOut.add(id);
-                              }
-                            });
-                          },
-                        ),
-                        ...entry.value.map(
-                          (line) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _CartLineCard(
-                              line: line,
-                              modo: _pagoMoneda,
-                              tasa: tasa,
-                              onRemove: () =>
-                                  _cart.removeProduct(line.part.id),
-                              onQuantityChanged: (q) =>
-                                  _cart.setQuantity(line.part.id, q),
-                            ),
+                        const SizedBox(height: 6),
+                        if (_cart.restoreMessage != null) ...[
+                          Text(_cart.restoreMessage!,
+                              textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                        ],
+                        Text(
+                          'Encuentra los repuestos que necesitas y agrégalos aquí.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.35,
+                            color: AppColors.textSecondary,
                           ),
                         ),
+                        const SizedBox(height: 24),
+                        FilledButton.icon(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.search),
+                            label: const Text('Explorar catálogo')),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                Material(
-                  elevation: 8,
-                  color: Colors.white,
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      child: Column(
+                )
+              : LayoutBuilder(builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 980 &&
+                      MediaQuery.textScalerOf(context).scale(14) <= 18;
+                  final groups = _cart.supplierGroups.entries.toList();
+                  final heading = LayoutBuilder(builder: (context, box) {
+                    final title = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Revisa tu compra',
+                            style: TextStyle(
+                                fontSize: 24,
+                                height: 1.2,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary)),
+                        const SizedBox(height: 6),
+                        Text(
+                            '${_cart.lines.length} ${_cart.lines.length == 1 ? 'repuesto' : 'repuestos'} · ${_cart.itemCount} unidades · ${groups.length} ${groups.length == 1 ? 'proveedor' : 'proveedores'}',
+                            style: TextStyle(
+                                fontSize: 13, color: AppColors.textSecondary)),
+                      ],
+                    );
+                    final back = TextButton.icon(
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: const Text('Seguir comprando'),
+                      style:
+                          TextButton.styleFrom(minimumSize: const Size(0, 44)),
+                    );
+                    return box.maxWidth < 580
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [title, const SizedBox(height: 4), back])
+                        : Row(children: [Expanded(child: title), back]);
+                  });
+                  final warning = _cart.restoreMessage ?? _cart.storageMessage;
+                  final summary = _CartPanel(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            'Precio del pedido',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          SegmentedFilterBar(
-                            labels: const ['REF', 'USD', 'Bolívares'],
-                            selectedIndex: switch (_pagoMoneda) {
-                              _PagoMoneda.ref => 0,
-                              _PagoMoneda.usd => 1,
-                              _PagoMoneda.bolivares => 2,
-                            },
-                            onSelected: (index) {
-                              setState(() {
-                                _pagoMoneda = switch (index) {
-                                  1 => _PagoMoneda.usd,
-                                  2 => _PagoMoneda.bolivares,
-                                  _ => _PagoMoneda.ref,
-                                };
-                              });
-                            },
-                          ),
-                          if (appliedCredit > 0)
-                            Text(
-                              'Saldo a favor: −${_cartMoney(appliedCredit, _pagoMoneda, tasa)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                                color: AppColors.brand,
-                              ),
-                            ),
-                          if (!(pagaBolivares && totalBs == null))
-                            Text(
-                              'Total a pagar: ${_cartMoney(displayNet < 0 ? 0 : displayNet, _pagoMoneda, tasa)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                              ),
-                            ),
-                          if (pagaBolivares && totalBs == null) ...[
-                            const SizedBox(height: 6),
-                            const Text(
-                              'No hay tasa BCV vigente para cobrar en bolívares.',
+                          Text('Resumen del pedido',
                               style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.brandBlue,
-                              ),
-                            ),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary)),
+                          const SizedBox(height: 16),
+                          _CartCurrencySelector(
+                            selected: _pagoMoneda.index,
+                            onSelected: _submitting
+                                ? null
+                                : (index) {
+                                    setState(() => _pagoMoneda =
+                                        _PagoMoneda.values[index]);
+                                  },
+                          ),
+                          const SizedBox(height: 16),
+                          _CartSummaryRow(
+                              label: 'Productos (${_cart.itemCount} uds)',
+                              value:
+                                  _cartMoney(displayGross, _pagoMoneda, tasa)),
+                          if (appliedCredit > 0) ...[
+                            const SizedBox(height: 10),
+                            _CartSummaryRow(
+                                label: 'Saldo a favor',
+                                value:
+                                    '−${_cartMoney(appliedCredit, _pagoMoneda, tasa)}'),
+                          ],
+                          const SizedBox(height: 12),
+                          Divider(height: 1, color: AppColors.divider),
+                          const SizedBox(height: 12),
+                          Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                    child: Text('Subtotal',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.textSecondary))),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                    fit: FlexFit.tight,
+                                    child: Text(
+                                        _cartMoney(
+                                            displayNet < 0 ? 0 : displayNet,
+                                            _pagoMoneda,
+                                            tasa),
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                            fontSize: 24,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: -0.5,
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures()
+                                            ],
+                                            color: AppColors.textPrimary))),
+                              ]),
+                          const SizedBox(height: 12),
+                          Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.local_shipping_outlined,
+                                    size: 18, color: AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: Text(
+                                        'Revisa la entrega en el siguiente paso.',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            height: 1.4,
+                                            color: AppColors.textSecondary))),
+                              ]),
+                          if (pagaBolivares && totalBs == null) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                                'No hay tasa BCV vigente para cobrar en bolívares.',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.brandBlue)),
                           ],
                           if (!_cart.meetsAllImporterMinOrders) ...[
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Complete el pedido mínimo de cada importador para confirmar.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.brandBlue,
-                              ),
-                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                                'Completa el mínimo de cada proveedor para continuar.',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    color: AppColors.textPrimary)),
                           ],
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 16),
                           FilledButton(
                             onPressed: canConfirm ? _checkout : null,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 48),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              textStyle: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
                             child: _submitting
                                 ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
+                                    height: 20,
+                                    width: 20,
                                     child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Confirmar pedido'),
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Text('Continuar con la entrega',
+                                    textAlign: TextAlign.center),
                           ),
-                        ],
+                        ]),
+                  );
+                  final products = [
+                    if (warning != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Text(warning,
+                            style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                    for (final group in groups)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildSupplierGroup(group, tasa),
+                      ),
+                  ];
+                  return Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: wide ? 1100 : 720),
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                            wide ? 24 : 16, wide ? 28 : 20, wide ? 24 : 16, 0),
+                        child: wide
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                    heading,
+                                    const SizedBox(height: 24),
+                                    Expanded(
+                                        child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                          Expanded(
+                                              child: ListView(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          bottom: 24),
+                                                  children: products)),
+                                          const SizedBox(width: 24),
+                                          SizedBox(
+                                              width: 312,
+                                              child: SingleChildScrollView(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          bottom: 24),
+                                                  child: summary)),
+                                        ])),
+                                  ])
+                            : ListView(
+                                padding: EdgeInsets.only(
+                                    bottom: 24 +
+                                        MediaQuery.paddingOf(context).bottom),
+                                children: [
+                                    heading,
+                                    const SizedBox(height: 16),
+                                    ...products,
+                                    const SizedBox(height: 4),
+                                    summary,
+                                  ]),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
+                  );
+                }),
     );
   }
 }
 
-/// Fila de carrito: imagen, detalle, precios y cantidad.
+/// Compact product row; supplier identity belongs to its containing group.
 class _CartLineCard extends StatelessWidget {
-  const _CartLineCard({
-    required this.line,
-    required this.modo,
-    required this.tasa,
-    required this.onRemove,
-    required this.onQuantityChanged,
-  });
-
+  const _CartLineCard(
+      {super.key,
+      required this.line,
+      required this.modo,
+      required this.tasa,
+      required this.onRemove,
+      required this.onQuantityChanged});
   final CartLine line;
   final _PagoMoneda modo;
   final double? tasa;
-  final VoidCallback onRemove;
-  final ValueChanged<int> onQuantityChanged;
+  final VoidCallback? onRemove;
+  final ValueChanged<int>? onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -568,217 +718,240 @@ class _CartLineCard extends StatelessWidget {
     final cover = part.coverImageUrl?.trim();
     final sku = (part.sku ?? '').trim();
     final unit = _cartUnitDollars(line, modo);
-    final lineTotal = unit * line.quantity;
-    final usdPromo = modo == _PagoMoneda.usd && part.tieneOfertaDirecta;
-    final minQty = part.minOrderQtyEffective;
-    final maxQty = part.stockForSale;
-    final canDec = line.quantity > minQty;
-    final canInc = line.quantity < maxQty;
-
-    final promoChip = ProductCatalogPricing.campaignDiscountChipEs(
-      part.activeCampaignDiscountPercent,
-      discountRules: part.discountRules,
-      quantity: line.quantity,
-    );
-    return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderSubtle),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 80,
-                height: 80,
-                child: cover != null && cover.isNotEmpty
-                    ? Image.network(
-                        cover,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _thumbPlaceholder(),
-                      )
-                    : _thumbPlaceholder(),
-              ),
-            ),
+    final promo = ProductCatalogPricing.campaignDiscountChipEs(
+        part.activeCampaignDiscountPercent,
+        discountRules: part.discountRules,
+        quantity: line.quantity);
+    final thumbnail = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+            width: 56,
+            height: 56,
+            child: cover != null && cover.isNotEmpty
+                ? Image.network(cover,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => _thumbPlaceholder())
+                : _thumbPlaceholder()));
+    final details =
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(part.nombre,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              height: 1.3,
+              color: AppColors.textPrimary)),
+      if (sku.isNotEmpty) ...[
+        const SizedBox(height: 3),
+        Text('SKU $sku',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ],
+      const SizedBox(height: 4),
+      Text('${_cartMoney(unit, modo, tasa)} / ud',
+          style: TextStyle(
+              fontSize: 12, height: 1.3, color: AppColors.textSecondary)),
+      if (promo != null ||
+          (modo == _PagoMoneda.usd && part.tieneOfertaDirecta)) ...[
+        const SizedBox(height: 6),
+        _CartOfferChip(
+            label: promo ?? 'Oferta aplicada',
+            bg: AppColors.brandBlueContainer,
+            fg: AppColors.brandBlue,
+            border: AppColors.divider),
+      ],
+    ]);
+    final remove = IconButton(
+        onPressed: onRemove,
+        tooltip: 'Quitar del carrito',
+        style: IconButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            padding: EdgeInsets.zero,
+            foregroundColor: AppColors.textSecondary),
+        icon: const Icon(Icons.close_rounded, size: 18));
+    final quantity = Column(mainAxisSize: MainAxisSize.min, children: [
+      _CartQuantityControl(line: line, onChanged: onQuantityChanged),
+      const SizedBox(height: 5),
+      Text('Mín. ${part.minOrderQtyEffective} · Disp. ${part.stockForSale}',
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+    ]);
+    final amount = Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Importe',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          const SizedBox(height: 3),
+          Text(_cartMoney(unit * line.quantity, modo, tasa),
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: AppColors.textPrimary)),
+        ]);
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 640 &&
+            MediaQuery.textScalerOf(context).scale(14) <= 18;
+        if (wide) {
+          return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            thumbnail,
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          part.nombre,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14.5,
-                            height: 1.25,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: onRemove,
-                        tooltip: 'Quitar del carrito',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 36,
-                        ),
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (sku.isNotEmpty)
-                    Text(
-                      'SKU $sku',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        _cartMoney(unit, modo, tasa),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          color: usdPromo
-                              ? AppColors.successGreen
-                              : AppColors.brandBlue,
-                        ),
-                      ),
-                      Text(
-                        ' / ud',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Total línea ${_cartMoney(lineTotal, modo, tasa)}',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (usdPromo || promoChip != null) ...[
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        if (usdPromo)
-                          _CartOfferChip(
-                            label: 'Promoción',
-                            bg: AppColors.successGreen.withOpacity(0.12),
-                            fg: AppColors.successGreen,
-                            border: AppColors.successGreen.withOpacity(0.35),
-                          ),
-                        if (promoChip != null)
-                          _CartOfferChip(
-                            label: promoChip,
-                            bg: const Color(0xFFFFF6E5),
-                            fg: const Color(0xFF8A5A00),
-                            border: const Color(0xFFE8A317).withOpacity(0.45),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _QtyButton(
-                        icon: Icons.remove_rounded,
-                        enabled: canDec,
-                        onTap: canDec
-                            ? () => onQuantityChanged(line.quantity - 1)
-                            : null,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(
-                          '${line.quantity}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                      _QtyButton(
-                        icon: Icons.add_rounded,
-                        enabled: canInc,
-                        onTap: canInc
-                            ? () => onQuantityChanged(line.quantity + 1)
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'uds',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      if (minQty > 1) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          'mín. $minQty',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+            Expanded(child: details),
+            const SizedBox(width: 12),
+            quantity,
+            const SizedBox(width: 16),
+            SizedBox(width: 104, child: amount),
+            const SizedBox(width: 4),
+            remove,
+          ]);
+        }
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                thumbnail,
+                const SizedBox(width: 12),
+                Expanded(child: details),
+                remove,
+              ]),
+              const SizedBox(height: 14),
+              Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [quantity, amount]),
+            ]);
+      }),
     );
   }
 
-  Widget _thumbPlaceholder() {
-    return ColoredBox(
-      color: AppColors.fieldFill,
-      child: Icon(
-        Icons.precision_manufacturing_outlined,
-        color: AppColors.textSecondary.withOpacity(0.55),
-        size: 30,
-      ),
-    );
+  Widget _thumbPlaceholder() => ColoredBox(
+      color: AppColors.surfaceTinted,
+      child: Icon(Icons.image_outlined, color: AppColors.textMuted, size: 24));
+}
+
+class _CartQuantityControl extends StatelessWidget {
+  const _CartQuantityControl({required this.line, required this.onChanged});
+  final CartLine line;
+  final ValueChanged<int>? onChanged;
+  @override
+  Widget build(BuildContext context) {
+    final canDec =
+        onChanged != null && line.quantity > line.part.minOrderQtyEffective;
+    final canInc = onChanged != null && line.quantity < line.part.stockForSale;
+    return DecoratedBox(
+        decoration: BoxDecoration(
+            border: Border.all(color: AppColors.borderSubtle),
+            borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          _QtyButton(
+              icon: Icons.remove_rounded,
+              enabled: canDec,
+              onTap: canDec ? () => onChanged!(line.quantity - 1) : null),
+          CartQuantityField(
+              quantity: line.quantity,
+              minimum: line.part.minOrderQtyEffective,
+              maximum: line.part.stockForSale,
+              onChanged: onChanged,
+              embedded: true),
+          _QtyButton(
+              icon: Icons.add_rounded,
+              enabled: canInc,
+              onTap: canInc ? () => onChanged!(line.quantity + 1) : null),
+        ]));
   }
+}
+
+class _CartPanel extends StatelessWidget {
+  const _CartPanel({required this.child, this.padding = EdgeInsets.zero});
+  final Widget child;
+  final EdgeInsets padding;
+  @override
+  Widget build(BuildContext context) => Material(
+      color: AppColors.card,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.divider)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(padding: padding, child: child));
+}
+
+class _CartSummaryRow extends StatelessWidget {
+  const _CartSummaryRow({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) =>
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child: Text(label,
+                style:
+                    TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+        const SizedBox(width: 12),
+        Flexible(
+            fit: FlexFit.tight,
+            child: Text(value,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: AppColors.textPrimary))),
+      ]);
+}
+
+class _CartCurrencySelector extends StatelessWidget {
+  const _CartCurrencySelector(
+      {required this.selected, required this.onSelected});
+  final int selected;
+  final ValueChanged<int>? onSelected;
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(
+            color: AppColors.surfaceTinted,
+            borderRadius: BorderRadius.circular(10)),
+        child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Row(children: [
+              for (var i = 0; i < 3; i++)
+                Expanded(
+                    child: Semantics(
+                  selected: i == selected,
+                  button: true,
+                  child: Material(
+                    color: i == selected
+                        ? AppColors.brandBlue
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      onTap: onSelected == null ? null : () => onSelected!(i),
+                      borderRadius: BorderRadius.circular(8),
+                      child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 44),
+                          child: Center(
+                              child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 10),
+                                  child: Text(
+                                      const ['REF', 'USD', 'Bolívares'][i],
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: i == selected
+                                              ? AppColors.white
+                                              : AppColors.textPrimary))))),
+                    ),
+                  ),
+                )),
+            ])),
+      );
 }
 
 class _CartOfferChip extends StatelessWidget {
@@ -828,25 +1001,31 @@ class _QtyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: enabled ? AppColors.brandBlueContainer : AppColors.fieldFill,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: SizedBox(
-          width: 34,
-          height: 34,
-          child: Icon(
-            icon,
-            size: 18,
-            color: enabled
-                ? AppColors.brandBlue
-                : AppColors.textMuted,
+    return Semantics(
+        button: true,
+        enabled: enabled,
+        label: icon == Icons.add_rounded
+            ? 'Aumentar cantidad'
+            : 'Reducir cantidad',
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(
+                icon,
+                size: 18,
+                color: enabled
+                    ? Theme.of(context).colorScheme.primary
+                    : AppColors.textMuted,
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
 
@@ -956,9 +1135,7 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
       }
     }
     final text = _usaPerfil ? null : _armarTextoEntrega();
-    final maps = _usaPerfil
-        ? null
-        : _maps.text.trim();
+    final maps = _usaPerfil ? null : _maps.text.trim();
     Navigator.of(context).pop(
       _DestinoEntregaResult(
         useProfile: _usaPerfil,
@@ -970,12 +1147,12 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
 
   List<String> _envioNotas() {
     final notes = <String>[];
-    for (final entry in CartService.instance.linesGroupedByImporterName.entries) {
+    for (final entry in CartService.instance.supplierGroups.entries) {
       if (entry.value.isEmpty) continue;
       final line = entry.value.first;
       final note = EnvioPolitica.notaConfirmacion(
         tipo: line.part.ownerEnvioTipo,
-        proveedor: entry.key,
+        proveedor: CartService.instance.importadorDisplayName(entry.key),
         minimoGratis: line.part.ownerEnvioGratisMinimo,
       );
       if (note != null) notes.add(note);

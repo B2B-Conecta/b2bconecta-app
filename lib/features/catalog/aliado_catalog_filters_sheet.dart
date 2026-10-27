@@ -463,7 +463,8 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     return _choiceChip(
                       label: preset.label,
                       selected: _minRatingAvg == preset.minAvg,
-                      onTap: () => setState(() => _minRatingAvg = preset.minAvg),
+                      onTap: () =>
+                          setState(() => _minRatingAvg = preset.minAvg),
                     );
                   }).toList(),
                 ),
@@ -521,10 +522,10 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 _sectionHeader(
                   'Promoción',
                   icon: Icons.local_offer_outlined,
-                  hint: 'Productos con precio USD de promoción.',
+                  hint: 'Productos con precio de oferta.',
                 ),
                 _choiceChip(
-                  label: 'Solo con promoción USD',
+                  label: 'Solo productos con promoción USD',
                   selected: _onlyWithCommercialDiscount,
                   onTap: () => setState(
                     () => _onlyWithCommercialDiscount =
@@ -703,8 +704,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_buildDraft()),
+                    onPressed: () => Navigator.of(context).pop(_buildDraft()),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(

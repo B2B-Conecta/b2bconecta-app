@@ -245,6 +245,8 @@ class _FavoriteRow extends StatelessWidget {
                       CatalogProductPriceDisplay(
                         listPriceUsd: part.precio,
                         salePriceUsd: part.salePriceUsd,
+                        quantity: part.minOrderQtyEffective,
+                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
                         discountRules: part.discountRules,
                         catalogGrid: true,
                         compact: true,

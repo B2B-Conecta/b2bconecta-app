@@ -37,15 +37,18 @@ class ProductWarrantySeal extends StatelessWidget {
               color: Colors.white,
             ),
             SizedBox(width: 3),
-            Text(
+            Flexible(
+                child: Text(
               'Garantía',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
                 letterSpacing: 0.2,
               ),
-            ),
+            )),
           ],
         ),
       );

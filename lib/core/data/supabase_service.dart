@@ -26,6 +26,7 @@ import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_impor
 import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/features/inventory/inventory_service.dart';
+import 'package:motolink_pro_app/features/inventory/product_delete_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_flag.dart';
@@ -338,17 +339,16 @@ class SupabaseService {
         verified: verified,
       );
 
-  static Future<List<ImporterSalesSnapshot>>
-      adminListImporterSalesSnapshots({
+  static Future<List<ImporterSalesSnapshot>> adminListImporterSalesSnapshots({
     int days = 30,
     int? limit,
     int offset = 0,
   }) =>
-          CatalogService.adminListImporterSalesSnapshots(
-            days: days,
-            limit: limit,
-            offset: offset,
-          );
+      CatalogService.adminListImporterSalesSnapshots(
+        days: days,
+        limit: limit,
+        offset: offset,
+      );
 
   static Future<List<PartModel>> fetchMyInventory({
     int limit = 200,
@@ -392,13 +392,20 @@ class SupabaseService {
       InventoryService.setProductsActiveBulk(
           productIds: productIds, isActive: isActive);
 
-  static Future<void> deleteProduct({required String productId}) =>
-      InventoryService.deleteProduct(productId: productId);
-
-  static Future<int> deleteProductsBulk({
-    required List<String> productIds,
+  static Future<ProductDeleteBatchResult> deleteProduct({
+    required String productId,
+    String? label,
   }) =>
-      InventoryService.deleteProductsBulk(productIds: productIds);
+      InventoryService.deleteProduct(productId: productId, label: label);
+
+  static Future<ProductDeleteBatchResult> deleteProductsBulk({
+    required List<String> productIds,
+    Map<String, String>? labelsById,
+  }) =>
+      InventoryService.deleteProductsBulk(
+        productIds: productIds,
+        labelsById: labelsById,
+      );
 
   static Future<String> uploadProductImage({
     required Uint8List bytes,
@@ -710,6 +717,7 @@ class SupabaseService {
 
   static Future<String> checkoutMultiImportadorCart({
     required List<Map<String, dynamic>> lines,
+    String moneda = 'BOLIVARES',
     bool destinoEntregaUsaPerfil = true,
     String? destinoEntregaTexto,
     String? destinoEntregaMapsUrl,
@@ -719,6 +727,7 @@ class SupabaseService {
   }) =>
       OrdersService.checkoutMultiImportadorCart(
           lines: lines,
+          moneda: moneda,
           destinoEntregaUsaPerfil: destinoEntregaUsaPerfil,
           destinoEntregaTexto: destinoEntregaTexto,
           destinoEntregaMapsUrl: destinoEntregaMapsUrl,
@@ -1572,18 +1581,19 @@ class SupabaseService {
   static Future<void> adminCancelCommissionSettlement(String settlementId) =>
       CommissionsService.adminCancelCommissionSettlement(settlementId);
 
-  static Future<CommissionCollectedIncomeReport> fetchCollectedCommissionReport({
+  static Future<CommissionCollectedIncomeReport>
+      fetchCollectedCommissionReport({
     required DateTime from,
     required DateTime to,
     String? importadorId,
     CommissionSettlementDocumentType? documentType,
   }) =>
-      CommissionsService.fetchCollectedCommissionReport(
-        from: from,
-        to: to,
-        importadorId: importadorId,
-        documentType: documentType,
-      );
+          CommissionsService.fetchCollectedCommissionReport(
+            from: from,
+            to: to,
+            importadorId: importadorId,
+            documentType: documentType,
+          );
 
   static Future<List<SupportTicketModel>> listMySupportTickets() =>
       SupportService.listMySupportTickets();

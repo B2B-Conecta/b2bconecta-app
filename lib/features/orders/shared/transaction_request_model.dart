@@ -14,6 +14,11 @@ import 'package:motolink_pro_app/core/utils/business_calendar.dart';
 import 'order_payment_pricing.dart';
 import 'package:motolink_pro_app/features/inventory/product_volume_tiers.dart';
 
+String orderAmountCurrency(Iterable<TransactionRequestModel> lines) =>
+    lines.isNotEmpty && lines.every((line) => line.amountCurrencyLabel == 'USD')
+        ? 'USD'
+        : 'REF';
+
 /// Fila de `transaction_requests` con joins opcionales (producto, aliado, importador).
 class TransactionRequestModel {
   const TransactionRequestModel({
@@ -287,7 +292,8 @@ class TransactionRequestModel {
 
   bool get hasPickupConfirmed => pickupConfirmedAt != null;
 
-  bool get carrierDecisionResolved => CarrierDecision.isResolved(carrierDecision);
+  bool get carrierDecisionResolved =>
+      CarrierDecision.isResolved(carrierDecision);
 
   bool get aliadoDebeDecidirTransportista =>
       status == TransactionRequestStatus.pedidoListo &&
@@ -358,7 +364,7 @@ class TransactionRequestModel {
   /// Tasa BCV congelada al confirmar (`transaction_requests.tasa_bcv_aplicada`).
   final double? tasaBcvAplicada;
 
-  /// Total REF de la línea. Coincide con [precioTotal] / `precio_total_usd`.
+  /// BCV reference total, independent of a new order's USD payment incentive.
   final double? totalRef;
 
   /// Total en bolívares congelado: precio REF de la línea × [tasaBcvAplicada].
@@ -400,22 +406,34 @@ class TransactionRequestModel {
   bool get bajoPromocionCatalogo =>
       promoCampaignId != null && promoCampaignId!.trim().isNotEmpty;
 
+  bool get hasCheckoutPriceSnapshot =>
+      discountRules?['checkout_pricing_version']?.toString() == '1';
+
+  String get amountCurrencyLabel =>
+      hasCheckoutPriceSnapshot && metodoPagoMoneda == 'DIVISAS' ? 'USD' : 'REF';
+
   double get refBaseTotalForPago => OrderPaymentPricing.refBaseTotal(
         precioTotal: precioTotal,
         precioBaseAliadoTotal: precioBaseAliadoTotal,
       );
 
-  List<String> get metodosPagoPermitidos =>
-      PagoMetodo.filterByImporterAccepted(
+  List<String> get metodosPagoPermitidos => PagoMetodo.filterByImporterAccepted(
         ownerAcceptedPagoMetodos,
         pagoSoloDivisas: ownerPagoSoloDivisas,
-      );
+      )
+          .where((method) =>
+              !hasCheckoutPriceSnapshot ||
+              (metodoPagoMoneda == 'DIVISAS'
+                  ? PagoMetodo.qualifiesForUsdDiscount(method)
+                  : PagoMetodo.isBolivares(method)))
+          .toList();
 
   String? pagoInstruccionesImportadorFor(String? metodo) =>
       PagoMetodoInstrucciones.forMetodo(ownerPagoMetodoInstrucciones, metodo);
 
   /// Snapshot del pedido o, si falta el % divisas, reglas actuales del producto.
   Map<String, dynamic>? get effectiveDiscountRulesForPago {
+    if (hasCheckoutPriceSnapshot) return const {};
     if (parseUsdPaymentDiscountPct(discountRules) != null) {
       return discountRules;
     }
@@ -546,7 +564,8 @@ class TransactionRequestModel {
   }
 
   String? pagoInstruccionesCarrierFor(String? metodo) =>
-      PagoMetodoInstrucciones.forMetodo(carrierPagoInstruccionesEffective, metodo);
+      PagoMetodoInstrucciones.forMetodo(
+          carrierPagoInstruccionesEffective, metodo);
 
   bool get aliadoPuedeElegirTransportista =>
       status == TransactionRequestStatus.pedidoListo &&
@@ -658,7 +677,9 @@ class TransactionRequestModel {
   /// Distingue rechazo inicial, anulación B2B Conecta (post-aprobación) y cancelación por aliado.
   String statusLabelEs({bool aliadoViewer = false}) {
     if (status == TransactionRequestStatus.rechazado && canceladoPorAliado) {
-      return aliadoViewer ? 'Cancelada por usted' : 'Cancelada por la tienda minorista';
+      return aliadoViewer
+          ? 'Cancelada por usted'
+          : 'Cancelada por la tienda minorista';
     }
     if (status == TransactionRequestStatus.rechazado &&
         canceladoPorImportador) {
@@ -721,7 +742,8 @@ class TransactionRequestModel {
       if (m != null && m.isNotEmpty) {
         final city = pickupCiudad?.trim();
         final state = pickupEstado?.trim();
-        final extra = [city, state].whereType<String>().where((s) => s.isNotEmpty);
+        final extra =
+            [city, state].whereType<String>().where((s) => s.isNotEmpty);
         if (extra.isNotEmpty) {
           return '$m, ${extra.join(', ')}';
         }
@@ -1117,16 +1139,20 @@ class TransactionRequestModel {
           ? ownerMap!['pago_solo_divisas'] as bool
           : ownerMap?['pago_solo_divisas']?.toString().toLowerCase() == 'true',
       importerCarrierId: _nullableText(json['importer_carrier_id']),
-      importerCarrierDriverId: _nullableText(json['importer_carrier_driver_id']),
+      importerCarrierDriverId:
+          _nullableText(json['importer_carrier_driver_id']),
       carrierCompanyName: _nullableText(carrierMap?['company_name']),
-      carrierEtaHoursSnapshot: _asNullableDouble(json['carrier_eta_hours_snapshot']),
+      carrierEtaHoursSnapshot:
+          _asNullableDouble(json['carrier_eta_hours_snapshot']),
       carrierDistanceKmSnapshot:
           _asNullableDouble(json['carrier_distance_km_snapshot']),
-      carrierFeeUsdSnapshot: _asNullableDouble(json['carrier_fee_usd_snapshot']),
+      carrierFeeUsdSnapshot:
+          _asNullableDouble(json['carrier_fee_usd_snapshot']),
       carrierFletePagoModoSnapshot:
           _nullableText(json['carrier_flete_pago_modo_snapshot']),
       carrierSelectedAt: _parseDate(json['carrier_selected_at']),
-      fleteFacturaStoragePath: _nullableText(json['flete_factura_storage_path']),
+      fleteFacturaStoragePath:
+          _nullableText(json['flete_factura_storage_path']),
       fleteFacturaFileName: _nullableText(json['flete_factura_file_name']),
       fleteFacturaSubmittedAt: _parseDate(json['flete_factura_submitted_at']),
       carrierAcceptedPagoMetodos:
@@ -1149,7 +1175,8 @@ class TransactionRequestModel {
           _nullableText(json['flete_comprobante_pago_file_name']),
       fleteComprobanteSubmittedAt:
           _parseDate(json['flete_comprobante_submitted_at']),
-      fletePagoEstadoRevision: _nullableText(json['flete_pago_estado_revision']),
+      fletePagoEstadoRevision:
+          _nullableText(json['flete_pago_estado_revision']),
       fleteComprobanteRechazoNota:
           _nullableText(json['flete_comprobante_rechazo_nota']),
       fletePagoAprobadoAt: _parseDate(json['flete_pago_aprobado_at']),
@@ -1211,7 +1238,8 @@ class TransactionRequestModel {
           _parseImporterViewOrderItems(json['_importer_view_order_items']),
       facturaUrl: _nullableText(json['factura_url']),
       checkoutGroupId: _nullableText(json['checkout_group_id']),
-      originalCheckoutGroupId: _nullableText(json['original_checkout_group_id']),
+      originalCheckoutGroupId:
+          _nullableText(json['original_checkout_group_id']),
       confirmadoPor: _nullableText(json['confirmado_por']),
       discountRules: parseDiscountRulesMap(json['discount_rules']),
       productDiscountRules: productDiscountRules,

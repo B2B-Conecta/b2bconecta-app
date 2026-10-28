@@ -7,6 +7,8 @@ import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dar
 import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_mapping.dart';
 import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_result.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/inventory/inventory_search.dart';
+import 'package:motolink_pro_app/features/inventory/product_delete_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
@@ -231,10 +233,9 @@ class InventoryService {
         .select('*, profiles!products_owner_id_fkey(business_name)')
         .eq('owner_id', uid);
 
-    final q = searchQuery?.trim();
-    if (q != null && q.isNotEmpty) {
-      final safe = SupabaseAccess.sanitizeIlike(q);
-      query = query.ilike('name', '%$safe%');
+    final searchOr = InventorySearch.postgrestOrFilter(searchQuery);
+    if (searchOr != null) {
+      query = query.or(searchOr);
     }
 
     final cat = category?.trim();
@@ -342,23 +343,56 @@ class InventoryService {
   }
 
   /// Elimina un producto del inventario del importador (RLS: owner).
-  static Future<void> deleteProduct({required String productId}) async {
-    if (productId.trim().isEmpty) return;
-    await SupabaseAccess.client
-        .from('products')
-        .delete()
-        .eq('id', productId.trim());
+  ///
+  /// No borra en cascada historial de postventa: un FK `23503` queda en
+  /// [ProductDeleteBatchResult.blocked] en lugar de lanzar el error crudo.
+  static Future<ProductDeleteBatchResult> deleteProduct({
+    required String productId,
+    String? label,
+  }) {
+    final id = productId.trim();
+    if (id.isEmpty) return Future.value(const ProductDeleteBatchResult());
+    return deleteProductsBulk(
+      productIds: [id],
+      labelsById: label == null || label.trim().isEmpty
+          ? null
+          : {id: label.trim()},
+    );
   }
 
-  /// Elimina varios productos del inventario actual (RLS).
-  static Future<int> deleteProductsBulk({
+  /// Elimina productos uno a uno para poder reportar éxitos vs bloqueados por FK.
+  ///
+  /// Ante `23503` (p. ej. `replacement_orders_product_id_fkey`) el SKU se marca
+  /// como bloqueado; no se tocan tablas de historial.
+  static Future<ProductDeleteBatchResult> deleteProductsBulk({
     required List<String> productIds,
+    Map<String, String>? labelsById,
   }) async {
     final ids =
         productIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
-    if (ids.isEmpty) return 0;
-    await SupabaseAccess.client.from('products').delete().inFilter('id', ids);
-    return ids.length;
+    if (ids.isEmpty) return const ProductDeleteBatchResult();
+
+    final deleted = <String>[];
+    final blocked = <ProductDeleteBlockedItem>[];
+
+    for (final id in ids) {
+      try {
+        await SupabaseAccess.client.from('products').delete().eq('id', id);
+        deleted.add(id);
+      } on PostgrestException catch (error) {
+        if (!ProductDeleteErrors.isForeignKeyViolation(error)) rethrow;
+        final label = labelsById?[id]?.trim();
+        blocked.add(
+          ProductDeleteBlockedItem(
+            id: id,
+            label: (label != null && label.isNotEmpty) ? label : id,
+            reason: ProductDeleteErrors.classify(error),
+          ),
+        );
+      }
+    }
+
+    return ProductDeleteBatchResult(deletedIds: deleted, blocked: blocked);
   }
 
   /// Sube una imagen al bucket [product-images] y devuelve la URL pública.
@@ -393,12 +427,13 @@ class InventoryService {
       _ => 'image/jpeg',
     };
 
+    // Path ya es único (timestamp); upsert:true provoca 42P10 en Storage.
     await SupabaseAccess.client.storage
         .from(SupabaseAccess.productImagesBucket)
         .uploadBinary(
           path,
           bytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: true),
+          fileOptions: FileOptions(contentType: contentType),
         );
 
     return SupabaseAccess.client.storage

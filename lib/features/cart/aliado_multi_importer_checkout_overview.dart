@@ -63,7 +63,7 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Cada proveedor emite su factura y usted realiza un pago separado. '
-            'Total del pedido: ${formatRefAmount(totalRef)} REF.',
+            'Total del pedido: ${formatRefAmount(totalRef)} ${orderAmountCurrency(allLines)}.',
             style: TextStyle(
               fontSize: 11.5,
               height: 1.35,

@@ -482,11 +482,14 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               _GoogleMark(),
               SizedBox(width: 10),
-              Text(
-                'Continuar con Google',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  'Continuar con Google',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

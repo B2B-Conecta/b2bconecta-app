@@ -498,91 +498,93 @@ class _PublishedProductTile extends StatelessWidget {
           );
         },
         child: DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 64,
-                height: 64,
-                child: part.coverImageUrl != null &&
-                        part.coverImageUrl!.isNotEmpty
-                    ? Image.network(
-                        part.coverImageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => ColoredBox(
-                          color: AppColors.surfaceTinted,
-                          child: const Icon(Icons.image_outlined),
-                        ),
-                      )
-                    : ColoredBox(
-                        color: AppColors.surfaceTinted,
-                        child: const Icon(Icons.image_outlined),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    part.nombre,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  if (sku != null && sku.isNotEmpty)
-                    Text(
-                      'SKU $sku',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  if (category != null && category.isNotEmpty)
-                    Text(
-                      category,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.brandBlue,
-                      ),
-                    ),
-                  const SizedBox(height: 4),
-                  CatalogProductPriceDisplay(
-                    listPriceUsd: part.precio,
-                    salePriceUsd: part.salePriceUsd,
-                    discountRules: part.discountRules,
-                    compact: true,
-                    showPromotionChips: false,
-                  ),
-                ],
-              ),
-            ),
-            Column(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.chevron_right, color: AppColors.brand),
-                TextButton(
-                  onPressed: enabled ? onToggleVisibility : null,
-                  child: busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(part.isActive ? 'Ocultar' : 'Mostrar'),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: part.coverImageUrl != null &&
+                            part.coverImageUrl!.isNotEmpty
+                        ? Image.network(
+                            part.coverImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => ColoredBox(
+                              color: AppColors.surfaceTinted,
+                              child: const Icon(Icons.image_outlined),
+                            ),
+                          )
+                        : ColoredBox(
+                            color: AppColors.surfaceTinted,
+                            child: const Icon(Icons.image_outlined),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        part.nombre,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      if (sku != null && sku.isNotEmpty)
+                        Text(
+                          'SKU $sku',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      if (category != null && category.isNotEmpty)
+                        Text(
+                          category,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandBlue,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      CatalogProductPriceDisplay(
+                        listPriceUsd: part.precio,
+                        salePriceUsd: part.salePriceUsd,
+                        quantity: part.minOrderQtyEffective,
+                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                        discountRules: part.discountRules,
+                        compact: true,
+                        showPromotionChips: false,
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    const Icon(Icons.chevron_right, color: AppColors.brand),
+                    TextButton(
+                      onPressed: enabled ? onToggleVisibility : null,
+                      child: busy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(part.isActive ? 'Ocultar' : 'Mostrar'),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
         ),
       ),
     );

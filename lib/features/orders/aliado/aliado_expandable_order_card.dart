@@ -765,7 +765,7 @@ String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
   final imp = lines.length;
   final buf = StringBuffer(
     '$imp ${imp == 1 ? "importador" : "importadores"} · $uds uds · '
-    '${formatRefAmount(totalRef)} REF',
+    '${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}',
   );
   final bsVals =
       lines.map((r) => r.precioTotalBsUi).whereType<double>().toList();

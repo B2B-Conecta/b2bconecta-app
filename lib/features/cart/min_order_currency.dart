@@ -1,5 +1,5 @@
 /// Unidad de presentación del pedido mínimo.
-/// REF = precio de catálogo / carrito. Divisa = USD de pago (Zelle, USDT, Binance),
+/// REF = precio de catálogo / carrito. Divisa = USD de pago (Zelle, USDT),
 /// que puede ser menor que REF si hay descuento por pago en dólares.
 /// El checkout sigue validando el subtotal REF.
 enum MinOrderCurrency {

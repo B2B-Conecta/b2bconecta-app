@@ -27,7 +27,39 @@ XYZ-002,Bujía,3,25
 
       expect(preview.headers, ['Cod_Art', 'Descripcion', 'Precio_Mayor', 'Existencia']);
       expect(preview.sampleRows.first['Cod_Art'], 'ABC-001');
+      expect(preview.sampleRows, hasLength(2));
       expect(preview.totalDataRowsEstimate, 2);
+    });
+
+    test('previewFile con sampleRowCount alto refleja todas las filas', () {
+      final lines = [
+        'sku,nombre,precio',
+        for (var i = 1; i <= 12; i++) 'SKU-$i,Producto $i,${i + 1}.00',
+      ];
+      final bytes = Uint8List.fromList(utf8.encode(lines.join('\n')));
+      final compact = FlexibleCatalogImportService.previewFile(
+        bytes: bytes,
+        meta: const CatalogImportFileMeta(
+          format: CatalogImportFileFormat.csv,
+          headerRow: 1,
+          dataStartsAtRow: 2,
+        ),
+      );
+      expect(compact.sampleRows, hasLength(5));
+      expect(compact.totalDataRowsEstimate, 12);
+
+      final details = FlexibleCatalogImportService.previewFile(
+        bytes: bytes,
+        meta: const CatalogImportFileMeta(
+          format: CatalogImportFileFormat.csv,
+          headerRow: 1,
+          dataStartsAtRow: 2,
+        ),
+        sampleRowCount: FlexibleCatalogImportService.detailsPreviewMaxRows,
+      );
+      expect(details.sampleRows, hasLength(12));
+      expect(details.totalDataRowsEstimate, 12);
+      expect(details.sampleRows.last['sku'], 'SKU-12');
     });
 
     test('parseInBatches aplica mapeo dinámico ERP', () async {

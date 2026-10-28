@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 
-/// Así ve la tienda el precio, con la misma cascada del catálogo.
+/// Vista de los precios publicados, igual que en el catálogo de la tienda.
 class ImporterProductPricePreview extends StatelessWidget {
   const ImporterProductPricePreview({
     super.key,
@@ -44,7 +44,7 @@ class ImporterProductPricePreview extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Precio REF es la base. El precio USD aparece solo si hay promoción.',
+              'Precios por unidad: USD promocional primero, seguido del REF original y su equivalente en bolívares.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
@@ -62,7 +62,6 @@ class ImporterProductPricePreview extends StatelessWidget {
       ),
     );
   }
-
 }
 
 double? parsePreviewMoney(String raw) {

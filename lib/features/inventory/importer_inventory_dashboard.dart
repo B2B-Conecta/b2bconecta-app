@@ -29,6 +29,8 @@ import 'importer_inventory_layout.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'importer_sales_snapshot.dart';
+import 'product_delete_outcome_sheet.dart';
+import 'product_delete_result.dart';
 import 'product_images.dart';
 
 enum _InventorySelectionMode { none, visibility, delete }
@@ -260,16 +262,71 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   }) async {
     if (products.isEmpty) return false;
     final count = products.length;
-    final names = products.take(6).map(_productDeleteLabel).toList();
-    final extra = count - names.length;
+    final scrollable = count > 3;
     final result = await showAdaptiveAdminSheet<bool>(
       context: context,
-      builder: (ctx, _) {
+      draggable: scrollable,
+      initialChildSize: count > 8 ? 0.82 : 0.68,
+      minChildSize: 0.45,
+      maxChildSize: 0.94,
+      builder: (ctx, scroll) {
         final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+        final list = ListView.separated(
+          controller: scroll,
+          shrinkWrap: !scrollable,
+          physics: scrollable
+              ? null
+              : const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: 4, bottom: 4),
+          itemCount: products.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, index) {
+            final part = products[index];
+            final sku = part.sku?.trim();
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _productThumbnail(part, desktop: false),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _productDeleteLabel(part),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (sku != null && sku.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'SKU $sku',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+
         return Padding(
           padding: EdgeInsets.fromLTRB(20, 4, 20, 12 + bottom),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: scrollable ? MainAxisSize.max : MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
@@ -292,21 +349,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                 ),
               ),
               const SizedBox(height: 12),
-              for (final name in names)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              if (extra > 0)
-                Text(
-                  'y $extra más',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
+              if (scrollable) Expanded(child: list) else list,
               const SizedBox(height: 16),
               FilledButton(
                 style: FilledButton.styleFrom(
@@ -336,19 +379,82 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     ];
   }
 
+  Future<void> _applyDeleteResult(ProductDeleteBatchResult result) async {
+    if (!mounted) return;
+    if (result.hasDeleted) {
+      setState(() {
+        _selectedIds.removeWhere(result.deletedIds.contains);
+        if (_selectedIds.isEmpty) {
+          _selectionMode = _InventorySelectionMode.none;
+        }
+      });
+      _reload();
+    }
+
+    if (result.hasBlocked) {
+      final action = await showProductDeleteOutcomeSheet(
+        context: context,
+        result: result,
+      );
+      if (!mounted) return;
+      if (action == ProductDeleteOutcomeAction.pauseBlocked) {
+        await _pauseBlockedProducts(result.blockedIds);
+      }
+      return;
+    }
+
+    if (result.hasDeleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.deletedCount == 1
+                ? 'Producto eliminado.'
+                : '${result.deletedCount} productos eliminados.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pauseBlockedProducts(List<String> ids) async {
+    final targets = ids.where((id) => id.isNotEmpty).toList();
+    if (targets.isEmpty) return;
+    try {
+      await SupabaseService.setProductsActiveBulk(
+        productIds: targets,
+        isActive: false,
+      );
+      if (!mounted) return;
+      _reload();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            targets.length == 1
+                ? 'Producto pausado. Ya no aparece en el catálogo.'
+                : '${targets.length} productos pausados. Ya no aparecen en el catálogo.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo pausar: $e')),
+      );
+    }
+  }
+
   Future<void> _deleteSingle(PartModel part) async {
     final ok = await _confirmDeleteDialog(products: [part]);
     if (!ok || !mounted) return;
     try {
-      await SupabaseService.deleteProduct(productId: part.id);
-      if (!mounted) return;
-      _reload();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Producto eliminado.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      final result = await SupabaseService.deleteProduct(
+        productId: part.id,
+        label: _productDeleteLabel(part),
       );
+      if (!mounted) return;
+      await _applyDeleteResult(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -364,24 +470,16 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     final ok = await _confirmDeleteDialog(products: products);
     if (!ok || !mounted) return;
     final ids = products.map((part) => part.id).toList();
+    final labels = {
+      for (final part in products) part.id: _productDeleteLabel(part),
+    };
     try {
-      await SupabaseService.deleteProductsBulk(productIds: ids);
-      if (!mounted) return;
-      setState(() {
-        _selectedIds.clear();
-        _selectionMode = _InventorySelectionMode.none;
-      });
-      _reload();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            ids.length == 1
-                ? '1 producto eliminado.'
-                : '${ids.length} productos eliminados.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      final result = await SupabaseService.deleteProductsBulk(
+        productIds: ids,
+        labelsById: labels,
       );
+      if (!mounted) return;
+      await _applyDeleteResult(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1082,9 +1180,47 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     });
   }
 
+  void _patchLoadedPartActive(String id, bool isActive) {
+    final i = _loadedParts.indexWhere((part) => part.id == id);
+    if (i < 0) return;
+    _loadedParts[i] = _loadedParts[i].copyWith(isActive: isActive);
+  }
+
+  /// Si el filtro activo ya no admite el producto, lo saca de la lista local
+  /// sin reiniciar página ni scroll.
+  void _dropLoadedPartIfFilteredOut(String id, bool isActive) {
+    final excludedByFilter =
+        (_filterActiveOnly && !isActive) || (_filterHidden && isActive);
+    if (!excludedByFilter) return;
+    _loadedParts.removeWhere((part) => part.id == id);
+    _selectedIds.remove(id);
+    _productPageIndex = clampListPageIndex(
+      pageIndex: _productPageIndex,
+      total: _loadedParts.length,
+      pageSize: _productPageSize,
+    );
+  }
+
+  void _refreshInventoryMetricsQuietly() {
+    _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
+  }
+
   Future<void> _applyBulkVisibility({required bool isActive}) async {
     if (_selectedIds.isEmpty) return;
     final ids = _selectedIds.toList();
+    final previousById = <String, bool>{
+      for (final part in _loadedParts)
+        if (ids.contains(part.id)) part.id: part.isActive,
+    };
+
+    setState(() {
+      for (final id in ids) {
+        _patchLoadedPartActive(id, isActive);
+      }
+      _selectedIds.clear();
+      _selectionMode = _InventorySelectionMode.none;
+    });
+
     try {
       await SupabaseService.setProductsActiveBulk(
         productIds: ids,
@@ -1092,10 +1228,11 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       );
       if (!mounted) return;
       setState(() {
-        _selectedIds.clear();
-        _selectionMode = _InventorySelectionMode.none;
+        for (final id in ids) {
+          _dropLoadedPartIfFilteredOut(id, isActive);
+        }
+        _refreshInventoryMetricsQuietly();
       });
-      _reload();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1107,6 +1244,11 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       );
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        for (final entry in previousById.entries) {
+          _patchLoadedPartActive(entry.key, entry.value);
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo actualizar: $e')),
       );
@@ -1114,16 +1256,29 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   }
 
   Future<void> _toggleActive(PartModel part, bool value) async {
-    setState(() => _togglingProductIds.add(part.id));
+    if (part.isActive == value) return;
+    final previous = part.isActive;
+
+    setState(() {
+      _togglingProductIds.add(part.id);
+      _patchLoadedPartActive(part.id, value);
+    });
+
     try {
       await SupabaseService.setProductActive(
         productId: part.id,
         isActive: value,
       );
       if (!mounted) return;
-      _reload();
+      setState(() {
+        _dropLoadedPartIfFilteredOut(part.id, value);
+        _refreshInventoryMetricsQuietly();
+      });
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _patchLoadedPartActive(part.id, previous);
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo actualizar: $e')),
       );
@@ -1547,9 +1702,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
 
   InputDecoration _inventorySearchDecoration() {
     return InputDecoration(
-      hintText: 'Buscar en mi inventario…',
+      hintText: 'Buscar por nombre, SKU, categoría…',
       hintStyle: AppColors.hintStyle,
       prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+      suffixIcon: IconButton(
+        tooltip: 'Buscar',
+        onPressed: () => _reloadInventory(preserveScroll: true),
+        icon: Icon(Icons.arrow_forward_rounded, color: AppColors.brandBlue),
+      ),
       isDense: true,
       filled: true,
       fillColor: AppColors.fieldFill,
@@ -1569,6 +1729,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     return TextField(
       controller: _searchController,
       decoration: _inventorySearchDecoration(),
+      textInputAction: TextInputAction.search,
       onSubmitted: (_) => _reloadInventory(preserveScroll: true),
     );
   }
@@ -2023,9 +2184,34 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
 
     return [
+      SliverPadding(
+        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+        sliver: SliverList.separated(
+          itemCount: parts.length,
+          separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 10 : 8),
+          itemBuilder: (context, i) =>
+              _buildProductTile(parts[i], desktop: isDesktop),
+        ),
+      ),
+      if (_loadingMoreInventory)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.brand,
+                ),
+              ),
+            ),
+          ),
+        ),
       SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, listBottomPadding),
           child: ListPageBar(
             total: _loadedParts.length,
             hasMore: _hasMoreInventory,
@@ -2044,31 +2230,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
           ),
         ),
       ),
-      SliverPadding(
-        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, listBottomPadding),
-        sliver: SliverList.separated(
-          itemCount: parts.length,
-          separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 10 : 8),
-          itemBuilder: (context, i) =>
-              _buildProductTile(parts[i], desktop: isDesktop),
-        ),
-      ),
-      if (_loadingMoreInventory)
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: 28),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: AppColors.brand,
-                ),
-              ),
-            ),
-          ),
-        ),
     ];
   }
 

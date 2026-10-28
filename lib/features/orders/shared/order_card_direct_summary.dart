@@ -43,11 +43,13 @@ class OrderCardProductPeek {
     this.sku,
     this.imageUrl,
     this.lineStatusLabel,
+    this.currencyLabel = 'REF',
   });
 
   final String name;
   final int quantity;
   final double lineTotalRef;
+  final String currencyLabel;
   final String? sku;
   final String? imageUrl;
   final String? lineStatusLabel;
@@ -62,11 +64,8 @@ String? _locationLine(String? ciudad, String? estado) {
 }
 
 String orderCardPartyInitials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((p) => p.isNotEmpty)
-      .toList();
+  final parts =
+      name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
   if (parts.length == 1) {
     final s = parts.first;
@@ -154,9 +153,10 @@ List<OrderCardProductPeek> orderCardProductPeeks({
       forImportadorUserId: importerUserId,
     );
     final cover = productCoverImageUrl(r.productImageUrls);
-    final lineStatus = r.qtyAdjustmentStatus == QtyAdjustmentStatus.pendienteAliado
-        ? 'Ajuste pendiente'
-        : null;
+    final lineStatus =
+        r.qtyAdjustmentStatus == QtyAdjustmentStatus.pendienteAliado
+            ? 'Ajuste pendiente'
+            : null;
     for (var i = 0; i < desglose.length; i++) {
       final p = desglose[i];
       out.add(
@@ -165,6 +165,7 @@ List<OrderCardProductPeek> orderCardProductPeeks({
           sku: p.sku,
           quantity: p.cantidad,
           lineTotalRef: p.precioRef,
+          currencyLabel: r.amountCurrencyLabel,
           imageUrl: desglose.length == 1 ? cover : null,
           lineStatusLabel: lineStatus,
         ),
@@ -206,9 +207,8 @@ class OrderCardDirectSummary extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final visible = compact && products.length > 1
-        ? products.take(1).toList()
-        : products;
+    final visible =
+        compact && products.length > 1 ? products.take(1).toList() : products;
     final extra = products.length - visible.length;
     final showLineTotal = !compact && products.length > 1;
     final gap = density.isDesktop ? 4.0 : 6.0;
@@ -412,7 +412,7 @@ class _OrderCardProductRow extends StatelessWidget {
                 ),
               if (showLineTotal)
                 Text(
-                  '${formatRefAmount(product.lineTotalRef)} REF',
+                  '${formatRefAmount(product.lineTotalRef)} ${product.currencyLabel}',
                   style: TextStyle(
                     fontSize: density.contentSmallSize,
                     fontWeight: FontWeight.w600,

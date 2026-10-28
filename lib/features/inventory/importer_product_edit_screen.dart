@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'product_min_order_qty.dart';
 import 'product_custom_fields_section.dart';
+import 'product_delete_outcome_sheet.dart';
 import 'product_image_gallery_editor.dart';
 import 'importer_product_price_preview.dart';
 
@@ -309,9 +310,47 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
 
     setState(() => _saving = true);
     try {
-      await SupabaseService.deleteProduct(productId: widget.initial!.id);
+      final result = await SupabaseService.deleteProduct(
+        productId: widget.initial!.id,
+        label: name,
+      );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      if (result.allSucceeded) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+      if (result.hasBlocked) {
+        final action = await showProductDeleteOutcomeSheet(
+          context: context,
+          result: result,
+        );
+        if (!mounted) return;
+        if (action == ProductDeleteOutcomeAction.pauseBlocked) {
+          try {
+            await SupabaseService.setProductsActiveBulk(
+              productIds: result.blockedIds,
+              isActive: false,
+            );
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Producto pausado. Ya no aparece en el catálogo.',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            Navigator.of(context).pop(true);
+            return;
+          } catch (pauseError) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No se pudo pausar: $pauseError')),
+            );
+          }
+        }
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

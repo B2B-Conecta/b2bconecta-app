@@ -451,7 +451,8 @@ class OrdersService {
     final profile = await ProfileService.fetchMyProfile();
     final role = profile?.role?.trim().toLowerCase();
     if (role != 'aliado') {
-      throw StateError('Solo las tiendas minoristas pueden crear solicitudes de pedido.');
+      throw StateError(
+          'Solo las tiendas minoristas pueden crear solicitudes de pedido.');
     }
     if (profile == null) {
       throw StateError('No se encontró el perfil de la tienda minorista.');
@@ -515,9 +516,8 @@ class OrdersService {
       );
     }
     final minRaw = prodMap['min_order_qty'];
-    final minParsed = minRaw is int
-        ? minRaw
-        : int.tryParse(minRaw?.toString() ?? '');
+    final minParsed =
+        minRaw is int ? minRaw : int.tryParse(minRaw?.toString() ?? '');
     final minEffective = ProductMinOrderQty.resolve(minParsed);
     if (cantidad < minEffective) {
       throw StockInsufficientException(
@@ -561,6 +561,7 @@ class OrdersService {
   /// Confirma carrito multi-importador (una fila `transaction_requests` por importador + snapshot BCV).
   static Future<String> checkoutMultiImportadorCart({
     required List<Map<String, dynamic>> lines,
+    String moneda = 'BOLIVARES',
     bool destinoEntregaUsaPerfil = true,
     String? destinoEntregaTexto,
     String? destinoEntregaMapsUrl,
@@ -572,7 +573,8 @@ class OrdersService {
     if (uid == null) throw StateError('No hay sesión activa.');
     final profile = await ProfileService.fetchMyProfile();
     if (profile == null || profile.role?.trim().toLowerCase() != 'aliado') {
-      throw StateError('Solo las tiendas minoristas pueden confirmar el carrito.');
+      throw StateError(
+          'Solo las tiendas minoristas pueden confirmar el carrito.');
     }
     if (destinoEntregaUsaPerfil) {
       if (!profile.hasFiscalMapsShareLink) {
@@ -606,8 +608,9 @@ class OrdersService {
     }
 
     final res = await SupabaseAccess.client.rpc(
-      'aliado_checkout_multi_importador',
+      'aliado_checkout_multi_importador_moneda',
       params: <String, dynamic>{
+        'p_moneda': moneda,
         'p_lines': lines,
         'p_destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
         'p_destino_entrega_texto': destinoEntregaTexto,
@@ -1081,7 +1084,8 @@ class OrdersService {
     }
   }
 
-  static List<TransactionRequestMessageModel> _messagesFromRows(dynamic response) {
+  static List<TransactionRequestMessageModel> _messagesFromRows(
+      dynamic response) {
     final list = response as List<dynamic>;
     return list
         .map(
@@ -1167,7 +1171,8 @@ class OrdersService {
     return DateTime.now();
   }
 
-  static Future<({String resolution, double? creditAmount, DateTime? resolvedAt})>
+  static Future<
+          ({String resolution, double? creditAmount, DateTime? resolvedAt})>
       resolveOrderPostventaCaso({
     required String transactionRequestId,
     required String resolution,
@@ -1186,12 +1191,13 @@ class OrdersService {
     return (
       resolution: map['resolution']?.toString() ?? resolution,
       creditAmount: amount == null ? null : double.tryParse(amount.toString()),
-      resolvedAt: DateTime.tryParse(map['resolved_at']?.toString() ?? '')
-          ?.toLocal(),
+      resolvedAt:
+          DateTime.tryParse(map['resolved_at']?.toString() ?? '')?.toLocal(),
     );
   }
 
-  static Future<Map<String, dynamic>?> fetchReplacementOrder(String casoId) async {
+  static Future<Map<String, dynamic>?> fetchReplacementOrder(
+      String casoId) async {
     final id = casoId.trim();
     if (id.isEmpty) return null;
     final row = await SupabaseAccess.client
@@ -1218,8 +1224,10 @@ class OrdersService {
     return map['status']?.toString() ?? status;
   }
 
-  static Future<List<AliadoCreditBalance>> fetchAliadoCreditBalancesForImporter() async {
-    final res = await SupabaseAccess.client.rpc('importer_aliado_credit_balances');
+  static Future<List<AliadoCreditBalance>>
+      fetchAliadoCreditBalancesForImporter() async {
+    final res =
+        await SupabaseAccess.client.rpc('importer_aliado_credit_balances');
     if (res is! List) return const [];
     return res
         .whereType<Map>()
@@ -1234,8 +1242,10 @@ class OrdersService {
         .toList();
   }
 
-  static Future<List<ImporterCreditBalance>> fetchImporterCreditBalances() async {
-    final res = await SupabaseAccess.client.rpc('aliado_importer_credit_balances');
+  static Future<List<ImporterCreditBalance>>
+      fetchImporterCreditBalances() async {
+    final res =
+        await SupabaseAccess.client.rpc('aliado_importer_credit_balances');
     if (res is! List) return const [];
     return res
         .whereType<Map>()

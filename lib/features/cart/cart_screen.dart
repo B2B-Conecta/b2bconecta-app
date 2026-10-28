@@ -32,16 +32,15 @@ class CartScreen extends StatefulWidget {
   State<CartScreen> createState() => _CartScreenState();
 }
 
-enum _PagoMoneda { ref, usd, bolivares }
+enum _PagoMoneda { bolivares, usd }
 
 /// Every display currency starts with the same effective price as checkout.
 double _cartUnitDollars(CartLine line, _PagoMoneda modo) {
   switch (modo) {
-    case _PagoMoneda.ref:
-      return line.precioUnitarioAliadoRef;
     case _PagoMoneda.usd:
       return ProductCatalogPricing.aliadoUnitUsdPaymentLine(
           refUnitUsd: line.precioUnitarioAliadoRef,
+          salePriceUsd: line.part.salePriceUsd,
           discountRules: line.part.discountRules,
           ownerPagoSoloDivisas: line.part.ownerPagoSoloDivisas);
     case _PagoMoneda.bolivares:
@@ -51,8 +50,6 @@ double _cartUnitDollars(CartLine line, _PagoMoneda modo) {
 
 String _cartMoney(double dollars, _PagoMoneda modo, double? tasa) {
   switch (modo) {
-    case _PagoMoneda.ref:
-      return '${formatRefAmount(dollars)} REF';
     case _PagoMoneda.usd:
       return '${formatRefAmount(dollars)} USD';
     case _PagoMoneda.bolivares:
@@ -65,8 +62,9 @@ class _CartScreenState extends State<CartScreen> {
   final _cart = CartService.instance;
   bool _submitting = false;
   bool _choosingDelivery = false;
-  _PagoMoneda _pagoMoneda = _PagoMoneda.ref;
+  _PagoMoneda _pagoMoneda = _PagoMoneda.bolivares;
   double? _tasa;
+  DateTime? _tasaEffectiveDate;
   Map<String, ImporterCreditBalance> _credits = const {};
   final Set<String> _creditOptOut = {};
 
@@ -76,11 +74,13 @@ class _CartScreenState extends State<CartScreen> {
     _tasa = widget.liveTasaBcv;
     _cart.addListener(_onCart);
     _loadCredits();
-    if (_tasa == null) {
-      SupabaseService.fetchGlobalTasaBcv().then((v) {
-        if (mounted) setState(() => _tasa = v);
-      }).catchError((_) {});
-    }
+    SupabaseService.fetchGlobalTasaBcvRecord().then((record) {
+      if (!mounted || record == null) return;
+      setState(() {
+        _tasa = record.tasa;
+        _tasaEffectiveDate = DateTime.tryParse(record.effectiveDate ?? '');
+      });
+    }).catchError((_) {});
   }
 
   void _onCart() {
@@ -99,7 +99,8 @@ class _CartScreenState extends State<CartScreen> {
 
   double _groupSubtotal(List<CartLine> lines) => lines.fold<double>(
         0,
-        (sum, line) => sum + line.precioUnitarioAliadoRef * line.quantity,
+        (sum, line) =>
+            sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity,
       );
 
   double _creditFor(List<CartLine> lines) {
@@ -144,7 +145,11 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _choosingDelivery = true);
     final result = await showDialog<_DestinoEntregaResult?>(
       context: context,
-      builder: (ctx) => _DestinoEntregaDialog(profile: widget.profile),
+      builder: (ctx) => _DestinoEntregaDialog(
+          profile: widget.profile,
+          paymentSummary: _pagoMoneda == _PagoMoneda.usd
+              ? 'Pago en divisas (USD).'
+              : 'Pago en bolívares a la tasa BCV. El REF es la base de cálculo.'),
     );
 
     if (!mounted) return;
@@ -170,8 +175,7 @@ class _CartScreenState extends State<CartScreen> {
           .toList();
 
       final appliedCredit = _appliedCredit;
-      final moneda =
-          _pagoMoneda == _PagoMoneda.bolivares ? 'BOLIVARES' : 'DIVISAS';
+      final moneda = _pagoMoneda == _PagoMoneda.usd ? 'DIVISAS' : 'BOLIVARES';
       final orderId = await SupabaseService.checkoutMultiImportadorCart(
         lines: lines,
         destinoEntregaUsaPerfil: result.useProfile,
@@ -179,35 +183,13 @@ class _CartScreenState extends State<CartScreen> {
         destinoEntregaMapsUrl: result.mapsUrl,
         promoByImportador: _cart.promoAttributionPayloadForCheckout(),
         applyCreditByImportador: _creditPayload(),
+        moneda: moneda,
       );
-      try {
-        await OrdersService.freezeCheckoutMoneda(
-          checkoutGroupId: orderId,
-          moneda: moneda,
-        );
-      } catch (e) {
-        final purchaseValue = _cart.totalRef() - appliedCredit;
-        trackPurchase(
-          orderId: orderId.trim().isNotEmpty
-              ? orderId.trim()
-              : 'checkout-${DateTime.now().millisecondsSinceEpoch}',
-          valueUsd: purchaseValue,
-        );
-        _cart.clear();
-        MainShellTabController.notifyPedidosReload();
-        if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Pedido registrado. La moneda de pago no quedó guardada: $e',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        nav.pop(true);
-        return;
-      }
-      final purchaseValue = _cart.totalRef() - appliedCredit;
+      final purchaseValue = _cart.lines.fold<double>(
+              0,
+              (sum, line) =>
+                  sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity) -
+          appliedCredit;
       trackPurchase(
         orderId: orderId.trim().isNotEmpty
             ? orderId.trim()
@@ -399,10 +381,13 @@ class _CartScreenState extends State<CartScreen> {
       (sum, line) => sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity,
     );
     final displayNet = displayGross - appliedCredit;
-    final pagaBolivares = _pagoMoneda == _PagoMoneda.bolivares;
+    final pagaBolivares = _pagoMoneda != _PagoMoneda.usd;
+    final currencyBlocked = pagaBolivares &&
+        _cart.lines.any((line) => line.part.ownerPagoSoloDivisas);
     final canConfirm = _cart.canEdit &&
         !_submitting &&
         !_choosingDelivery &&
+        !currencyBlocked &&
         _cart.meetsAllImporterMinOrders &&
         (!pagaBolivares || totalBs != null);
 
@@ -535,48 +520,45 @@ class _CartScreenState extends State<CartScreen> {
                                   },
                           ),
                           const SizedBox(height: 16),
-                          _CartSummaryRow(
-                              label: 'Productos (${_cart.itemCount} uds)',
-                              value:
-                                  _cartMoney(displayGross, _pagoMoneda, tasa)),
+                          if (pagaBolivares || appliedCredit > 0)
+                            _CartSummaryRow(
+                                label: pagaBolivares && appliedCredit <= 0
+                                    ? 'Referencia'
+                                    : 'Productos (${_cart.itemCount} uds)',
+                                value: pagaBolivares
+                                    ? '${formatRefAmount(displayGross)} REF'
+                                    : _cartMoney(
+                                        displayGross, _pagoMoneda, tasa)),
                           if (appliedCredit > 0) ...[
                             const SizedBox(height: 10),
                             _CartSummaryRow(
                                 label: 'Saldo a favor',
-                                value:
-                                    '−${_cartMoney(appliedCredit, _pagoMoneda, tasa)}'),
+                                value: pagaBolivares
+                                    ? '−${formatRefAmount(appliedCredit)} REF'
+                                    : '−${_cartMoney(appliedCredit, _pagoMoneda, tasa)}'),
+                            if (pagaBolivares) ...[
+                              const SizedBox(height: 10),
+                              _CartSummaryRow(
+                                  label: 'Referencia',
+                                  value:
+                                      '${formatRefAmount(displayNet < 0 ? 0 : displayNet)} REF'),
+                            ],
+                          ],
+                          if (pagaBolivares || appliedCredit > 0) ...[
+                            const SizedBox(height: 12),
+                            Divider(height: 1, color: AppColors.divider),
                           ],
                           const SizedBox(height: 12),
-                          Divider(height: 1, color: AppColors.divider),
-                          const SizedBox(height: 12),
-                          Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                    child: Text('Subtotal',
-                                        style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.textSecondary))),
-                                const SizedBox(width: 12),
-                                Flexible(
-                                    fit: FlexFit.tight,
-                                    child: Text(
-                                        _cartMoney(
-                                            displayNet < 0 ? 0 : displayNet,
-                                            _pagoMoneda,
-                                            tasa),
-                                        textAlign: TextAlign.right,
-                                        style: TextStyle(
-                                            fontSize: 24,
-                                            height: 1.15,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: -0.5,
-                                            fontFeatures: const [
-                                              FontFeature.tabularFigures()
-                                            ],
-                                            color: AppColors.textPrimary))),
-                              ]),
+                          _CartSummaryRow(
+                              label: 'Subtotal',
+                              value: _cartMoney(displayNet < 0 ? 0 : displayNet,
+                                  _pagoMoneda, tasa),
+                              prominent: true),
+                          if (pagaBolivares && totalBs != null) ...[
+                            const SizedBox(height: 8),
+                            _CartBcvRate(
+                                tasa: tasa!, effectiveDate: _tasaEffectiveDate),
+                          ],
                           const SizedBox(height: 12),
                           Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,6 +580,11 @@ class _CartScreenState extends State<CartScreen> {
                                 'No hay tasa BCV vigente para cobrar en bolívares.',
                                 style: TextStyle(
                                     fontSize: 12, color: AppColors.brandBlue)),
+                          ],
+                          if (currencyBlocked) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                                'Un proveedor solo acepta divisas. Elige Divisas (USD) para continuar.'),
                           ],
                           if (!_cart.meetsAllImporterMinOrders) ...[
                             const SizedBox(height: 12),
@@ -750,9 +737,18 @@ class _CartLineCard extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
       ],
       const SizedBox(height: 4),
-      Text('${_cartMoney(unit, modo, tasa)} / ud',
+      Text(
+          modo == _PagoMoneda.bolivares
+              ? '${formatRefAmount(unit)} REF / ud'
+              : '${_cartMoney(unit, modo, tasa)} / ud',
           style: TextStyle(
               fontSize: 12, height: 1.3, color: AppColors.textSecondary)),
+      if (modo == _PagoMoneda.bolivares) ...[
+        const SizedBox(height: 2),
+        Text(_cartMoney(unit, modo, tasa),
+            style: TextStyle(
+                fontSize: 11, height: 1.3, color: AppColors.textSecondary)),
+      ],
       if (promo != null ||
           (modo == _PagoMoneda.usd && part.tieneOfertaDirecta)) ...[
         const SizedBox(height: 6),
@@ -777,6 +773,14 @@ class _CartLineCard extends StatelessWidget {
       Text('Mín. ${part.minOrderQtyEffective} · Disp. ${part.stockForSale}',
           style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
     ]);
+    final amountValue = _cartMoney(unit * line.quantity, modo, tasa);
+    final amountStyle = TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: AppColors.textPrimary);
+    final amountWidth = _cartTextWidth(context, amountValue, amountStyle)
+        .clamp(104.0, double.infinity);
     final amount = Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
@@ -784,18 +788,19 @@ class _CartLineCard extends StatelessWidget {
           Text('Importe',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 3),
-          Text(_cartMoney(unit * line.quantity, modo, tasa),
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  color: AppColors.textPrimary)),
+          if (modo == _PagoMoneda.bolivares) ...[
+            _CartMoneyText(
+                value: '${formatRefAmount(unit * line.quantity)} REF',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 2),
+          ],
+          _CartMoneyText(value: amountValue, style: amountStyle),
         ]);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: LayoutBuilder(builder: (context, constraints) {
         final wide = constraints.maxWidth >= 640 &&
+            amountWidth <= constraints.maxWidth - 520 &&
             MediaQuery.textScalerOf(context).scale(14) <= 18;
         if (wide) {
           return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -805,7 +810,7 @@ class _CartLineCard extends StatelessWidget {
             const SizedBox(width: 12),
             quantity,
             const SizedBox(width: 16),
-            SizedBox(width: 104, child: amount),
+            SizedBox(width: amountWidth, child: amount),
             const SizedBox(width: 4),
             remove,
           ]);
@@ -883,27 +888,99 @@ class _CartPanel extends StatelessWidget {
 }
 
 class _CartSummaryRow extends StatelessWidget {
-  const _CartSummaryRow({required this.label, required this.value});
+  const _CartSummaryRow(
+      {required this.label, required this.value, this.prominent = false});
   final String label;
   final String value;
+  final bool prominent;
   @override
-  Widget build(BuildContext context) =>
-      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(
-            child: Text(label,
-                style:
-                    TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+  Widget build(BuildContext context) {
+    final labelStyle = TextStyle(
+        fontSize: 13,
+        fontWeight: prominent ? FontWeight.w500 : FontWeight.w400,
+        color: AppColors.textSecondary);
+    final valueStyle = TextStyle(
+        fontSize: prominent ? 24 : 13,
+        height: prominent ? 1.15 : null,
+        fontWeight: prominent ? FontWeight.w700 : FontWeight.w600,
+        letterSpacing: prominent ? -0.5 : null,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: AppColors.textPrimary);
+    final labelText = Text(label, style: labelStyle);
+    if (value.isEmpty) return labelText;
+    final amount = _CartMoneyText(value: value, style: valueStyle);
+    return LayoutBuilder(builder: (context, constraints) {
+      final needed = _cartTextWidth(context, label, labelStyle) +
+          12 +
+          _cartTextWidth(context, value, valueStyle);
+      if (needed > constraints.maxWidth) {
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [labelText, const SizedBox(height: 6), amount]);
+      }
+      return Row(children: [
+        labelText,
         const SizedBox(width: 12),
-        Flexible(
-            fit: FlexFit.tight,
-            child: Text(value,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    color: AppColors.textPrimary))),
+        Expanded(child: amount),
       ]);
+    });
+  }
+}
+
+double _cartTextWidth(BuildContext context, String value, TextStyle style) {
+  final painter = TextPainter(
+      text: TextSpan(
+          text: value, style: DefaultTextStyle.of(context).style.merge(style)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+      maxLines: 1)
+    ..layout();
+  final width = painter.width.ceilToDouble();
+  painter.dispose();
+  return width;
+}
+
+/// Keep the currency and full value together, including unusually long totals.
+class _CartMoneyText extends StatelessWidget {
+  const _CartMoneyText({required this.value, required this.style});
+  final String value;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) => FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Text(value,
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.right,
+          style: style));
+}
+
+class _CartBcvRate extends StatelessWidget {
+  const _CartBcvRate({required this.tasa, this.effectiveDate});
+  final double tasa;
+  final DateTime? effectiveDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(fontSize: 11, color: AppColors.textSecondary);
+    final date = effectiveDate;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 4, runSpacing: 2, children: [
+        Text('Tasa BCV: 1 REF =', style: style),
+        Text(formatBsLabel(tasa, fractionDigits: 4),
+            maxLines: 1, softWrap: false, style: style),
+      ]),
+      if (date != null) ...[
+        const SizedBox(height: 3),
+        Text(
+            'Vigencia BCV: ${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+            style: style),
+      ],
+    ]);
+  }
 }
 
 class _CartCurrencySelector extends StatelessWidget {
@@ -919,7 +996,7 @@ class _CartCurrencySelector extends StatelessWidget {
         child: Padding(
             padding: const EdgeInsets.all(4),
             child: Row(children: [
-              for (var i = 0; i < 3; i++)
+              for (var i = 0; i < 2; i++)
                 Expanded(
                     child: Semantics(
                   selected: i == selected,
@@ -939,7 +1016,10 @@ class _CartCurrencySelector extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 4, vertical: 10),
                                   child: Text(
-                                      const ['REF', 'USD', 'Bolívares'][i],
+                                      const [
+                                        'Bolívares (REF)',
+                                        'Divisas (USD)'
+                                      ][i],
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                           fontSize: 12,
@@ -1044,9 +1124,12 @@ class _DestinoEntregaResult {
 
 /// Destino: dirección fiscal del perfil, o formulario de ubicación alterna.
 class _DestinoEntregaDialog extends StatefulWidget {
-  const _DestinoEntregaDialog({required this.profile});
+  const _DestinoEntregaDialog(
+      {required this.profile, required this.paymentSummary});
 
   final ProfileModel profile;
+
+  final String paymentSummary;
 
   @override
   State<_DestinoEntregaDialog> createState() => _DestinoEntregaDialogState();
@@ -1184,6 +1267,9 @@ class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(widget.paymentSummary,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
             Text(
               'La tienda recibe la mercancía en esta dirección. Puede usar la de su perfil u otra para este pedido.',
               style: TextStyle(

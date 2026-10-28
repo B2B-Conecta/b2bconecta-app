@@ -46,7 +46,7 @@ String adminCheckoutGroupResumenLinea(List<TransactionRequestModel> lines) {
   final uds = adminCheckoutGroupTotalUds(lines);
   final ref = adminCheckoutGroupTotalRef(lines);
   if (lines.length == 1) {
-    return '$uds uds · Total (tienda minorista) ${ref.toStringAsFixed(2)} REF';
+    return '$uds uds · Total (tienda minorista) ${ref.toStringAsFixed(2)} ${orderAmountCurrency(lines)}';
   }
   final importers = lines
       .map((e) => e.ownerId.trim())
@@ -54,7 +54,7 @@ String adminCheckoutGroupResumenLinea(List<TransactionRequestModel> lines) {
       .toSet();
   return '$uds uds · ${lines.length} líneas · '
       '${importers.length} importador(es) · '
-      '${ref.toStringAsFixed(2)} REF total';
+      '${ref.toStringAsFixed(2)} ${orderAmountCurrency(lines)} total';
 }
 
 /// Primera línea morosa del grupo (para banner / acciones).

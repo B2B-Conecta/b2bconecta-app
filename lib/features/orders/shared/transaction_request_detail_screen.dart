@@ -455,7 +455,8 @@ class _TransactionRequestDetailScreenState
               runSpacing: 6,
               children: [
                 _chip('Estado: $estadoChip'),
-                _chip('Total REF: ${totalRef.toStringAsFixed(2)}'),
+                _chip(
+                    'Total ${orderAmountCurrency(lines)}: ${totalRef.toStringAsFixed(2)}'),
               ],
             ),
             const SizedBox(height: 6),
@@ -538,7 +539,8 @@ class _TransactionRequestDetailScreenState
         OrderCardCollapsibleSection(
           title: 'Partes del pedido',
           subtitle: TransactionRequestPartiesContactSection.partiesSubtitle(r),
-          infoMessage: 'Tienda minorista e importador involucrados en el pedido.',
+          infoMessage:
+              'Tienda minorista e importador involucrados en el pedido.',
           child: TransactionRequestPartiesContactSection(
             request: r,
             embedded: true,

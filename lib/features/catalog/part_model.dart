@@ -259,9 +259,8 @@ class PartModel {
 
   /// Precio de venta al aliado (cascada E4 + valla; sin tramo volumen si [quantity] = 1 en grid).
   double precioUnitarioParaAliado({int quantity = 1}) =>
-      ProductCatalogPricing.aliadoUnitUsd(
+      ProductCatalogPricing.aliadoUnitRef(
         listPriceUsd: precio,
-        salePriceUsd: salePriceUsd,
         discountRules: discountRules,
         quantity: quantity,
         campaignDiscountPercent: activeCampaignDiscountPercent,
@@ -324,8 +323,8 @@ class PartModel {
       ownerEnvioTipo: EnvioPolitica.normalize(ownerProfile?['envio_tipo']),
       ownerEnvioGratisMinimo:
           _asNullableDouble(ownerProfile?['monto_minimo_envio_gratis']),
-      ownerTransportistas:
-          EnvioPolitica.parseNombres(ownerProfile?['transportistas_habilitados']),
+      ownerTransportistas: EnvioPolitica.parseNombres(
+          ownerProfile?['transportistas_habilitados']),
       nombre: nombreRaw?.toString() ?? '',
       descripcion: _nullableText(descripcionRaw),
       compatibilidad: _nullableText(compatibilidadRaw),
@@ -404,8 +403,7 @@ class PartModel {
       id: id ?? this.id,
       ownerId: ownerId ?? this.ownerId,
       ownerBusinessName: ownerBusinessName ?? this.ownerBusinessName,
-      ownerLogoStoragePath:
-          ownerLogoStoragePath ?? this.ownerLogoStoragePath,
+      ownerLogoStoragePath: ownerLogoStoragePath ?? this.ownerLogoStoragePath,
       ownerEstado: ownerEstado ?? this.ownerEstado,
       ownerCiudad: ownerCiudad ?? this.ownerCiudad,
       nombre: nombre ?? this.nombre,
@@ -439,12 +437,11 @@ class PartModel {
           ownerCatalogVerifiedAt ?? this.ownerCatalogVerifiedAt,
       salePriceUsd: salePriceUsd ?? this.salePriceUsd,
       discountRules: discountRules ?? this.discountRules,
-      activeCampaignDiscountPercent: activeCampaignDiscountPercent ??
-          this.activeCampaignDiscountPercent,
+      activeCampaignDiscountPercent:
+          activeCampaignDiscountPercent ?? this.activeCampaignDiscountPercent,
       activePromoCampaignId:
           activePromoCampaignId ?? this.activePromoCampaignId,
-      ownerPagoSoloDivisas:
-          ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
+      ownerPagoSoloDivisas: ownerPagoSoloDivisas ?? this.ownerPagoSoloDivisas,
       ownerEnvioTipo: ownerEnvioTipo ?? this.ownerEnvioTipo,
       ownerEnvioGratisMinimo:
           ownerEnvioGratisMinimo ?? this.ownerEnvioGratisMinimo,
@@ -529,7 +526,9 @@ class PartModel {
     Map<String, dynamic>? m;
     if (profiles is Map) {
       m = Map<String, dynamic>.from(profiles);
-    } else if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+    } else if (profiles is List &&
+        profiles.isNotEmpty &&
+        profiles.first is Map) {
       m = Map<String, dynamic>.from(profiles.first as Map);
     }
     if (m == null) return null;
@@ -544,7 +543,9 @@ class PartModel {
     Map<String, dynamic>? m;
     if (profiles is Map) {
       m = Map<String, dynamic>.from(profiles);
-    } else if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+    } else if (profiles is List &&
+        profiles.isNotEmpty &&
+        profiles.first is Map) {
       m = Map<String, dynamic>.from(profiles.first as Map);
     }
     if (m == null) return false;
@@ -558,7 +559,9 @@ class PartModel {
     Map<String, dynamic>? m;
     if (profiles is Map) {
       m = Map<String, dynamic>.from(profiles);
-    } else if (profiles is List && profiles.isNotEmpty && profiles.first is Map) {
+    } else if (profiles is List &&
+        profiles.isNotEmpty &&
+        profiles.first is Map) {
       m = Map<String, dynamic>.from(profiles.first as Map);
     }
     if (m == null) return (null, null);

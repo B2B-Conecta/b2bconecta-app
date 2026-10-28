@@ -1,6 +1,8 @@
 import 'package:motolink_pro_app/features/inventory/product_volume_tiers.dart';
 
-/// Cascada E4 para precios aliado (catálogo y preview; checkout en servidor).
+/// Separate BCV-reference and foreign-currency payment prices.
+/// [aliadoUnitRef] is the cart's REF base. Direct USD offers are considered only
+/// by [aliadoUnitUsdPaymentLine]; [aliadoUnitUsd] retains legacy USD comparisons.
 ///
 /// Volumen y valla son caminos excluyentes sobre el precio **base** (lista):
 /// - Si la cantidad activa un tramo por unidades → % volumen sobre lista
@@ -34,6 +36,7 @@ abstract final class ProductCatalogPricing {
   /// Precio unitario aliado en línea USD (sobre [refUnitUsd] ya con cascada E4).
   static double aliadoUnitUsdPaymentLine({
     required double refUnitUsd,
+    double? salePriceUsd,
     Map<String, dynamic>? discountRules,
     bool ownerPagoSoloDivisas = false,
   }) {
@@ -41,9 +44,29 @@ abstract final class ProductCatalogPricing {
       discountRules: discountRules,
       ownerPagoSoloDivisas: ownerPagoSoloDivisas,
     );
-    if (pct == null) return refUnitUsd;
-    return refUnitUsd * (1 - pct / 100.0);
+    // Direct USD offers and percentage incentives are alternatives, not
+    // cumulative discounts. Neither may change the REF base.
+    return _roundQuoteUnit(_minCandidate(refUnitUsd, [
+      salePriceUsd,
+      if (pct != null) refUnitUsd * (1 - pct / 100.0),
+    ]));
   }
+
+  /// BCV reference after general volume/promotion discounts, never USD offers.
+  static double aliadoUnitRef({
+    required double listPriceUsd,
+    Map<String, dynamic>? discountRules,
+    int quantity = 1,
+    double? campaignDiscountPercent,
+  }) =>
+      _roundQuoteUnit(aliadoUnitUsd(
+          listPriceUsd: listPriceUsd,
+          discountRules: discountRules,
+          quantity: quantity,
+          campaignDiscountPercent: campaignDiscountPercent));
+
+  static double _roundQuoteUnit(double value) =>
+      (value * 10000).round() / 10000;
 
   static bool hasAnyCommercialBenefit({
     required double listPriceUsd,
@@ -73,7 +96,8 @@ abstract final class ProductCatalogPricing {
     required double listPriceUsd,
     double? salePriceUsd,
   }) {
-    if (!hasDirectSale(listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd)) {
+    if (!hasDirectSale(
+        listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd)) {
       return null;
     }
     if (listPriceUsd <= 0) return null;

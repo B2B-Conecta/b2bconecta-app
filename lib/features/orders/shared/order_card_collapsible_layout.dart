@@ -41,7 +41,7 @@ String orderCardProductosSubtitle(
   final totalRef = lines.fold<double>(0, (a, r) => a + r.precioTotal);
   final n = lines.length;
   final partidas = n == 1 ? '1 partida' : '$n partidas';
-  return '$partidas · $uds uds · ${formatRefAmount(totalRef)} REF';
+  return '$partidas · $uds uds · ${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}';
 }
 
 /// Subtítulo de comisión B2B Conecta (importador).

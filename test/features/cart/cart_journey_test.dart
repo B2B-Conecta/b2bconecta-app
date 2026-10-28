@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
@@ -8,6 +9,62 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
 void main() {
+  for (final scenario in [
+    (size: const Size(1440, 900), scale: 1.0),
+    (size: const Size(320, 740), scale: 1.0),
+    (size: const Size(390, 844), scale: 1.6),
+  ]) {
+    testWidgets(
+        'Bs and the full cart amount stay together at ${scenario.size}, text ${scenario.scale}',
+        (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final cart = CartService.instance..clear();
+      addTearDown(cart.clear);
+      cart.addOrIncrement(
+          const PartModel(
+              id: 'bs-line',
+              ownerId: 'supplier',
+              nombre: 'Disco EBC 245 mm',
+              precio: 52,
+              stock: 90),
+          delta: 5,
+          precioUnitarioAliadoRef: 52);
+      await tester.pumpWidget(MaterialApp(
+          theme: buildAppTheme(),
+          builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scenario.scale)),
+              child: child!),
+          home: const CartScreen(
+              profile: ProfileModel(id: 'ally', role: 'aliado'),
+              liveTasaBcv: 881.8769)));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Bolívares (REF)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bolívares (REF)'));
+      await tester.pumpAndSettle();
+      final amounts = find.text('Bs 229.287,99');
+      expect(amounts, findsNWidgets(2));
+      expect(find.text('260.00 REF'), findsNWidgets(2));
+      expect(find.text('Tasa BCV: 1 REF ='), findsOneWidget);
+      expect(find.text('Bs 881,8769'), findsOneWidget);
+      for (final element in amounts.evaluate()) {
+        final paragraph = tester.renderObject<RenderParagraph>(find.descendant(
+            of: find.byElementPredicate((candidate) => candidate == element),
+            matching: find.byType(RichText)));
+        final boxes = paragraph.getBoxesForSelection(const TextSelection(
+            baseOffset: 0, extentOffset: 'Bs 229.287,99'.length));
+        expect(boxes.map((box) => box.top).toSet(), hasLength(1),
+            reason: 'The currency and complete amount must share one line.');
+        expect(paragraph.didExceedMaxLines, isFalse);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   testWidgets('cart currency tabs preserve effective volume prices',
       (tester) async {
     final cart = CartService.instance..clear();
@@ -33,8 +90,9 @@ void main() {
             liveTasaBcv: 10)));
     await tester.pumpAndSettle();
     expect(find.textContaining('80.00 REF / ud'), findsOneWidget);
-    await tester.ensureVisible(find.text('USD'));
-    await tester.tap(find.text('USD'));
+    await tester.ensureVisible(find.text('Divisas (USD)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Divisas (USD)'));
     await tester.pumpAndSettle();
     expect(find.textContaining('76.00 USD / ud'), findsOneWidget);
     expect(find.textContaining('760.00 USD'), findsWidgets);
@@ -184,11 +242,11 @@ void main() {
           .descendant(
               of: find.byType(ListView), matching: find.byType(Scrollable))
           .first;
-      await tester.scrollUntilVisible(find.text('Bolívares'), 150,
+      await tester.scrollUntilVisible(find.text('Bolívares (REF)'), 150,
           scrollable: productScroll);
-      await tester.ensureVisible(find.text('Bolívares'));
+      await tester.ensureVisible(find.text('Bolívares (REF)'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Bolívares'));
+      await tester.tap(find.text('Bolívares (REF)'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Bs'), findsWidgets);
       await tester.scrollUntilVisible(

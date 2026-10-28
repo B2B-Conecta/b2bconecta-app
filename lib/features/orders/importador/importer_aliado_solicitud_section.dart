@@ -216,8 +216,10 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
     super.key,
     required this.request,
     this.compact = false,
+
     /// Dentro de [ImporterExpandableOrderCard]: sin títulos duplicados respecto a la cabecera de la tarjeta.
     this.embedInOrderCard = false,
+
     /// En cabecera embebida: si es false, solo totales; el desglose va al bloque expandido.
     this.productDetailRows = true,
   });
@@ -348,9 +350,8 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final titleSize = compact ? 12.0 : 13.0;
     final bodySize = compact ? 11.5 : 12.0;
-    final pad = compact
-        ? const EdgeInsets.fromLTRB(0, 6, 0, 0)
-        : EdgeInsets.zero;
+    final pad =
+        compact ? const EdgeInsets.fromLTRB(0, 6, 0, 0) : EdgeInsets.zero;
     final totalUds = lines.fold<int>(0, (s, r) => s + r.cantidad);
     final totalRef = lines.fold<double>(0, (s, r) => s + r.precioTotal);
     final uid = SupabaseService.currentUserId;
@@ -374,7 +375,7 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
           ],
           Text(
             '${lines.length} líneas · $totalUds uds · '
-            '${formatRefAmount(totalRef)} REF',
+            '${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}',
             style: TextStyle(
               fontSize: bodySize * 0.95,
               color: AppColors.textPrimary,
@@ -440,7 +441,7 @@ String _totalRefEtiquetaPedidoAliado(TransactionRequestModel r) {
   final total = r.tieneDescuentoDivisasAplicadoEnPedido
       ? r.precioTotal
       : r.refBaseTotalForPago;
-  final buf = StringBuffer('${formatRefAmount(total)} REF');
+  final buf = StringBuffer('${formatRefAmount(total)} ${r.amountCurrencyLabel}');
   if (r.tieneDescuentoDivisasAplicadoEnPedido) {
     buf.write(' (antes ${formatRefAmount(r.refBaseTotalForPago)})');
   }

@@ -26,6 +26,7 @@ import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_impor
 import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/features/inventory/inventory_service.dart';
+import 'package:motolink_pro_app/features/inventory/product_delete_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_flag.dart';
@@ -391,13 +392,20 @@ class SupabaseService {
       InventoryService.setProductsActiveBulk(
           productIds: productIds, isActive: isActive);
 
-  static Future<void> deleteProduct({required String productId}) =>
-      InventoryService.deleteProduct(productId: productId);
-
-  static Future<int> deleteProductsBulk({
-    required List<String> productIds,
+  static Future<ProductDeleteBatchResult> deleteProduct({
+    required String productId,
+    String? label,
   }) =>
-      InventoryService.deleteProductsBulk(productIds: productIds);
+      InventoryService.deleteProduct(productId: productId, label: label);
+
+  static Future<ProductDeleteBatchResult> deleteProductsBulk({
+    required List<String> productIds,
+    Map<String, String>? labelsById,
+  }) =>
+      InventoryService.deleteProductsBulk(
+        productIds: productIds,
+        labelsById: labelsById,
+      );
 
   static Future<String> uploadProductImage({
     required Uint8List bytes,

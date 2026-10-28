@@ -16,7 +16,6 @@ import 'product_detail_purchase_controls.dart';
 import 'product_detail_information.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
-import 'product_warranty_seal.dart';
 import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
 import 'product_share_sheet.dart';
@@ -215,8 +214,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Umbral propio de ficha: en web ancha no debe verse como móvil apilado.
     final isDesktop =
-        MediaQuery.sizeOf(context).width >= AppBreakpoints.b2bDesktop;
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.productDetailDesktop;
     if (isDesktop) return _buildDesktopLayout(context);
     return _buildMobileLayout(context);
   }
@@ -304,15 +304,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             maxWidth: AppBreakpoints.productDetailMaxWidth,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 20, 28, 28),
+            padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   flex: 5,
-                  child: _buildDesktopImageCard(),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: _buildDesktopImageCard(),
+                  ),
                 ),
-                const SizedBox(width: 32),
+                const SizedBox(width: 36),
                 Expanded(
                   flex: 6,
                   child: SingleChildScrollView(
@@ -350,19 +353,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildDesktopImageCard() {
     return Material(
       color: AppColors.card,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       elevation: 0,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.borderSubtle),
         ),
         child: Stack(
           children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: _buildHeroImageContent(),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 520),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: _buildHeroImageContent(),
+              ),
             ),
             if (_profile?.isAliado == true)
               Positioned(
@@ -384,59 +390,86 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       productName: part.nombre,
       heroTag: ProductDetailScreen.heroImageTag(widget.part));
 
-  List<Widget> _buildInfoSections({bool desktop = false}) => [
-        ProductDetailHeading(part: part, desktop: desktop),
-        if (_family.length > 1) ...[
-          const SizedBox(height: 12),
-          ProductVariantSelector(
-              options: _family, selected: part, onSelected: _selectVariant),
-        ],
-        const SizedBox(height: 12),
-        ProductDetailPurchaseSummary(part: part),
-        if (part.hasOwnerMinOrderAmount) ...[
-          const SizedBox(height: 8),
-          Text('${part.ownerMinOrderAmountLabelEs} por despacho.',
+  List<Widget> _buildInfoSections({bool desktop = false}) {
+    final buyBlock = <Widget>[
+      if (_family.length > 1) ...[
+        ProductVariantSelector(
+            options: _family, selected: part, onSelected: _selectVariant),
+        const SizedBox(height: 14),
+      ],
+      ProductDetailPurchaseSummary(part: part),
+      if (part.hasOwnerMinOrderAmount) ...[
+        const SizedBox(height: 8),
+        Text('${part.ownerMinOrderAmountLabelEs} por despacho.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      ],
+      if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
+        const SizedBox(height: 8),
+        Align(
+            alignment: Alignment.centerLeft,
+            child: EnvioPoliticaBadge(tipo: part.ownerEnvioTipo)),
+        if (part.ownerTransportistas.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text('Transportistas: ${part.ownerTransportistas.join(', ')}',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ],
-        if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
-          const SizedBox(height: 8),
-          Align(
-              alignment: Alignment.centerLeft,
-              child: EnvioPoliticaBadge(tipo: part.ownerEnvioTipo)),
-          if (part.ownerTransportistas.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text('Transportistas: ${part.ownerTransportistas.join(', ')}',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          ],
-        ],
-        if (desktop) ...[
-          const SizedBox(height: 12),
-          _buildActionAlerts(),
-          _buildActionButtons(),
-        ],
+      ],
+      if (desktop) ...[
+        const SizedBox(height: 14),
+        _buildActionAlerts(),
+        _buildActionButtons(),
+      ],
+    ];
+
+    final detailsBlock = <Widget>[
+      ProductDetailSupplier(
+          part: part,
+          onOpen: _canOpenImporterStore ? _openImporterStore : null),
+      if (part.isCatalogVerified || part.isCatalogFeatured) ...[
         const SizedBox(height: 6),
-        ProductDetailSupplier(
-            part: part,
-            onOpen: _canOpenImporterStore ? _openImporterStore : null),
-        if (part.isCatalogVerified || part.isCatalogFeatured) ...[
-          const SizedBox(height: 4),
-          ImporterCatalogSealsRow(
-              verified: part.isCatalogVerified,
-              featured: part.isCatalogFeatured),
-        ],
-        const SizedBox(height: 12),
-        Divider(height: 1, color: AppColors.divider),
-        const SizedBox(height: 16),
-        ProductDetailInformation(
-            part: part,
-            showInternalReference: _profile?.isAdministrador == true ||
-                _profile?.isImportador == true),
-        if (part.hasWarranty) ...[
-          const SizedBox(height: 16),
-          const Align(
-              alignment: Alignment.centerLeft, child: ProductWarrantySeal()),
-        ],
-      ];
+        ImporterCatalogSealsRow(
+            verified: part.isCatalogVerified,
+            featured: part.isCatalogFeatured),
+      ],
+      const SizedBox(height: 14),
+      ProductDetailInformation(
+          part: part,
+          showInternalReference: _profile?.isAdministrador == true ||
+              _profile?.isImportador == true),
+    ];
+
+    final panelChildren = <Widget>[
+      ...buyBlock,
+      const SizedBox(height: 16),
+      Divider(height: 1, color: AppColors.divider),
+      const SizedBox(height: 4),
+      ...detailsBlock,
+    ];
+
+    return [
+      ProductDetailHeading(part: part, desktop: desktop),
+      const SizedBox(height: 14),
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            desktop ? 18 : 14,
+            desktop ? 16 : 14,
+            desktop ? 18 : 14,
+            desktop ? 18 : 14,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: panelChildren,
+          ),
+        ),
+      ),
+    ];
+  }
 
   Widget _buildCommerceExtras() => _related.isEmpty
       ? const SizedBox.shrink()
@@ -510,6 +543,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         part: part,
         profile: _profile!,
         compact: compact,
+        variantFamily: _family,
         onOpenCart: _openCart,
         onAsk: _canAskAboutProduct ? _askAboutProduct : null);
   }

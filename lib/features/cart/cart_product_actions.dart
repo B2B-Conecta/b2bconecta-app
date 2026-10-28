@@ -84,4 +84,80 @@ abstract final class CartProductActions {
             part.precioUnitarioParaAliado(quantity: selected));
     return selected;
   }
+
+  /// Sets the cart line to [quantity], creating it when missing.
+  /// Used by the multi-variant picker so confirming can refresh existing lines.
+  ///
+  /// Con [enforceLineMinOrder] en false (familia de variantes) se permite
+  /// cantidad por SKU bajo el MOQ de línea; el modal valida el acumulado.
+  static int upsertQuantity(
+      {required PartModel part,
+      required ProfileModel profile,
+      required CartService cart,
+      required int quantity,
+      bool enforceLineMinOrder = true}) {
+    final blocked = enforceLineMinOrder
+        ? blockReason(part: part, profile: profile, cart: cart)
+        : blockReasonForFamilyLine(
+            part: part, profile: profile, cart: cart);
+    if (blocked != null) return 0;
+
+    final maximum = part.stockForSale;
+    if (maximum < 1) return 0;
+    if (quantity < 1) {
+      if (lineFor(part, cart) != null) {
+        cart.setQuantity(part.id, 0, enforceLineMinOrder: false);
+      }
+      return 0;
+    }
+
+    final minimum =
+        enforceLineMinOrder ? part.minOrderQtyEffective : 1;
+    if (enforceLineMinOrder &&
+        (maximum < minimum || quantity < minimum)) {
+      return 0;
+    }
+    final selected = quantity.clamp(minimum, maximum);
+    if (lineFor(part, cart) != null) {
+      cart.setQuantity(
+        part.id,
+        selected,
+        enforceLineMinOrder: enforceLineMinOrder,
+      );
+      return selected;
+    }
+    cart.addOrIncrement(
+      part,
+      delta: selected,
+      precioUnitarioAliadoRef:
+          part.precioUnitarioParaAliado(quantity: selected),
+      enforceLineMinOrder: enforceLineMinOrder,
+    );
+    return selected;
+  }
+
+  /// Como [blockReason], pero sin exigir stock ≥ MOQ de la línea (MOQ familiar).
+  static String? blockReasonForFamilyLine(
+      {required PartModel part,
+      required ProfileModel? profile,
+      required CartService cart}) {
+    if (profile == null || !profile.isAliado) {
+      return 'Inicia sesión como tienda minorista para agregar productos.';
+    }
+    if (!profile.hasActiveAccountAccess) {
+      return 'Tu cuenta debe estar habilitada para realizar compras.';
+    }
+    if (!cart.canEdit) {
+      return 'Estamos recuperando tu carrito. Espera o reintenta desde el carrito.';
+    }
+    if (profile.pedidosSuspendidosMorosidad) {
+      return 'B2B Conecta suspendió nuevos pedidos en su cuenta por morosidad.';
+    }
+    if (part.ownerId?.trim().isNotEmpty != true) {
+      return 'No se pudo identificar al importador.';
+    }
+    if (!part.isActive) return 'Este producto está pausado por el proveedor.';
+    if (part.stockForSale < 1) return 'Sin stock disponible.';
+    return null;
+  }
 }

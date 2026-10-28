@@ -193,10 +193,7 @@ class AliadoProductCard extends StatelessWidget {
                                   ])))),
                       if (profile.isAliado) ...[
                         const SizedBox(height: 4),
-                        CatalogCartButton(
-                            part: part,
-                            profile: profile,
-                            onChooseVariant: onTap),
+                        CatalogCartButton(part: part, profile: profile),
                       ] else if (onTap != null) ...[
                         const SizedBox(height: 4),
                         FilledButton(

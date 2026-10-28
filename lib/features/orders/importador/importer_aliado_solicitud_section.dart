@@ -290,7 +290,7 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           ] else if (r.tieneDescuentoDivisasDisponible) ...[
             SizedBox(height: compact ? 4 : 6),
             Text(
-              'Zelle, Binance, USDT o efectivo aplican descuento en divisas al registrar el pago.',
+              'Zelle, USDT o efectivo aplican descuento en divisas al registrar el pago.',
               style: TextStyle(
                 fontSize: compact ? 10 : 10.5,
                 color: AppColors.textSecondary,

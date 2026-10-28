@@ -9,6 +9,8 @@ import 'catalog_import_orchestrator.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'catalog_import_header_guess.dart';
+import 'catalog_import_preview_details_dialog.dart';
+import 'flexible_catalog_import_service.dart';
 import 'product_custom_fields.dart';
 import 'importer_import_visibility_section.dart';
 import 'product_custom_fields_section.dart';
@@ -620,10 +622,21 @@ class _ImporterFlexibleImportScreenState
       subtitle:
           '$ext · ${widget.preview.headers.length} columnas · '
           '${estimate ?? '?'} repuestos aprox.',
-      child: const Text(
-        'Exporta tu listado tal como sale del ERP. B2B Conecta reconoce '
-        'automáticamente SKU, nombre y precio.',
-        style: TextStyle(fontSize: 12.5, height: 1.45),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Revisa el archivo y asocia columnas. '
+            'SKU, nombre y precio se detectan solos cuando es posible.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _previewDetailsButton(),
+        ],
       ),
     );
   }
@@ -1441,17 +1454,104 @@ class _ImporterFlexibleImportScreenState
     );
   }
 
+  Future<void> _openPreviewDetails() async {
+    // El wizard solo guarda 5 filas de muestra; al abrir detalles releemos
+    // el archivo para mostrar todas las filas (hasta el tope de seguridad).
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 14),
+                Text(
+                  'Cargando filas del archivo…',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    CatalogImportPreview detailsPreview;
+    try {
+      detailsPreview = await Future<CatalogImportPreview>(() {
+        return FlexibleCatalogImportService.previewFile(
+          bytes: widget.bytes,
+          meta: widget.fileMeta,
+          sampleRowCount: FlexibleCatalogImportService.detailsPreviewMaxRows,
+        );
+      });
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo leer el archivo: $e')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+
+    await showCatalogImportPreviewDetailsDialog(
+      context: context,
+      preview: detailsPreview,
+      fileName: widget.fileName,
+      coreHeaders: _coreMappedSources,
+      erpHeaders: _erpMappedSources,
+    );
+  }
+
+  Widget _previewDetailsButton() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: const Key('import-preview-details'),
+        onPressed: widget.preview.headers.isEmpty ? null : _openPreviewDetails,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          visualDensity: VisualDensity.compact,
+          foregroundColor: AppColors.brandBlue,
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        icon: const Icon(Icons.open_in_full_rounded, size: 18),
+        label: const Text('Ver detalles de la carga'),
+      ),
+    );
+  }
+
   Widget _previewPanel() {
+    final estimate = widget.preview.totalDataRowsEstimate;
+    final sample = widget.preview.sampleRows.length;
     return _sectionCard(
       icon: Icons.table_chart_outlined,
-      title: 'Vista previa del archivo',
-      subtitle:
-          'Azul = catálogo B2B Conecta · Azul acento = dato ERP · Gris = sin asignar',
-      child: _PreviewTable(
-        headers: widget.preview.headers,
-        rows: widget.preview.sampleRows,
-        coreHeaders: _coreMappedSources,
-        erpHeaders: _erpMappedSources,
+      title: 'Vista previa',
+      subtitle: estimate == null
+          ? 'Muestra del archivo · azul = clave · acento = extra'
+          : 'Muestra $sample de ~$estimate · azul = clave · acento = extra',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _previewDetailsButton(),
+          const SizedBox(height: 6),
+          _PreviewTable(
+            headers: widget.preview.headers,
+            rows: widget.preview.sampleRows,
+            coreHeaders: _coreMappedSources,
+            erpHeaders: _erpMappedSources,
+          ),
+        ],
       ),
     );
   }
@@ -1612,11 +1712,18 @@ class _ImporterFlexibleImportScreenState
                         expanded: _previewExpanded,
                         onExpandedChanged: (v) =>
                             setState(() => _previewExpanded = v),
-                        child: _PreviewTable(
-                          headers: widget.preview.headers,
-                          rows: widget.preview.sampleRows,
-                          coreHeaders: _coreMappedSources,
-                          erpHeaders: _erpMappedSources,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _previewDetailsButton(),
+                            const SizedBox(height: 8),
+                            _PreviewTable(
+                              headers: widget.preview.headers,
+                              rows: widget.preview.sampleRows,
+                              coreHeaders: _coreMappedSources,
+                              erpHeaders: _erpMappedSources,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -1845,7 +1952,7 @@ class _ImportOptionTile extends StatelessWidget {
   }
 }
 
-class _PreviewTable extends StatelessWidget {
+class _PreviewTable extends StatefulWidget {
   const _PreviewTable({
     required this.headers,
     required this.rows,
@@ -1858,17 +1965,95 @@ class _PreviewTable extends StatelessWidget {
   final Set<String> coreHeaders;
   final Set<String> erpHeaders;
 
+  @override
+  State<_PreviewTable> createState() => _PreviewTableState();
+}
+
+class _PreviewTableState extends State<_PreviewTable> {
+  final _horizontalScroll = ScrollController();
+  final _verticalScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalScroll.dispose();
+    _verticalScroll.dispose();
+    super.dispose();
+  }
+
   Color _headerColor(String h) {
-    if (coreHeaders.contains(h)) return AppColors.brandBlue;
-    if (erpHeaders.contains(h)) return AppColors.brandAccent;
+    if (widget.coreHeaders.contains(h)) return AppColors.brandBlue;
+    if (widget.erpHeaders.contains(h)) return AppColors.brandAccent;
     return AppColors.textPrimary;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (headers.isEmpty) {
+    if (widget.headers.isEmpty) {
       return const Text('No se detectaron columnas en el archivo.');
     }
+
+    final table = DataTable(
+      headingRowColor: WidgetStateProperty.all(
+        AppColors.brandBlueContainer.withOpacity(0.4),
+      ),
+      headingRowHeight: 40,
+      dataRowMinHeight: 36,
+      dataRowMaxHeight: 52,
+      columnSpacing: 20,
+      columns: widget.headers.map((h) {
+        final isCore = widget.coreHeaders.contains(h);
+        final isErp = widget.erpHeaders.contains(h);
+        return DataColumn(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isCore || isErp)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    isCore
+                        ? Icons.storefront_outlined
+                        : Icons.dataset_outlined,
+                    size: 14,
+                    color: _headerColor(h),
+                  ),
+                ),
+              Text(
+                h,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _headerColor(h),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+      rows: widget.rows
+          .map(
+            (row) => DataRow(
+              cells: widget.headers
+                  .map(
+                    (h) => DataCell(
+                      Text(
+                        row[h] ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: widget.coreHeaders.contains(h) ||
+                                  widget.erpHeaders.contains(h)
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          )
+          .toList(),
+    );
 
     return ClipRRect(
       borderRadius: AppDecorations.radius12,
@@ -1877,67 +2062,26 @@ class _PreviewTable extends StatelessWidget {
           border: Border.all(color: Colors.black.withOpacity(0.08)),
           borderRadius: AppDecorations.radius12,
         ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(
-              AppColors.brandBlueContainer.withOpacity(0.4),
-            ),
-            headingRowHeight: 40,
-            dataRowMinHeight: 36,
-            dataRowMaxHeight: 52,
-            columnSpacing: 20,
-            columns: headers.map((h) {
-              final isCore = coreHeaders.contains(h);
-              final isErp = erpHeaders.contains(h);
-              return DataColumn(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isCore || isErp)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Icon(
-                          isCore ? Icons.storefront_outlined : Icons.dataset_outlined,
-                          size: 14,
-                          color: _headerColor(h),
-                        ),
-                      ),
-                    Text(
-                      h,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _headerColor(h),
-                      ),
-                    ),
-                  ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 220),
+          child: Scrollbar(
+            controller: _horizontalScroll,
+            thumbVisibility: true,
+            trackVisibility: true,
+            scrollbarOrientation: ScrollbarOrientation.bottom,
+            child: SingleChildScrollView(
+              controller: _horizontalScroll,
+              scrollDirection: Axis.horizontal,
+              child: Scrollbar(
+                controller: _verticalScroll,
+                thumbVisibility: true,
+                trackVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _verticalScroll,
+                  child: table,
                 ),
-              );
-            }).toList(),
-            rows: rows
-                .map(
-                  (row) => DataRow(
-                    cells: headers
-                        .map(
-                          (h) => DataCell(
-                            Text(
-                              row[h] ?? '',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: coreHeaders.contains(h) ||
-                                        erpHeaders.contains(h)
-                                    ? AppColors.textPrimary
-                                    : AppColors.textSecondary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                )
-                .toList(),
+              ),
+            ),
           ),
         ),
       ),

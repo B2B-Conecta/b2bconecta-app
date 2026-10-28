@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'part_model.dart';
+import 'variant_cart_picker_sheet.dart';
 
 /// Compact purchase becomes a quantity control; desktop also allows preselection.
 class ProductDetailPurchaseControls extends StatefulWidget {
@@ -16,12 +17,16 @@ class ProductDetailPurchaseControls extends StatefulWidget {
       required this.onOpenCart,
       this.onAsk,
       this.cart,
+      this.variantFamily = const [],
       this.compact = false});
   final PartModel part;
   final ProfileModel profile;
   final VoidCallback onOpenCart;
   final VoidCallback? onAsk;
   final CartService? cart;
+
+  /// Hermanas del mismo `parent_sku`. Si hay 2+, se ofrece agregar varias.
+  final List<PartModel> variantFamily;
   final bool compact;
 
   @override
@@ -115,6 +120,31 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
             label: 'Ver carrito', onPressed: widget.onOpenCart)));
+  }
+
+  Future<void> _openMultiVariantPicker() async {
+    final family = widget.variantFamily.length > 1
+        ? widget.variantFamily
+        : widget.part.variantChoices;
+    if (family.length < 2) return;
+    final seed = widget.part.copyWith(variants: family);
+    final result = await showVariantCartPickerSheet(
+      context: context,
+      part: seed,
+      profile: widget.profile,
+      cart: _cart,
+    );
+    if (result == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text(
+        '${result.totalUnits} unidades (${result.addedLines} opción(es)) '
+        'añadidas al carrito.',
+      ),
+      behavior: SnackBarBehavior.floating,
+      action: SnackBarAction(
+          label: 'Ver carrito', onPressed: widget.onOpenCart),
+    ));
   }
 
   void _step(int delta) {
@@ -295,12 +325,20 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                       padding: EdgeInsets.zero),
                   icon: const Icon(Icons.add_rounded, size: 18)),
             ])));
+    final multiFamily = widget.variantFamily.length > 1
+        ? widget.variantFamily
+        : widget.part.variantChoices;
+    final hasMultiVariants = multiFamily.length > 1;
+    final addAction =
+        hasMultiVariants ? _openMultiVariantPicker : _add;
+    final addLabel = enabled ? 'Agregar al carrito' : unavailable;
+
     final action = FilledButton.icon(
         key: const Key('product-purchase-action'),
         onPressed: line != null
             ? _openCart
             : enabled
-                ? _add
+                ? addAction
                 : null,
         style: FilledButton.styleFrom(
             minimumSize: const Size(0, 48),
@@ -311,14 +349,12 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
         icon: Icon(
             line != null
                 ? Icons.shopping_cart_outlined
-                : Icons.add_shopping_cart_rounded,
+                : hasMultiVariants
+                    ? Icons.tune_rounded
+                    : Icons.add_shopping_cart_rounded,
             size: 18),
         label: Text(
-            line != null
-                ? 'Ver carrito'
-                : enabled
-                    ? 'Agregar al carrito'
-                    : unavailable,
+            line != null ? 'Ver carrito' : addLabel,
             textAlign: TextAlign.center));
 
     final status = Semantics(
@@ -326,9 +362,11 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
         child: Text(
             line != null
                 ? 'En tu carrito: $quantity unidades'
-                : enabled
-                    ? 'Añadirás $quantity unidades'
-                    : 'Cantidad',
+                : !enabled
+                    ? 'Cantidad'
+                    : hasMultiVariants
+                        ? 'Elige cantidades por opción al agregar'
+                        : 'Añadirás $quantity unidades',
             style: TextStyle(
                 fontSize: 12,
                 height: 1.4,
@@ -336,6 +374,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                 color: line != null
                     ? Theme.of(context).colorScheme.primary
                     : AppColors.textSecondary)));
+
     return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -346,7 +385,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                 action: action,
                 inCart: line != null,
                 quantity: quantity,
-                initialLabel: enabled ? 'Agregar al carrito' : unavailable),
+                initialLabel: addLabel),
           ] else ...[
             Row(children: [
               Expanded(child: status),
@@ -362,25 +401,28 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                         const Icon(Icons.chat_bubble_outline_rounded, size: 17),
                     label: const Text('Consultar')),
             ]),
-            const SizedBox(height: 6),
-            LayoutBuilder(builder: (context, constraints) {
-              final largeText =
-                  MediaQuery.textScalerOf(context).scale(14) >= 21;
-              if (constraints.maxWidth < 330 || largeText) {
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Align(alignment: Alignment.centerLeft, child: selector),
-                      const SizedBox(height: 8),
-                      action,
-                    ]);
-              }
-              return Row(children: [
-                selector,
-                const SizedBox(width: 10),
-                Expanded(child: action)
-              ]);
-            }),
+            const SizedBox(height: 8),
+            if (line != null || !hasMultiVariants)
+              LayoutBuilder(builder: (context, constraints) {
+                final largeText =
+                    MediaQuery.textScalerOf(context).scale(14) >= 21;
+                if (constraints.maxWidth < 330 || largeText) {
+                  return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(alignment: Alignment.centerLeft, child: selector),
+                        const SizedBox(height: 8),
+                        action,
+                      ]);
+                }
+                return Row(children: [
+                  selector,
+                  const SizedBox(width: 10),
+                  Expanded(child: action)
+                ]);
+              })
+            else
+              action,
           ],
           if (blocked != null &&
               (line != null ||

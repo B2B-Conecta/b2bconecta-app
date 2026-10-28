@@ -6,7 +6,7 @@ import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'part_model.dart';
-import 'product_detail_screen.dart';
+import 'variant_cart_picker_sheet.dart';
 
 class CatalogCartButton extends StatelessWidget {
   const CatalogCartButton(
@@ -20,6 +20,8 @@ class CatalogCartButton extends StatelessWidget {
   final ProfileModel profile;
   final CartService? cart;
   final VoidCallback? onOpenCart;
+
+  /// Override for tests or custom flows. Default opens the multi-qty sheet.
   final VoidCallback? onChooseVariant;
 
   void _openCart(BuildContext context) {
@@ -29,6 +31,31 @@ class CatalogCartButton extends StatelessWidget {
     }
     Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (_) => CartScreen(profile: profile)));
+  }
+
+  Future<void> _openVariantPicker(
+      BuildContext context, CartService service) async {
+    if (onChooseVariant != null) {
+      onChooseVariant!();
+      return;
+    }
+    final result = await showVariantCartPickerSheet(
+      context: context,
+      part: part,
+      profile: profile,
+      cart: service,
+    );
+    if (result == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text(
+        '${result.totalUnits} unidades (${result.addedLines} opción(es)) '
+        'añadidas al carrito.',
+      ),
+      behavior: SnackBarBehavior.floating,
+      action: SnackBarAction(
+          label: 'Ver carrito', onPressed: () => _openCart(context)),
+    ));
   }
 
   void _activate(BuildContext context, CartService service) {
@@ -56,9 +83,7 @@ class CatalogCartButton extends StatelessWidget {
         builder: (context, _) {
           if (part.variantChoices.isNotEmpty) {
             return FilledButton.icon(
-                onPressed: onChooseVariant ??
-                    () => Navigator.of(context).push(MaterialPageRoute<void>(
-                        builder: (_) => ProductDetailScreen(part: part))),
+                onPressed: () => _openVariantPicker(context, service),
                 style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 44),
                     padding:
@@ -67,8 +92,8 @@ class CatalogCartButton extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10)),
                     textStyle: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w600)),
-                icon: const Icon(Icons.tune_rounded, size: 18),
-                label: const Text('Elegir opciones'));
+                icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
+                label: const Text('Agregar al carrito'));
           }
           final line = CartProductActions.lineFor(part, service);
           final blocked = CartProductActions.blockReason(

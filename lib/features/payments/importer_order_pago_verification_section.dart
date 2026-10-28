@@ -12,7 +12,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_order_panel_widgets.dart';
 
-/// Verificación del comprobante declarado por el aliado (Zelle, Pago Móvil, Binance, transferencia, efectivo).
+/// Verificación del comprobante declarado por el aliado (Zelle, Pago Móvil, USDT, transferencia, efectivo).
 class ImporterOrderPagoVerificationSection extends StatefulWidget {
   const ImporterOrderPagoVerificationSection({
     super.key,

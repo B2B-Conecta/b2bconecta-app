@@ -17,11 +17,11 @@ class ProductDetailPurchaseSummary extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceTinted,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -32,7 +32,7 @@ class ProductDetailPurchaseSummary extends StatelessWidget {
                   compact: false,
                   showPromotionChips: true,
                   bcvRate: bcvRate),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               ProductStockSummary(part: part, inline: true),
             ]),
       ),

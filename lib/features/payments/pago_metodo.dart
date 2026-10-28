@@ -5,6 +5,7 @@ abstract final class PagoMetodo {
   static const pagoMovil = 'pago_movil';
   static const zelleDivisas = 'zelle_divisas';
   static const transferencia = 'transferencia';
+  /// Legado: pedidos históricos. Ya no se ofrece en UI ni en métodos aceptados.
   static const binance = 'binance';
   static const usdt = 'usdt';
   static const efectivo = 'efectivo';
@@ -16,7 +17,6 @@ abstract final class PagoMetodo {
   static const valuesMotoconecta = [
     zelleDivisas,
     pagoMovil,
-    binance,
     usdt,
     transferencia,
     efectivo,
@@ -25,7 +25,6 @@ abstract final class PagoMetodo {
   /// Métodos que activan el % `usd_payment_discount_pct` del producto al registrar pago.
   static const valuesUsdDiscount = [
     zelleDivisas,
-    binance,
     usdt,
     efectivo,
   ];
@@ -41,7 +40,6 @@ abstract final class PagoMetodo {
     zelleDivisas,
     transferencia,
     efectivo,
-    binance,
     usdt,
   ];
 

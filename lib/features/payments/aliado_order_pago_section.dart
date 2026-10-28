@@ -391,7 +391,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
               child: Text(
                 metodosPermitidos.isEmpty
                     ? 'Este importador no tiene métodos de pago configurados. Acuerde con él por chat.'
-                    : 'Métodos habilitados por el importador; Zelle, Binance, USDT y efectivo pueden aplicar descuento en divisas.',
+                    : 'Métodos habilitados por el importador; Zelle, USDT y efectivo pueden aplicar descuento en divisas.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.35,

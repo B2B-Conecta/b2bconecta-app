@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/catalog/catalog_cart_button.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_cart_price.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/variant_cart_picker_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 const buyer =
@@ -19,27 +20,89 @@ const product = PartModel(
     ownerId: 'supplier');
 
 void main() {
-  testWidgets('variant family opens options without adding a default SKU',
+  testWidgets('variant family opens picker without adding a default SKU',
       (tester) async {
     final cart = CartService();
     var choosing = false;
     final family = product.copyWith(variants: [
-      product.copyWith(id: 'small', minOrderQty: 1),
-      product.copyWith(id: 'large', minOrderQty: 2),
+      product.copyWith(id: 'small', minOrderQty: 1, stock: 20),
+      product.copyWith(id: 'large', minOrderQty: 2, stock: 20),
     ]);
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
             body: SizedBox(
-                width: 156,
+                width: 220,
                 child: CatalogCartButton(
                     part: family,
                     profile: buyer,
                     cart: cart,
                     onChooseVariant: () => choosing = true)))));
-    await tester.tap(find.text('Elegir opciones'));
+    await tester.tap(find.text('Agregar al carrito'));
     await tester.pump();
     expect(choosing, isTrue);
     expect(cart.isEmpty, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'variant picker confirms independent quantities and respects cancel',
+      (tester) async {
+    final cart = CartService();
+    final small = product.copyWith(
+        id: 'small',
+        nombre: 'LED stop S',
+        minOrderQty: 1,
+        stock: 20,
+        variantAttributeValue: 'S');
+    final large = product.copyWith(
+        id: 'large',
+        nombre: 'LED stop L',
+        minOrderQty: 2,
+        stock: 20,
+        variantAttributeValue: 'L');
+    final family = product.copyWith(variants: [small, large]);
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SizedBox(
+                width: 360,
+                child: CatalogCartButton(
+                    part: family, profile: buyer, cart: cart)))));
+    await tester.tap(find.text('Agregar al carrito'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancelar'), findsOneWidget);
+    expect(cart.isEmpty, isTrue);
+
+    // MOQ familiar = 5 (ficha). Se puede repartir: 3 + 2.
+    final plusButtons = find.descendant(
+      of: find.byType(VariantCartPickerSheet),
+      matching: find.byIcon(Icons.add),
+    );
+    expect(plusButtons, findsWidgets);
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(plusButtons.at(0));
+      await tester.pump();
+    }
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(plusButtons.at(1));
+      await tester.pump();
+    }
+
+    await tester.tap(find.descendant(
+      of: find.byType(VariantCartPickerSheet),
+      matching: find.text('Agregar al carrito'),
+    ));
+    await tester.pumpAndSettle();
+    expect(cart.itemCount, 3 + 2);
+    expect(cart.lines.map((line) => line.part.id).toSet(),
+        {'small', 'large'});
+
+    // Re-open and cancel leaves cart unchanged.
+    final before = cart.itemCount;
+    await tester.tap(find.text('Agregar al carrito').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(cart.itemCount, before);
     expect(tester.takeException(), isNull);
   });
 

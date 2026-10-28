@@ -28,7 +28,6 @@ set
   accepted_pago_metodos = array[
     'zelle_divisas',
     'pago_movil',
-    'binance',
     'usdt',
     'transferencia',
     'efectivo'
@@ -53,13 +52,6 @@ set
         lpad(right(regexp_replace(coalesce(p.phone, ''), '\D', '', 'g'), 4), 4, '0'),
         coalesce(p.business_name, 'Importador demo'),
         coalesce(p.rif, 'J-000000000')
-      ),
-    'binance',
-      format(
-        E'Binance ID: %s\nEmail: importador%s@binance.demo\nTitular: %s\nMoneda: USDT',
-        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
-        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
-        coalesce(p.business_name, 'Importador demo')
       ),
     'usdt',
       format(

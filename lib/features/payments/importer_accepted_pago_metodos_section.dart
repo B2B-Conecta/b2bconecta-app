@@ -117,7 +117,7 @@ class _ImporterAcceptedPagoMetodosSectionState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Active al menos un método en divisas (Zelle, Binance, USDT o efectivo) '
+              'Active al menos un método en divisas (Zelle, USDT o efectivo) '
               'antes de deshabilitar pagos en Bs.',
             ),
             duration: Duration(seconds: 4),
@@ -289,7 +289,7 @@ class _ImporterAcceptedPagoMetodosSectionState
                     const ProfileInfoIcon(
                       title: 'Solo pagos en divisas',
                       message:
-                          'Si lo activa, las tiendas minoristas solo podrán pagar en Zelle, Binance, USDT o efectivo. '
+                          'Si lo activa, las tiendas minoristas solo podrán pagar en Zelle, USDT o efectivo. '
                           'Se ocultan Pago Móvil y transferencia en Bs.',
                     ),
                   ],

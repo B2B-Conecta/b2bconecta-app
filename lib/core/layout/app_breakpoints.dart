@@ -25,5 +25,8 @@ abstract final class AppBreakpoints {
   static const double authFormMaxWidth = 420;
 
   /// Ficha de producto aliado en escritorio.
-  static const double productDetailMaxWidth = 1120;
+  static const double productDetailMaxWidth = 1280;
+
+  /// Umbral para ficha de producto en dos columnas (imagen | compra).
+  static const double productDetailDesktop = 860;
 }

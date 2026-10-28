@@ -11,6 +11,11 @@ void main() {
     expect(parseProductImageFilename('ABC123_2.png')?.slot, 2);
     expect(parseProductImageFilename('ABC123-3.webp')?.slot, 3);
     expect(parseProductImageFilename('folder/XYZ.jpg')?.sku, 'XYZ');
+    // SKUs que terminan en -02 / -03 no son slots de galería.
+    expect(parseProductImageFilename('VAR70-ACE-02.jpg')?.sku, 'VAR70-ACE-02');
+    expect(parseProductImageFilename('VAR70-ACE-02.jpg')?.slot, 1);
+    expect(parseProductImageFilename('VAR70-AMO-03.jpg')?.sku, 'VAR70-AMO-03');
+    expect(parseProductImageFilename('VAR70-AMO-03.jpg')?.slot, 1);
   });
 
   test('mergeProductImageUrls append respeta max 3', () {

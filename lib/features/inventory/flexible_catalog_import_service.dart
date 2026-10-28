@@ -16,12 +16,21 @@ import 'catalog_import_validator.dart';
 class FlexibleCatalogImportService {
   FlexibleCatalogImportService._();
 
+  /// Filas en la tarjeta compacta del wizard (mapeo).
   static const defaultSampleRowCount = 5;
 
+  /// Máximo de filas al abrir «Ver detalles de la carga».
+  /// Suficiente para catálogos típicos; archivos enormes se truncan con aviso.
+  static const detailsPreviewMaxRows = 2000;
+
   /// Paso 1: extrae cabeceras y filas de muestra para el wizard de mapeo.
+  ///
+  /// [sampleRowCount] limita cuántas filas se materializan en [sampleRows]
+  /// (el conteo total sigue en [totalDataRowsEstimate]).
   static CatalogImportPreview previewFile({
     required Uint8List bytes,
     required CatalogImportFileMeta meta,
+    int sampleRowCount = defaultSampleRowCount,
   }) {
     final table = _readTabular(bytes, meta);
     if (table.headers.isEmpty) {
@@ -39,12 +48,13 @@ class FlexibleCatalogImportService {
     final dataStart = meta.dataStartsAtRow - 1;
     final samples = <Map<String, String>>[];
     var dataRows = 0;
+    final cap = sampleRowCount < 1 ? defaultSampleRowCount : sampleRowCount;
 
     for (var r = dataStart; r < table.rows.length; r++) {
       final raw = table.rows[r];
       if (_rowIsEmpty(raw)) continue;
       dataRows++;
-      if (samples.length < defaultSampleRowCount) {
+      if (samples.length < cap) {
         samples.add(_zipRow(headers, raw));
       }
     }

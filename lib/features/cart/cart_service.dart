@@ -292,22 +292,27 @@ class CartService extends ChangeNotifier {
     PartModel part, {
     required double precioUnitarioAliadoRef,
     int delta = 1,
+    bool enforceLineMinOrder = true,
   }) {
     if (!canEdit || !part.isActive || delta < 1) return;
     final maxStock = part.stockForSale;
     final minQty = part.minOrderQtyEffective;
-    if (maxStock < minQty) return;
+    if (maxStock < 1) return;
+    if (enforceLineMinOrder && maxStock < minQty) return;
     final idx = _lines.indexWhere((l) => l.part.id == part.id);
     if (idx >= 0) {
       final existing = _lines[idx];
       final next = existing.quantity + delta;
       existing.quantity = next > maxStock ? maxStock : next;
-      if (existing.quantity < minQty) existing.quantity = minQty;
+      if (enforceLineMinOrder && existing.quantity < minQty) {
+        existing.quantity = minQty;
+      }
       existing.precioUnitarioAliadoRef =
           existing.part.precioUnitarioParaAliado(quantity: existing.quantity);
     } else {
-      var q = delta < minQty ? minQty : delta;
+      var q = enforceLineMinOrder && delta < minQty ? minQty : delta;
       if (q > maxStock) q = maxStock;
+      if (q < 1) return;
       final cascada = part.precioUnitarioParaAliado(quantity: q);
       _lines.add(
         CartLine(
@@ -327,7 +332,11 @@ class CartService extends ChangeNotifier {
     _changed();
   }
 
-  void setQuantity(String productId, int qty) {
+  void setQuantity(
+    String productId,
+    int qty, {
+    bool enforceLineMinOrder = true,
+  }) {
     if (!canEdit) return;
     final idx = _lines.indexWhere((l) => l.part.id == productId);
     if (idx < 0) return;
@@ -339,7 +348,7 @@ class CartService extends ChangeNotifier {
       _changed();
       return;
     }
-    var next = qty < minQty ? minQty : qty;
+    var next = enforceLineMinOrder && qty < minQty ? minQty : qty;
     line.quantity = next > maxStock ? maxStock : next;
     line.precioUnitarioAliadoRef =
         line.part.precioUnitarioParaAliado(quantity: line.quantity);

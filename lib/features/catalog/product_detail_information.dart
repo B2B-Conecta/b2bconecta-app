@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'aliado_catalog_categories.dart';
 import 'part_model.dart';
+import 'product_warranty_seal.dart';
 
 /// Product identity leads the detail page; a database ID is never a SKU.
 class ProductDetailHeading extends StatelessWidget {
@@ -18,6 +19,8 @@ class ProductDetailHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     final category = part.category?.trim() ?? '';
     final sku = part.sku?.trim() ?? '';
+    final showMeta =
+        category.isNotEmpty || sku.isNotEmpty || part.hasWarranty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -26,16 +29,16 @@ class ProductDetailHeading extends StatelessWidget {
           container: true,
           child: Text(part.nombre,
               style: TextStyle(
-                  fontSize: desktop ? 28 : 22,
+                  fontSize: desktop ? 30 : 22,
                   height: 1.2,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary)),
         ),
-        if (category.isNotEmpty || sku.isNotEmpty) ...[
-          const SizedBox(height: 6),
+        if (showMeta) ...[
+          const SizedBox(height: 8),
           Wrap(
-              spacing: 10,
-              runSpacing: 4,
+              spacing: 8,
+              runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (category.isNotEmpty)
@@ -59,6 +62,7 @@ class ProductDetailHeading extends StatelessWidget {
                           fontSize: 13,
                           height: 1.4,
                           color: AppColors.textSecondary)),
+                if (part.hasWarranty) const ProductWarrantySeal(compact: true),
               ]),
         ],
       ],

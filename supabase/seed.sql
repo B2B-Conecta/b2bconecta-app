@@ -16,7 +16,7 @@
 --   aliado*@motoconecta.seed     → aliado123
 --
 -- Incluye: 15 importadores (2 × 15 SKU + 10 × 5 SKU; 13–15 catálogo vacío para carga masiva),
--- datos de pago demo por método (Zelle, Pago Móvil, Binance, USDT, transferencia, efectivo),
+-- datos de pago demo por método (Zelle, Pago Móvil, USDT, transferencia, efectivo),
 -- 3 aliados (solo aliado1 con pedidos demo), 3 admins (incluye owner local),
 -- pedidos entregados con pago aprobado + método de pago y comprobante,
 -- valoraciones bucket_v2 de demo (admin / reputación importador) y
@@ -703,7 +703,6 @@ set
   accepted_pago_metodos = array[
     'zelle_divisas',
     'pago_movil',
-    'binance',
     'usdt',
     'transferencia',
     'efectivo'
@@ -728,13 +727,6 @@ set
         lpad(right(regexp_replace(coalesce(p.phone, ''), '\D', '', 'g'), 4), 4, '0'),
         coalesce(p.business_name, 'Importador demo'),
         coalesce(p.rif, 'J-000000000')
-      ),
-    'binance',
-      format(
-        E'Binance ID: %s\nEmail: importador%s@binance.demo\nTitular: %s\nMoneda: USDT',
-        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
-        regexp_replace(coalesce(p.phone, ''), '.*-', ''),
-        coalesce(p.business_name, 'Importador demo')
       ),
     'usdt',
       format(
@@ -1269,7 +1261,7 @@ select
   5 + (pp.line_no % 3),
   round((pp.unit_price * (5 + (pp.line_no % 3)))::numeric, 4),
   0.05,
-  (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'binance'])[
+  (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'usdt'])[
     1 + (pp.line_no % 5)
   ],
   'seed/comprobantes/aliado-demo.pdf',
@@ -1373,7 +1365,7 @@ select
   v.commission_rate_snapshot,
   round((v.precio_total_usd * v.commission_rate_snapshot)::numeric, 4),
   m.devengo_base + (v.line_no * interval '1 day'),
-  (array['pago_movil', 'zelle_divisas', 'transferencia', 'efectivo', 'binance'])[
+  (array['pago_movil', 'zelle_divisas', 'transferencia', 'efectivo', 'usdt'])[
     1 + (v.line_no % 5)
   ],
   'seed/comprobantes/e3-tramo-demo.pdf',
@@ -1472,7 +1464,7 @@ set
   ),
   pago_metodo = coalesce(
     tr.pago_metodo,
-    (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'binance'])[
+    (array['transferencia', 'pago_movil', 'zelle_divisas', 'efectivo', 'usdt'])[
       1 + (abs(hashtext(tr.id::text)) % 5)
     ]
   ),

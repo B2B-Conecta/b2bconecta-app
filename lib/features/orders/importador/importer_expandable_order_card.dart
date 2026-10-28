@@ -186,7 +186,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             size: 14, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Text(
-                          '${formatRefAmount(totalRef)} REF',
+                          '${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -366,6 +366,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                         _DetailSummaryStrip(
                           destino: destinoTxt,
                           totalRef: totalRef,
+                          currencyLabel: orderAmountCurrency(lines),
                           partidas: lines.length,
                           unidades:
                               lines.fold<int>(0, (a, x) => a + x.cantidad),
@@ -573,10 +574,12 @@ class _DetailSummaryStrip extends StatelessWidget {
     required this.totalRef,
     required this.partidas,
     required this.unidades,
+    this.currencyLabel = 'REF',
   });
 
   final String destino;
   final double totalRef;
+  final String currencyLabel;
   final int partidas;
   final int unidades;
 
@@ -599,7 +602,7 @@ class _DetailSummaryStrip extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${formatRefAmount(totalRef)} REF',
+            '${formatRefAmount(totalRef)} $currencyLabel',
             style: const TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 14,

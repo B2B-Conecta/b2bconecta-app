@@ -38,10 +38,15 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     // Keep the published prices distinct. Cart discounts must not relabel the
     // USD offer as REF or replace the base used for the Bs equivalent.
     final ref = listPriceUsd;
+    final usd = ProductCatalogPricing.aliadoUnitUsdPaymentLine(
+        refUnitUsd: ref,
+        salePriceUsd: salePriceUsd,
+        discountRules: discountRules,
+        ownerPagoSoloDivisas: ownerPagoSoloDivisas);
     final hasUsdPrice = ProductCatalogPricing.hasDirectSale(
-        listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd);
+        listPriceUsd: listPriceUsd, salePriceUsd: usd);
     final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
-        listPriceUsd: listPriceUsd, salePriceUsd: salePriceUsd);
+        listPriceUsd: listPriceUsd, salePriceUsd: usd);
     final mainSize = catalogGrid
         ? (prominent ? 20.0 : (compact ? 14.0 : 16.0))
         : (compact ? 20.0 : 22.0);
@@ -69,8 +74,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                 runSpacing: 2,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  amount(
-                      salePriceUsd!, 'USD', mainSize, AppColors.successGreen),
+                  amount(usd, 'USD', mainSize, AppColors.successGreen),
                   if (discountLabel != null)
                     _UsdDiscountChip(label: discountLabel),
                 ]),

@@ -338,17 +338,16 @@ class SupabaseService {
         verified: verified,
       );
 
-  static Future<List<ImporterSalesSnapshot>>
-      adminListImporterSalesSnapshots({
+  static Future<List<ImporterSalesSnapshot>> adminListImporterSalesSnapshots({
     int days = 30,
     int? limit,
     int offset = 0,
   }) =>
-          CatalogService.adminListImporterSalesSnapshots(
-            days: days,
-            limit: limit,
-            offset: offset,
-          );
+      CatalogService.adminListImporterSalesSnapshots(
+        days: days,
+        limit: limit,
+        offset: offset,
+      );
 
   static Future<List<PartModel>> fetchMyInventory({
     int limit = 200,
@@ -710,6 +709,7 @@ class SupabaseService {
 
   static Future<String> checkoutMultiImportadorCart({
     required List<Map<String, dynamic>> lines,
+    String moneda = 'BOLIVARES',
     bool destinoEntregaUsaPerfil = true,
     String? destinoEntregaTexto,
     String? destinoEntregaMapsUrl,
@@ -719,6 +719,7 @@ class SupabaseService {
   }) =>
       OrdersService.checkoutMultiImportadorCart(
           lines: lines,
+          moneda: moneda,
           destinoEntregaUsaPerfil: destinoEntregaUsaPerfil,
           destinoEntregaTexto: destinoEntregaTexto,
           destinoEntregaMapsUrl: destinoEntregaMapsUrl,
@@ -1572,18 +1573,19 @@ class SupabaseService {
   static Future<void> adminCancelCommissionSettlement(String settlementId) =>
       CommissionsService.adminCancelCommissionSettlement(settlementId);
 
-  static Future<CommissionCollectedIncomeReport> fetchCollectedCommissionReport({
+  static Future<CommissionCollectedIncomeReport>
+      fetchCollectedCommissionReport({
     required DateTime from,
     required DateTime to,
     String? importadorId,
     CommissionSettlementDocumentType? documentType,
   }) =>
-      CommissionsService.fetchCollectedCommissionReport(
-        from: from,
-        to: to,
-        importadorId: importadorId,
-        documentType: documentType,
-      );
+          CommissionsService.fetchCollectedCommissionReport(
+            from: from,
+            to: to,
+            importadorId: importadorId,
+            documentType: documentType,
+          );
 
   static Future<List<SupportTicketModel>> listMySupportTickets() =>
       SupportService.listMySupportTickets();

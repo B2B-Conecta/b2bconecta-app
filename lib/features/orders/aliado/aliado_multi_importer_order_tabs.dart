@@ -81,7 +81,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Carrito con $nImp importadores · '
-                      '${formatRefAmount(totalRef)} REF'
+                      '${formatRefAmount(totalRef)} ${orderAmountCurrency(allLines)}'
                       '${refCorta != null ? ' · ref. $refCorta' : ''}',
                       style: TextStyle(
                         fontSize: 11.5,

@@ -1,24 +1,17 @@
+import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
-import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/features/orders/shared/admin_order_panel_utils.dart';
-import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_eligibility.dart';
-import 'package:motolink_pro_app/features/orders/importador/importer_order_date_badge.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
-import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -52,26 +45,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
         : <TransactionRequestModel>[request];
     final isCheckoutGroup = lines.length > 1;
     final r = request;
-    final groupMoroso = adminCheckoutGroupEsMoroso(lines);
-    final importerCount = isCheckoutGroup
-        ? lines.map((e) => e.ownerId.trim()).where((s) => s.isNotEmpty).toSet().length
-        : 0;
-
-    final titulo = isCheckoutGroup
-        ? (expanded
-            ? 'Carrito · ${lines.length} líneas'
-                '${importerCount > 1 ? ' · $importerCount importadores' : ''}'
-            : adminCheckoutGroupTitle(lines))
-        : null;
-    final resumen =
-        isCheckoutGroup ? adminCheckoutGroupResumenLinea(lines) : null;
-    final fechaLabel = isCheckoutGroup
-        ? ImporterOrderDate.etiquetaGrupo(lines)
-        : ImporterOrderDate.etiquetaFecha(r);
-    final fechaActiva = isCheckoutGroup
-        ? lines.any(ImporterOrderDate.isAbierto)
-        : ImporterOrderDate.isAbierto(r);
-
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.hardEdge,
@@ -89,132 +62,30 @@ class AdminExpandableOrderCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Material(
-            color: Colors.transparent,
-            child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: onToggle,
-                        child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              ImporterOrderDateBadge(
-                                label: fechaLabel,
-                                isActive: fechaActiva,
-                              ),
-                              const Spacer(),
-                              OrderStatusHeaderChips(
-                                statusLabel: statusLabel,
-                                showMoroso: groupMoroso,
-                              ),
-                            ],
-                          ),
-                          OrderPostventaHeaderMarks(lines: lines),
-                          const SizedBox(height: 8),
-                          if (isCheckoutGroup && titulo != null)
-                            Text(
-                              titulo,
-                              maxLines: expanded ? 2 : 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          OrderCardDirectSummary(
-                            lines: lines,
-                            viewerRole: AppHomeRole.administrador,
-                            compact: !expanded,
-                          ),
-                          if (resumen != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              resumen,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                          if (!expanded) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              r.destinoEntregaLineaCompactaEs,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                                height: 1.25,
-                              ),
-                            ),
-                          ],
-                          if (!expanded &&
-                              r.status ==
-                                  TransactionRequestStatus.pedidoListo) ...[
-                            const SizedBox(height: 6),
-                            OrderCardCompactNoticeChip(
-                              label: 'Listo para recolección',
-                              icon: Icons.notifications_active_outlined,
-                              color: Colors.teal.shade900,
-                            ),
-                          ],
-                          if (!expanded &&
-                              !isCheckoutGroup &&
-                              lines.every((x) => x.pedidoEntregadoYPagado)) ...[
-                            const SizedBox(height: 6),
-                            OrderCardCompactNoticeChip(
-                              label: 'Entregado y pagado',
-                              icon: Icons.check_circle_outline,
-                              color: Colors.green.shade800,
-                            ),
-                          ] else if (!expanded && groupMoroso) ...[
-                            const SizedBox(height: 8),
-                            MorosoOrderCardNotice(
-                              request: adminCheckoutGroupMorosoRef(lines),
-                              expanded: false,
-                              riskWarningChild: lines.any(
-                                (x) => x.pagoPendienteRiesgoCuentaTresDiasHabiles,
-                              )
-                                  ? _RiesgoMorosoBanner()
-                                  : null,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    ),
-                    OrderChatIconButton(
-                      relatedOrderIds: lines.map((e) => e.id).toList(),
-                      onOpen: () {
-                        showOrderChatSheet(
-                          context: context,
-                          transactionRequestId: lines.first.id,
-                          mergedThreadRequestIds: isCheckoutGroup
-                              ? lines.map((e) => e.id).toList()
-                              : null,
-                          orderLines: lines,
-                          allowReplyAsAliado: false,
-                          allowReplyAsAdmin: true,
-                          title: 'Chat del pedido',
-                          onThreadChanged: onRequestMutated,
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          OrderCardGuidance(
+          OrderSummaryHeader(
+            lines: lines,
+            viewerRole: AppHomeRole.administrador,
             expanded: expanded,
             onToggle: onToggle,
+            statusLabel: statusLabel,
+            onCancel: null,
+            cancelBusy: false,
+            chatAction: OrderChatIconButton(
+              relatedOrderIds: lines.map((e) => e.id).toList(),
+              onOpen: () {
+                showOrderChatSheet(
+                  context: context,
+                  transactionRequestId: lines.first.id,
+                  mergedThreadRequestIds:
+                      isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+                  orderLines: lines,
+                  allowReplyAsAliado: false,
+                  allowReplyAsAdmin: true,
+                  title: 'Chat del pedido',
+                  onThreadChanged: onRequestMutated,
+                );
+              },
+            ),
           ),
           if (expanded) ...[
             const Divider(height: 1),
@@ -224,18 +95,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: onToggle,
-                      icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Cerrar'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: kOrderCardSectionGap),
                   if (isCheckoutGroup)
                     AdminCheckoutGroupMasterHeader(
@@ -245,8 +104,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                   else ...[
                     OrderCardCollapsibleSection(
                       title: 'Partes del pedido',
-                      subtitle:
-                          TransactionRequestPartiesContactSection.partiesSubtitle(
+                      subtitle: TransactionRequestPartiesContactSection
+                          .partiesSubtitle(
                         r,
                       ),
                       infoMessage:
@@ -272,7 +131,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
                         [r],
                         viewer: PedidoDesgloseViewer.importador,
                       ),
-                      initiallyExpanded: orderCardProductsInitiallyExpanded(r.status),
+                      initiallyExpanded:
+                          orderCardProductsInitiallyExpanded(r.status),
                       child: TransactionRequestProductosDesgloseSection(
                         lines: [r],
                         compact: true,
@@ -327,8 +187,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                     OrderCardCollapsibleSection(
                       title: 'Seguimiento',
                       subtitle: orderCardTimelineSubtitle(r),
-                      initiallyExpanded:
-                          orderCardTimelineInitiallyExpanded(r),
+                      initiallyExpanded: orderCardTimelineInitiallyExpanded(r),
                       child: CourierTimelineWidget(
                         request: r,
                         compact: true,

@@ -4,6 +4,7 @@ import 'aliado_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 
 String formatAliadoPedidosFilterDate(DateTime d) {
   final local = d.toLocal();
@@ -33,7 +34,7 @@ class AliadoPedidosFiltersSheet extends StatefulWidget {
     return showModalBottomSheet<AliadoPedidosFiltersDraft>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -59,6 +60,8 @@ class AliadoPedidosFiltersSheet extends StatefulWidget {
 class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
   String? _status;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -67,6 +70,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     super.initState();
     _status = widget.initial.statusFilter;
     _morosoOnly = widget.initial.morosoOnly;
+    _creditOnly = widget.initial.creditOnly;
+    _replacementOnly = widget.initial.replacementOnly;
     _dateFrom = widget.initial.dateFrom;
     _dateTo = widget.initial.dateTo;
   }
@@ -75,6 +80,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     return AliadoPedidosFiltersDraft(
       statusFilter: _status,
       morosoOnly: _morosoOnly,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
       dateFrom: _dateFrom,
       dateTo: _dateTo,
     );
@@ -84,6 +91,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     setState(() {
       _status = null;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -103,12 +112,14 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     setState(() {
       if (isFrom) {
         _dateFrom = picked;
-        if (_dateTo != null && _dateOnly(_dateTo!).isBefore(_dateOnly(picked))) {
+        if (_dateTo != null &&
+            _dateOnly(_dateTo!).isBefore(_dateOnly(picked))) {
           _dateTo = picked;
         }
       } else {
         _dateTo = picked;
-        if (_dateFrom != null && _dateOnly(_dateFrom!).isAfter(_dateOnly(picked))) {
+        if (_dateFrom != null &&
+            _dateOnly(_dateFrom!).isAfter(_dateOnly(picked))) {
           _dateFrom = picked;
         }
       }
@@ -156,7 +167,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     final bottom = MediaQuery.of(context).viewPadding.bottom;
 
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       child: Column(
         children: [
@@ -186,7 +197,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Puede acotar por un paso, por fechas o por pagos pendientes.',
+                  'Encuentra tus pedidos por fecha, estado o tipo.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -238,6 +249,15 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                     }),
                   ],
                 ),
+                _sectionTitle('TIPO DE PEDIDO'),
+                OrderSignalFilterBar(
+                  creditOnly: _creditOnly,
+                  replacementOnly: _replacementOnly,
+                  onChanged: (credit, replacement) => setState(() {
+                    _creditOnly = credit;
+                    _replacementOnly = replacement;
+                  }),
+                ),
                 _sectionTitle('PAGO PENDIENTE'),
                 SwitchListTile(
                   value: _morosoOnly,
@@ -267,6 +287,9 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    ActionChip(
+                        label: const Text('Hoy'),
+                        onPressed: () => _applyPresetDays(1)),
                     ActionChip(
                       label: const Text('7 días'),
                       onPressed: () => _applyPresetDays(7),
@@ -332,8 +355,7 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_buildDraft()),
+                    onPressed: () => Navigator.of(context).pop(_buildDraft()),
                     child: const Text('Aplicar filtros'),
                   ),
                 ),

@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -956,6 +957,10 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const SizedBox(height: 4),
+        Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: OrdersListHeading(count: groups.length)),
         OrderListFilterBar(
           searchController: _searchCtrl,
           onSearchChanged: (_) => setState(() {}),
@@ -1001,6 +1006,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                 )
               : PagedItems<List<TransactionRequestModel>>(
                   items: groups,
+                  pagerAtBottom: true,
                   itemKey: checkoutGroupExpandKey,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   onRefresh: _load,

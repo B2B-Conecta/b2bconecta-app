@@ -1,23 +1,19 @@
+import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
-import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
 import 'importer_aliado_solicitud_section.dart';
-import 'importer_order_date_badge.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
 
@@ -81,9 +77,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     final isCheckoutGroup = lines.length > 1;
 
     final uid = SupabaseService.currentUserId;
-    final titulo = isCheckoutGroup
-        ? tituloCheckoutGrupoImportador(lines, uid)
-        : null;
     final promoChip = importerPromoChipForLines(lines);
 
     final destinoTxt = isCheckoutGroup
@@ -99,13 +92,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       0,
       (sum, line) => sum + line.creditoAplicadoMonto,
     );
-
-    final fechaLabel = isCheckoutGroup
-        ? ImporterOrderDate.etiquetaGrupo(lines)
-        : ImporterOrderDate.etiquetaFecha(r);
-    final fechaActiva = isCheckoutGroup
-        ? lines.any(ImporterOrderDate.isAbierto)
-        : ImporterOrderDate.isAbierto(r);
 
     final anyEntregadoPago = isCheckoutGroup
         ? lines.any((x) => x.pedidoEntregadoYPagado)
@@ -131,170 +117,19 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Material(
-            color: expanded
-                ? AppColors.surfaceTinted.withOpacity(0.55)
-                : Colors.transparent,
-            child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: onToggle,
-                        child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ImporterOrderDateBadge(
-                          label: fechaLabel,
-                          isActive: fechaActiva,
-                        ),
-                        const Spacer(),
-                        OrderStatusHeaderChips(
-                          statusLabel: statusLabel,
-                          showMoroso: anyPagoPendienteTrasEntrega,
-                        ),
-                      ],
-                    ),
-                    OrderPostventaHeaderMarks(lines: lines),
-                    const SizedBox(height: 10),
-                    if (isCheckoutGroup && titulo != null)
-                      Text(
-                        titulo,
-                        maxLines: expanded ? 4 : 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          height: 1.25,
-                        ),
-                      ),
-                    OrderCardDirectSummary(
-                      lines: lines,
-                      viewerRole: AppHomeRole.importador,
-                      importerUserId: uid,
-                      compact: !expanded,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.payments_outlined,
-                            size: 14, color: AppColors.textSecondary),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        if (creditApplied > 0) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              'Crédito aplicado ${formatRefAmount(creditApplied)} REF',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.brandAccent,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if ((aliadoCreditRemaining ?? 0) > 0) ...[
-                      const SizedBox(height: 8),
-                      _OrderCreditNotice(
-                        storeName: lines.first.aliadoBusinessName,
-                        amount: aliadoCreditRemaining!,
-                      ),
-                    ],
-                    if (promoChip != null) ...[
-                      const SizedBox(height: 8),
-                      promoChip,
-                    ],
-                    if (expanded &&
-                        operationalHeadline != null &&
-                        operationalHeadline!.isNotEmpty &&
-                        operationalHeadline != '—') ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        operationalHeadline!,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                          color: r.status == TransactionRequestStatus.entregado
-                              ? Colors.green.shade800
-                              : AppColors.brandBlue,
-                        ),
-                      ),
-                    ],
-                    if (r.hasTransitEta &&
-                        (r.status == TransactionRequestStatus.enTransito ||
-                            r.status == TransactionRequestStatus.enviado)) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Llegada al taller: ${r.transitEtaResumenEs}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.teal.shade800,
-                        ),
-                      ),
-                    ],
-                    if (!expanded && anyEntregadoPago) ...[
-                      const SizedBox(height: 8),
-                      OrderCardCompactNoticeChip(
-                        label: 'Entregado y pagado',
-                        icon: Icons.check_circle_outline,
-                        color: Colors.green.shade800,
-                      ),
-                    ] else if (anyPagoPendienteTrasEntrega && !expanded) ...[
-                      const SizedBox(height: 8),
-                      MorosoOrderCardNotice(
-                        request: isCheckoutGroup
-                            ? lines.firstWhere(
-                                (x) => x.esPedidoMoroso,
-                                orElse: () => r,
-                              )
-                            : r,
-                        expanded: false,
-                        riskWarningChild: null,
-                      ),
-                    ] else if (!expanded &&
-                        lines.any((l) => l.qtyAdjustmentPendienteAliado)) ...[
-                      const SizedBox(height: 8),
-                      OrderCardCompactNoticeChip(
-                        label: 'Ajuste de cantidad pendiente',
-                        icon: Icons.inventory_2_outlined,
-                        color: Colors.amber.shade900,
-                      ),
-                    ],
-                  ],
-                ),
-                      ),
-                    ),
-                    OrderChatIconButton(
-                      relatedOrderIds: lines.map((e) => e.id).toList(),
-                      onOpen: () => _openChat(context, lines, isCheckoutGroup),
-                    ),
-                  ],
-                ),
-              ),
-          ),
-          OrderCardGuidance(
+          OrderSummaryHeader(
+            lines: lines,
+            viewerRole: AppHomeRole.importador,
             expanded: expanded,
             onToggle: onToggle,
+            statusLabel: statusLabel,
+            onCancel: canCancelByImporter ? onCancelByImporter : null,
+            cancelBusy: cancelBusy,
+            chatAction: OrderChatIconButton(
+              relatedOrderIds: lines.map((e) => e.id).toList(),
+              onOpen: () => _openChat(context, lines, isCheckoutGroup),
+            ),
           ),
-          if (ratingBar != null) ratingBar!,
           if (nextStatus != null &&
               nextActionLabel != null &&
               onAdvance != null)
@@ -305,24 +140,6 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                 child: FilledButton(
                   onPressed: onAdvance,
                   child: Text(nextActionLabel!),
-                ),
-              ),
-            ),
-          if (expanded && canCancelByImporter && onCancelByImporter != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-              child: OutlinedButton.icon(
-                onPressed: cancelBusy ? null : onCancelByImporter,
-                icon: cancelBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.cancel_outlined, size: 20),
-                label: Text(cancelBusy ? 'Cancelando…' : 'Cancelar pedido'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade800,
                 ),
               ),
             ),
@@ -363,6 +180,21 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (promoChip != null) ...[
+                          promoChip,
+                          const SizedBox(height: 10),
+                        ],
+                        if (creditApplied > 0) ...[
+                          Text(
+                              'Saldo aplicado: ${formatRefAmount(creditApplied)} REF'),
+                          const SizedBox(height: 10),
+                        ],
+                        if ((aliadoCreditRemaining ?? 0) > 0) ...[
+                          _OrderCreditNotice(
+                              amount: aliadoCreditRemaining!,
+                              storeName: lines.first.aliadoBusinessName),
+                          const SizedBox(height: 10),
+                        ],
                         _DetailSummaryStrip(
                           destino: destinoTxt,
                           totalRef: totalRef,
@@ -381,7 +213,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             color: Colors.green.shade800,
                           ),
                         ],
-                        if (lines.any((l) => l.qtyAdjustmentPendienteAliado)) ...[
+                        if (lines
+                            .any((l) => l.qtyAdjustmentPendienteAliado)) ...[
                           const SizedBox(height: 10),
                           _InfoBanner(
                             color: Colors.amber,
@@ -417,11 +250,11 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             if (TransactionRequestAliadoContactSection
                                 .kycAprobadoPara(lines.first))
                               IconButton(
-                                onPressed: () => showImporterAliadoKycDetailSheet(
+                                onPressed: () =>
+                                    showImporterAliadoKycDetailSheet(
                                   context,
-                                  aliado:
-                                      TransactionRequestAliadoContactSection
-                                          .kycModelPara(lines.first),
+                                  aliado: TransactionRequestAliadoContactSection
+                                      .kycModelPara(lines.first),
                                 ),
                                 icon: const Icon(
                                   Icons.verified_user_outlined,
@@ -505,7 +338,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               OrderOpenChatButton(
-                                relatedOrderIds: lines.map((e) => e.id).toList(),
+                                relatedOrderIds:
+                                    lines.map((e) => e.id).toList(),
                                 onPressed: () =>
                                     _openChat(context, lines, isCheckoutGroup),
                               ),
@@ -541,6 +375,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                   )
                 : const SizedBox.shrink(),
           ),
+          if (expanded && ratingBar != null) ratingBar!,
         ],
       ),
     );
@@ -562,7 +397,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       allowReplyAsAdmin: false,
       allowReplyAsImportador: orderLinesAllowChatReply(lines),
       deliveryGrace: orderLinesChatDeliveryGrace(lines),
-      title: (shop != null && shop.isNotEmpty) ? 'Chat · $shop' : 'Chat del pedido',
+      title: (shop != null && shop.isNotEmpty)
+          ? 'Chat · $shop'
+          : 'Chat del pedido',
       onThreadChanged: onThreadChanged,
     );
   }
@@ -597,7 +434,9 @@ class _DetailSummaryStrip extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            partidas == 1 ? '1 partida · $unidades uds' : '$partidas partidas · $unidades uds',
+            partidas == 1
+                ? '1 partida · $unidades uds'
+                : '$partidas partidas · $unidades uds',
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
           ),
           const SizedBox(height: 4),

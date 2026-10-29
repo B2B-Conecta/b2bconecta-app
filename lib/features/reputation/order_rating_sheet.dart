@@ -695,7 +695,7 @@ class OrderRatingPendingBar extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Toque para abrir el cuestionario. No está en el detalle del pedido.',
+                              'Comparte tu experiencia con esta compra.',
                               style: TextStyle(
                                 fontSize: 11,
                                 height: 1.3,

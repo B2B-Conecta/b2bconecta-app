@@ -32,18 +32,17 @@ import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_replacement_tracker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
 import 'aliado_pedidos_filters_sheet.dart';
-import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
-import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_status_label.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
 
 class AliadoPedidosPanel extends StatefulWidget {
   const AliadoPedidosPanel({super.key});
@@ -76,9 +75,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           .map(
             (s) => OrderStatusFilterOption(
               status: s,
-              label: TransactionRequestStatus.labelEs(
-                s,
-              ),
+              label: orderStatusLabel(s),
             ),
           )
           .toList();
@@ -216,6 +213,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     return AliadoPedidosFiltersDraft(
       statusFilter: _statusFilter,
       morosoOnly: _morosoOnly,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
       dateFrom: _dateFrom,
       dateTo: _dateTo,
     );
@@ -236,23 +235,13 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   void _applyFiltersDraft(AliadoPedidosFiltersDraft draft) {
     setState(() {
+      if (draft.hasStatusFilter || draft.morosoOnly) {
+        _scope = PedidosListScope.todos;
+      }
       _statusFilter = draft.statusFilter;
       _morosoOnly = draft.morosoOnly;
-      _dateFrom = draft.dateFrom;
-      _dateTo = draft.dateTo;
-    });
-  }
-
-  Future<void> _openDateFilters() async {
-    final draft = await ImporterPedidosFiltersSheet.show(
-      context,
-      initial: ImporterPedidosFiltersDraft(
-        dateFrom: _dateFrom,
-        dateTo: _dateTo,
-      ),
-    );
-    if (draft == null || !mounted) return;
-    setState(() {
+      _creditOnly = draft.creditOnly;
+      _replacementOnly = draft.replacementOnly;
       _dateFrom = draft.dateFrom;
       _dateTo = draft.dateTo;
     });
@@ -287,56 +276,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       return 'Desde ${formatAliadoPedidosFilterDate(from)}';
     }
     return 'Hasta ${formatAliadoPedidosFilterDate(to!)}';
-  }
-
-  InputDecoration _pedidosSearchDecoration({required int filterBadge}) {
-    return InputDecoration(
-      hintText: 'Buscar por producto, SKU o importador…',
-      hintStyle: AppColors.hintStyle,
-      prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
-      filled: true,
-      fillColor: AppColors.fieldFill,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.borderSubtle),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.borderSubtle),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brandBlue, width: 1.2),
-      ),
-      isDense: true,
-      suffixIcon: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_searchCtrl.text.trim().isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear, size: 20),
-              color: AppColors.textSecondary,
-              onPressed: () => _searchCtrl.clear(),
-            ),
-          IconButton(
-            tooltip: 'Más filtros',
-            onPressed: _openPedidosFiltersSheet,
-            icon: Badge(
-              isLabelVisible: filterBadge > 0,
-              label: Text('$filterBadge'),
-              backgroundColor: AppColors.brand,
-              child: Icon(
-                Icons.tune,
-                color: filterBadge > 0
-                    ? AppColors.brand
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _activeFilterChip({
@@ -389,6 +328,14 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       ));
     }
 
+    if (_creditOnly)
+      chips.add(_activeFilterChip(
+          label: 'Saldo aplicado',
+          onDeleted: () => setState(() => _creditOnly = false)));
+    if (_replacementOnly)
+      chips.add(_activeFilterChip(
+          label: 'Cambio de producto',
+          onDeleted: () => setState(() => _replacementOnly = false)));
     if (chips.isEmpty) return null;
 
     return Padding(
@@ -467,11 +414,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         context,
         request: ref,
         onSubmitted: _refreshExpandedCard,
-        bundleCheckoutGroupId:
-            (cg != null && cg.isNotEmpty) ? cg : null,
+        bundleCheckoutGroupId: (cg != null && cg.isNotEmpty) ? cg : null,
         bundleImportadorId: imp.isNotEmpty ? imp : null,
-        importadorLabel:
-            (label != null && label.isNotEmpty) ? label : null,
+        importadorLabel: (label != null && label.isNotEmpty) ? label : null,
         cancellationReason: motivo,
       );
     });
@@ -688,8 +633,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       lines: g,
       lineaPuedeConfirmar: (r) => r.puedeConfirmarRecepcionAliado,
       chunkPuedeConfirmar: _puedeConfirmarRecepcionImportador,
-      busyKeyForChunk: (chunk) =>
-          _entregaBusyKeyForImportadorChunk(chunk, cg),
+      busyKeyForChunk: (chunk) => _entregaBusyKeyForImportadorChunk(chunk, cg),
       entregaBusyId: _entregaBusyId,
       onConfirmarLinea: (r) => _confirmarEntrega(context, r),
       onConfirmarChunk: (chunk) => _confirmarEntregaGrupoImportador(
@@ -732,106 +676,108 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       );
       return _wrapExpandedFooter(
         Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (r.qtyAdjustmentPendienteAliado) ...[
-            AliadoQtyAdjustmentActions(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (r.qtyAdjustmentPendienteAliado) ...[
+              AliadoQtyAdjustmentActions(
+                request: r,
+                onChanged: _refreshExpandedCard,
+              ),
+              SizedBox(height: sectionGap),
+            ],
+            AliadoPedidoCarrierSelectionSection(
               request: r,
               onChanged: _refreshExpandedCard,
             ),
+            if ((r.status == TransactionRequestStatus.pedidoListo ||
+                    r.hasPickupConfirmed) &&
+                r.carrierDecisionResolved) ...[
+              SizedBox(height: sectionGap),
+              PickupLocationDisplaySection(request: r),
+            ],
+            if (r.aliadoMuestraSeccionFleteSeparado) ...[
+              SizedBox(height: sectionGap),
+              AliadoFleteSeparadoSection(
+                request: r,
+                onChanged: _refreshExpandedCard,
+                compact: true,
+              ),
+            ],
             SizedBox(height: sectionGap),
-          ],
-          AliadoPedidoCarrierSelectionSection(
-            request: r,
-            onChanged: _refreshExpandedCard,
-          ),
-          if ((r.status == TransactionRequestStatus.pedidoListo ||
-                  r.hasPickupConfirmed) &&
-              r.carrierDecisionResolved) ...[
-            SizedBox(height: sectionGap),
-            PickupLocationDisplaySection(request: r),
-          ],
-          if (r.aliadoMuestraSeccionFleteSeparado) ...[
-            SizedBox(height: sectionGap),
-            AliadoFleteSeparadoSection(
-              request: r,
-              onChanged: _refreshExpandedCard,
-              compact: true,
-            ),
-          ],
-          SizedBox(height: sectionGap),
-          OrderCardCollapsibleSection(
-            title: OrderVocab.seccionPagoFactura,
-            subtitle: pagoSubtitle?.isNotEmpty == true
-                ? pagoSubtitle!
-                : OrderPaymentFlowCopy.aliadoSeccionPagoSubtitulo,
-            infoMessage: OrderSectionHelp.pagoAliadoMetodo,
-            initiallyExpanded: !r.pedidoEntregadoYPagado,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AliadoImportadorFacturaSection(lines: [r], compact: true),
-                SizedBox(height: sectionGap + 4),
-                _PasarelaPagoMotoLinkCard(
-                  lineCount: 1,
-                  importerName: r.ownerBusinessName,
-                  montoRef: r.refBaseTotalForPago > 0
-                      ? r.refBaseTotalForPago
-                      : r.precioTotal,
-                  previewLines: [r],
-                  childBuilder: (onMetodoPreview) => AliadoOrderPagoSection(
-                    key: ValueKey<String>('pago-${r.id}'),
-                    request: r,
-                    profile: _profile,
-                    onChanged: _refreshExpandedCard,
-                    onPagoMetodoPreviewChanged: onMetodoPreview,
-                    suppressPrimaryTitle: true,
-                    suppressNegotiationIntro: true,
+            OrderCardCollapsibleSection(
+              title: OrderVocab.seccionPagoFactura,
+              subtitle: pagoSubtitle?.isNotEmpty == true
+                  ? pagoSubtitle!
+                  : OrderPaymentFlowCopy.aliadoSeccionPagoSubtitulo,
+              infoMessage: OrderSectionHelp.pagoAliadoMetodo,
+              initiallyExpanded:
+                  r.hasProveedorFactura && !r.pedidoEntregadoYPagado,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AliadoImportadorFacturaSection(lines: [r], compact: true),
+                  SizedBox(height: sectionGap + 4),
+                  _PasarelaPagoMotoLinkCard(
+                    lineCount: 1,
+                    importerName: r.ownerBusinessName,
+                    montoRef: r.refBaseTotalForPago > 0
+                        ? r.refBaseTotalForPago
+                        : r.precioTotal,
+                    previewLines: [r],
+                    currencyLabel: r.amountCurrencyLabel,
+                    childBuilder: (onMetodoPreview) => AliadoOrderPagoSection(
+                      key: ValueKey<String>('pago-${r.id}'),
+                      request: r,
+                      profile: _profile,
+                      onChanged: _refreshExpandedCard,
+                      onPagoMetodoPreviewChanged: onMetodoPreview,
+                      suppressPrimaryTitle: true,
+                      suppressNegotiationIntro: true,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          SizedBox(height: sectionGap),
-          OrderCardCollapsibleSection(
-            title: 'Mensajes',
-            subtitle: 'Hilo con el importador y B2B Conecta',
-            infoMessage: OrderSectionHelp.chatPedido,
-            initiallyExpanded: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                OrderOpenChatButton(
-                  relatedOrderIds: [r.id],
-                  onPressed: () {
-                    final counterpart = r.ownerBusinessName?.trim();
-                  showOrderChatSheet(
-                    context: context,
-                    transactionRequestId: r.id,
-                    orderLines: [r],
+            SizedBox(height: sectionGap),
+            OrderCardCollapsibleSection(
+              title: 'Mensajes',
+              subtitle: 'Hilo con el importador y B2B Conecta',
+              infoMessage: OrderSectionHelp.chatPedido,
+              initiallyExpanded: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OrderOpenChatButton(
+                    relatedOrderIds: [r.id],
+                    onPressed: () {
+                      final counterpart = r.ownerBusinessName?.trim();
+                      showOrderChatSheet(
+                        context: context,
+                        transactionRequestId: r.id,
+                        orderLines: [r],
+                        allowReplyAsAliado: orderLinesAllowChatReply([r]),
+                        allowReplyAsAdmin: false,
+                        deliveryGrace: orderLinesChatDeliveryGrace([r]),
+                        title: (counterpart != null && counterpart.isNotEmpty)
+                            ? 'Chat · $counterpart'
+                            : 'Chat del pedido',
+                        onThreadChanged: _refreshExpandedCard,
+                      );
+                    },
+                  ),
+                  OrderReturnButtons(
+                    lines: [r],
                     allowReplyAsAliado: orderLinesAllowChatReply([r]),
-                    allowReplyAsAdmin: false,
-                    deliveryGrace: orderLinesChatDeliveryGrace([r]),
-                      title: (counterpart != null && counterpart.isNotEmpty)
-                          ? 'Chat · $counterpart'
-                          : 'Chat del pedido',
-                      onThreadChanged: _refreshExpandedCard,
-                    );
-                  },
-                ),
-                OrderReturnButtons(
-                  lines: [r],
-                  allowReplyAsAliado: orderLinesAllowChatReply([r]),
-                  allowReplyAsImportador: false,
-                  showReplacementTracker: false,
-                  onChanged: _refreshExpandedCard,
-                ),
-              ],
+                    allowReplyAsImportador: false,
+                    showReplacementTracker: false,
+                    onChanged: _refreshExpandedCard,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
     }
 
     return const SizedBox.shrink();
@@ -850,7 +796,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final cg = chunk.first.checkoutGroupId?.trim() ?? '';
     final usePagoUnificado = chunk.length > 1 &&
         cg.isNotEmpty &&
-        chunk.every((TransactionRequestModel r) => r.checkoutGroupId?.trim() == cg);
+        chunk.every(
+            (TransactionRequestModel r) => r.checkoutGroupId?.trim() == cg);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -907,56 +854,58 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           title: 'Pago e factura',
           subtitle: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),
           infoMessage: OrderSectionHelp.pagoAliadoMetodo,
-          initiallyExpanded: !chunk.every((l) => l.pedidoEntregadoYPagado),
+          initiallyExpanded: chunk
+              .any((l) => l.hasProveedorFactura && !l.pedidoEntregadoYPagado),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AliadoImportadorFacturaSection(lines: chunk, compact: true),
               const SizedBox(height: 20),
               _PasarelaPagoMotoLinkCard(
-          lineCount: chunk.length,
-          singleComprobantePorProveedor: usePagoUnificado,
-          importerName: name,
-          pagoIndex: importerIndex,
-          pagoTotal: importerTotal,
-          montoRef: subtotal,
-          previewLines: usePagoUnificado ? chunk : null,
-          childBuilder: usePagoUnificado
-              ? (onMetodoPreview) =>
-                  _columnPagoUnificadoImportador(chunk, onMetodoPreview)
-              : null,
-          child: usePagoUnificado
-              ? null
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < chunk.length; i++) ...[
-                      if (chunk.length > 1) ...[
-                        if (i > 0) ...[
-                          const SizedBox(height: 8),
-                          Divider(height: 1, color: Colors.grey.shade200),
-                          const SizedBox(height: 12),
+                lineCount: chunk.length,
+                singleComprobantePorProveedor: usePagoUnificado,
+                importerName: name,
+                pagoIndex: importerIndex,
+                pagoTotal: importerTotal,
+                montoRef: subtotal,
+                previewLines: usePagoUnificado ? chunk : null,
+                currencyLabel: orderAmountCurrency(chunk),
+                childBuilder: usePagoUnificado
+                    ? (onMetodoPreview) =>
+                        _columnPagoUnificadoImportador(chunk, onMetodoPreview)
+                    : null,
+                child: usePagoUnificado
+                    ? null
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < chunk.length; i++) ...[
+                            if (chunk.length > 1) ...[
+                              if (i > 0) ...[
+                                const SizedBox(height: 8),
+                                Divider(height: 1, color: Colors.grey.shade200),
+                                const SizedBox(height: 12),
+                              ],
+                              Text(
+                                chunk[i].etiquetaProductoAliado,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: AppColors.brandBlue,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            AliadoOrderPagoSection(
+                              request: chunk[i],
+                              profile: _profile,
+                              onChanged: _refreshExpandedCard,
+                              suppressPrimaryTitle: true,
+                              suppressNegotiationIntro: true,
+                            ),
+                          ],
                         ],
-                        Text(
-                          chunk[i].etiquetaProductoAliado,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: AppColors.brandBlue,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      AliadoOrderPagoSection(
-                        request: chunk[i],
-                        profile: _profile,
-                        onChanged: _refreshExpandedCard,
-                        suppressPrimaryTitle: true,
-                        suppressNegotiationIntro: true,
                       ),
-                    ],
-                  ],
-                ),
               ),
             ],
           ),
@@ -976,10 +925,11 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         OrderCardCollapsibleSection(
           title: 'Mensajes',
           subtitle: chunk.length > 1
-              ? OrderActionsFlowCopy.carritoChatImportador(chunk.first.ownerBusinessName)
+              ? OrderActionsFlowCopy.carritoChatImportador(
+                  chunk.first.ownerBusinessName)
               : 'Hilo con el importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          initiallyExpanded: true,
+          initiallyExpanded: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1058,8 +1008,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     if (importadorLabel != null && importadorLabel.trim().isNotEmpty) {
       pendingLabel = 'Valorar a ${importadorLabel.trim()}';
     } else if (pendingImportadores > 1) {
-      pendingLabel =
-          OrderActionsFlowCopy.valorarImportadoresPendientes(pendingImportadores);
+      pendingLabel = OrderActionsFlowCopy.valorarImportadoresPendientes(
+          pendingImportadores);
     }
 
     return OrderRatingPendingBar(
@@ -1127,25 +1077,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     );
   }
 
-  Widget? _qtyAdjustmentCollapsedAccessory(List<TransactionRequestModel> g) {
-    final pending =
-        g.where((r) => r.qtyAdjustmentPendienteAliado).toList(growable: false);
-    if (pending.isEmpty) return null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < pending.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
-          AliadoQtyAdjustmentActions(
-            key: ValueKey<String>('qty-adj-collapsed-${pending[i].id}'),
-            request: pending[i],
-            onChanged: _refreshExpandedCard,
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _buildOrderCard(
     BuildContext context,
     List<TransactionRequestModel> g,
@@ -1154,10 +1085,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final primary = g.first;
     final isMulti = g.length > 1;
     final checkoutGroupId = g.first.checkoutGroupId?.trim();
-    final cgForBundle =
-        (checkoutGroupId != null && checkoutGroupId.isNotEmpty)
-            ? checkoutGroupId
-            : null;
+    final cgForBundle = (checkoutGroupId != null && checkoutGroupId.isNotEmpty)
+        ? checkoutGroupId
+        : null;
 
     return AliadoExpandableOrderCard(
       request: primary,
@@ -1166,9 +1096,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       onToggle: () => _toggleExpand(expandKey),
       statusLabel: isMulti ? _labelGrupo(g) : _label(primary),
       ratingBar: _aliadoRatingBarVisibleEnFicha(
-            g,
-            expanded: _expandedRequestId == expandKey,
-          )
+        g,
+        expanded: _expandedRequestId == expandKey,
+      )
           ? _buildAliadoRatingBar(
               context,
               g,
@@ -1183,9 +1113,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ? () => _cancelarGrupoPendiente(context, g)
           : null,
       cancelarSolicitudPendienteBusy: _cancelarBusyId == expandKey,
-      collapsedAccessory: _expandedRequestId == expandKey
-          ? null
-          : _qtyAdjustmentCollapsedAccessory(g),
       expandedFooter: isMulti ? null : _orderCardFooter(context, g),
       multiImporterPanelBuilder: isMulti
           ? (ctx, chunk, idx, total) => _multiImporterPanelContent(
@@ -1269,8 +1196,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final filtered = _filtered;
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
     final activeFilterChips = _buildActiveFilterChipsRow();
-    final showFilteredCount = filterBadge > 0 ||
-        _searchCtrl.text.trim().isNotEmpty;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final enCursoGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => _esEnCurso(r.status)).toList(),
@@ -1299,8 +1224,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       replacementOnly: _replacementOnly,
     );
     final scopeEmpty = switch (_scope) {
-      PedidosListScope.todos =>
-        enCursoGroups.isEmpty && cerradosGroups.isEmpty,
+      PedidosListScope.todos => enCursoGroups.isEmpty && cerradosGroups.isEmpty,
       PedidosListScope.enCurso => enCursoGroups.isEmpty,
       PedidosListScope.entregados => entregadosGroups.isEmpty,
       PedidosListScope.cancelados => canceladosGroups.isEmpty,
@@ -1318,71 +1242,27 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: B2bOrdersPanelLayout.listColumn(
+              B2bOrdersPanelLayout.listColumn(
+                  context, OrdersListHeading(count: visibleGroups.length)),
+              B2bOrdersPanelLayout.listColumn(
                   context,
-                  TextField(
-                    controller: _searchCtrl,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => setState(() {}),
-                    decoration:
-                        _pedidosSearchDecoration(filterBadge: filterBadge),
-                  ),
-                ),
-              ),
+                  OrderListFilterBar(
+                    searchController: _searchCtrl,
+                    onSearchChanged: (_) => setState(() {}),
+                    hintText: 'Buscar producto o proveedor…',
+                    padding: const EdgeInsets.only(bottom: 8),
+                    onFilters: _openPedidosFiltersSheet,
+                    activeFilterCount: filterBadge,
+                  )),
               B2bOrdersPanelLayout.listColumn(
-                context,
-                PedidosScopeBar(
-                  selected: _scope,
-                  onSelected: _selectScope,
-                ),
-              ),
-              B2bOrdersPanelLayout.listColumn(
-                context,
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      OrderDateShortcutBar(
-                        from: _dateFrom,
-                        to: _dateTo,
-                        onChanged: (from, to) => setState(() {
-                          _dateFrom = from;
-                          _dateTo = to;
-                        }),
-                        onPickRange: _openDateFilters,
-                      ),
-                      OrderSignalFilterBar(
-                        creditOnly: _creditOnly,
-                        replacementOnly: _replacementOnly,
-                        onChanged: (credit, replacement) => setState(() {
-                          _creditOnly = credit;
-                          _replacementOnly = replacement;
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                  context,
+                  PedidosScopeBar(
+                    selected: _scope,
+                    onSelected: _selectScope,
+                  )),
+              const SizedBox(height: 8),
               if (activeFilterChips != null)
                 B2bOrdersPanelLayout.listColumn(context, activeFilterChips),
-              if (showFilteredCount)
-                B2bOrdersPanelLayout.listColumn(
-                  context,
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      '${filtered.length} de ${_rows.length} pedidos',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
               Expanded(
                 child: filtered.isEmpty
                     ? ListView(
@@ -1394,7 +1274,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                               children: [
                                 Text(
                                   'Ningún pedido coincide con los filtros.',
-                                  style: TextStyle(color: AppColors.textSecondary),
+                                  style:
+                                      TextStyle(color: AppColors.textSecondary),
                                 ),
                                 TextButton(
                                   onPressed: _clearFilters,
@@ -1426,7 +1307,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                               )
                             : PagedItems(
                                 items: visibleGroups,
-                                alwaysShow: true,
+                                itemKey: checkoutGroupExpandKey,
+                                alwaysShow: false,
+                                pagerAtBottom: true,
                                 resetKey: Object.hash(
                                   _scope,
                                   _statusFilter,
@@ -1438,8 +1321,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                                   _searchCtrl.text,
                                 ),
                                 padding: EdgeInsets.only(
-                                  bottom: B2bOrdersPanelLayout
-                                      .listBottomPadding(screenWidth),
+                                  bottom:
+                                      B2bOrdersPanelLayout.listBottomPadding(
+                                          screenWidth),
                                 ),
                                 onRefresh: _load,
                                 itemBuilder: (g) {
@@ -1500,6 +1384,7 @@ class _PasarelaPagoMotoLinkCard extends StatefulWidget {
     this.pagoTotal,
     this.montoRef,
     this.previewLines,
+    this.currencyLabel = 'REF',
     this.childBuilder,
     this.child,
   });
@@ -1511,6 +1396,7 @@ class _PasarelaPagoMotoLinkCard extends StatefulWidget {
   final int? pagoTotal;
   final double? montoRef;
   final List<TransactionRequestModel>? previewLines;
+  final String currencyLabel;
   final Widget Function(ValueChanged<String?> onMetodoPreview)? childBuilder;
   final Widget? child;
 
@@ -1559,6 +1445,7 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
   @override
   Widget build(BuildContext context) {
     final lines = widget.previewLines;
+    final currency = widget.currencyLabel;
     UsdPaymentDiscountPreview? discountPreview;
     if (lines != null && lines.isNotEmpty && _metodoPreview != null) {
       discountPreview = OrderPaymentPricing.previewForLines(
@@ -1628,8 +1515,8 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                         const SizedBox(height: 2),
                         Text(
                           discountPreview != null && discountPreview.applies
-                              ? 'Monto con descuento: ${formatRefAmount(montoMostrar)} REF'
-                              : 'Monto de este importador: ${formatRefAmount(montoMostrar)} REF',
+                              ? 'Monto con descuento: ${formatRefAmount(montoMostrar)} $currency'
+                              : 'Monto de este importador: ${formatRefAmount(montoMostrar)} $currency',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
@@ -1644,7 +1531,7 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                             montoBase != null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            'Antes del descuento: ${formatRefAmount(montoBase)} REF',
+                            'Antes del descuento: ${formatRefAmount(montoBase)} $currency',
                             style: TextStyle(
                               fontSize: 10.5,
                               color: AppColors.textSecondary,

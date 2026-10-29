@@ -115,7 +115,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Bajo crédito'), findsOneWidget);
+      expect(find.text('Saldo aplicado'), findsOneWidget);
       expect(find.text('Cambio de producto'), findsOneWidget);
       expect(find.text('Todas'), findsOneWidget);
       expect(find.text('Entregados'), findsOneWidget);

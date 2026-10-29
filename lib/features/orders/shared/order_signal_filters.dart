@@ -25,7 +25,7 @@ List<List<TransactionRequestModel>> filterOrderGroupsBySignals(
   }).toList();
 }
 
-/// Todos · Bajo crédito · Cambio de producto, una sola elección.
+/// Todos · Saldo aplicado · Cambio de producto, una sola elección.
 class OrderSignalFilterBar extends StatelessWidget {
   const OrderSignalFilterBar({
     super.key,
@@ -42,7 +42,7 @@ class OrderSignalFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = creditOnly ? 1 : (replacementOnly ? 2 : 0);
     return SegmentedFilterBar(
-      labels: const ['Todos', 'Bajo crédito', 'Cambio de producto'],
+      labels: const ['Todos', 'Saldo aplicado', 'Cambio de producto'],
       selectedIndex: selected,
       onSelected: (index) => onChanged(index == 1, index == 2),
     );

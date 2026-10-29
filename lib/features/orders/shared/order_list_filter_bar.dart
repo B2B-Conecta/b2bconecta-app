@@ -25,6 +25,9 @@ class OrderListFilterBar extends StatefulWidget {
     this.onStatusChanged,
     this.morosoOnly = false,
     this.onMorosoOnlyChanged,
+    this.onFilters,
+    this.activeFilterCount = 0,
+    this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 8),
   });
 
   final TextEditingController searchController;
@@ -35,6 +38,9 @@ class OrderListFilterBar extends StatefulWidget {
   final ValueChanged<String?>? onStatusChanged;
   final bool morosoOnly;
   final ValueChanged<bool>? onMorosoOnlyChanged;
+  final VoidCallback? onFilters;
+  final int activeFilterCount;
+  final EdgeInsetsGeometry padding;
 
   @override
   State<OrderListFilterBar> createState() => _OrderListFilterBarState();
@@ -74,53 +80,80 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: widget.padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: widget.searchController,
-            onChanged: widget.onSearchChanged,
-            textInputAction: TextInputAction.search,
-            style: TextStyle(color: AppColors.textPrimary),
-            cursorColor: AppColors.brandAccent,
-            decoration: InputDecoration(
-              hintText: widget.hintText,
-              hintStyle: AppColors.hintStyle,
-              prefixIcon:
-                  Icon(Icons.search, color: AppColors.textSecondary),
-              suffixIcon: widget.searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 20),
-                      color: AppColors.textSecondary,
-                      onPressed: () {
-                        widget.searchController.clear();
-                        widget.onSearchChanged('');
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: AppColors.fieldFill,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
+          LayoutBuilder(builder: (context, constraints) {
+            final search = TextField(
+              controller: widget.searchController,
+              onChanged: widget.onSearchChanged,
+              textInputAction: TextInputAction.search,
+              style: TextStyle(color: AppColors.textPrimary),
+              cursorColor: AppColors.brandAccent,
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: AppColors.hintStyle,
+                prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                suffixIcon: widget.searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        color: AppColors.textSecondary,
+                        onPressed: () {
+                          widget.searchController.clear();
+                          widget.onSearchChanged('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: AppColors.fieldFill,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.borderSubtle),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.borderSubtle),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: AppColors.brandAccent, width: 1.2),
+                ),
+                isDense: true,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.borderSubtle),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.borderSubtle),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.brandAccent, width: 1.2),
-              ),
-              isDense: true,
-            ),
-          ),
+            );
+            if (widget.onFilters == null) return search;
+            final filters = OutlinedButton.icon(
+              onPressed: widget.onFilters,
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(widget.activeFilterCount > 0
+                  ? 'Filtros (${widget.activeFilterCount})'
+                  : 'Filtros'),
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10)),
+            );
+            if (constraints.maxWidth < 320 ||
+                MediaQuery.textScalerOf(context).scale(14) > 19) {
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    search,
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerRight, child: filters),
+                  ]);
+            }
+            return Row(children: [
+              Expanded(child: search),
+              const SizedBox(width: 8),
+              filters
+            ]);
+          }),
           if (_hasStatusFilter || _hasMorosoFilter) ...[
             const SizedBox(height: 10),
             SingleChildScrollView(

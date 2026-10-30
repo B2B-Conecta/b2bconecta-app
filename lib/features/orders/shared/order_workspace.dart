@@ -59,7 +59,7 @@ class OrderWorkspace extends StatelessWidget {
         return ScrollCompactLayout(
             enabled: viewerRole == AppHomeRole.aliado,
             resetKey: (selectedKey, resetKey),
-            collapseHeadingWhenCompact: !detailOpen,
+            collapseHeadingWhenCompact: true,
             builder: (context, compact) => PopScope<Object?>(
                   canPop: !detailOpen,
                   onPopInvokedWithResult: (didPop, result) {

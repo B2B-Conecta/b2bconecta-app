@@ -114,12 +114,20 @@ void main() {
             greaterThan(detailHeight + 20));
         expect(find.byTooltip('Volver a pedidos'), findsOneWidget);
         if (width >= 1000) {
-          // The full-collapse behavior belongs to the list only.
+          // The general title also recedes in detail; the order reference stays.
           expect(
               tester
                   .getSize(find.byKey(const ValueKey('desktop-page-heading')))
                   .height,
-              greaterThan(30));
+              0);
+          expect(find.textContaining('Pedido #SCROLL2'), findsOneWidget);
+          await tester.drag(detailScroll, const Offset(0, 400));
+          await tester.pumpAndSettle();
+          expect(
+              tester
+                  .getSize(find.byKey(const ValueKey('desktop-page-heading')))
+                  .height,
+              greaterThan(0));
         }
         await tester.tap(find.byTooltip('Volver a pedidos'));
         await tester.pumpAndSettle();

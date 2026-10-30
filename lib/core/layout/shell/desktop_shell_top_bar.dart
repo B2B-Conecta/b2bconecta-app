@@ -14,6 +14,7 @@ class DesktopShellTopBar extends StatelessWidget {
     this.onMessagesTap,
     this.unreadMessages = 0,
     this.trailingActions = const [],
+    this.leading,
   });
 
   final int unreadNotifications;
@@ -21,6 +22,9 @@ class DesktopShellTopBar extends StatelessWidget {
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final List<Widget> trailingActions;
+
+  /// P. ej. botón para volver a mostrar el menú lateral.
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +46,10 @@ class DesktopShellTopBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           child: Row(
             children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: 8),
+              ],
               const Spacer(),
               ...trailingActions,
               if (onMessagesTap != null)

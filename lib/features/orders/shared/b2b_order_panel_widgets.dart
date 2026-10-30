@@ -31,8 +31,12 @@ class B2bPanelSectionCard extends StatelessWidget {
     final maxW = B2bOrdersPanelLayout.expandedSectionMaxWidth(width);
     final radius = BorderRadius.circular(density.sectionBorderRadius);
 
+    final surface = AppColors.resolveSurface(
+      tint,
+      fallback: AppColors.surfaceTinted,
+    );
     Widget card = Material(
-      color: tint ?? AppColors.surfaceTinted,
+      color: surface,
       borderRadius: radius,
       child: Padding(
         padding: density.panelCardPadding,
@@ -44,7 +48,11 @@ class B2bPanelSectionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: density.panelCardIconSize, color: AppColors.brandBlue),
+                    Icon(
+                      icon,
+                      size: density.panelCardIconSize,
+                      color: AppColors.brandLink,
+                    ),
                     SizedBox(width: density.isDesktop ? 8 : 10),
                   ],
                   Expanded(
@@ -66,7 +74,7 @@ class B2bPanelSectionCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: density.panelCardSubtitleSize,
                               height: 1.35,
-                              color: AppColors.textPrimary,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],

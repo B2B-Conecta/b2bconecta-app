@@ -1404,7 +1404,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
-              '${p.precio.toStringAsFixed(2)} REF',
+              '${p.precio.toStringAsFixed(2)} '
+              '${_pagoSoloDivisas ? 'USD' : 'REF'}',
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 color: AppColors.brand,
@@ -1824,12 +1825,13 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     return const SizedBox.shrink();
                   }
                   final revenue = data.revenueRef.toStringAsFixed(2);
+                  final currency = _pagoSoloDivisas ? 'USD' : 'REF';
                   return _inventorySection(
                     hPad: hPad,
                     child: _InventoryDisclosure(
                       title: 'Desempeño de ventas',
                       subtitle:
-                          '${data.ordersEntregados} entregados · $revenue REF',
+                          '${data.ordersEntregados} entregados · $revenue $currency',
                       icon: Icons.auto_graph_rounded,
                       child: ImporterSalesSnapshotCard(
                         snapshot: data,

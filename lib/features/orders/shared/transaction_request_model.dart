@@ -1297,7 +1297,7 @@ class TransactionRequestModel {
   }
 
   static double? _asNullableDouble(dynamic v) {
-    if (v == null) return null;
+    if (v == null || v is bool) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString());
   }

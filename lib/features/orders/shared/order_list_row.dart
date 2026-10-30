@@ -3,7 +3,13 @@ import 'order_list_colors.dart';
 import 'order_list_entry.dart';
 
 class OrderListColumnsHeader extends StatelessWidget {
-  const OrderListColumnsHeader({super.key});
+  const OrderListColumnsHeader({
+    super.key,
+    this.partyLabel = 'Proveedor',
+  });
+
+  final String partyLabel;
+
   @override
   Widget build(BuildContext context) {
     final colors = OrderListColors.of(context);
@@ -12,16 +18,16 @@ class OrderListColumnsHeader extends StatelessWidget {
       child: DefaultTextStyle(
         style: TextStyle(
             fontSize: 12, fontWeight: FontWeight.w600, color: colors.secondary),
-        child: const Row(children: [
-          Expanded(flex: 5, child: Text('Pedido')),
-          SizedBox(width: 16),
-          Expanded(flex: 3, child: Text('Proveedor')),
-          SizedBox(width: 16),
-          SizedBox(width: 176, child: Text('Estado del envío')),
-          SizedBox(width: 16),
-          SizedBox(
+        child: Row(children: [
+          const Expanded(flex: 5, child: Text('Pedido')),
+          const SizedBox(width: 16),
+          Expanded(flex: 3, child: Text(partyLabel)),
+          const SizedBox(width: 16),
+          const SizedBox(width: 176, child: Text('Estado del envío')),
+          const SizedBox(width: 16),
+          const SizedBox(
               width: 150, child: Text('Total', textAlign: TextAlign.right)),
-          SizedBox(width: 48),
+          const SizedBox(width: 48),
         ]),
       ),
     );
@@ -118,12 +124,9 @@ class _OrderListRowState extends State<OrderListRow> {
       ])),
     ]);
     final provider = Tooltip(
-      message: entry.lines
-          .map((line) => line.ownerBusinessName ?? 'Proveedor')
-          .toSet()
-          .join('\n'),
+      message: entry.partyTooltip,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(Icons.storefront_outlined, size: 16, color: colors.secondary),
+        Icon(entry.partyIcon, size: 16, color: colors.secondary),
         const SizedBox(width: 6),
         Expanded(
             child: Text(entry.provider,

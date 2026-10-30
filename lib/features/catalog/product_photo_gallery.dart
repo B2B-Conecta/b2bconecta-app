@@ -270,27 +270,31 @@ class _PhotoStatus extends StatelessWidget {
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: AppColors.surfaceTinted,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.image_outlined, size: 40, color: AppColors.textMuted),
-              const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary)),
-              if (onRetry != null)
-                TextButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Reintentar'),
-                ),
-            ]),
-          ),
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return ColoredBox(
+      color: AppColors.surfaceTintedFor(b),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.image_outlined,
+                size: 40, color: AppColors.textMutedFor(b)),
+            const SizedBox(height: 8),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondaryFor(b))),
+            if (onRetry != null)
+              TextButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Reintentar'),
+              ),
+          ]),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _PhotoViewer extends StatefulWidget {

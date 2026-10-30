@@ -19,6 +19,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_catalog_coverage.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/sync_app_colors_to_theme.dart';
 import 'aliado_catalog_layout.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
@@ -56,7 +57,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver, SyncAppColorsToTheme {
   int _catalogCrossAxisCount = 5;
   final _catalogScrollController = ScrollController();
 
@@ -717,6 +719,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // IndexedStack reutiliza el State: hay que depender del Theme para redibujar.
+    AppColors.brightness = Theme.of(context).brightness;
     final appBar = widget.embedInDesktopShell
         ? null
         : MotolinkAppBar(

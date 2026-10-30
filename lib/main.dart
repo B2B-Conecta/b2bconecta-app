@@ -119,13 +119,11 @@ class MyApp extends StatelessWidget {
           // Solo claro/oscuro (nunca system).
           themeMode: mode,
           builder: (context, child) {
-            AppColors.brightness = themeController.effectiveBrightness;
-            // Key fuerza reconstrucción completa de la UI al cambiar tono.
-            return KeyedSubtree(
-              key: ValueKey<String>('theme-${mode.name}'),
-              child: MarketingConsentHost(
-                child: child ?? const SizedBox.shrink(),
-              ),
+            // Sincroniza AppColors con el Theme ya resuelto (sin KeyedSubtree:
+            // recrear todo el navigator dejaba overlays/sidebar a medias).
+            AppColors.brightness = Theme.of(context).brightness;
+            return MarketingConsentHost(
+              child: child ?? const SizedBox.shrink(),
             );
           },
           // La URL del navegador sigue el *nombre* de la ruta del Navigator.

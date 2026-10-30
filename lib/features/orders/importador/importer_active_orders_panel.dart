@@ -6,9 +6,6 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_stat
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_advance.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
-import 'package:motolink_pro_app/core/layout/filter_menu_button.dart';
-import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
@@ -26,14 +23,15 @@ import 'package:motolink_pro_app/features/reputation/order_rating_sheet.dart';
 import 'importer_notificar_ajuste_cantidad_dialog.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'importer_pedidos_filters_draft.dart';
-import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'importer_pedidos_filters_sheet.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 
 /// Pedidos del importador: ingreso directo, filtros rápidos y ciclo completo en una sola vista.
 class ImporterActiveOrdersPanel extends StatefulWidget {
@@ -255,10 +253,22 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     return null;
   }
 
+  ImporterPedidosFiltersDraft _currentFiltersDraft() {
+    return ImporterPedidosFiltersDraft(
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      morosoOnly: _morosoOnly,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+      onlyNuevos: _onlyNuevos,
+    );
+  }
+
   void _clearFilters() {
     _searchCtrl.clear();
     setState(() {
-      _scope = PedidosListScope.enCurso;
+      _expandedRequestId = null;
+      _scope = PedidosListScope.todos;
       _onlyNuevos = false;
       _morosoOnly = false;
       _creditOnly = false;
@@ -268,19 +278,128 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     });
   }
 
-  Future<void> _openDateFilters() async {
-    final draft = await ImporterPedidosFiltersSheet.show(
-      context,
-      initial: ImporterPedidosFiltersDraft(
-        dateFrom: _dateFrom,
-        dateTo: _dateTo,
-      ),
-    );
-    if (draft == null || !mounted) return;
+  void _applyFiltersDraft(ImporterPedidosFiltersDraft draft) {
     setState(() {
+      _expandedRequestId = null;
+      if (draft.onlyNuevos) {
+        _scope = PedidosListScope.enCurso;
+      } else if (draft.morosoOnly) {
+        _scope = PedidosListScope.todos;
+      }
       _dateFrom = draft.dateFrom;
       _dateTo = draft.dateTo;
+      _morosoOnly = draft.morosoOnly;
+      _creditOnly = draft.creditOnly;
+      _replacementOnly = draft.replacementOnly;
+      _onlyNuevos = draft.onlyNuevos;
     });
+  }
+
+  Future<void> _openPedidosFiltersSheet() async {
+    final draft = await ImporterPedidosFiltersSheet.show(
+      context,
+      initial: _currentFiltersDraft(),
+      showOnlyNuevos: true,
+    );
+    if (draft == null || !mounted) return;
+    _applyFiltersDraft(draft);
+  }
+
+  String _dateFilterChipLabel() {
+    final from = _dateFrom;
+    final to = _dateTo;
+    if (from != null && to != null) {
+      return '${formatImporterPedidosFilterDate(from)} – ${formatImporterPedidosFilterDate(to)}';
+    }
+    if (from != null) {
+      return 'Desde ${formatImporterPedidosFilterDate(from)}';
+    }
+    return 'Hasta ${formatImporterPedidosFilterDate(to!)}';
+  }
+
+  Widget _activeFilterChip({
+    required String label,
+    required VoidCallback onDeleted,
+    Color? accent,
+  }) {
+    final color = accent ?? AppColors.brandAccent;
+    return InputChip(
+      label: Text(label),
+      deleteIcon: const Icon(Icons.close, size: 16),
+      onDeleted: onDeleted,
+      backgroundColor: color.withOpacity(0.12),
+      side: BorderSide(color: color.withOpacity(0.35)),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  Widget? _buildActiveFilterChipsRow() {
+    final draft = _currentFiltersDraft();
+    final chips = <Widget>[];
+    if (draft.onlyNuevos) {
+      chips.add(_activeFilterChip(
+        label: 'Pedido nuevo',
+        onDeleted: () => setState(() => _onlyNuevos = false),
+      ));
+    }
+    if (draft.morosoOnly) {
+      chips.add(_activeFilterChip(
+        label: 'Pago pendiente',
+        accent: Colors.red.shade800,
+        onDeleted: () => setState(() => _morosoOnly = false),
+      ));
+    }
+    if (draft.hasDateFilter) {
+      chips.add(_activeFilterChip(
+        label: _dateFilterChipLabel(),
+        onDeleted: () => setState(() {
+          _dateFrom = null;
+          _dateTo = null;
+        }),
+      ));
+    }
+    if (draft.creditOnly) {
+      chips.add(_activeFilterChip(
+        label: 'Saldo aplicado',
+        onDeleted: () => setState(() => _creditOnly = false),
+      ));
+    }
+    if (draft.replacementOnly) {
+      chips.add(_activeFilterChip(
+        label: 'Cambio de producto',
+        onDeleted: () => setState(() => _replacementOnly = false),
+      ));
+    }
+    if (chips.isEmpty) return null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ...chips,
+          TextButton(
+            onPressed: _clearFilters,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Limpiar',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _matchesScope(TransactionRequestModel r) {
@@ -316,17 +435,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
   String _rowKey(TransactionRequestModel r) => r.id;
 
-  String get _fechaFilterId =>
-      OrderDateShortcuts.active(_dateFrom, _dateTo).name;
-
-  String get _senalFilterId {
-    if (_creditOnly) return 'credito';
-    if (_replacementOnly) return 'cambio';
-    return 'todos';
-  }
-
   void _onScopeChanged(PedidosListScope next) {
     setState(() {
+      _expandedRequestId = null;
       if (next != _scope) _onlyNuevos = false;
       _scope = next;
       if (next != PedidosListScope.entregados &&
@@ -334,253 +445,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         _morosoOnly = false;
       }
     });
-  }
-
-  void _selectFecha(String id) {
-    final today = OrderDateShortcuts.day(DateTime.now());
-    switch (id) {
-      case 'today':
-        setState(() {
-          _dateFrom = today;
-          _dateTo = today;
-        });
-      case 'days7':
-        setState(() {
-          _dateFrom = today.subtract(const Duration(days: 6));
-          _dateTo = today;
-        });
-      case 'days30':
-        setState(() {
-          _dateFrom = today.subtract(const Duration(days: 29));
-          _dateTo = today;
-        });
-      case 'custom':
-        _openDateFilters();
-      default:
-        setState(() {
-          _dateFrom = null;
-          _dateTo = null;
-        });
-    }
-  }
-
-  void _selectSenal(String id) {
-    setState(() {
-      _creditOnly = id == 'credito';
-      _replacementOnly = id == 'cambio';
-    });
-  }
-
-  String _customDateLabel() {
-    String fmt(DateTime? d) => d == null
-        ? '…'
-        : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
-    return '${fmt(_dateFrom)} – ${fmt(_dateTo)}';
-  }
-
-  Widget _desktopFilterToolbar() {
-    final date = OrderDateShortcuts.active(_dateFrom, _dateTo);
-    final dateLabel = switch (date) {
-      OrderDateShortcut.all => 'Fecha',
-      OrderDateShortcut.today => 'Fecha · Hoy',
-      OrderDateShortcut.days7 => 'Fecha · 7 días',
-      OrderDateShortcut.days30 => 'Fecha · 30 días',
-      OrderDateShortcut.custom => 'Fecha · ${_customDateLabel()}',
-    };
-    final showPago = _scope == PedidosListScope.entregados ||
-        _scope == PedidosListScope.todos;
-    final signalCount = [
-      _creditOnly,
-      _replacementOnly,
-      _onlyNuevos,
-      showPago && _morosoOnly,
-    ].where((v) => v).length;
-    final anyActive = date != OrderDateShortcut.all || signalCount > 0;
-
-    FilterMenuOption dateOption(String label, String id) => FilterMenuOption(
-          label: label,
-          selected: _fechaFilterId == id,
-          onPressed: () => _selectFecha(id),
-        );
-
-    return FilterToolbar(
-      padding: const EdgeInsets.only(top: 2),
-      children: [
-        FilterMenuButton(
-          icon: Icons.calendar_today_outlined,
-          label: dateLabel,
-          active: date != OrderDateShortcut.all,
-          menuChildren: [
-            dateOption('Todas las fechas', 'all'),
-            dateOption('Hoy', 'today'),
-            dateOption('Últimos 7 días', 'days7'),
-            dateOption('Últimos 30 días', 'days30'),
-            FilterMenuOption(
-              label: date == OrderDateShortcut.custom
-                  ? 'Personalizado · ${_customDateLabel()}'
-                  : 'Personalizado…',
-              icon: Icons.date_range_outlined,
-              selected: date == OrderDateShortcut.custom,
-              onPressed: () => _selectFecha('custom'),
-            ),
-          ],
-        ),
-        FilterMenuButton(
-          icon: Icons.filter_list,
-          label: signalCount == 0 ? 'Señales' : 'Señales ($signalCount)',
-          active: signalCount > 0,
-          tone: showPago && _morosoOnly ? Colors.red.shade700 : null,
-          menuChildren: [
-            FilterMenuCheck(
-              label: 'Pedido nuevo',
-              value: _onlyNuevos,
-              onChanged: (v) => setState(() {
-                _onlyNuevos = v;
-                if (v) {
-                  _scope = PedidosListScope.enCurso;
-                  _morosoOnly = false;
-                }
-              }),
-            ),
-            FilterMenuCheck(
-              label: 'Bajo crédito',
-              value: _creditOnly,
-              onChanged: (v) => setState(() {
-                _creditOnly = v;
-                if (v) _replacementOnly = false;
-              }),
-            ),
-            FilterMenuCheck(
-              label: 'Cambio de producto',
-              value: _replacementOnly,
-              onChanged: (v) => setState(() {
-                _replacementOnly = v;
-                if (v) _creditOnly = false;
-              }),
-            ),
-            if (showPago)
-              FilterMenuCheck(
-                label: 'Pago pendiente',
-                value: _morosoOnly,
-                onChanged: (v) => setState(() => _morosoOnly = v),
-              ),
-          ],
-        ),
-        if (anyActive)
-          TextButton(
-            onPressed: () => setState(() {
-              _onlyNuevos = false;
-              _morosoOnly = false;
-              _creditOnly = false;
-              _replacementOnly = false;
-              _dateFrom = null;
-              _dateTo = null;
-            }),
-            child: const Text('Limpiar'),
-          ),
-      ],
-    );
-  }
-
-  Widget _quickFilterBar({required double pad}) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PedidosScopeBar(
-            selected: _scope,
-            onSelected: _onScopeChanged,
-          ),
-          if (isAdminDesktopLayout(context))
-            _desktopFilterToolbar()
-          else
-            _mobileFilterDisclosure(),
-        ],
-      ),
-    );
-  }
-
-  Widget _mobileFilterDisclosure() {
-    final showPago = _scope == PedidosListScope.entregados ||
-        _scope == PedidosListScope.todos;
-    const fechaOptions = [
-      (id: 'all', label: 'Todas'),
-      (id: 'today', label: 'Hoy'),
-      (id: 'days7', label: '7 días'),
-      (id: 'days30', label: '30 días'),
-      (id: 'custom', label: 'Fechas'),
-    ];
-    const senalOptions = [
-      (id: 'todos', label: 'Todos'),
-      (id: 'credito', label: 'Bajo crédito'),
-      (id: 'cambio', label: 'Cambio de producto'),
-    ];
-    const pagoOptions = [
-      (id: 'todos', label: 'Todos'),
-      (id: 'pendiente', label: 'Pago pendiente'),
-    ];
-    String labelOf(List<({String id, String label})> options, String id) {
-      for (final option in options) {
-        if (option.id == id) return option.label;
-      }
-      return options.first.label;
-    }
-
-    final summary = [
-      labelOf(fechaOptions, _fechaFilterId),
-      labelOf(senalOptions, _senalFilterId),
-      if (_onlyNuevos) 'Pedido nuevo',
-      if (showPago) labelOf(pagoOptions, _morosoOnly ? 'pendiente' : 'todos'),
-    ].join(' · ');
-    final menus = <Widget>[
-      _OrdersFilterMenu(
-        label: 'Fecha',
-        value: _fechaFilterId,
-        options: fechaOptions,
-        onSelected: _selectFecha,
-      ),
-      _OrdersFilterMenu(
-        label: 'Señales',
-        value: _senalFilterId,
-        options: senalOptions,
-        onSelected: _selectSenal,
-      ),
-      if (showPago)
-        _OrdersFilterMenu(
-          label: 'Pago',
-          value: _morosoOnly ? 'pendiente' : 'todos',
-          options: pagoOptions,
-          onSelected: (id) => setState(() => _morosoOnly = id == 'pendiente'),
-        ),
-    ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 720) {
-          return _OrdersFiltersDisclosure(
-            summary: summary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < menus.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 12),
-                  menus[i],
-                ],
-              ],
-            ),
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < menus.length; i++) ...[
-              if (i > 0) const SizedBox(width: 12),
-              Expanded(child: menus[i]),
-            ],
-          ],
-        );
-      },
-    );
   }
 
   /// Agrupa por `checkout_group_id`; si un grupo tiene estados distintos, muestra tarjetas sueltas.
@@ -609,12 +473,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String _displayGroupKey(List<TransactionRequestModel> g) {
     if (g.length == 1) return _rowKey(g.single);
     return checkoutGroupExpandKey(g);
-  }
-
-  void _toggleExpand(String key) {
-    setState(() {
-      _expandedRequestId = _expandedRequestId == key ? null : key;
-    });
   }
 
   Future<void> _advanceGroup(
@@ -866,208 +724,76 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       creditOnly: _creditOnly,
       replacementOnly: _replacementOnly,
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final masterDetail =
-            constraints.maxWidth >= _kImporterOrdersMasterDetailMinWidth;
-        final screenWidth = masterDetail
-            ? _kImporterOrdersMasterListWidth
-            : MediaQuery.sizeOf(context).width;
-        final listPad = masterDetail
-            ? 12.0
-            : B2bOrdersPanelLayout.listHorizontalPadding(
-                MediaQuery.sizeOf(context).width,
-              );
-        final listColumn = Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-                padding: EdgeInsets.symmetric(horizontal: listPad),
-                child: OrdersListHeading(count: groups.length)),
-            Padding(
-              padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 0),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                textInputAction: TextInputAction.search,
-                style: TextStyle(color: AppColors.textPrimary),
-                cursorColor: AppColors.brand,
-                decoration: InputDecoration(
-                  hintText: 'Buscar por producto, SKU o tienda minorista',
-                  hintStyle: AppColors.hintStyle,
-                  prefixIcon:
-                      Icon(Icons.search, color: AppColors.textSecondary),
-                  suffixIcon: _searchCtrl.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
-                          color: AppColors.textSecondary,
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() {});
-                          },
-                        ),
-                  isDense: true,
-                  filled: true,
-                  fillColor: AppColors.fieldFill,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: AppColors.brand,
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            _quickFilterBar(pad: listPad),
-            ImporterThirdPartyAdsCarousel(
-              padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 0),
-            ),
-            ImporterActivePromoBanner(
-              padding: EdgeInsets.fromLTRB(listPad, 8, listPad, 0),
-            ),
-            Expanded(
-              child: filtered.isEmpty || groups.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 24),
-                      children: [
-                        Center(
-                          child: Column(
-                            children: [
-                              Text(
-                                'Ningún pedido coincide con los filtros.',
-                                style:
-                                    TextStyle(color: AppColors.textSecondary),
-                              ),
-                              TextButton(
-                                onPressed: _clearFilters,
-                                child: const Text('Limpiar filtros'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  : PagedItems(
-                      pagerAtBottom: true,
-                      items: groups,
-                      resetKey: Object.hash(
-                        _scope,
-                        _onlyNuevos,
-                        _morosoOnly,
-                        _creditOnly,
-                        _replacementOnly,
-                        _dateFrom,
-                        _dateTo,
-                        _searchCtrl.text,
-                      ),
-                      padding: EdgeInsets.fromLTRB(
-                        listPad,
-                        12,
-                        listPad,
-                        B2bOrdersPanelLayout.listBottomPadding(screenWidth),
-                      ),
-                      onRefresh: _load,
-                      itemKey: _displayGroupKey,
-                      itemBuilder: (g) => _orderCard(
-                        context,
-                        g,
-                        masterDetail: masterDetail,
-                      ),
-                    ),
-            ),
-          ],
-        );
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: masterDetail
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: _kImporterOrdersMasterListWidth,
-                          child: listColumn,
-                        ),
-                        VerticalDivider(width: 1, color: AppColors.divider),
-                        Expanded(child: _buildDetailPane(context, groups)),
-                      ],
-                    )
-                  : listColumn,
-            ),
-            if (_loading)
-              const Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: IgnorePointer(
-                  child: LinearProgressIndicator(
-                    minHeight: 2,
-                    color: AppColors.brand,
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
+    final filterBadge = _currentFiltersDraft().activePanelFilterCount;
+    final activeFilterChips = _buildActiveFilterChipsRow();
+    final detailOpen = _expandedRequestId != null;
 
-  Widget _buildDetailPane(
-    BuildContext context,
-    List<List<TransactionRequestModel>> groups,
-  ) {
-    final selected = groups
-        .where((g) => _displayGroupKey(g) == _expandedRequestId)
-        .firstOrNull;
-    if (selected == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 40,
-              color: AppColors.textSecondary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!detailOpen) ...[
+          const ImporterThirdPartyAdsCarousel(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+          ),
+          const ImporterActivePromoBanner(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+          ),
+        ],
+        Expanded(
+          child: OrderWorkspace(
+            viewerRole: AppHomeRole.importador,
+            groups: groups,
+            selectedKey: _expandedRequestId,
+            groupKey: _displayGroupKey,
+            onSelect: (key) => setState(() => _expandedRequestId = key),
+            onClose: () => setState(() => _expandedRequestId = null),
+            onClearFilters: _clearFilters,
+            loading: _loading,
+            onRefresh: _load,
+            resetKey: Object.hash(
+              _scope,
+              _onlyNuevos,
+              _morosoOnly,
+              _creditOnly,
+              _replacementOnly,
+              _dateFrom,
+              _dateTo,
+              _searchCtrl.text,
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Seleccione un pedido para ver el detalle.',
-              style: TextStyle(color: AppColors.textSecondary),
+            detailBuilder: (group) => _orderCard(context, group),
+            controls: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OrdersListHeading(count: groups.length),
+                OrderListFilterBar(
+                  softStyle: true,
+                  searchController: _searchCtrl,
+                  onSearchChanged: (_) => setState(() {
+                    _expandedRequestId = null;
+                  }),
+                  hintText: 'Buscar por producto, SKU o tienda minorista…',
+                  padding: const EdgeInsets.only(bottom: 8),
+                  onFilters: _openPedidosFiltersSheet,
+                  activeFilterCount: filterBadge,
+                ),
+                PedidosScopeBar(
+                  selected: _scope,
+                  onSelected: _onScopeChanged,
+                  filledStyle: true,
+                ),
+                if (activeFilterChips != null) activeFilterChips,
+              ],
             ),
-          ],
+          ),
         ),
-      );
-    }
-    final key = _displayGroupKey(selected);
-    return SingleChildScrollView(
-      key: PageStorageKey<String>('importer-order-detail-$key'),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      child: _orderCard(context, selected,
-          masterDetail: false, forceExpanded: true),
+      ],
     );
   }
 
   Widget _orderCard(
     BuildContext context,
-    List<TransactionRequestModel> g, {
-    required bool masterDetail,
-    bool forceExpanded = false,
-  }) {
+    List<TransactionRequestModel> g,
+  ) {
     final primary = g.first;
     final isBundle = g.length > 1;
     final nextBase = TransactionRequestStatus.nextForImporter(primary.status);
@@ -1076,12 +802,12 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final headline =
         TransactionRequestStatus.importerOperationalHeadline(primary.status);
     final rk = _displayGroupKey(g);
-    final isSelected = _expandedRequestId == rk;
     final canCancel = _canCancelGroup(g);
     final showQtyAdj = _showQtyAdjustmentSection(g);
     final canNotifyQty = _canNotifyQtyAdjustment(g);
     final qtyAdjHint = _qtyAdjustmentDisabledHint(g);
     return ImporterExpandableOrderCard(
+      workspaceDetail: true,
       request: primary,
       checkoutGroupLines: isBundle ? g : null,
       ratingBar: g.any(
@@ -1098,9 +824,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               bundleAliadoId: isBundle ? primary.aliadoId : null,
             )
           : null,
-      expanded: forceExpanded || (!masterDetail && isSelected),
-      highlighted: masterDetail && !forceExpanded && isSelected,
-      onToggle: () => _toggleExpand(rk),
+      expanded: true,
+      onToggle: () => setState(() => _expandedRequestId = null),
       statusLabel:
           TransactionRequestStatus.importerFilterStatusLabelEs(primary.status),
       operationalHeadline: headline,
@@ -1127,227 +852,63 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       qtyAdjustmentDisabledHint: qtyAdjHint,
       onThreadChanged: _load,
       aliadoCreditRemaining: _creditFor(primary.aliadoId),
-      expandedFooter: masterDetail && !forceExpanded
-          ? null
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (g.any((r) =>
-                    r.status == TransactionRequestStatus.pedidoListo)) ...[
-                  ImporterOrderCarrierSummarySection(
-                    lines: g,
-                  ),
-                  if (g.first.importadorMuestraSeccionRecoleccion) ...[
-                    const SizedBox(height: 12),
-                    ImporterConfirmPickupSection(
-                      lines: g,
-                      onChanged: _load,
-                    ),
-                  ],
-                ],
-                if (g.length == 1) ...[
-                  ImporterOrderPagoVerificationSection(
-                    request: g.single,
-                    onChanged: _load,
-                  ),
-                  ImporterOrderInvoiceSection(
-                    request: g.single,
-                    onChanged: _load,
-                  ),
-                  const SizedBox(height: 12),
-                  ImporterOrderFleteInvoiceSection(
-                    request: g.single,
-                    onChanged: () => _load(silent: true),
-                  ),
-                  ImporterOrderFleteComprobanteSection(
-                    request: g.single,
-                    onChanged: () => _load(silent: true),
-                  ),
-                ] else ...[
-                  ImporterOrderPagoVerificationSection(
-                    request: g.first,
-                    bundleLines: g,
-                    onChanged: _load,
-                  ),
-                  const SizedBox(height: 12),
-                  ImporterOrderInvoiceSection(
-                    request: g.first,
-                    invoiceBundleLines: g,
-                    onChanged: _load,
-                  ),
-                  const SizedBox(height: 12),
-                  ImporterOrderFleteInvoiceSection(
-                    request: g.first,
-                    onChanged: () => _load(silent: true),
-                  ),
-                  ImporterOrderFleteComprobanteSection(
-                    request: g.first,
-                    onChanged: () => _load(silent: true),
-                  ),
-                ],
-              ],
-            ),
-    );
-  }
-}
-
-const double _kImporterOrdersMasterDetailMinWidth = 1080;
-const double _kImporterOrdersMasterListWidth = 440;
-
-class _OrdersFiltersDisclosure extends StatefulWidget {
-  const _OrdersFiltersDisclosure({
-    required this.summary,
-    required this.child,
-  });
-
-  final String summary;
-  final Widget child;
-
-  @override
-  State<_OrdersFiltersDisclosure> createState() =>
-      _OrdersFiltersDisclosureState();
-}
-
-class _OrdersFiltersDisclosureState extends State<_OrdersFiltersDisclosure> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _open ? AppColors.brand : AppColors.borderSubtle,
-        ),
-      ),
-      child: Column(
+      expandedFooter: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InkWell(
-            onTap: () => setState(() => _open = !_open),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-              child: Row(
-                children: [
-                  Icon(Icons.filter_list, size: 18, color: AppColors.brand),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Filtros',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          widget.summary,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    _open ? Icons.expand_less : Icons.expand_more,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
+          if (g.any(
+              (r) => r.status == TransactionRequestStatus.pedidoListo)) ...[
+            ImporterOrderCarrierSummarySection(
+              lines: g,
+            ),
+            if (g.first.importadorMuestraSeccionRecoleccion) ...[
+              const SizedBox(height: 12),
+              ImporterConfirmPickupSection(
+                lines: g,
+                onChanged: _load,
               ),
+            ],
+          ],
+          if (g.length == 1) ...[
+            ImporterOrderPagoVerificationSection(
+              request: g.single,
+              onChanged: _load,
             ),
-          ),
-          if (_open)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: widget.child,
+            ImporterOrderInvoiceSection(
+              request: g.single,
+              onChanged: _load,
             ),
+            const SizedBox(height: 12),
+            ImporterOrderFleteInvoiceSection(
+              request: g.single,
+              onChanged: () => _load(silent: true),
+            ),
+            ImporterOrderFleteComprobanteSection(
+              request: g.single,
+              onChanged: () => _load(silent: true),
+            ),
+          ] else ...[
+            ImporterOrderPagoVerificationSection(
+              request: g.first,
+              bundleLines: g,
+              onChanged: _load,
+            ),
+            const SizedBox(height: 12),
+            ImporterOrderInvoiceSection(
+              request: g.first,
+              invoiceBundleLines: g,
+              onChanged: _load,
+            ),
+            const SizedBox(height: 12),
+            ImporterOrderFleteInvoiceSection(
+              request: g.first,
+              onChanged: () => _load(silent: true),
+            ),
+            ImporterOrderFleteComprobanteSection(
+              request: g.first,
+              onChanged: () => _load(silent: true),
+            ),
+          ],
         ],
-      ),
-    );
-  }
-}
-
-class _OrdersFilterMenu extends StatelessWidget {
-  const _OrdersFilterMenu({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onSelected,
-  });
-
-  final String label;
-  final String value;
-  final List<({String id, String label})> options;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final current = options.firstWhere(
-      (option) => option.id == value,
-      orElse: () => options.first,
-    );
-    return SizedBox(
-      width: double.infinity,
-      child: PopupMenuButton<String>(
-        onSelected: onSelected,
-        tooltip: label,
-        offset: const Offset(0, 46),
-        itemBuilder: (context) => [
-          for (final option in options)
-            PopupMenuItem<String>(
-              value: option.id,
-              child: Text(
-                option.label,
-                style: TextStyle(
-                  fontWeight:
-                      option.id == value ? FontWeight.w800 : FontWeight.w500,
-                  color: option.id == value
-                      ? AppColors.brand
-                      : AppColors.textPrimary,
-                ),
-              ),
-            ),
-        ],
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: label,
-            filled: true,
-            fillColor: AppColors.fieldFill,
-            isDense: true,
-            contentPadding: const EdgeInsets.fromLTRB(12, 14, 8, 14),
-            suffixIcon: Icon(
-              Icons.expand_more,
-              size: 20,
-              color: AppColors.textSecondary,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.borderSubtle),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.borderSubtle),
-            ),
-          ),
-          child: Text(
-            current.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
       ),
     );
   }

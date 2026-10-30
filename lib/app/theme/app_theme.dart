@@ -15,6 +15,36 @@ class AppColors {
 
   static bool get _dark => brightness == Brightness.dark;
 
+  /// Preferir esto en hojas visuales: se engancha a [Theme] y evita placeholders
+  /// “congelados” al cambiar claro/oscuro sin refrescar.
+  static Brightness brightnessOf(BuildContext context) =>
+      Theme.of(context).brightness;
+
+  static bool isDarkOf(BuildContext context) =>
+      brightnessOf(context) == Brightness.dark;
+
+  static Color surfaceTintedFor(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return dark
+        ? Color.lerp(black, brandBlue, 0.20)!
+        : Color.lerp(white, brandBlue, 0.04)!;
+  }
+
+  static Color textSecondaryFor(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return dark ? white.withOpacity(0.78) : black.withOpacity(0.62);
+  }
+
+  static Color textMutedFor(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return dark ? white.withOpacity(0.72) : black.withOpacity(0.48);
+  }
+
+  static Color photoFrameFor(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return dark ? Color.lerp(black, brandBlue, 0.14)! : white;
+  }
+
   /// Azul oscuro de marca (referencia oficial).
   static const brandBlue = Color(0xFF0039A0);
 
@@ -28,6 +58,10 @@ class AppColors {
 
   /// Compat: mismo que [brand].
   static const brandOrange = brand;
+
+  /// Enlace / icono de marca legible sobre superficies del tema actual.
+  /// En oscuro usa el acento claro; en claro el azul cobalto.
+  static Color get brandLink => _dark ? brandAccent : brandBlue;
 
   /// Superficie suave: blanco + tinte azul marca (claro) / azul sobre negro (oscuro).
   static Color get brandBlueContainer => _dark
@@ -77,6 +111,31 @@ class AppColors {
   /// Atención funcional y estrella de valoración; legibles en ambos temas.
   static const warningAmber = Color(0xFF946200);
   static const warningAmberOnDark = Color(0xFFF2C66D);
+
+  /// Superficies pastel adaptadas (evita blanco/ámbar claro + texto blanco).
+  static Color get warningSurface => _dark
+      ? Color.lerp(black, warningAmberOnDark, 0.18)!
+      : const Color(0xFFFFF8E1);
+
+  static Color get infoSurface => _dark
+      ? Color.lerp(black, brandAccent, 0.18)!
+      : Color.lerp(white, brandBlue, 0.08)!;
+
+  static Color get successSurface => _dark
+      ? Color.lerp(black, successGreen, 0.22)!
+      : const Color(0xFFE8F5E9);
+
+  static Color get tealSurface => _dark
+      ? Color.lerp(black, const Color(0xFF4DB6AC), 0.20)!
+      : const Color(0xFFE0F2F1);
+
+  /// Si [color] es un pastel claro en modo oscuro, lo sustituye por [fallback].
+  static Color resolveSurface(Color? color, {Color? fallback}) {
+    final fb = fallback ?? surfaceTinted;
+    if (color == null) return fb;
+    if (_dark && color.computeLuminance() > 0.65) return fb;
+    return color;
+  }
 }
 
 class AppDecorations {
@@ -93,9 +152,32 @@ class AppDecorations {
   static BorderRadius get radius12 => BorderRadius.circular(12);
 }
 
+SnackBarThemeData _snackBarTheme({
+  required Color background,
+  required Color foreground,
+  required Color action,
+}) {
+  return SnackBarThemeData(
+    backgroundColor: background,
+    contentTextStyle: TextStyle(
+      color: foreground,
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      height: 1.35,
+    ),
+    actionTextColor: action,
+    disabledActionTextColor: foreground.withOpacity(0.45),
+    behavior: SnackBarBehavior.floating,
+    elevation: 4,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    insetPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+  );
+}
+
 ThemeData buildAppTheme() {
   const primary = AppColors.brandBlue;
   const accent = AppColors.brandAccent;
+  final snackBg = Color.lerp(AppColors.black, primary, 0.22)!;
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
@@ -110,6 +192,13 @@ ThemeData buildAppTheme() {
       surface: AppColors.white,
       onSurface: AppColors.black,
       outline: primary.withOpacity(0.18),
+      inverseSurface: snackBg,
+      onInverseSurface: AppColors.white,
+    ),
+    snackBarTheme: _snackBarTheme(
+      background: snackBg,
+      foreground: AppColors.white,
+      action: accent,
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.white,
@@ -188,6 +277,8 @@ ThemeData buildAppDarkTheme() {
   final scaffold = Color.lerp(AppColors.black, brand, 0.10)!;
   final surface = Color.lerp(AppColors.black, brand, 0.22)!;
   final field = Color.lerp(AppColors.black, brand, 0.28)!;
+  // Elevado respecto al scaffold: se lee bien sin el flash blanco de inverseSurface.
+  final snackBg = Color.lerp(AppColors.black, brand, 0.48)!;
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
@@ -203,6 +294,13 @@ ThemeData buildAppDarkTheme() {
       onSurface: AppColors.white,
       onSurfaceVariant: AppColors.white.withOpacity(0.78),
       outline: AppColors.white.withOpacity(0.22),
+      inverseSurface: snackBg,
+      onInverseSurface: AppColors.white,
+    ),
+    snackBarTheme: _snackBarTheme(
+      background: snackBg,
+      foreground: AppColors.white,
+      action: primary,
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: surface,

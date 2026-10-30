@@ -299,7 +299,7 @@ class _DetailProductRow extends StatelessWidget {
             height: 64,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                color: colors.soft, borderRadius: BorderRadius.circular(10)),
             child: image == null
                 ? fallback()
                 : Image.network(image,

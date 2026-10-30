@@ -10,11 +10,13 @@ class ImporterProductPricePreview extends StatelessWidget {
     required this.listPriceUsd,
     this.salePriceUsd,
     this.quantity = 1,
+    this.pagoSoloDivisas = false,
   });
 
   final double? listPriceUsd;
   final double? salePriceUsd;
   final int quantity;
+  final bool pagoSoloDivisas;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +46,10 @@ class ImporterProductPricePreview extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Precios por unidad: USD promocional primero, seguido del REF original y su equivalente en bolívares.',
+              pagoSoloDivisas
+                  ? 'Solo divisas: la tienda ve este precio en USD.'
+                  : 'Precios por unidad: USD promocional primero, seguido del '
+                      'REF original y su equivalente en bolívares.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
@@ -56,6 +61,7 @@ class ImporterProductPricePreview extends StatelessWidget {
               listPriceUsd: list,
               salePriceUsd: salePriceUsd,
               quantity: qty,
+              ownerPagoSoloDivisas: pagoSoloDivisas,
             ),
           ],
         ),

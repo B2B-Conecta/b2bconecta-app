@@ -53,13 +53,14 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
     final snap = r.qtyAdjustmentSolicitadaSnapshot ?? r.cantidad;
     final note = r.qtyAdjustmentNote?.trim();
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: AppColors.warningSurface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,7 +70,9 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
-              color: Colors.amber.shade900,
+              color: dark
+                  ? AppColors.warningAmberOnDark
+                  : AppColors.warningAmber,
             ),
           ),
           const SizedBox(height: 6),
@@ -78,7 +81,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
             style: TextStyle(
               fontSize: 12.5,
               height: 1.35,
-              color: Colors.grey.shade900,
+              color: AppColors.textPrimary,
             ),
           ),
           if (note != null && note.isNotEmpty) ...[
@@ -88,7 +91,7 @@ class _AliadoQtyAdjustmentActionsState extends State<AliadoQtyAdjustmentActions>
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
-                color: AppColors.textPrimary,
+                color: AppColors.textSecondary,
               ),
             ),
           ],

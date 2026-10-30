@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'product_min_order_qty.dart';
 import 'product_custom_fields_section.dart';
 import 'product_delete_outcome_sheet.dart';
@@ -44,6 +45,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   bool _isActive = true;
   bool _hasWarranty = false;
   bool _saving = false;
+  bool _pagoSoloDivisas = false;
   Map<String, dynamic> _customFields = const {};
 
   bool get _isEdit => widget.initial != null && widget.initial!.id.isNotEmpty;
@@ -87,6 +89,17 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       controller.addListener(_onPreviewChanged);
     }
     _loadTasaBcv();
+    _loadPagoSoloDivisas();
+  }
+
+  Future<void> _loadPagoSoloDivisas() async {
+    try {
+      final profile = await ProfileService.fetchMyProfile();
+      if (!mounted) return;
+      setState(() => _pagoSoloDivisas = profile?.pagoSoloDivisas ?? false);
+    } catch (_) {
+      // Conserva el valor por defecto (modo REF + Bs).
+    }
   }
 
   void _onPreviewChanged() {
@@ -168,25 +181,28 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       );
       return;
     }
-    final saleRaw = _salePriceController.text.trim();
+    // Solo-divisas: un solo precio USD; se limpia cualquier oferta previa.
     double? salePrice;
-    if (saleRaw.isNotEmpty) {
-      salePrice = double.tryParse(saleRaw.replaceAll(',', '.'));
-      if (salePrice == null || salePrice <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Precio USD inválido.')),
-        );
-        return;
-      }
-      if (salePrice >= price) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'El precio USD debe ser menor que el precio REF.',
+    if (!_pagoSoloDivisas) {
+      final saleRaw = _salePriceController.text.trim();
+      if (saleRaw.isNotEmpty) {
+        salePrice = double.tryParse(saleRaw.replaceAll(',', '.'));
+        if (salePrice == null || salePrice <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Precio USD inválido.')),
+          );
+          return;
+        }
+        if (salePrice >= price) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'El precio USD debe ser menor que el precio REF.',
+              ),
             ),
-          ),
-        );
-        return;
+          );
+          return;
+        }
       }
     }
     setState(() => _saving = true);
@@ -468,46 +484,55 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         const SizedBox(height: 12),
         TextFormField(
           controller: _priceController,
-          decoration: _dec('Precio REF'),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _salePriceController,
-          enabled: !_saving,
           decoration: _dec(
-            'Precio USD',
-            hint: 'Opcional · promoción, menor que el REF',
-          ).copyWith(
-            helperText: 'Precio de promoción. Si lo dejas vacío, la tienda solo ve el REF.',
+            _pagoSoloDivisas ? 'Precio USD' : 'Precio REF',
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
           ],
         ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _bsPriceController,
-          readOnly: true,
-          enableInteractiveSelection: true,
-          decoration: _dec(
-            'Precio (Bs)',
-            hint: _tasaBcv == null ? 'No disponible' : null,
-          ).copyWith(
-            helperText:
-                'Solo lectura. Se calcula sobre el precio REF. La promoción USD no entra.',
+        if (!_pagoSoloDivisas) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _salePriceController,
+            enabled: !_saving,
+            decoration: _dec(
+              'Precio USD',
+              hint: 'Opcional · promoción, menor que el REF',
+            ).copyWith(
+              helperText:
+                  'Precio de promoción. Si lo dejas vacío, la tienda solo ve el REF.',
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+            ],
           ),
-        ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _bsPriceController,
+            readOnly: true,
+            enableInteractiveSelection: true,
+            decoration: _dec(
+              'Precio (Bs)',
+              hint: _tasaBcv == null ? 'No disponible' : null,
+            ).copyWith(
+              helperText:
+                  'Solo lectura. Se calcula sobre el precio REF. La promoción USD no entra.',
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         ImporterProductPricePreview(
           listPriceUsd: parsePreviewMoney(_priceController.text),
-          salePriceUsd: parsePreviewMoney(_salePriceController.text),
+          // En solo-divisas el precio de lista ya es USD; no se ofrece promoción.
+          salePriceUsd: _pagoSoloDivisas
+              ? null
+              : parsePreviewMoney(_salePriceController.text),
           quantity: int.tryParse(_minOrderQtyController.text.trim()) ??
               ProductMinOrderQty.platformFloor,
+          pagoSoloDivisas: _pagoSoloDivisas,
         ),
         const SizedBox(height: 12),
         TextFormField(

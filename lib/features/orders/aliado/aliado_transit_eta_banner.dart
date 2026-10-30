@@ -84,8 +84,10 @@ class AliadoTransitEtaBanner extends StatelessWidget {
       );
     }
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final tealInk = dark ? const Color(0xFF80CBC4) : Colors.teal.shade900;
     return Material(
-      color: Colors.teal.shade50,
+      color: AppColors.tealSurface,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -95,7 +97,7 @@ class AliadoTransitEtaBanner extends StatelessWidget {
             Icon(
               Icons.local_shipping_outlined,
               size: 22,
-              color: Colors.teal.shade800,
+              color: tealInk,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -107,7 +109,7 @@ class AliadoTransitEtaBanner extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Colors.teal.shade900.withOpacity(0.85),
+                      color: tealInk.withOpacity(0.9),
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -117,7 +119,7 @@ class AliadoTransitEtaBanner extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: Colors.teal.shade900,
+                      color: tealInk,
                       height: 1.2,
                     ),
                   ),
@@ -174,22 +176,24 @@ class AliadoTransitEtaChip extends StatelessWidget {
     final imp = importerName?.trim();
     final label = imp != null && imp.isNotEmpty ? '$imp · ~$eta' : 'Llegada ~$eta';
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final tealInk = dark ? const Color(0xFF80CBC4) : Colors.teal.shade900;
     return Chip(
       avatar: Icon(
         Icons.schedule,
         size: 16,
-        color: Colors.teal.shade800,
+        color: tealInk,
       ),
       label: Text(
         label,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: Colors.teal.shade900,
+          color: tealInk,
         ),
       ),
-      backgroundColor: Colors.teal.shade50,
-      side: BorderSide(color: Colors.teal.shade200),
+      backgroundColor: AppColors.tealSurface,
+      side: BorderSide(color: AppColors.borderSubtle),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       padding: const EdgeInsets.symmetric(horizontal: 4),

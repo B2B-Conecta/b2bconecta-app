@@ -817,16 +817,18 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: AppColors.successSurface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade200),
+              border: Border.all(color: AppColors.borderSubtle),
             ),
             child: Text(
               disc.resumenEs,
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.35,
-                color: Colors.green.shade900,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.green.shade300
+                    : Colors.green.shade900,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -885,7 +887,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
                             if (chunk.length > 1) ...[
                               if (i > 0) ...[
                                 const SizedBox(height: 8),
-                                Divider(height: 1, color: Colors.grey.shade200),
+                                Divider(height: 1, color: AppColors.divider),
                                 const SizedBox(height: 12),
                               ],
                               Text(
@@ -1450,9 +1452,9 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: AppColors.surfaceTinted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -1462,10 +1464,10 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.account_balance_wallet_outlined,
                   size: 22,
-                  color: AppColors.brandBlue,
+                  color: AppColors.brandLink,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1507,8 +1509,11 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
                             fontWeight: FontWeight.w700,
                             color: discountPreview != null &&
                                     discountPreview.applies
-                                ? Colors.green.shade800
-                                : AppColors.brandBlue,
+                                ? (Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.green.shade300
+                                    : Colors.green.shade800)
+                                : AppColors.brandLink,
                           ),
                         ),
                         if (discountPreview != null &&

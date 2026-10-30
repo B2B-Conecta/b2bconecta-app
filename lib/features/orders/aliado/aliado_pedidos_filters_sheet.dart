@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'aliado_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
@@ -14,6 +15,7 @@ String formatAliadoPedidosFilterDate(DateTime d) {
 }
 
 /// Panel único de filtros de pedidos del aliado.
+/// Móvil: bottom sheet. Escritorio web: diálogo flotante centrado.
 class AliadoPedidosFiltersSheet extends StatefulWidget {
   const AliadoPedidosFiltersSheet({
     super.key,
@@ -24,30 +26,25 @@ class AliadoPedidosFiltersSheet extends StatefulWidget {
 
   final AliadoPedidosFiltersDraft initial;
   final List<OrderStatusFilterOption> statusOptions;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
 
   static Future<AliadoPedidosFiltersDraft?> show(
     BuildContext context, {
     required AliadoPedidosFiltersDraft initial,
     required List<OrderStatusFilterOption> statusOptions,
   }) {
-    return showModalBottomSheet<AliadoPedidosFiltersDraft>(
+    return showAdaptiveAdminSheet<AliadoPedidosFiltersDraft>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.72,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (_, scrollController) => AliadoPedidosFiltersSheet(
-          initial: initial,
-          statusOptions: statusOptions,
-          scrollController: scrollController,
-        ),
+      showDragHandle: false,
+      draggable: true,
+      initialChildSize: 0.72,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      desktopMaxWidth: 560,
+      builder: (_, scrollController) => AliadoPedidosFiltersSheet(
+        initial: initial,
+        statusOptions: statusOptions,
+        scrollController: scrollController,
       ),
     );
   }
@@ -164,44 +161,69 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewPadding.bottom;
+    final desktop = isAdminDesktopLayout(context);
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
 
     return Material(
       color: AppColors.card,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: desktop
+          ? BorderRadius.circular(20)
+          : const BorderRadius.vertical(top: Radius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            padding: EdgeInsets.fromLTRB(20, desktop ? 20 : 12, 12, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.borderSubtle,
-                      borderRadius: BorderRadius.circular(2),
+                if (!desktop) ...[
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderSubtle,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Filtros de pedidos',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Encuentra tus pedidos por fecha, estado o tipo.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filtros de pedidos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Encuentra tus pedidos por fecha, estado o tipo.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -335,8 +357,17 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
               ],
             ),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, bottom + 16),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              border: Border(top: BorderSide(color: AppColors.borderSubtle)),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              desktop ? 18 : bottom + 16,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -354,7 +385,14 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
-                  child: ElevatedButton(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.brand,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     onPressed: () => Navigator.of(context).pop(_buildDraft()),
                     child: const Text('Aplicar filtros'),
                   ),

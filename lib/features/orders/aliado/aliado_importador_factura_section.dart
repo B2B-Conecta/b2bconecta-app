@@ -40,7 +40,7 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
     final r = _ref;
     if (r == null) {
       return B2bPanelSectionCard(
-        tint: Colors.amber.shade50,
+        tint: AppColors.warningSurface,
         icon: Icons.receipt_long_outlined,
         title: OrderPaymentFlowCopy.aliadoEsperaFactura,
       );
@@ -50,7 +50,7 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
     final name = r.proveedorFacturaFileName?.trim();
 
     return B2bPanelSectionCard(
-      tint: Colors.blue.shade50,
+      tint: AppColors.infoSurface,
       icon: Icons.description_outlined,
       title: 'Factura del importador',
       subtitle: [
@@ -66,7 +66,7 @@ class AliadoImportadorFacturaSection extends StatelessWidget {
             icon: const Icon(Icons.visibility_outlined, size: 18),
             label: const Text(OrderPaymentFlowCopy.aliadoVerFactura),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.brandBlue,
+              foregroundColor: AppColors.brandLink,
               minimumSize: b2bActionButtonMinSize(context),
             ),
           ),

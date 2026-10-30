@@ -42,6 +42,9 @@ class AliadoProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dependencia de Theme: al cambiar claro/oscuro se redibuja la tarjeta/foto.
+    final brightness = Theme.of(context).brightness;
+    AppColors.brightness = brightness;
     final scaler = MediaQuery.textScalerOf(context);
     final importer = (part.ownerBusinessName ?? '').trim();
     final supplier = importer.isEmpty ? 'Sin proveedor' : importer;
@@ -228,7 +231,7 @@ class AliadoProductCard extends StatelessWidget {
                               child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: ColoredBox(
-                                      color: AppColors.white,
+                                      color: AppColors.photoFrameFor(brightness),
                                       child: Stack(
                                           fit: StackFit.expand,
                                           children: [
@@ -303,13 +306,16 @@ class AliadoProductCard extends StatelessWidget {
     if (url == null || url.isEmpty) return const _PhotoPlaceholder();
     return Padding(
         padding: const EdgeInsets.all(10),
-        child: Image.network(url,
-            fit: BoxFit.contain,
-            excludeFromSemantics: true,
-            errorBuilder: (_, __, ___) => const _PhotoPlaceholder(failed: true),
-            loadingBuilder: (_, image, progress) => progress == null
-                ? image
-                : const _PhotoPlaceholder(loading: true)));
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+          errorBuilder: (_, __, ___) =>
+              const _PhotoPlaceholder(failed: true),
+          loadingBuilder: (_, image, progress) => progress == null
+              ? image
+              : const _PhotoPlaceholder(loading: true),
+        ));
   }
 }
 
@@ -318,29 +324,34 @@ class _PhotoPlaceholder extends StatelessWidget {
   final bool loading;
   final bool failed;
   @override
-  Widget build(BuildContext context) => ColoredBox(
-      color: AppColors.surfaceTinted,
-      child: Center(
-          child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(
-                    failed ? Icons.broken_image_outlined : Icons.image_outlined,
-                    size: 30,
-                    color: AppColors.textMuted),
-                const SizedBox(height: 6),
-                Text(
-                    loading
-                        ? 'Cargando foto…'
-                        : failed
-                            ? 'No se pudo cargar la foto'
-                            : 'Foto no disponible',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 11,
-                        height: 1.2,
-                        color: AppColors.textSecondary)),
-              ]))));
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return ColoredBox(
+        color: AppColors.surfaceTintedFor(b),
+        child: Center(
+            child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                      failed
+                          ? Icons.broken_image_outlined
+                          : Icons.image_outlined,
+                      size: 30,
+                      color: AppColors.textMutedFor(b)),
+                  const SizedBox(height: 6),
+                  Text(
+                      loading
+                          ? 'Cargando foto…'
+                          : failed
+                              ? 'No se pudo cargar la foto'
+                              : 'Foto no disponible',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 11,
+                          height: 1.2,
+                          color: AppColors.textSecondaryFor(b))),
+                ]))));
+  }
 }
 
 class _VariantOptionsChip extends StatelessWidget {

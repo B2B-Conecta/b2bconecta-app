@@ -519,7 +519,7 @@ class _DescuentoDivisasFichaChip extends StatelessWidget {
             color: Colors.green.shade900,
           ),
         ),
-        backgroundColor: Colors.green.shade50,
+        backgroundColor: AppColors.successSurface,
         side: BorderSide(color: Colors.green.shade200),
         visualDensity: VisualDensity.compact,
         padding: EdgeInsets.zero,

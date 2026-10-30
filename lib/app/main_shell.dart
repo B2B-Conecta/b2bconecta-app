@@ -326,6 +326,7 @@ class _MainShellState extends State<MainShell> {
       title: 'Pedidos',
       subtitle: 'En curso · entregas',
       bottomContentPadding: 8,
+      compactHeaderOnScroll: true,
     ),
     ShellDestination(
       icon: Icons.star_outline,
@@ -340,6 +341,7 @@ class _MainShellState extends State<MainShell> {
       label: 'Catálogo',
       title: 'Catálogo',
       subtitle: 'Inicio · repuestos · carrito',
+      compactHeaderOnScroll: true,
     ),
     ShellDestination(
       icon: Icons.favorite_border,

@@ -28,6 +28,7 @@ import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
 import 'sliver_catalog_card_rows.dart';
+import 'catalog_browse_layout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -466,10 +467,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _setCatalogSortMode(CatalogSortMode mode) {
-    setState(() => _catalogSortMode = mode);
-  }
-
   Future<bool> _ensureGpsForNearestSort() async {
     final pos = await GeolocatorService.getCurrentLatLng();
     if (!mounted) return false;
@@ -718,163 +715,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _activeFilterChip({
-    required String label,
-    required VoidCallback onDeleted,
-  }) {
-    return InputChip(
-      label: Text(label),
-      deleteIcon: const Icon(Icons.close, size: 16),
-      onDeleted: onDeleted,
-      backgroundColor: AppColors.brand.withOpacity(0.12),
-      side: BorderSide(color: AppColors.brand.withOpacity(0.35)),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  Widget? _buildActiveFilterChipsRow() {
-    final draft = _currentFiltersDraft();
-    final chips = <Widget>[];
-
-    if (draft.hasCategoryFilter) {
-      chips.add(_activeFilterChip(
-        label: draft.categoryLabel,
-        onDeleted: () {
-          setState(
-              () => _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel);
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    if (draft.hasImporterFilter) {
-      final n = draft.importerIds.length;
-      chips.add(_activeFilterChip(
-        label: n == 1 ? '1 proveedor' : '$n proveedores',
-        onDeleted: () {
-          setState(() => _selectedImporterIds = {});
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    final est = draft.ownerEstado.trim();
-    if (est.isNotEmpty) {
-      chips.add(_activeFilterChip(
-        label: 'Estado: $est',
-        onDeleted: () {
-          _ownerEstadoFilterController.clear();
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    final ciu = draft.ownerCiudad.trim();
-    if (ciu.isNotEmpty) {
-      chips.add(_activeFilterChip(
-        label: 'Ciudad: $ciu',
-        onDeleted: () {
-          _ownerCiudadFilterController.clear();
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    final min = draft.minPrice.trim();
-    final max = draft.maxPrice.trim();
-    if (min.isNotEmpty || max.isNotEmpty) {
-      final priceLabel = min.isNotEmpty && max.isNotEmpty
-          ? 'REF $min – $max'
-          : min.isNotEmpty
-              ? 'REF desde $min'
-              : 'REF hasta $max';
-      chips.add(_activeFilterChip(
-        label: priceLabel,
-        onDeleted: () {
-          _minPriceController.clear();
-          _maxPriceController.clear();
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    if (draft.hasNonDefaultSort) {
-      chips.add(_activeFilterChip(
-        label: 'Orden: ${draft.sortMode.labelEs}',
-        onDeleted: () {
-          _setCatalogSortMode(CatalogSortMode.defaultMode);
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    if (draft.minOwnerRatingAvg != null && draft.minOwnerRatingAvg! > 0) {
-      chips.add(_activeFilterChip(
-        label: '≥ ${draft.minOwnerRatingAvg!.toStringAsFixed(1)} ★',
-        onDeleted: () {
-          setState(() => _minOwnerRatingAvg = null);
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    if (draft.minOwnerRatingCount != null && draft.minOwnerRatingCount! > 0) {
-      chips.add(_activeFilterChip(
-        label: '≥ ${draft.minOwnerRatingCount} valoraciones',
-        onDeleted: () {
-          setState(() => _minOwnerRatingCount = null);
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    if (draft.hasCommercialDiscountFilter) {
-      chips.add(_activeFilterChip(
-        label: 'Promoción USD',
-        onDeleted: () {
-          setState(() => _onlyWithCommercialDiscount = false);
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-    if (_onlyEnvioIncluido) {
-      chips.add(_activeFilterChip(
-        label: 'Envío incluido',
-        onDeleted: () {
-          setState(() => _onlyEnvioIncluido = false);
-          _applyFiltersFromUi();
-        },
-      ));
-    }
-
-    if (chips.isEmpty) return null;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          ...chips,
-          TextButton(
-            onPressed: _clearFilters,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              'Limpiar',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final appBar = widget.embedInDesktopShell
@@ -969,7 +809,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
-    final activeFilterChips = _buildActiveFilterChipsRow();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -1007,307 +846,298 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final hPad = AliadoCatalogLayout.horizontalPadding(catalogWidth);
               _catalogCrossAxisCount = crossAxisCount;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (widget.homeRole == AppHomeRole.aliado)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
-                      child: Text(
-                        'Catálogo de repuestos',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+              return CatalogBrowseLayout(
+                heading: widget.homeRole == AppHomeRole.aliado
+                    ? Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+                        child: Text(
+                          'Catálogo de repuestos',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                    ),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                        hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
-                    child: isDesktopCatalog
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  textInputAction: TextInputAction.search,
-                                  onSubmitted: (_) => _applyFiltersFromUi(),
-                                  decoration: _searchDecoration(
-                                    onOpenFilters: bootstrapSnapshot.hasError
-                                        ? null
-                                        : () =>
-                                            _openCatalogFiltersSheet(importers),
-                                    filterBadge: filterBadge,
-                                    showFilterButton: false,
-                                  ),
+                      )
+                    : null,
+                search: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
+                  child: isDesktopCatalog
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                textInputAction: TextInputAction.search,
+                                onSubmitted: (_) => _applyFiltersFromUi(),
+                                decoration: _searchDecoration(
+                                  onOpenFilters: bootstrapSnapshot.hasError
+                                      ? null
+                                      : () =>
+                                          _openCatalogFiltersSheet(importers),
+                                  filterBadge: filterBadge,
+                                  showFilterButton: false,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              OutlinedButton.icon(
-                                onPressed: bootstrapSnapshot.hasError
-                                    ? null
-                                    : () => _openCatalogFiltersSheet(importers),
-                                icon: Badge(
-                                  isLabelVisible: filterBadge > 0,
-                                  label: Text('$filterBadge'),
-                                  child: const Icon(Icons.tune, size: 20),
-                                ),
-                                label: const Text('Filtros'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.brandAccent,
-                                  backgroundColor: AppColors.fieldFill,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                  side:
-                                      BorderSide(color: AppColors.borderSubtle),
-                                ),
-                              ),
-                            ],
-                          )
-                        : TextField(
-                            controller: _searchController,
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (_) => _applyFiltersFromUi(),
-                            decoration: _searchDecoration(
-                              onOpenFilters: bootstrapSnapshot.hasError
+                            ),
+                            const SizedBox(width: 12),
+                            OutlinedButton.icon(
+                              onPressed: bootstrapSnapshot.hasError
                                   ? null
                                   : () => _openCatalogFiltersSheet(importers),
-                              filterBadge: filterBadge,
-                            ),
-                          ),
-                  ),
-                  if (widget.homeRole == AppHomeRole.aliado)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
-                      child: AliadoCatalogQuickFilters(
-                        selected: _selectedQuickFilter,
-                        onSelected: _selectQuickFilter,
-                      ),
-                    ),
-                  if (activeFilterChips != null) activeFilterChips,
-                  if (_catalogSortMode == CatalogSortMode.featured &&
-                      widget.homeRole == AppHomeRole.aliado)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF6E5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: const Color(0xFFE8A317).withOpacity(0.35),
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.star_rounded,
-                              size: 18,
-                              color: Color(0xFFE8A317),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Orden Destacados: primero los proveedores con '
-                                'sello dorado por alto volumen.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.35,
-                                  color: Color(0xFF8A5A00),
-                                  fontWeight: FontWeight.w600,
+                              icon: Badge(
+                                isLabelVisible: filterBadge > 0,
+                                label: Text('$filterBadge'),
+                                child: const Icon(Icons.tune, size: 20),
+                              ),
+                              label: const Text('Filtros'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.brandAccent,
+                                backgroundColor: AppColors.fieldFill,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
                                 ),
+                                side: BorderSide(color: AppColors.borderSubtle),
                               ),
                             ),
                           ],
+                        )
+                      : TextField(
+                          controller: _searchController,
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: (_) => _applyFiltersFromUi(),
+                          decoration: _searchDecoration(
+                            onOpenFilters: bootstrapSnapshot.hasError
+                                ? null
+                                : () => _openCatalogFiltersSheet(importers),
+                            filterBadge: filterBadge,
+                          ),
                         ),
-                      ),
-                    ),
-                  if (promos.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 4),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () => _openActivePromotionsSheet(promos),
-                          icon: const Icon(Icons.campaign_outlined, size: 18),
-                          label: Text('Promociones (${promos.length})'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.brand,
-                            textStyle: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
+                ),
+                quickFilters: widget.homeRole == AppHomeRole.aliado
+                    ? Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                        child: AliadoCatalogQuickFilters(
+                          selected: _selectedQuickFilter,
+                          onSelected: _selectQuickFilter,
+                        ),
+                      )
+                    : null,
+                notice: _catalogSortMode == CatalogSortMode.featured &&
+                        widget.homeRole == AppHomeRole.aliado
+                    ? Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF6E5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFFE8A317).withOpacity(0.35),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.star_rounded,
+                                size: 18,
+                                color: Color(0xFFE8A317),
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Orden Destacados: primero los proveedores con '
+                                  'sello dorado por alto volumen.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.35,
+                                    color: Color(0xFF8A5A00),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : null,
+                promotions: promos.isNotEmpty
+                    ? Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 4),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => _openActivePromotionsSheet(promos),
+                            icon: const Icon(Icons.campaign_outlined, size: 18),
+                            label: Text('Promociones (${promos.length})'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.brand,
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  Expanded(
-                    child: FutureBuilder<List<PartModel>>(
-                      future: _partsFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                                ConnectionState.waiting &&
-                            _loadedParts.isEmpty) {
-                          return CatalogGridSkeleton(
-                            maxWidth: catalogWidth,
-                            horizontalPadding: hPad,
-                          );
-                        }
-                        if (snapshot.hasError) {
-                          return ListView(
-                            padding: const EdgeInsets.all(24),
-                            children: [
-                              const SizedBox(height: 120),
-                              Icon(Icons.error_outline,
-                                  size: 48, color: Colors.red.shade700),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No se pudieron cargar los repuestos.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${snapshot.error}',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-                        final parts = _loadedParts;
-                        final resultsLabel =
-                            '${_catalogTotal ?? parts.length} repuestos encontrados';
-                        final resultsStyle = TextStyle(
-                          fontSize: isDesktopCatalog ? 14 : 13,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        );
-
-                        if (parts.isEmpty) {
-                          return ListView(
-                            children: [
-                              if (promos.isNotEmpty)
-                                AliadoPromoBannerCarousel(
-                                  campaigns: promos,
-                                  onPromoCampaignSelected:
-                                      _onPromoCampaignSelected,
-                                  compact: isDesktopCatalog,
-                                ),
-                              Padding(
-                                padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
-                                child: Text(resultsLabel, style: resultsStyle),
-                              ),
-                              const SizedBox(height: 120),
-                              Center(
-                                child: Text(
-                                  _activeFilters.hasAnyFilter
-                                      ? 'No encontramos repuestos con esa búsqueda.'
-                                      : 'No hay repuestos disponibles.',
-                                  style:
-                                      TextStyle(color: AppColors.textSecondary),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Center(
-                                  child: TextButton.icon(
-                                onPressed: _clearFilters,
-                                icon: const Icon(Icons.restart_alt),
-                                label: const Text('Ver todos los repuestos'),
-                              )),
-                            ],
-                          );
-                        }
-
-                        // Un solo scroll: la valla va arriba del contenido y
-                        // se desplaza con el catálogo (deja de quedar fija).
-                        if (_hasMoreProducts && !_isLoadingMore) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (!mounted) return;
-                            _onCatalogScroll();
-                          });
-                        }
-                        return CustomScrollView(
-                          controller: _catalogScrollController,
-                          slivers: [
-                            if (promos.isNotEmpty)
-                              SliverToBoxAdapter(
-                                child: AliadoPromoBannerCarousel(
-                                  campaigns: promos,
-                                  onPromoCampaignSelected:
-                                      _onPromoCampaignSelected,
-                                  compact: isDesktopCatalog,
-                                ),
-                              ),
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                  hPad,
-                                  4,
-                                  hPad,
-                                  0,
-                                ),
-                                child: Text(
-                                  resultsLabel,
-                                  style: resultsStyle,
-                                ),
-                              ),
+                      )
+                    : null,
+                content: FutureBuilder<List<PartModel>>(
+                  future: _partsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        _loadedParts.isEmpty) {
+                      return CatalogGridSkeleton(
+                        maxWidth: catalogWidth,
+                        horizontalPadding: hPad,
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return ListView(
+                        padding: const EdgeInsets.all(24),
+                        children: [
+                          const SizedBox(height: 120),
+                          Icon(Icons.error_outline,
+                              size: 48, color: Colors.red.shade700),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No se pudieron cargar los repuestos.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
                             ),
-                            SliverPadding(
-                              padding: EdgeInsets.fromLTRB(
-                                hPad,
-                                0,
-                                hPad,
-                                16,
-                              ),
-                              sliver: SliverLayoutBuilder(
-                                builder: (context, sliverConstraints) {
-                                  final spacing =
-                                      AliadoCatalogLayout.gridSpacing(
-                                    catalogWidth,
-                                  );
-                                  final showDistance = _activeFilters
-                                      .sortByDistanceFromReference;
-                                  return SliverCatalogCardRows(
-                                    columns: crossAxisCount,
-                                    spacing: spacing,
-                                    itemCount: parts.length,
-                                    itemBuilder: (context, index) {
-                                      final p = parts[index];
-                                      return AliadoProductCard(
-                                        part: p,
-                                        profile: widget.profile,
-                                        compact: true,
-                                        showDistanceChips: showDistance,
-                                        onTap: () {
-                                          CatalogRouteLock.push(
-                                            context,
-                                            MaterialPageRoute<void>(
-                                              builder: (ctx) =>
-                                                  ProductDetailScreen(
-                                                part: p,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        onImporterTap: (p.ownerId
-                                                    ?.trim()
-                                                    .isNotEmpty ??
-                                                false)
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    final parts = _loadedParts;
+                    final resultsLabel =
+                        '${_catalogTotal ?? parts.length} repuestos encontrados';
+                    final resultsStyle = TextStyle(
+                      fontSize: isDesktopCatalog ? 14 : 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    );
+
+                    if (parts.isEmpty) {
+                      return ListView(
+                        children: [
+                          if (promos.isNotEmpty)
+                            AliadoPromoBannerCarousel(
+                              campaigns: promos,
+                              onPromoCampaignSelected: _onPromoCampaignSelected,
+                              compact: isDesktopCatalog,
+                            ),
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
+                            child: Text(resultsLabel, style: resultsStyle),
+                          ),
+                          const SizedBox(height: 120),
+                          Center(
+                            child: Text(
+                              _activeFilters.hasAnyFilter
+                                  ? 'No encontramos repuestos con esa búsqueda.'
+                                  : 'No hay repuestos disponibles.',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                              child: TextButton.icon(
+                            onPressed: _clearFilters,
+                            icon: const Icon(Icons.restart_alt),
+                            label: const Text('Ver todos los repuestos'),
+                          )),
+                        ],
+                      );
+                    }
+
+                    // Un solo scroll: la valla va arriba del contenido y
+                    // se desplaza con el catálogo (deja de quedar fija).
+                    if (_hasMoreProducts && !_isLoadingMore) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        _onCatalogScroll();
+                      });
+                    }
+                    return CustomScrollView(
+                      controller: _catalogScrollController,
+                      slivers: [
+                        if (promos.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: AliadoPromoBannerCarousel(
+                              campaigns: promos,
+                              onPromoCampaignSelected: _onPromoCampaignSelected,
+                              compact: isDesktopCatalog,
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              hPad,
+                              4,
+                              hPad,
+                              0,
+                            ),
+                            child: Text(
+                              resultsLabel,
+                              style: resultsStyle,
+                            ),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(
+                            hPad,
+                            0,
+                            hPad,
+                            16,
+                          ),
+                          sliver: SliverLayoutBuilder(
+                            builder: (context, sliverConstraints) {
+                              final spacing = AliadoCatalogLayout.gridSpacing(
+                                catalogWidth,
+                              );
+                              final showDistance =
+                                  _activeFilters.sortByDistanceFromReference;
+                              return SliverCatalogCardRows(
+                                columns: crossAxisCount,
+                                spacing: spacing,
+                                itemCount: parts.length,
+                                itemBuilder: (context, index) {
+                                  final p = parts[index];
+                                  return AliadoProductCard(
+                                    part: p,
+                                    profile: widget.profile,
+                                    compact: true,
+                                    showDistanceChips: showDistance,
+                                    onTap: () {
+                                      CatalogRouteLock.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                          builder: (ctx) => ProductDetailScreen(
+                                            part: p,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    onImporterTap:
+                                        (p.ownerId?.trim().isNotEmpty ?? false)
                                             ? () {
                                                 CatalogRouteLock.push(
                                                   context,
@@ -1322,40 +1152,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                                 );
                                               }
                                             : null,
-                                      );
-                                    },
                                   );
                                 },
-                              ),
-                            ),
-                            if (_isLoadingMore)
-                              const SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: EdgeInsets.only(bottom: 24),
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: AppColors.brand,
-                                      ),
-                                    ),
+                              );
+                            },
+                          ),
+                        ),
+                        if (_isLoadingMore)
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.only(bottom: 24),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: AppColors.brand,
                                   ),
                                 ),
                               ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  CatalogCartBar(
-                      onOpen: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    CartScreen(profile: widget.profile)),
-                          )),
-                ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                footer: CatalogCartBar(
+                    onOpen: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  CartScreen(profile: widget.profile)),
+                        )),
               );
             },
           );

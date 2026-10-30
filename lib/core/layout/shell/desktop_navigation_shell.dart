@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/admin_content_frame.dart';
+import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 import 'desktop_shell_top_bar.dart';
 import 'shell_destination.dart';
@@ -67,63 +68,92 @@ class DesktopNavigationShell extends StatelessWidget {
             statusBuilder: railStatusBuilder,
           ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DesktopShellTopBar(
-                  unreadNotifications: unreadNotifications,
-                  onNotificationTap: onNotificationTap,
-                  onMessagesTap: onMessagesTap,
-                  unreadMessages: unreadMessages,
-                  trailingActions: trailingActions,
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 22, 28, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dest.title,
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.4,
-                          height: 1.15,
-                        ),
-                      ),
-                      if (dest.subtitle != null && dest.subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: Text(
-                            dest.subtitle!,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              height: 1.45,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+            child: ScrollCompactLayout(
+              enabled: dest.compactHeaderOnScroll,
+              resetKey: safeIndex,
+              builder: (context, compact) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DesktopShellTopBar(
+                    unreadNotifications: unreadNotifications,
+                    onNotificationTap: onNotificationTap,
+                    onMessagesTap: onMessagesTap,
+                    unreadMessages: unreadMessages,
+                    trailingActions: trailingActions,
                   ),
-                ),
-                Expanded(
-                  child: AdminContentFrame(
-                    padding: EdgeInsets.fromLTRB(24, 0, 24, dest.bottomContentPadding),
-                    child: IndexedStack(
-                      index: safeIndex,
-                      children: pages,
+                  _DesktopPageHeading(
+                      destination: dest,
+                      compact: compact,
+                      hidden: ScrollCompactState.hideHeadingOf(context)),
+                  Expanded(
+                    child: AdminContentFrame(
+                      padding: EdgeInsets.fromLTRB(
+                          24, 0, 24, dest.bottomContentPadding),
+                      child: IndexedStack(
+                        index: safeIndex,
+                        children: pages,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+class _DesktopPageHeading extends StatelessWidget {
+  const _DesktopPageHeading({
+    required this.destination,
+    required this.compact,
+    required this.hidden,
+  });
+
+  final ShellDestination destination;
+  final bool compact;
+  final bool hidden;
+
+  @override
+  Widget build(BuildContext context) {
+    final heading = hidden
+        ? const SizedBox(key: ValueKey('desktop-page-heading'), height: 0)
+        : Padding(
+            key: const ValueKey('desktop-page-heading'),
+            padding:
+                EdgeInsets.fromLTRB(28, compact ? 8 : 22, 28, compact ? 6 : 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(destination.title,
+                    style: TextStyle(
+                        fontSize: compact ? 20 : 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.4,
+                        height: 1.15)),
+                if (!compact && destination.subtitle?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Text(destination.subtitle!,
+                          style: TextStyle(
+                              fontSize: 14.5,
+                              height: 1.45,
+                              color: AppColors.textSecondary))),
+                ],
+              ],
+            ),
+          );
+    // Flutter 3.24 AnimatedSize cannot safely lay out a zero-duration change.
+    if (MediaQuery.disableAnimationsOf(context)) return heading;
+    return AnimatedSize(
+        alignment: Alignment.topLeft,
+        duration: ScrollCompactLayout.motionDuration(context),
+        curve: Curves.easeOutCubic,
+        child: heading);
   }
 }
 
@@ -161,10 +191,12 @@ class _DesktopSideRail extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(extended ? 20 : 12, 20, extended ? 20 : 12, 16),
+              padding: EdgeInsets.fromLTRB(
+                  extended ? 20 : 12, 20, extended ? 20 : 12, 16),
               child: Column(
-                crossAxisAlignment:
-                    extended ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+                crossAxisAlignment: extended
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
                 children: [
                   // Un solo logo: horizontal si hay espacio; isotipo si está colapsado.
                   extended
@@ -187,7 +219,8 @@ class _DesktopSideRail extends StatelessWidget {
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 itemCount: destinations.length,
                 itemBuilder: (context, i) {
                   final d = destinations[i];
@@ -283,14 +316,15 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
                         color: AppColors.brandBlue,
                       ),
                       const SizedBox(width: 6),
-                      Text(
+                      Expanded(
+                          child: Text(
                         'Ajustes de cuenta',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.brandBlue,
                         ),
-                      ),
+                      )),
                     ],
                   ),
                 ],
@@ -336,9 +370,8 @@ class _RailNavTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected
-        ? AppColors.brand.withOpacity(0.12)
-        : Colors.transparent;
+    final bg =
+        selected ? AppColors.brand.withOpacity(0.12) : Colors.transparent;
     final fg = selected ? AppColors.brand : AppColors.textPrimary;
     final iconColor = selected ? AppColors.brand : AppColors.textSecondary;
 
@@ -357,53 +390,53 @@ class _RailNavTile extends StatelessWidget {
                   )
                 : null,
           ),
-            child: Tooltip(
+          child: Tooltip(
             message: label,
             child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: extended ? 14 : 4,
-              vertical: extended ? 12 : 8,
-            ),
-            child: extended
-                ? Row(
-                    children: [
-                      Icon(icon, size: 22, color: iconColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
+              padding: EdgeInsets.symmetric(
+                horizontal: extended ? 14 : 4,
+                vertical: extended ? 12 : 8,
+              ),
+              child: extended
+                  ? Row(
+                      children: [
+                        Icon(icon, size: 22, color: iconColor),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w600,
+                              color: fg,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        Icon(icon, size: 22, color: iconColor),
+                        const SizedBox(height: 4),
+                        Text(
                           label,
-                          maxLines: 1,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 10,
+                            height: 1.15,
                             fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w600,
+                                selected ? FontWeight.w800 : FontWeight.w600,
                             color: fg,
                           ),
                         ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Icon(icon, size: 22, color: iconColor),
-                      const SizedBox(height: 4),
-                      Text(
-                        label,
-                        maxLines: 2,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1.15,
-                          fontWeight:
-                              selected ? FontWeight.w800 : FontWeight.w600,
-                          color: fg,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import 'aliado_order_grouping.dart';
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
@@ -42,139 +43,169 @@ class OrderWorkspace extends StatelessWidget {
             .where((g) => checkoutGroupExpandKey(g) == selectedKey)
             .firstOrNull;
         final detailOpen = selected != null;
-        return PopScope<Object?>(
-          canPop: !detailOpen,
-          onPopInvokedWithResult: (didPop, result) {
-            if (!didPop && detailOpen) onClose();
-          },
-          child: ColoredBox(
-              color: OrderListColors.of(context).background,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    constraints.maxWidth >= 700 ? 20 : 12,
-                    constraints.maxWidth >= 700 ? 20 : 12,
-                    constraints.maxWidth >= 700 ? 20 : 12,
-                    detailOpen ? 20 : 4),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (loading) const LinearProgressIndicator(minHeight: 2),
-                      if (!detailOpen) ...[
-                        controls,
-                        const SizedBox(height: 12)
-                      ],
-                      Expanded(
-                          child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                            Flexible(
-                                flex: detailOpen ? 0 : 1,
-                                fit: detailOpen ? FlexFit.loose : FlexFit.tight,
-                                child: Offstage(
-                                    offstage: detailOpen,
-                                    child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                            maxWidth: constraints.maxWidth),
-                                        child: _surface(context, LayoutBuilder(
-                                            builder:
-                                                (context, listConstraints) {
-                                          final table = listConstraints
-                                                      .maxWidth >=
-                                                  900 &&
-                                              MediaQuery.textScalerOf(context)
-                                                      .scale(14) <
-                                                  20;
-                                          return Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.stretch,
-                                              children: [
-                                                if (table)
-                                                  const OrderListColumnsHeader(),
-                                                Expanded(
-                                                    child: groups.isEmpty
-                                                        ? _OrdersEmpty(
-                                                            onClear:
-                                                                onClearFilters)
-                                                        : PagedItems<
-                                                            List<
-                                                                TransactionRequestModel>>(
-                                                            items: groups,
-                                                            itemKey:
-                                                                checkoutGroupExpandKey,
-                                                            pagerAtBottom: true,
-                                                            pageBarBottomPadding:
-                                                                0,
-                                                            separator: 8,
-                                                            pageBarBuilder:
-                                                                (bar) =>
-                                                                    _pageFooter(
-                                                                        context,
-                                                                        bar),
-                                                            resetKey: resetKey,
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .only(
-                                                                    top: 8,
-                                                                    bottom: 8),
-                                                            onRefresh:
-                                                                onRefresh,
-                                                            itemBuilder: (g) => OrderListRow(
-                                                                entry:
-                                                                    OrderListEntry(
-                                                                        g),
-                                                                table: table,
-                                                                selected:
-                                                                    checkoutGroupExpandKey(
-                                                                            g) ==
-                                                                        selectedKey,
-                                                                onOpen: () =>
-                                                                    onSelect(
-                                                                        checkoutGroupExpandKey(
-                                                                            g))),
-                                                          )),
-                                              ]);
-                                        }))))),
-                            if (selected != null) ...[
+        return ScrollCompactLayout(
+            resetKey: (selectedKey, resetKey),
+            collapseHeadingWhenCompact: !detailOpen,
+            builder: (context, compact) => PopScope<Object?>(
+                  canPop: !detailOpen,
+                  onPopInvokedWithResult: (didPop, result) {
+                    if (!didPop && detailOpen) onClose();
+                  },
+                  child: ColoredBox(
+                      color: OrderListColors.of(context).background,
+                      child: AnimatedPadding(
+                        duration: ScrollCompactLayout.motionDuration(context),
+                        curve: Curves.easeOutCubic,
+                        padding: EdgeInsets.fromLTRB(
+                            constraints.maxWidth >= 700 ? 20 : 12,
+                            compact
+                                ? 4
+                                : (constraints.maxWidth >= 700 ? 20 : 12),
+                            constraints.maxWidth >= 700 ? 20 : 12,
+                            detailOpen ? 20 : 4),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (loading)
+                                const LinearProgressIndicator(minHeight: 2),
+                              if (!detailOpen) ...[
+                                controls,
+                                SizedBox(height: compact ? 4 : 12)
+                              ],
                               Expanded(
-                                  flex: 1,
-                                  child: Column(
+                                  child: Row(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
-                                        Padding(
-                                            padding: const EdgeInsets.fromLTRB(
-                                                16, 8, 8, 8),
-                                            child: Row(children: [
-                                              IconButton(
-                                                  onPressed: onClose,
-                                                  tooltip: 'Volver a pedidos',
-                                                  icon: const Icon(
-                                                      Icons.arrow_back)),
-                                              Expanded(
-                                                  child: Text(
-                                                      'Pedido ${OrderListEntry(selected).reference}',
-                                                      style: TextStyle(
-                                                          fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color: AppColors
-                                                              .textPrimary))),
-                                            ])),
-                                        const SizedBox(height: 12),
-                                        Expanded(
-                                            child: SingleChildScrollView(
-                                                key: ValueKey(
-                                                    'order-detail-${checkoutGroupExpandKey(selected)}'),
-                                                padding: const EdgeInsets.only(
-                                                    bottom: 20),
-                                                child:
-                                                    detailBuilder(selected))),
-                                      ])),
-                            ],
-                          ])),
-                    ]),
-              )),
-        );
+                                    Flexible(
+                                        flex: detailOpen ? 0 : 1,
+                                        fit: detailOpen
+                                            ? FlexFit.loose
+                                            : FlexFit.tight,
+                                        child: Offstage(
+                                            offstage: detailOpen,
+                                            child: ConstrainedBox(
+                                                constraints: BoxConstraints(
+                                                    maxWidth:
+                                                        constraints.maxWidth),
+                                                child: _surface(context,
+                                                    LayoutBuilder(builder:
+                                                        (context,
+                                                            listConstraints) {
+                                                  final table = listConstraints
+                                                              .maxWidth >=
+                                                          900 &&
+                                                      MediaQuery.textScalerOf(
+                                                                  context)
+                                                              .scale(14) <
+                                                          20;
+                                                  return Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .stretch,
+                                                      children: [
+                                                        if (table)
+                                                          const OrderListColumnsHeader(),
+                                                        Expanded(
+                                                            child: groups
+                                                                    .isEmpty
+                                                                ? _OrdersEmpty(
+                                                                    onClear:
+                                                                        onClearFilters)
+                                                                : PagedItems<
+                                                                    List<
+                                                                        TransactionRequestModel>>(
+                                                                    items:
+                                                                        groups,
+                                                                    itemKey:
+                                                                        checkoutGroupExpandKey,
+                                                                    pagerAtBottom:
+                                                                        true,
+                                                                    pageBarBottomPadding:
+                                                                        0,
+                                                                    separator:
+                                                                        8,
+                                                                    pageBarBuilder: (bar) =>
+                                                                        _pageFooter(
+                                                                            context,
+                                                                            bar),
+                                                                    resetKey:
+                                                                        resetKey,
+                                                                    padding: const EdgeInsets
+                                                                        .only(
+                                                                        top: 8,
+                                                                        bottom:
+                                                                            8),
+                                                                    onRefresh:
+                                                                        onRefresh,
+                                                                    itemBuilder: (g) => OrderListRow(
+                                                                        entry: OrderListEntry(
+                                                                            g),
+                                                                        table:
+                                                                            table,
+                                                                        selected:
+                                                                            checkoutGroupExpandKey(g) ==
+                                                                                selectedKey,
+                                                                        onOpen: () =>
+                                                                            onSelect(checkoutGroupExpandKey(g))),
+                                                                  )),
+                                                      ]);
+                                                }))))),
+                                    if (selected != null) ...[
+                                      Expanded(
+                                          flex: 1,
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                AnimatedPadding(
+                                                    duration:
+                                                        ScrollCompactLayout
+                                                            .motionDuration(
+                                                                context),
+                                                    curve: Curves.easeOutCubic,
+                                                    padding:
+                                                        EdgeInsets.fromLTRB(
+                                                            16,
+                                                            compact ? 0 : 8,
+                                                            8,
+                                                            compact ? 0 : 8),
+                                                    child: Row(children: [
+                                                      IconButton(
+                                                          onPressed: onClose,
+                                                          tooltip:
+                                                              'Volver a pedidos',
+                                                          icon: const Icon(Icons
+                                                              .arrow_back)),
+                                                      Expanded(
+                                                          child: Text(
+                                                              'Pedido ${OrderListEntry(selected).reference}',
+                                                              style: TextStyle(
+                                                                  fontSize: 16,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  color: AppColors
+                                                                      .textPrimary))),
+                                                    ])),
+                                                SizedBox(
+                                                    height: compact ? 0 : 12),
+                                                Expanded(
+                                                    child: SingleChildScrollView(
+                                                        key: ValueKey(
+                                                            'order-detail-${checkoutGroupExpandKey(selected)}'),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(
+                                                                bottom: 20),
+                                                        child: detailBuilder(
+                                                            selected))),
+                                              ])),
+                                    ],
+                                  ])),
+                            ]),
+                      )),
+                ));
       });
 
   Widget _surface(BuildContext context, Widget child) =>

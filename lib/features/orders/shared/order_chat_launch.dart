@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'order_list_colors.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
@@ -98,7 +99,8 @@ Future<void> showOrderChatSheet({
               ),
               Row(
                 children: [
-                  const Icon(Icons.chat_bubble_outline, color: AppColors.brand, size: 20),
+                  const Icon(Icons.chat_bubble_outline,
+                      color: AppColors.brand, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -163,7 +165,8 @@ void openOrderChatForNotification({
   for (final cart in groupAliadoOrdersByCheckout(rows)) {
     if (!cart.any((row) => row.id == line.id)) continue;
     final chunks = groupCheckoutLinesByImportador(cart);
-    final groups = chunks.isEmpty ? <List<TransactionRequestModel>>[cart] : chunks;
+    final groups =
+        chunks.isEmpty ? <List<TransactionRequestModel>>[cart] : chunks;
     for (final group in groups) {
       if (group.any((row) => row.id == line.id)) {
         chunk = group;
@@ -198,10 +201,12 @@ class OrderChatIconButton extends StatelessWidget {
     super.key,
     required this.relatedOrderIds,
     required this.onOpen,
+    this.showLabel = false,
   });
 
   final List<String> relatedOrderIds;
   final VoidCallback onOpen;
+  final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +216,22 @@ class OrderChatIconButton extends StatelessWidget {
       listenable: listenable,
       builder: (context, _) {
         final unread = provider?.unreadMensajeCountFor(relatedOrderIds) ?? 0;
+        if (showLabel) {
+          final colors = OrderListColors.of(context);
+          return OutlinedButton.icon(
+            onPressed: onOpen,
+            icon: Icon(
+                unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                size: 18),
+            label: Text(unread > 0 ? 'Mensajes ($unread)' : 'Mensajes'),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: colors.accent,
+                minimumSize: const Size(0, 44),
+                side: BorderSide(color: colors.border),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
+          );
+        }
         return IconButton(
           tooltip: unread > 0 ? 'Chat ($unread sin leer)' : 'Chat del pedido',
           visualDensity: VisualDensity.compact,

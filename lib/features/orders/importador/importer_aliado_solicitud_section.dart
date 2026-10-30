@@ -28,12 +28,13 @@ List<PedidoProductoLineUi> transactionRequestLineasDesgloseForViewer(
   );
 }
 
-/// Tarjeta de una partida (nombre, SKU opcional, unds, REF).
+/// Tarjeta de una partida con la moneda acordada en el pedido.
 Widget pedidoProductoLineCard(
   BuildContext context,
   PedidoProductoLineUi p,
-  bool compact,
-) {
+  bool compact, {
+  String currencyLabel = 'REF',
+}) {
   final density = B2bOrderCardDensityScope.of(context);
   final web = density.isDesktop && compact;
   final sku = p.sku?.trim();
@@ -73,7 +74,7 @@ Widget pedidoProductoLineCard(
         ],
         const SizedBox(height: 2),
         Text(
-          '${p.cantidad} uds · ${formatRefAmount(p.precioRef)} REF',
+          '${p.cantidad} uds · ${formatRefAmount(p.precioRef)} $currencyLabel',
           style: TextStyle(
             fontSize: web ? 10.5 : (compact ? 11 : 11.5),
             fontWeight: FontWeight.w600,
@@ -144,7 +145,9 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
           if (showPrecioHelp && viewer == PedidoDesgloseViewer.importador) ...[
             const SizedBox(height: 4),
             Text(
-              'Precios en REF = precio lista del importador (con oferta o volumen si aplican).',
+              orderAmountCurrency(lines) == 'USD'
+                  ? 'Precios acordados para pago en divisas (USD).'
+                  : 'Precios en REF para pago en bolívares a la tasa BCV del pedido.',
               style: TextStyle(
                 fontSize: helpSize,
                 color: AppColors.textSecondary,
@@ -203,7 +206,8 @@ class _LineDesgloseBlock extends StatelessWidget {
       children: [
         for (var j = 0; j < partidas.length; j++) ...[
           if (j > 0) SizedBox(height: compact ? 4 : 6),
-          pedidoProductoLineCard(context, partidas[j], compact),
+          pedidoProductoLineCard(context, partidas[j], compact,
+              currencyLabel: line.amountCurrencyLabel),
         ],
       ],
     );
@@ -301,7 +305,9 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           if (!embedInOrderCard) ...[
             const SizedBox(height: 2),
             Text(
-              'REF = precio lista del importador (con oferta o volumen si aplican).',
+              r.amountCurrencyLabel == 'USD'
+                  ? 'Precios acordados para pago en divisas (USD).'
+                  : 'Precios en REF para pago en bolívares a la tasa BCV del pedido.',
               style: TextStyle(
                 fontSize: compact ? 9.5 : 10.5,
                 color: AppColors.textSecondary,
@@ -323,7 +329,8 @@ class ImporterAliadoSolicitudSection extends StatelessWidget {
           if (showRows)
             for (var i = 0; i < partidas.length; i++) ...[
               if (i > 0) SizedBox(height: compact ? 4 : 6),
-              pedidoProductoLineCard(context, partidas[i], compact),
+              pedidoProductoLineCard(context, partidas[i], compact,
+                  currencyLabel: r.amountCurrencyLabel),
             ],
         ],
       ),
@@ -385,7 +392,9 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
           if (!embedInOrderCard) ...[
             const SizedBox(height: 2),
             Text(
-              'REF = precio lista del importador (con oferta o volumen si aplican).',
+              orderAmountCurrency(lines) == 'USD'
+                  ? 'Precios acordados para pago en divisas (USD).'
+                  : 'Precios en REF para pago en bolívares a la tasa BCV del pedido.',
               style: TextStyle(
                 fontSize: compact ? 9.5 : 10.5,
                 color: AppColors.textSecondary,
@@ -423,14 +432,16 @@ class ImporterCheckoutBundleSolicitudSection extends StatelessWidget {
     final partidas =
         r.lineasProductoDesglose(forImportadorUserId: importadorUid);
     if (partidas.length == 1) {
-      return pedidoProductoLineCard(context, partidas.single, compact);
+      return pedidoProductoLineCard(context, partidas.single, compact,
+          currencyLabel: r.amountCurrencyLabel);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var j = 0; j < partidas.length; j++) ...[
           if (j > 0) SizedBox(height: compact ? 4 : 6),
-          pedidoProductoLineCard(context, partidas[j], compact),
+          pedidoProductoLineCard(context, partidas[j], compact,
+              currencyLabel: r.amountCurrencyLabel),
         ],
       ],
     );
@@ -441,7 +452,8 @@ String _totalRefEtiquetaPedidoAliado(TransactionRequestModel r) {
   final total = r.tieneDescuentoDivisasAplicadoEnPedido
       ? r.precioTotal
       : r.refBaseTotalForPago;
-  final buf = StringBuffer('${formatRefAmount(total)} ${r.amountCurrencyLabel}');
+  final buf =
+      StringBuffer('${formatRefAmount(total)} ${r.amountCurrencyLabel}');
   if (r.tieneDescuentoDivisasAplicadoEnPedido) {
     buf.write(' (antes ${formatRefAmount(r.refBaseTotalForPago)})');
   }

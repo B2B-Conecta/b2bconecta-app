@@ -48,7 +48,8 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
               color: AppColors.brandBlue.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,16 +112,20 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
                     _PasoChip(
                       label: '1. Factura',
                       done: chunk.any((r) => r.hasProveedorFactura),
-                      active: fase == AliadoImportadorPagoFase.esperandoFacturaProveedor,
+                      active: fase ==
+                          AliadoImportadorPagoFase.esperandoFacturaProveedor,
                     ),
-                    Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade500),
+                    Icon(Icons.chevron_right,
+                        size: 16, color: Colors.grey.shade500),
                     _PasoChip(
                       label: '2. Su pago',
                       done: fase == AliadoImportadorPagoFase.pagoConfirmado,
                       active: fase == AliadoImportadorPagoFase.pendientePago ||
-                          fase == AliadoImportadorPagoFase.comprobanteEnRevision,
+                          fase ==
+                              AliadoImportadorPagoFase.comprobanteEnRevision,
                     ),
-                    Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade500),
+                    Icon(Icons.chevron_right,
+                        size: 16, color: Colors.grey.shade500),
                     _PasoChip(
                       label: '3. Recepción',
                       done: chunk.every(
@@ -136,7 +141,7 @@ class AliadoImportadorPedidoBlock extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '$lineCount ${lineCount == 1 ? "línea" : "líneas"} · '
-                        'A pagar a este proveedor: ${formatRefAmount(monto)} REF',
+                        'A pagar a este proveedor: ${formatRefAmount(monto)} ${orderAmountCurrency(chunk)}',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -246,7 +251,8 @@ class _PasoChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg),
+            style:
+                TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg),
           ),
         ],
       ),

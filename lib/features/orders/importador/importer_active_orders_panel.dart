@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -554,32 +555,32 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         ),
     ];
     return LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 720) {
-            return _OrdersFiltersDisclosure(
-              summary: summary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < menus.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 12),
-                    menus[i],
-                  ],
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 720) {
+          return _OrdersFiltersDisclosure(
+            summary: summary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < menus.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  menus[i],
                 ],
-              ),
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < menus.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
-                Expanded(child: menus[i]),
               ],
-            ],
+            ),
           );
-        },
-      );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < menus.length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(child: menus[i]),
+            ],
+          ],
+        );
+      },
+    );
   }
 
   /// Agrupa por `checkout_group_id`; si un grupo tiene estados distintos, muestra tarjetas sueltas.
@@ -881,6 +882,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
+                padding: EdgeInsets.symmetric(horizontal: listPad),
+                child: OrdersListHeading(count: groups.length)),
+            Padding(
               padding: EdgeInsets.fromLTRB(listPad, 12, listPad, 0),
               child: TextField(
                 controller: _searchCtrl,
@@ -959,6 +963,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                       ],
                     )
                   : PagedItems(
+                      pagerAtBottom: true,
                       items: groups,
                       resetKey: Object.hash(
                         _scope,

@@ -1,26 +1,22 @@
+import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
-import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
-import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
-import 'package:motolink_pro_app/features/orders/importador/importer_order_date_badge.dart';
 import 'aliado_multi_importer_order_tabs.dart';
+import 'aliado_order_detail_view.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
 import 'package:motolink_pro_app/features/orders/shared/moroso_order_visual.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_guidance.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_direct_summary.dart';
-import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 
@@ -39,8 +35,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     this.expandedFooter,
     this.multiImporterPanelBuilder,
     this.ratingBar,
-    this.collapsedAccessory,
     this.onChatChanged,
+    this.workspaceDetail = false,
+    this.detailSectionsBuilder,
   });
 
   final TransactionRequestModel request;
@@ -48,6 +45,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   /// Varias filas del mismo carrito (mismo `checkout_group_id`). Si es una sola fila, dejar null.
   final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
+  final bool workspaceDetail;
+  final AliadoDetailSectionsBuilder? detailSectionsBuilder;
   final VoidCallback onToggle;
   final String statusLabel;
 
@@ -59,11 +58,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   final bool cancelarSolicitudPendienteBusy;
   final Widget? expandedFooter;
 
-  /// CTA de valoración (modal), visible sin expandir la ficha.
+  /// CTA de valoración, visible dentro del pedido abierto.
   final Widget? ratingBar;
-
-  /// Acciones visibles sin expandir (p. ej. aceptar/rechazar ajuste de cantidad).
-  final Widget? collapsedAccessory;
 
   /// Tras enviar o recibir un mensaje desde el chat.
   final VoidCallback? onChatChanged;
@@ -96,533 +92,306 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     final porImportador = useMultiImporterTabs
         ? groupCheckoutLinesByImportador(lines)
         : const <List<TransactionRequestModel>>[];
-    final String tracking;
-    final bool showHeadline;
-    if (isCheckoutGroup) {
-      final sameStatus = lines.every((x) => x.status == lines.first.status);
-      tracking = sameStatus
-          ? TransactionRequestStatus.aliadoTrackingHeadline(
-              lines.first.status,
-              canceladoPorAliado: lines.first.canceladoPorAliado,
-              canceladoPorImportador: lines.first.canceladoPorImportador,
-              anuladoPorMotolink: lines.first.anuladoPorMotolink,
-            )
-          : 'Varias líneas en distinto estado';
-      showHeadline = tracking.isNotEmpty && tracking != '—';
-    } else {
-      tracking = TransactionRequestStatus.aliadoTrackingHeadline(
-        r.status,
-        canceladoPorAliado: r.canceladoPorAliado,
-        canceladoPorImportador: r.canceladoPorImportador,
-        anuladoPorMotolink: r.anuladoPorMotolink,
+    final summary = OrderSummaryHeader(
+      lines: lines,
+      viewerRole: AppHomeRole.aliado,
+      expanded: expanded,
+      onToggle: onToggle,
+      statusLabel: statusLabel,
+      showToggle: !workspaceDetail,
+      detailSummary: workspaceDetail,
+      onCancel: onCancelarSolicitudPendiente != null &&
+              lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)
+          ? onCancelarSolicitudPendiente
+          : null,
+      cancelBusy: cancelarSolicitudPendienteBusy,
+      chatAction: OrderChatIconButton(
+        showLabel: workspaceDetail,
+        relatedOrderIds: lines.map((e) => e.id).toList(),
+        onOpen: () {
+          final counterpart = lines.first.ownerBusinessName?.trim();
+          showOrderChatSheet(
+            context: context,
+            transactionRequestId: lines.first.id,
+            mergedThreadRequestIds:
+                isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+            orderLines: lines,
+            allowReplyAsAliado: orderLinesAllowChatReply(lines),
+            allowReplyAsAdmin: false,
+            deliveryGrace: orderLinesChatDeliveryGrace(lines),
+            title: (counterpart != null && counterpart.isNotEmpty)
+                ? 'Chat · $counterpart'
+                : 'Chat del pedido',
+            onThreadChanged: onChatChanged,
+          );
+        },
+      ),
+    );
+    if (workspaceDetail && detailSectionsBuilder != null) {
+      return B2bOrderCardDensityScope(
+        density: density,
+        child: AliadoOrderDetailView(
+          key: ValueKey(checkoutGroupExpandKey(lines)),
+          lines: lines,
+          summary: summary,
+          sectionsBuilder: detailSectionsBuilder!,
+        ),
       );
-      showHeadline = tracking.isNotEmpty && tracking != '—';
     }
-
-    final fechaLabel = isCheckoutGroup
-        ? ImporterOrderDate.etiquetaGrupo(lines)
-        : ImporterOrderDate.etiquetaFecha(r);
-    final fechaActiva = isCheckoutGroup
-        ? lines.any(ImporterOrderDate.isAbierto)
-        : ImporterOrderDate.isAbierto(r);
-
     return B2bOrderCardDensityScope(
       density: density,
-      child: Card(
-      margin: EdgeInsets.only(bottom: density.cardMarginBottom),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: Padding(
-                padding: density.cardHeaderPadding,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: onToggle,
-                        child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              ImporterOrderDateBadge(
-                                label: fechaLabel,
-                                isActive: fechaActiva,
-                              ),
-                              const Spacer(),
-                              OrderStatusHeaderChips(
-                                statusLabel: statusLabel,
-                                showMoroso: isCheckoutGroup
-                                    ? lines.any((x) => x.esPedidoMoroso)
-                                    : r.esPedidoMoroso,
-                              ),
-                            ],
-                          ),
-                          OrderPostventaHeaderMarks(lines: lines),
-                          SizedBox(height: density.isDesktop ? 6 : 8),
-                          if (expanded && showHeadline) ...[
-                            Text(
-                              tracking,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: density.trackingHeadlineSize,
-                                color: isCheckoutGroup &&
-                                        !lines.every((x) =>
-                                            x.status == lines.first.status)
-                                    ? AppColors.brandBlue
-                                    : r.status ==
-                                            TransactionRequestStatus.rechazado
-                                        ? Colors.red.shade800
-                                        : r.status ==
-                                                TransactionRequestStatus
-                                                    .entregado
-                                            ? Colors.green.shade800
-                                            : AppColors.brandBlue,
-                              ),
-                            ),
-                            SizedBox(height: density.isDesktop ? 2 : 4),
-                          ],
-                          if (isCheckoutGroup)
-                            Text(
-                              tituloCheckoutGrupoAliado(lines),
-                              maxLines: expanded ? 3 : 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: density.productTitleSize,
-                              ),
-                            ),
-                          if (isCheckoutGroup &&
-                              distinctImporterIds.length > 1) ...[
-                            SizedBox(height: density.isDesktop ? 4 : 6),
-                            _MultiImporterPagoResumenChip(lines: lines),
-                          ],
-                          OrderCardDirectSummary(
-                            lines: lines,
-                            viewerRole: AppHomeRole.aliado,
-                            compact: !expanded,
-                          ),
-                          SizedBox(height: density.isDesktop ? 2 : 4),
-                          Text(
-                            isCheckoutGroup
-                                ? _checkoutGroupResumen(lines)
-                                : _lineaPrecioResumenAliado(r),
-                            style: TextStyle(
-                              fontSize: density.metaTextSize,
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (!isCheckoutGroup &&
-                              r.tieneDescuentoDivisasAplicadoEnPedido) ...[
-                            const SizedBox(height: 4),
-                            _DescuentoDivisasFichaChip(request: r),
-                          ],
-                          if (!isCheckoutGroup &&
-                              r.aliadoPagoEstadoResumenEs != null &&
-                              !r.pedidoEntregadoYPagado &&
-                              !r.pagoMotolinkPendienteTrasEntrega) ...[
-                            SizedBox(height: density.isDesktop ? 2 : 4),
-                            Text(
-                              r.aliadoPagoEstadoResumenEs!,
-                              style: TextStyle(
-                                fontSize: density.secondaryTextSize,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.brandBlue.withOpacity(0.95),
-                                height: 1.25,
-                              ),
-                            ),
-                          ],
-                          if (!expanded &&
-                              !isCheckoutGroup &&
-                              r.pedidoEntregadoYPagado) ...[
-                            const SizedBox(height: 6),
-                            OrderCardCompactNoticeChip(
-                              label: 'Entregado y pagado',
-                              icon: Icons.check_circle_outline,
-                              color: Colors.green.shade800,
-                            ),
-                          ] else if (!isCheckoutGroup && r.esPedidoMoroso) ...[
-                            const SizedBox(height: 8),
-                            MorosoOrderCardNotice(
-                              request: r,
-                              expanded: expanded,
-                              aliadoViewer: true,
-                              riskWarningChild: r
-                                      .pagoPendienteRiesgoCuentaTresDiasHabiles
-                                  ? Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: Colors.red.shade200,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '>3 días hábiles sin pago: posible restricción de nuevos pedidos.',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          height: 1.3,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.red.shade900,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                          ],
-                          if (!expanded) ...[
-                            const SizedBox(height: 6),
-                            if (isCheckoutGroup)
-                              ..._checkoutGroupEtaChips(lines)
-                            else
-                              AliadoTransitEtaChip(request: r),
-                          ],
-                        ],
-                      ),
-                    ),
-                    ),
-                    OrderChatIconButton(
-                      relatedOrderIds: lines.map((e) => e.id).toList(),
-                      onOpen: () {
-                        final counterpart =
-                            lines.first.ownerBusinessName?.trim();
-                        showOrderChatSheet(
-                          context: context,
-                          transactionRequestId: lines.first.id,
-                          mergedThreadRequestIds: isCheckoutGroup
-                              ? lines.map((e) => e.id).toList()
-                              : null,
-                          orderLines: lines,
-                          allowReplyAsAliado: orderLinesAllowChatReply(lines),
-                          allowReplyAsAdmin: false,
-                          deliveryGrace: orderLinesChatDeliveryGrace(lines),
-                          title: (counterpart != null && counterpart.isNotEmpty)
-                              ? 'Chat · $counterpart'
-                              : 'Chat del pedido',
-                          onThreadChanged: onChatChanged,
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          OrderCardGuidance(
-            expanded: expanded,
-            onToggle: onToggle,
-          ),
-          if (ratingBar != null) ratingBar!,
-          if (collapsedAccessory != null) ...[
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                density.cardExpandedPadding.left,
-                0,
-                density.cardExpandedPadding.right,
-                density.isDesktop ? 6 : 8,
-              ),
-              child: collapsedAccessory!,
-            ),
-          ],
-          if (onCancelarSolicitudPendiente != null &&
-              lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)) ...[
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                density.cardExpandedPadding.left,
-                0,
-                density.cardExpandedPadding.right,
-                density.isDesktop ? 6 : 8,
-              ),
-              child: Row(
-                children: [
-                  if (density.isDesktop)
-                    OutlinedButton.icon(
-                      onPressed: cancelarSolicitudPendienteBusy
-                          ? null
-                          : onCancelarSolicitudPendiente,
-                      icon: cancelarSolicitudPendienteBusy
-                          ? SizedBox(
-                              width: density.buttonIconSize,
-                              height: density.buttonIconSize,
-                              child: const CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(Icons.delete_outline, size: density.buttonIconSize),
-                      label: Text(
-                        cancelarSolicitudPendienteBusy
-                            ? 'Cancelando…'
-                            : isCheckoutGroup
-                                ? 'Cancelar carrito'
-                                : 'Cancelar pedido',
-                      ),
-                      style: density.outlinedButtonStyle(
-                        foregroundColor: Colors.red.shade800,
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: cancelarSolicitudPendienteBusy
-                            ? null
-                            : onCancelarSolicitudPendiente,
-                        icon: cancelarSolicitudPendienteBusy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.delete_outline, size: 20),
-                        label: Text(
-                          cancelarSolicitudPendienteBusy
-                              ? 'Cancelando…'
-                              : isCheckoutGroup
-                                  ? 'Cancelar carrito'
-                                  : 'Cancelar pedido',
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red.shade800,
-                        ),
-                      ),
-                    ),
-                  ProfileInfoIcon(
-                    title: 'Cancelar pedido',
-                    message: OrderSectionHelp.aliadoCancelPending,
-                    iconSize: density.isDesktop ? 16 : 18,
-                  ),
-                ],
-              ),
-            ),
-          ],
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeInOut,
-            alignment: Alignment.topCenter,
-            child: expanded
-                ? B2bOrdersPanelLayout.expandedContent(
-                    context,
-                    Builder(
-                      builder: (ctx) {
-                        final sectionGap = B2bOrdersPanelLayout.sectionGap(
-                          MediaQuery.sizeOf(ctx).width,
-                        );
-                        return Padding(
-                    padding: density.cardExpandedPadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: onToggle,
-                            icon: Icon(Icons.close, size: density.isDesktop ? 16 : 18),
-                            label: const Text('Cerrar'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.textSecondary,
-                              visualDensity: density.buttonVisualDensity,
-                              textStyle: TextStyle(fontSize: density.buttonTextSize),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: sectionGap),
-                        if (expandedLeading != null) expandedLeading!,
-                        if (isCheckoutGroup &&
-                            lines.any((x) => x.esPedidoMoroso)) ...[
-                          const SizedBox(height: 8),
-                          MorosoOrderCardNotice(
-                            request: lines.firstWhere(
-                              (x) => x.esPedidoMoroso,
-                              orElse: () => lines.first,
-                            ),
-                            expanded: true,
-                            aliadoViewer: true,
-                          ),
-                        ],
-                        if (isCheckoutGroup) ...[
-                          if (useMultiImporterTabs) ...[
-                            AliadoPedidoMaestroHeader(
-                              allLines: lines,
-                              porImportador: porImportador,
-                            ),
-                            SizedBox(height: sectionGap),
-                          ],
-                          OrderCardCollapsibleSection(
-                            title: 'Entrega',
-                            subtitle: lines.first.destinoEntregaLineaCompactaEs,
-                            child: TransactionRequestDestinoEntregaSection(
-                              request: lines.first,
-                              hideSectionTitle: true,
-                            ),
-                          ),
-                          if (!useMultiImporterTabs) ...[
-                            SizedBox(height: sectionGap),
-                            if (consolidarDatosImportador)
-                              OrderCardCollapsibleSection(
-                                title: 'Importador',
-                                subtitle: orderCardPartySubtitle(
-                                  businessName: lines.first.ownerBusinessName,
-                                  ciudad: lines.first.ownerCiudad,
-                                  estado: lines.first.ownerEstado,
-                                ),
-                                child: TransactionRequestImporterContactSection(
-                                  request: lines.first,
-                                  embedded: true,
-                                ),
-                              ),
-                            if (consolidarDatosImportador)
-                              SizedBox(height: sectionGap),
-                            OrderCardCollapsibleSection(
-                              title: 'Productos',
-                              subtitle: orderCardProductosSubtitle(
-                                lines,
-                                viewer: PedidoDesgloseViewer.aliado,
-                              ),
-                              initiallyExpanded:
-                                  orderCardProductsInitiallyExpanded(
-                                lines.first.status,
-                              ),
-                              child: TransactionRequestProductosDesgloseSection(
-                                lines: lines,
-                                compact: true,
-                                viewer: PedidoDesgloseViewer.aliado,
-                                showPrecioHelp: false,
-                                showImporterGroupHeaders: true,
-                                hideSectionTitle: true,
-                              ),
-                            ),
-                            SizedBox(height: sectionGap),
-                            OrderCardCollapsibleSection(
-                              title: 'Seguimiento',
-                              subtitle: orderCardTimelineSubtitle(
-                                lines.first,
-                                aliadoViewer: true,
-                              ),
-                              initiallyExpanded:
-                                  orderCardTimelineInitiallyExpanded(
-                                lines.first,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (checkoutGroupMismoEstadoEnvio(lines)) ...[
-                                    ..._checkoutGroupEtaBanners(lines),
-                                    CourierTimelineWidget(
-                                      request: lines.first,
-                                      compact: true,
-                                      viewerRole: AppHomeRole.aliado,
-                                      showHeading: false,
-                                      embedded: true,
-                                    ),
-                                    ..._postTimelineBloquesAliado(
-                                      lines: lines,
-                                      consolidarDatosImportador:
-                                          consolidarDatosImportador,
-                                    ),
-                                  ] else
-                                    ..._postTimelineBloquesAliado(
-                                      lines: lines,
-                                      consolidarDatosImportador:
-                                          consolidarDatosImportador,
-                                      timelinePorLinea: true,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            SizedBox(height: sectionGap),
-                            AliadoMultiImporterOrderTabs(
-                              allLines: lines,
-                              porImportador: porImportador,
-                              importerPanelBuilder: multiImporterPanelBuilder!,
-                            ),
-                          ],
-                        ] else ...[
-                          OrderCardCollapsibleSection(
-                            title: 'Importador',
-                            subtitle: orderCardPartySubtitle(
-                              businessName: r.ownerBusinessName,
-                              ciudad: r.ownerCiudad,
-                              estado: r.ownerEstado,
-                            ),
-                            child: TransactionRequestImporterContactSection(
-                              request: r,
-                              embedded: true,
-                            ),
-                          ),
-                          SizedBox(height: sectionGap),
-                          OrderCardCollapsibleSection(
-                            title: 'Entrega',
-                            subtitle: r.destinoEntregaLineaCompactaEs,
-                            child: TransactionRequestDestinoEntregaSection(
-                              request: r,
-                              hideSectionTitle: true,
-                            ),
-                          ),
-                          SizedBox(height: sectionGap),
-                          OrderCardCollapsibleSection(
-                            title: 'Productos',
-                            subtitle: orderCardProductosSubtitle(
-                              [r],
-                              viewer: PedidoDesgloseViewer.aliado,
-                            ),
-                            initiallyExpanded: orderCardProductsInitiallyExpanded(
-                              r.status,
-                            ),
-                            child: TransactionRequestProductosDesgloseSection(
-                              lines: <TransactionRequestModel>[r],
-                              compact: true,
-                              viewer: PedidoDesgloseViewer.aliado,
-                              showPrecioHelp: false,
-                              hideSectionTitle: true,
-                            ),
-                          ),
-                          SizedBox(height: sectionGap),
-                          OrderCardCollapsibleSection(
-                            title: 'Seguimiento',
-                            subtitle: orderCardTimelineSubtitle(
-                              r,
-                              aliadoViewer: true,
-                            ),
-                            initiallyExpanded:
-                                orderCardTimelineInitiallyExpanded(r),
+      child: _AliadoOrderSurface(
+        embedded: workspaceDetail,
+        margin: EdgeInsets.only(bottom: density.cardMarginBottom),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            summary,
+            if (workspaceDetail) OrderFulfilmentProgress(lines: lines),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: expanded
+                  ? B2bOrdersPanelLayout.expandedContent(
+                      context,
+                      Builder(
+                        builder: (ctx) {
+                          final sectionGap = B2bOrdersPanelLayout.sectionGap(
+                            MediaQuery.sizeOf(ctx).width,
+                          );
+                          return Padding(
+                            padding: density.cardExpandedPadding,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                AliadoTransitEtaBanner(request: r),
-                                const SizedBox(height: 8),
-                                CourierTimelineWidget(
-                                  request: r,
-                                  compact: true,
-                                  viewerRole: AppHomeRole.aliado,
-                                  showHeading: false,
-                                  embedded: true,
-                                ),
+                                if (!workspaceDetail)
+                                  SizedBox(height: sectionGap),
+                                if (expandedLeading != null) expandedLeading!,
+                                if (!useMultiImporterTabs &&
+                                    expandedFooter != null) ...[
+                                  if (!workspaceDetail)
+                                    SizedBox(height: sectionGap),
+                                  expandedFooter!,
+                                ],
+                                if (lines.any((x) => x.esPedidoMoroso)) ...[
+                                  const SizedBox(height: 8),
+                                  MorosoOrderCardNotice(
+                                    request: lines.firstWhere(
+                                      (x) => x.esPedidoMoroso,
+                                      orElse: () => lines.first,
+                                    ),
+                                    expanded: true,
+                                    aliadoViewer: true,
+                                  ),
+                                ],
+                                if (isCheckoutGroup) ...[
+                                  if (useMultiImporterTabs) ...[
+                                    AliadoPedidoMaestroHeader(
+                                      allLines: lines,
+                                      porImportador: porImportador,
+                                    ),
+                                    SizedBox(height: sectionGap),
+                                  ],
+                                  OrderCardCollapsibleSection(
+                                    title: 'Entrega',
+                                    subtitle: lines
+                                        .first.destinoEntregaLineaCompactaEs,
+                                    child:
+                                        TransactionRequestDestinoEntregaSection(
+                                      request: lines.first,
+                                      hideSectionTitle: true,
+                                    ),
+                                  ),
+                                  if (!useMultiImporterTabs) ...[
+                                    SizedBox(height: sectionGap),
+                                    if (consolidarDatosImportador)
+                                      OrderCardCollapsibleSection(
+                                        title: 'Importador',
+                                        subtitle: orderCardPartySubtitle(
+                                          businessName:
+                                              lines.first.ownerBusinessName,
+                                          ciudad: lines.first.ownerCiudad,
+                                          estado: lines.first.ownerEstado,
+                                        ),
+                                        child:
+                                            TransactionRequestImporterContactSection(
+                                          request: lines.first,
+                                          embedded: true,
+                                        ),
+                                      ),
+                                    if (consolidarDatosImportador)
+                                      SizedBox(height: sectionGap),
+                                    OrderCardCollapsibleSection(
+                                      title: 'Productos',
+                                      subtitle: orderCardProductosSubtitle(
+                                        lines,
+                                        viewer: PedidoDesgloseViewer.aliado,
+                                      ),
+                                      initiallyExpanded:
+                                          orderCardProductsInitiallyExpanded(
+                                        lines.first.status,
+                                      ),
+                                      child:
+                                          TransactionRequestProductosDesgloseSection(
+                                        lines: lines,
+                                        compact: true,
+                                        viewer: PedidoDesgloseViewer.aliado,
+                                        showPrecioHelp: false,
+                                        showImporterGroupHeaders: true,
+                                        hideSectionTitle: true,
+                                      ),
+                                    ),
+                                    SizedBox(height: sectionGap),
+                                    OrderCardCollapsibleSection(
+                                      title: 'Seguimiento',
+                                      subtitle: orderCardTimelineSubtitle(
+                                        lines.first,
+                                        aliadoViewer: true,
+                                      ),
+                                      initiallyExpanded:
+                                          orderCardTimelineInitiallyExpanded(
+                                        lines.first,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (checkoutGroupMismoEstadoEnvio(
+                                              lines)) ...[
+                                            ..._checkoutGroupEtaBanners(lines),
+                                            CourierTimelineWidget(
+                                              request: lines.first,
+                                              compact: true,
+                                              viewerRole: AppHomeRole.aliado,
+                                              showHeading: false,
+                                              embedded: true,
+                                            ),
+                                            ..._postTimelineBloquesAliado(
+                                              lines: lines,
+                                              consolidarDatosImportador:
+                                                  consolidarDatosImportador,
+                                            ),
+                                          ] else
+                                            ..._postTimelineBloquesAliado(
+                                              lines: lines,
+                                              consolidarDatosImportador:
+                                                  consolidarDatosImportador,
+                                              timelinePorLinea: true,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    SizedBox(height: sectionGap),
+                                    AliadoMultiImporterOrderTabs(
+                                      allLines: lines,
+                                      porImportador: porImportador,
+                                      importerPanelBuilder:
+                                          multiImporterPanelBuilder!,
+                                    ),
+                                  ],
+                                ] else ...[
+                                  OrderCardCollapsibleSection(
+                                    title: 'Importador',
+                                    subtitle: orderCardPartySubtitle(
+                                      businessName: r.ownerBusinessName,
+                                      ciudad: r.ownerCiudad,
+                                      estado: r.ownerEstado,
+                                    ),
+                                    child:
+                                        TransactionRequestImporterContactSection(
+                                      request: r,
+                                      embedded: true,
+                                    ),
+                                  ),
+                                  SizedBox(height: sectionGap),
+                                  OrderCardCollapsibleSection(
+                                    title: 'Entrega',
+                                    subtitle: r.destinoEntregaLineaCompactaEs,
+                                    child:
+                                        TransactionRequestDestinoEntregaSection(
+                                      request: r,
+                                      hideSectionTitle: true,
+                                    ),
+                                  ),
+                                  SizedBox(height: sectionGap),
+                                  OrderCardCollapsibleSection(
+                                    title: 'Productos',
+                                    subtitle: orderCardProductosSubtitle(
+                                      [r],
+                                      viewer: PedidoDesgloseViewer.aliado,
+                                    ),
+                                    initiallyExpanded:
+                                        orderCardProductsInitiallyExpanded(
+                                      r.status,
+                                    ),
+                                    child:
+                                        TransactionRequestProductosDesgloseSection(
+                                      lines: <TransactionRequestModel>[r],
+                                      compact: true,
+                                      viewer: PedidoDesgloseViewer.aliado,
+                                      showPrecioHelp: false,
+                                      hideSectionTitle: true,
+                                    ),
+                                  ),
+                                  SizedBox(height: sectionGap),
+                                  OrderCardCollapsibleSection(
+                                    title: 'Seguimiento',
+                                    subtitle: orderCardTimelineSubtitle(
+                                      r,
+                                      aliadoViewer: true,
+                                    ),
+                                    initiallyExpanded:
+                                        orderCardTimelineInitiallyExpanded(r),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        AliadoTransitEtaBanner(request: r),
+                                        const SizedBox(height: 8),
+                                        CourierTimelineWidget(
+                                          request: r,
+                                          compact: true,
+                                          viewerRole: AppHomeRole.aliado,
+                                          showHeading: false,
+                                          embedded: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
-                          ),
-                        ],
-                        if (!useMultiImporterTabs &&
-                            expandedFooter != null) ...[
-                          SizedBox(height: sectionGap),
-                          expandedFooter!,
-                        ],
-                      ],
-                    ),
-                  );
-                      },
-                    ),
-                )
-                : const SizedBox.shrink(),
-          ),
-        ],
+                          );
+                        },
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            if (expanded && ratingBar != null) ratingBar!,
+          ],
+        ),
       ),
-    ),
     );
   }
+}
+
+class _AliadoOrderSurface extends StatelessWidget {
+  const _AliadoOrderSurface(
+      {required this.embedded,
+      required this.margin,
+      required this.clipBehavior,
+      required this.child});
+  final bool embedded;
+  final EdgeInsetsGeometry margin;
+  final Clip clipBehavior;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => embedded
+      ? child
+      : Card(margin: margin, clipBehavior: clipBehavior, child: child);
 }
 
 /// Tras el timeline: contacto por importador (si no está unificado arriba) y bloques de recogida por línea en tránsito.
@@ -715,7 +484,8 @@ class _MultiImporterPagoResumenChip extends StatelessWidget {
 }
 
 String _lineaPrecioResumenAliado(TransactionRequestModel r) {
-  final buf = StringBuffer('${formatRefAmount(r.precioTotal)} REF');
+  final buf = StringBuffer(
+      '${formatRefAmount(r.precioTotal)} ${r.amountCurrencyLabel}');
   if (r.tieneDescuentoDivisasAplicadoEnPedido) {
     buf.write(' (antes ${formatRefAmount(r.refBaseTotalForPago)})');
   }
@@ -739,7 +509,8 @@ class _DescuentoDivisasFichaChip extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Chip(
-        avatar: Icon(Icons.savings_outlined, size: 16, color: Colors.green.shade800),
+        avatar: Icon(Icons.savings_outlined,
+            size: 16, color: Colors.green.shade800),
         label: Text(
           'Descuento divisas · ${PagoMetodo.labelEs(metodo)}',
           style: TextStyle(
@@ -774,7 +545,7 @@ String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
     buf.write(' · ~${formatVesAmount(sumBs)} Bs');
   }
   if (lines.any(
-    (r) => r.discountRules != null && r.discountRules!.isNotEmpty,
+    (r) => r.hasAppliedVolumeDiscount,
   )) {
     buf.write(' · descuentos volumen en ficha');
   }

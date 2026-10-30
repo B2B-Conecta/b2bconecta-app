@@ -409,6 +409,9 @@ class TransactionRequestModel {
   bool get hasCheckoutPriceSnapshot =>
       discountRules?['checkout_pricing_version']?.toString() == '1';
 
+  bool get hasAppliedVolumeDiscount =>
+      (appliedVolumeDiscountPctFromSnapshot(discountRules) ?? 0) > 0;
+
   String get amountCurrencyLabel =>
       hasCheckoutPriceSnapshot && metodoPagoMoneda == 'DIVISAS' ? 'USD' : 'REF';
 

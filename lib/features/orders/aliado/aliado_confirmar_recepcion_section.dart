@@ -20,21 +20,23 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
 
     final varios = bloques.length > 1;
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final tealInk = dark ? const Color(0xFF80CBC4) : Colors.teal.shade900;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
-        color: Colors.teal.shade50,
+        color: AppColors.tealSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade300, width: 1.2),
+        border: Border.all(color: AppColors.borderSubtle, width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Icon(Icons.inventory_2_outlined, color: Colors.teal.shade800, size: 22),
+              Icon(Icons.inventory_2_outlined, color: tealInk, size: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -44,7 +46,7 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
-                    color: Colors.teal.shade900,
+                    color: tealInk,
                   ),
                 ),
               ),

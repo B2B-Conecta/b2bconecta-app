@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_controller.dart';
 import 'package:motolink_pro_app/core/layout/aliado_bottom_nav.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/commissions/admin_commission_settlements_panel.dart';
@@ -543,7 +544,10 @@ class _MainShellState extends State<MainShell> {
 
   Widget _aliadoCartTopBarAction() {
     return ListenableBuilder(
-      listenable: CartService.instance,
+      listenable: Listenable.merge([
+        CartService.instance,
+        ThemeController.instance,
+      ]),
       builder: (context, _) {
         final n = CartService.instance.itemCount;
         return HeaderIconButton(
@@ -687,38 +691,45 @@ class _MainShellState extends State<MainShell> {
     List<Widget> trailingActions = const [],
     Widget Function(bool extended)? railStatusBuilder,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_showAliadoAccessApprovedBanner && role == AppHomeRole.aliado)
-          AliadoAccessApprovedBanner(
-            message: _aliadoAccessApprovedMessage,
-            onDismiss: _dismissAliadoAccessApprovedBanner,
-            compact: true,
-          ),
-        if (role == AppHomeRole.importador && _dailyStoreNotice != null)
-          ImporterDailyStoreNoticeBanner(
-            notice: _dailyStoreNotice!,
-            onDismiss: () => setState(() => _dailyStoreNotice = null),
-          ),
-        Expanded(
-          child: B2bDesktopShell(
-            selectedIndex: _tabIndex,
-            onDestinationSelected: (i) => _onB2bTabSelected(i, role),
-            destinations: destinations,
-            pages: _b2bPages(role: role, desktop: true),
-            profile: _profile,
-            unreadNotifications: _notifications.unreadCount,
-            onNotificationTap: _openNotificationCenter,
-            onMessagesTap: _openMessagesInbox,
-            unreadMessages: _notifications.unreadChatCount,
-            onOpenSettings: _openAccountSettings,
-            railBadgeLabel: railBadgeLabel,
-            trailingActions: trailingActions,
-            railStatusBuilder: railStatusBuilder,
-          ),
-        ),
-      ],
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        AppColors.brightness = ThemeController.instance.effectiveBrightness;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_showAliadoAccessApprovedBanner && role == AppHomeRole.aliado)
+              AliadoAccessApprovedBanner(
+                message: _aliadoAccessApprovedMessage,
+                onDismiss: _dismissAliadoAccessApprovedBanner,
+                compact: true,
+              ),
+            if (role == AppHomeRole.importador && _dailyStoreNotice != null)
+              ImporterDailyStoreNoticeBanner(
+                notice: _dailyStoreNotice!,
+                onDismiss: () => setState(() => _dailyStoreNotice = null),
+              ),
+            Expanded(
+              child: B2bDesktopShell(
+                selectedIndex: _tabIndex,
+                onDestinationSelected: (i) => _onB2bTabSelected(i, role),
+                destinations: destinations,
+                // Nuevas instancias de página → IndexedStack redibuja con AppColors actual.
+                pages: _b2bPages(role: role, desktop: true),
+                profile: _profile,
+                unreadNotifications: _notifications.unreadCount,
+                onNotificationTap: _openNotificationCenter,
+                onMessagesTap: _openMessagesInbox,
+                unreadMessages: _notifications.unreadChatCount,
+                onOpenSettings: _openAccountSettings,
+                railBadgeLabel: railBadgeLabel,
+                trailingActions: trailingActions,
+                railStatusBuilder: railStatusBuilder,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -726,7 +737,11 @@ class _MainShellState extends State<MainShell> {
     required AppHomeRole role,
     required List<BottomNavigationBarItem> navItems,
   }) {
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        AppColors.brightness = ThemeController.instance.effectiveBrightness;
+        return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -774,6 +789,8 @@ class _MainShellState extends State<MainShell> {
                 items: navItems,
               ),
             ),
+    );
+      },
     );
   }
 

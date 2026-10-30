@@ -41,6 +41,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.onThreadChanged,
     this.ratingBar,
     this.aliadoCreditRemaining,
+    this.workspaceDetail = false,
   });
 
   final TransactionRequestModel request;
@@ -49,6 +50,9 @@ class ImporterExpandableOrderCard extends StatelessWidget {
 
   /// Fila elegida en el master-detail de escritorio.
   final bool highlighted;
+
+  /// Detalle a pantalla completa vía [OrderWorkspace] (sin accordion).
+  final bool workspaceDetail;
   final VoidCallback onToggle;
   final String statusLabel;
   final String? operationalHeadline;
@@ -102,14 +106,21 @@ class ImporterExpandableOrderCard extends StatelessWidget {
         ? lines.any((x) => x.pagoPendienteRiesgoCuentaTresDiasHabiles)
         : r.pagoPendienteRiesgoCuentaTresDiasHabiles;
 
+    final showBody = workspaceDetail || expanded;
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: workspaceDetail
+          ? EdgeInsets.zero
+          : const EdgeInsets.only(bottom: 10),
       elevation: 0,
       color: highlighted ? AppColors.brandBlueContainer : null,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(workspaceDetail ? 16 : 14),
         side: BorderSide(
-          color: highlighted ? AppColors.brand : AppColors.borderSubtle,
+          color: highlighted
+              ? AppColors.brand
+              : workspaceDetail
+                  ? AppColors.borderSubtle
+                  : AppColors.borderSubtle,
           width: highlighted ? 1.4 : 1,
         ),
       ),
@@ -120,12 +131,15 @@ class ImporterExpandableOrderCard extends StatelessWidget {
           OrderSummaryHeader(
             lines: lines,
             viewerRole: AppHomeRole.importador,
-            expanded: expanded,
+            expanded: showBody,
             onToggle: onToggle,
             statusLabel: statusLabel,
+            showToggle: !workspaceDetail,
+            detailSummary: workspaceDetail,
             onCancel: canCancelByImporter ? onCancelByImporter : null,
             cancelBusy: cancelBusy,
             chatAction: OrderChatIconButton(
+              showLabel: workspaceDetail,
               relatedOrderIds: lines.map((e) => e.id).toList(),
               onOpen: () => _openChat(context, lines, isCheckoutGroup),
             ),
@@ -143,7 +157,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-          if (expanded &&
+          if (showBody &&
               (canNotifyQtyAdjustment || qtyAdjustmentDisabledHint != null))
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
@@ -171,10 +185,11 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               ),
             ),
           AnimatedSize(
-            duration: const Duration(milliseconds: 220),
+            duration: Duration(
+                milliseconds: workspaceDetail ? 0 : 220),
             curve: Curves.easeInOut,
             alignment: Alignment.topCenter,
-            child: expanded
+            child: showBody
                 ? Padding(
                     padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                     child: Column(
@@ -358,24 +373,27 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                           const SizedBox(height: 12),
                           expandedFooter!,
                         ],
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: onToggle,
-                            icon: const Icon(Icons.keyboard_arrow_up, size: 20),
-                            label: const Text('Ocultar detalle'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.textSecondary,
+                        if (!workspaceDetail) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: onToggle,
+                              icon:
+                                  const Icon(Icons.keyboard_arrow_up, size: 20),
+                              label: const Text('Ocultar detalle'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   )
                 : const SizedBox.shrink(),
           ),
-          if (expanded && ratingBar != null) ratingBar!,
+          if (showBody && ratingBar != null) ratingBar!,
         ],
       ),
     );

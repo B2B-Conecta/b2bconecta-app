@@ -221,9 +221,38 @@ void main() {
     ]))));
     await tester.pump();
     expect(find.text('12.00 REF'), findsOneWidget);
-    expect(find.text('20.00 REF'), findsOneWidget);
+    // Solo divisas: el precio de lista se etiqueta USD (sin incentivo %).
+    expect(find.text('20.00 USD'), findsOneWidget);
+    expect(find.text('20.00 REF'), findsNothing);
+    expect(find.text('Bs 200,00'), findsNothing);
     expect(find.text('Precio USD'), findsNothing);
     expect(find.textContaining('19.00 USD'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'solo-divisas list price shows as USD without Bs and keeps promo USD first',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+            body: Column(children: [
+      CatalogProductPriceDisplay(
+          listPriceUsd: 12,
+          catalogGrid: true,
+          bcvRate: 10,
+          ownerPagoSoloDivisas: true),
+      CatalogProductPriceDisplay(
+          listPriceUsd: 12,
+          salePriceUsd: 10,
+          catalogGrid: true,
+          bcvRate: 10,
+          ownerPagoSoloDivisas: true),
+    ]))));
+    await tester.pump();
+    expect(find.text('12.00 USD'), findsWidgets);
+    expect(find.text('10.00 USD'), findsOneWidget);
+    expect(find.textContaining('REF'), findsNothing);
+    expect(find.textContaining('Bs '), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

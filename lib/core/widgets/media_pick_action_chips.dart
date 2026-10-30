@@ -86,9 +86,9 @@ class MediaPickActionChips extends StatelessWidget {
       icon: const Icon(Icons.attach_file, size: 18),
       label: Text(buttonLabel),
       style: OutlinedButton.styleFrom(
-        foregroundColor: active ? AppColors.brand : AppColors.textMuted,
+        foregroundColor: active ? AppColors.brandLink : AppColors.textMuted,
         side: BorderSide(
-          color: active ? AppColors.brand : AppColors.borderSubtle,
+          color: active ? AppColors.brandLink : AppColors.borderSubtle,
         ),
         visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
         minimumSize: Size(compact ? 0 : double.infinity, compact ? 32 : 44),

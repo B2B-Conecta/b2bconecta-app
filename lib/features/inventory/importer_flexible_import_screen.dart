@@ -103,7 +103,7 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.description:
         'Detalle técnico, referencia OEM o notas del repuesto.',
     CatalogImportField.priceUsd:
-        'Precio mayorista en dólares (USD). B2B Conecta no convierte a Bs en la importación.',
+        'Precio de lista (en catálogo: REF, o USD si su cuenta es solo divisas).',
     CatalogImportField.salePriceUsd:
         'Precio promocional en USD, si aplica. Debe ser menor al precio de lista.',
     CatalogImportField.stock:
@@ -819,9 +819,12 @@ class _ImporterFlexibleImportScreenState
 
   Widget _coreMappingCard({required bool desktop}) {
     final optionalFields = _optionalFields
-        .where((f) =>
-            f != CatalogImportField.usdPaymentDiscountPct ||
-            !widget.pagoSoloDivisas)
+        .where((f) {
+          if (!widget.pagoSoloDivisas) return true;
+          // Solo divisas: un precio USD de lista; sin oferta ni % pago USD.
+          return f != CatalogImportField.usdPaymentDiscountPct &&
+              f != CatalogImportField.salePriceUsd;
+        })
         .toList();
 
     Widget requiredGrid() {

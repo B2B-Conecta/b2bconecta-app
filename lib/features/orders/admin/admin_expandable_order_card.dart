@@ -25,6 +25,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
     required this.statusLabel,
     this.expandedFooter,
     this.onRequestMutated,
+    this.workspaceDetail = false,
   });
 
   final TransactionRequestModel request;
@@ -33,6 +34,9 @@ class AdminExpandableOrderCard extends StatelessWidget {
 
   /// Fila elegida en el master-detail de escritorio.
   final bool highlighted;
+
+  /// Detalle a pantalla completa vía [OrderWorkspace] (sin accordion).
+  final bool workspaceDetail;
   final VoidCallback onToggle;
   final String statusLabel;
   final Widget? expandedFooter;
@@ -45,8 +49,11 @@ class AdminExpandableOrderCard extends StatelessWidget {
         : <TransactionRequestModel>[request];
     final isCheckoutGroup = lines.length > 1;
     final r = request;
+    final showBody = workspaceDetail || expanded;
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: workspaceDetail
+          ? EdgeInsets.zero
+          : const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.hardEdge,
       color: highlighted ? AppColors.brandBlueContainer : null,
       shape: highlighted
@@ -57,7 +64,12 @@ class AdminExpandableOrderCard extends StatelessWidget {
                 width: 1.5,
               ),
             )
-          : null,
+          : workspaceDetail
+              ? RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: AppColors.borderSubtle),
+                )
+              : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,12 +77,15 @@ class AdminExpandableOrderCard extends StatelessWidget {
           OrderSummaryHeader(
             lines: lines,
             viewerRole: AppHomeRole.administrador,
-            expanded: expanded,
+            expanded: showBody,
             onToggle: onToggle,
             statusLabel: statusLabel,
+            showToggle: !workspaceDetail,
+            detailSummary: workspaceDetail,
             onCancel: null,
             cancelBusy: false,
             chatAction: OrderChatIconButton(
+              showLabel: workspaceDetail,
               relatedOrderIds: lines.map((e) => e.id).toList(),
               onOpen: () {
                 showOrderChatSheet(
@@ -87,7 +102,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
               },
             ),
           ),
-          if (expanded) ...[
+          if (showBody) ...[
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),

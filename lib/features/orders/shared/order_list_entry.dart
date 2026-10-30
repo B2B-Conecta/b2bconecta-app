@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'aliado_order_grouping.dart';
 import 'importer_order_date.dart';
 import 'order_card_direct_summary.dart';
@@ -11,8 +12,12 @@ import 'order_list_colors.dart';
 
 /// Read-only projection: amounts always retain the order's agreed currency.
 class OrderListEntry {
-  OrderListEntry(this.lines);
+  OrderListEntry(
+    this.lines, {
+    this.viewerRole = AppHomeRole.aliado,
+  });
   final List<TransactionRequestModel> lines;
+  final AppHomeRole viewerRole;
   String get key => checkoutGroupExpandKey(lines);
   String get reference {
     final id = lines.first.checkoutGroupId?.trim();
@@ -24,17 +29,53 @@ class OrderListEntry {
       orderCardProductPeeks(lines: lines);
   String get title =>
       products.isEmpty ? 'Productos del pedido' : products.first.name;
+
+  /// Cabecera de columna según quién mira el listado.
+  String get partyColumnLabel => switch (viewerRole) {
+        AppHomeRole.aliado => 'Proveedor',
+        AppHomeRole.importador => 'Tienda',
+        AppHomeRole.administrador => 'Partes',
+      };
+
+  IconData get partyIcon => switch (viewerRole) {
+        AppHomeRole.aliado => Icons.storefront_outlined,
+        AppHomeRole.importador => Icons.store_outlined,
+        AppHomeRole.administrador => Icons.groups_outlined,
+      };
+
+  List<OrderCardRelatedParty> get parties =>
+      orderCardRelatedParties(lines: lines, viewerRole: viewerRole);
+
+  /// Contraparte(s) para la fila: proveedor, tienda o ambas (admin).
   String get provider {
-    final names = lines
-        .map((l) => l.ownerBusinessName?.trim() ?? '')
-        .where((n) => n.isNotEmpty)
-        .toSet()
-        .toList();
-    return names.isEmpty
-        ? 'Proveedor'
-        : names.length == 1
-            ? names.first
-            : '${names.first} +${names.length - 1}';
+    final list = parties;
+    if (list.isEmpty) return partyColumnLabel;
+    if (list.length == 1) return list.first.displayName;
+    if (viewerRole == AppHomeRole.administrador && list.length >= 2) {
+      final retailers =
+          list.where((p) => p.kind == OrderCardPartyKind.retailer).toList();
+      final wholesalers =
+          list.where((p) => p.kind == OrderCardPartyKind.wholesaler).toList();
+      final left = retailers.isEmpty
+          ? list.first.displayName
+          : retailers.length == 1
+              ? retailers.first.displayName
+              : '${retailers.first.displayName} +${retailers.length - 1}';
+      final right = wholesalers.isEmpty
+          ? (list.length > 1 ? list[1].displayName : '')
+          : wholesalers.length == 1
+              ? wholesalers.first.displayName
+              : '${wholesalers.first.displayName} +${wholesalers.length - 1}';
+      if (right.isEmpty) return left;
+      return '$left · $right';
+    }
+    return '${list.first.displayName} +${list.length - 1}';
+  }
+
+  String get partyTooltip {
+    final list = parties;
+    if (list.isEmpty) return partyColumnLabel;
+    return list.map((p) => '${p.roleLabel}: ${p.displayName}').join('\n');
   }
 
   int get quantity => lines.fold(0, (sum, l) => sum + l.cantidad);

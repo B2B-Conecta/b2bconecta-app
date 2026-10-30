@@ -10,7 +10,6 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/admin_order_panel_utils.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
@@ -31,13 +30,11 @@ import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_buttons.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_date_shortcuts.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
-import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
-import 'package:motolink_pro_app/core/layout/filter_chip_strip.dart';
-import 'package:motolink_pro_app/core/layout/filter_menu_button.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 
@@ -180,217 +177,151 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     }
   }
 
+  ImporterPedidosFiltersDraft _currentFiltersDraft() {
+    return ImporterPedidosFiltersDraft(
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      morosoOnly: _morosoOnly,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
+  }
+
   void _clearFilters() {
     _searchCtrl.clear();
     setState(() {
+      _expandedRequestId = null;
       _statusFilter = null;
+      _scope = PedidosListScope.todos;
       _morosoOnly = false;
       _creditOnly = false;
       _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
+    if (_fetchKind != _loadedKind) _load();
   }
 
-  Future<void> _openDateFilters() async {
-    final draft = await ImporterPedidosFiltersSheet.show(
-      context,
-      initial: ImporterPedidosFiltersDraft(
-        dateFrom: _dateFrom,
-        dateTo: _dateTo,
-      ),
-    );
-    if (draft == null || !mounted) return;
+  void _applyFiltersDraft(ImporterPedidosFiltersDraft draft) {
     setState(() {
+      _expandedRequestId = null;
+      if (draft.morosoOnly) {
+        _scope = PedidosListScope.todos;
+      }
       _dateFrom = draft.dateFrom;
       _dateTo = draft.dateTo;
+      _morosoOnly = draft.morosoOnly;
+      _creditOnly = draft.creditOnly;
+      _replacementOnly = draft.replacementOnly;
     });
+    if (_fetchKind != _loadedKind) _load();
   }
 
-  void _setDateShortcut(OrderDateShortcut shortcut, {bool toggle = true}) {
-    if (shortcut == OrderDateShortcut.custom) {
-      _openDateFilters();
-      return;
+  Future<void> _openPedidosFiltersSheet() async {
+    final draft = await ImporterPedidosFiltersSheet.show(
+      context,
+      initial: _currentFiltersDraft(),
+      showOnlyNuevos: false,
+    );
+    if (draft == null || !mounted) return;
+    _applyFiltersDraft(draft);
+  }
+
+  String _dateFilterChipLabel() {
+    final from = _dateFrom;
+    final to = _dateTo;
+    if (from != null && to != null) {
+      return '${formatImporterPedidosFilterDate(from)} – ${formatImporterPedidosFilterDate(to)}';
     }
-    final active = OrderDateShortcuts.active(_dateFrom, _dateTo);
-    final today = OrderDateShortcuts.day(DateTime.now());
-    final next =
-        toggle && active == shortcut ? OrderDateShortcut.all : shortcut;
-    setState(() {
-      switch (next) {
-        case OrderDateShortcut.today:
-          _dateFrom = today;
-          _dateTo = today;
-        case OrderDateShortcut.days7:
-          _dateFrom = today.subtract(const Duration(days: 6));
-          _dateTo = today;
-        case OrderDateShortcut.days30:
-          _dateFrom = today.subtract(const Duration(days: 29));
-          _dateTo = today;
-        case OrderDateShortcut.all:
-        case OrderDateShortcut.custom:
-          _dateFrom = null;
-          _dateTo = null;
-      }
-    });
+    if (from != null) {
+      return 'Desde ${formatImporterPedidosFilterDate(from)}';
+    }
+    return 'Hasta ${formatImporterPedidosFilterDate(to!)}';
   }
 
-  String _customDateLabel() {
-    String fmt(DateTime? d) => d == null
-        ? '…'
-        : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
-    return '${fmt(_dateFrom)} – ${fmt(_dateTo)}';
-  }
-
-  Widget _desktopFilterToolbar() {
-    final date = OrderDateShortcuts.active(_dateFrom, _dateTo);
-    final dateLabel = switch (date) {
-      OrderDateShortcut.all => 'Fecha',
-      OrderDateShortcut.today => 'Fecha · Hoy',
-      OrderDateShortcut.days7 => 'Fecha · 7 días',
-      OrderDateShortcut.days30 => 'Fecha · 30 días',
-      OrderDateShortcut.custom => 'Fecha · ${_customDateLabel()}',
-    };
-    final signalCount = [
-      _creditOnly,
-      _replacementOnly,
-      _showMorosoChip && _morosoOnly,
-    ].where((v) => v).length;
-    final anyActive = date != OrderDateShortcut.all || signalCount > 0;
-
-    FilterMenuOption dateOption(String label, OrderDateShortcut s) =>
-        FilterMenuOption(
-          label: label,
-          selected: date == s,
-          onPressed: () => _setDateShortcut(s, toggle: false),
-        );
-
-    return FilterToolbar(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
-      children: [
-        FilterMenuButton(
-          icon: Icons.calendar_today_outlined,
-          label: dateLabel,
-          active: date != OrderDateShortcut.all,
-          menuChildren: [
-            dateOption('Todas las fechas', OrderDateShortcut.all),
-            dateOption('Hoy', OrderDateShortcut.today),
-            dateOption('Últimos 7 días', OrderDateShortcut.days7),
-            dateOption('Últimos 30 días', OrderDateShortcut.days30),
-            const Divider(height: 8),
-            FilterMenuOption(
-              label: date == OrderDateShortcut.custom
-                  ? 'Personalizado · ${_customDateLabel()}'
-                  : 'Personalizado…',
-              icon: Icons.date_range_outlined,
-              selected: date == OrderDateShortcut.custom,
-              onPressed: _openDateFilters,
-            ),
-          ],
-        ),
-        FilterMenuButton(
-          icon: Icons.filter_list,
-          label: signalCount == 0 ? 'Señales' : 'Señales ($signalCount)',
-          active: signalCount > 0,
-          tone: _showMorosoChip && _morosoOnly ? Colors.red.shade700 : null,
-          menuChildren: [
-            FilterMenuCheck(
-              label: 'Bajo crédito',
-              value: _creditOnly,
-              onChanged: (v) => setState(() {
-                _creditOnly = v;
-                if (v) _replacementOnly = false;
-              }),
-            ),
-            FilterMenuCheck(
-              label: 'Cambio de producto',
-              value: _replacementOnly,
-              onChanged: (v) => setState(() {
-                _replacementOnly = v;
-                if (v) _creditOnly = false;
-              }),
-            ),
-            if (_showMorosoChip)
-              FilterMenuCheck(
-                label: 'Pago pendiente',
-                value: _morosoOnly,
-                onChanged: (v) => setState(() => _morosoOnly = v),
-              ),
-          ],
-        ),
-        if (anyActive)
-          TextButton(
-            onPressed: () => setState(() {
-              _dateFrom = null;
-              _dateTo = null;
-              _creditOnly = false;
-              _replacementOnly = false;
-              _morosoOnly = false;
-            }),
-            child: const Text('Limpiar'),
-          ),
-      ],
+  Widget _activeFilterChip({
+    required String label,
+    required VoidCallback onDeleted,
+    Color? accent,
+  }) {
+    final color = accent ?? AppColors.brandAccent;
+    return InputChip(
+      label: Text(label),
+      deleteIcon: const Icon(Icons.close, size: 16),
+      onDeleted: onDeleted,
+      backgroundColor: color.withOpacity(0.12),
+      side: BorderSide(color: color.withOpacity(0.35)),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: VisualDensity.compact,
     );
   }
 
-  List<Widget> _quickFilterChips() {
-    final date = OrderDateShortcuts.active(_dateFrom, _dateTo);
-    String customLabel() =>
-        date == OrderDateShortcut.custom ? _customDateLabel() : 'Fechas…';
-
-    return [
-      StripChip(
-        label: 'Hoy',
-        selected: date == OrderDateShortcut.today,
-        onTap: () => _setDateShortcut(OrderDateShortcut.today),
-      ),
-      StripChip(
-        label: '7 días',
-        selected: date == OrderDateShortcut.days7,
-        onTap: () => _setDateShortcut(OrderDateShortcut.days7),
-      ),
-      StripChip(
-        label: '30 días',
-        selected: date == OrderDateShortcut.days30,
-        onTap: () => _setDateShortcut(OrderDateShortcut.days30),
-      ),
-      StripChip(
-        label: customLabel(),
-        icon: Icons.calendar_today_outlined,
-        selected: date == OrderDateShortcut.custom,
-        onTap: () => _setDateShortcut(OrderDateShortcut.custom),
-      ),
-      const StripDivider(),
-      StripChip(
-        label: 'Bajo crédito',
-        selected: _creditOnly,
-        onTap: () => setState(() {
-          _creditOnly = !_creditOnly;
-          if (_creditOnly) _replacementOnly = false;
+  Widget? _buildActiveFilterChipsRow() {
+    final draft = _currentFiltersDraft();
+    final chips = <Widget>[];
+    if (draft.morosoOnly) {
+      chips.add(_activeFilterChip(
+        label: 'Pago pendiente',
+        accent: Colors.red.shade800,
+        onDeleted: () => setState(() => _morosoOnly = false),
+      ));
+    }
+    if (draft.hasDateFilter) {
+      chips.add(_activeFilterChip(
+        label: _dateFilterChipLabel(),
+        onDeleted: () => setState(() {
+          _dateFrom = null;
+          _dateTo = null;
         }),
-      ),
-      StripChip(
+      ));
+    }
+    if (draft.creditOnly) {
+      chips.add(_activeFilterChip(
+        label: 'Saldo aplicado',
+        onDeleted: () => setState(() => _creditOnly = false),
+      ));
+    }
+    if (draft.replacementOnly) {
+      chips.add(_activeFilterChip(
         label: 'Cambio de producto',
-        selected: _replacementOnly,
-        onTap: () => setState(() {
-          _replacementOnly = !_replacementOnly;
-          if (_replacementOnly) _creditOnly = false;
-        }),
+        onDeleted: () => setState(() => _replacementOnly = false),
+      ));
+    }
+    if (chips.isEmpty) return null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ...chips,
+          TextButton(
+            onPressed: _clearFilters,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Limpiar',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
-      if (_showMorosoChip)
-        StripChip(
-          label: 'Pago pendiente',
-          icon: Icons.warning_amber_rounded,
-          tone: Colors.red.shade700,
-          selected: _morosoOnly,
-          onTap: () => setState(() => _morosoOnly = !_morosoOnly),
-        ),
-    ];
+    );
   }
 
   void _onScopeChanged(PedidosListScope next) {
     if (next == _scope) return;
     setState(() {
+      _expandedRequestId = null;
       _scope = next;
       _statusFilter = null;
       if (next != PedidosListScope.entregados &&
@@ -433,12 +364,6 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       creditOnly: _creditOnly,
       replacementOnly: _replacementOnly,
     );
-  }
-
-  void _toggleExpand(String id) {
-    setState(() {
-      _expandedRequestId = _expandedRequestId == id ? null : id;
-    });
   }
 
   bool _groupHasOperational(List<TransactionRequestModel> g) => g.any(
@@ -840,200 +765,75 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         ),
       );
     }
-    if (_rows.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-          children: [
-            PedidosScopeBar(
-              selected: _scope,
-              onSelected: _onScopeChanged,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.35,
-              child: Center(child: Text(_emptyMessage)),
-            ),
-          ],
-        ),
-      );
-    }
-
+    // Aunque la consulta del alcance actual venga vacía (p. ej. solo hay
+    // entregados y estamos en «En curso»), hay que mostrar la barra de alcance
+    // para poder cambiar a Entregados / Cancelados / Todos.
     final groups = _displayGroups;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final masterDetail =
-            constraints.maxWidth >= _kOrdersMasterDetailMinWidth;
-        final listColumn = _buildListColumn(
-          context,
-          groups,
-          masterDetail: masterDetail,
-        );
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: masterDetail
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: _kOrdersMasterListWidth,
-                          child: listColumn,
-                        ),
-                        VerticalDivider(width: 1, color: AppColors.divider),
-                        Expanded(child: _buildDetailPane(context, groups)),
-                      ],
-                    )
-                  : listColumn,
-            ),
-            if (_loading)
-              const Positioned.fill(
-                child: IgnorePointer(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: LinearProgressIndicator(
-                      minHeight: 2,
-                      color: AppColors.brand,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
+    final filterBadge = _currentFiltersDraft().activePanelFilterCount;
+    final activeFilterChips = _buildActiveFilterChipsRow();
 
-  Widget _buildDetailPane(
-    BuildContext context,
-    List<List<TransactionRequestModel>> groups,
-  ) {
-    final selected = groups
-        .where((g) => checkoutGroupExpandKey(g) == _expandedRequestId)
-        .firstOrNull;
-    if (selected == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 40,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Seleccione un pedido para ver el detalle.',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      );
-    }
-    final expandKey = checkoutGroupExpandKey(selected);
-    return SingleChildScrollView(
-      key: PageStorageKey<String>('admin-order-detail-$expandKey'),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      child: AdminExpandableOrderCard(
-        key: ValueKey<String>('admin-order-detail-card-$expandKey'),
-        request: selected.first,
-        checkoutGroupLines: selected.length > 1 ? selected : null,
-        expanded: true,
-        onToggle: () => _toggleExpand(expandKey),
-        statusLabel: adminCheckoutGroupStatusLabel(selected),
-        expandedFooter: _buildExpandedFooter(context, selected),
-        onRequestMutated: _load,
+    return OrderWorkspace(
+      viewerRole: AppHomeRole.administrador,
+      groups: groups,
+      selectedKey: _expandedRequestId,
+      onSelect: (key) => setState(() => _expandedRequestId = key),
+      onClose: () => setState(() => _expandedRequestId = null),
+      onClearFilters: _clearFilters,
+      loading: _loading,
+      onRefresh: _load,
+      emptyMessage: groups.isEmpty ? _emptyMessage : null,
+      resetKey: Object.hash(
+        _scope,
+        _statusFilter,
+        _morosoOnly,
+        _creditOnly,
+        _replacementOnly,
+        _dateFrom,
+        _dateTo,
+        _searchCtrl.text,
+      ),
+      detailBuilder: (group) => _orderDetail(context, group),
+      controls: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OrdersListHeading(count: groups.length),
+          OrderListFilterBar(
+            softStyle: true,
+            searchController: _searchCtrl,
+            onSearchChanged: (_) => setState(() {
+              _expandedRequestId = null;
+            }),
+            hintText: 'Buscar por producto, SKU o empresa…',
+            padding: const EdgeInsets.only(bottom: 8),
+            onFilters: _openPedidosFiltersSheet,
+            activeFilterCount: filterBadge,
+          ),
+          PedidosScopeBar(
+            selected: _scope,
+            onSelected: _onScopeChanged,
+            filledStyle: true,
+          ),
+          if (activeFilterChips != null) activeFilterChips,
+        ],
       ),
     );
   }
 
-  Widget _buildListColumn(
+  Widget _orderDetail(
     BuildContext context,
-    List<List<TransactionRequestModel>> groups, {
-    required bool masterDetail,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 4),
-        Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: OrdersListHeading(count: groups.length)),
-        OrderListFilterBar(
-          searchController: _searchCtrl,
-          onSearchChanged: (_) => setState(() {}),
-          hintText: 'Buscar por producto, SKU o empresa',
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: PedidosScopeBar(
-            selected: _scope,
-            onSelected: _onScopeChanged,
-          ),
-        ),
-        if (isAdminDesktopLayout(context))
-          _desktopFilterToolbar()
-        else
-          FilterChipStrip(
-            padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
-            children: _quickFilterChips(),
-          ),
-        Expanded(
-          child: groups.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    const SizedBox(height: 48),
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Ningún pedido coincide con los filtros.',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _clearFilters,
-                            child: const Text('Limpiar filtros'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                )
-              : PagedItems<List<TransactionRequestModel>>(
-                  items: groups,
-                  pagerAtBottom: true,
-                  itemKey: checkoutGroupExpandKey,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  onRefresh: _load,
-                  itemBuilder: (g) {
-                    final primary = g.first;
-                    final expandKey = checkoutGroupExpandKey(g);
-                    final isSelected = _expandedRequestId == expandKey;
-                    return AdminExpandableOrderCard(
-                      request: primary,
-                      checkoutGroupLines: g.length > 1 ? g : null,
-                      expanded: !masterDetail && isSelected,
-                      highlighted: masterDetail && isSelected,
-                      onToggle: () => _toggleExpand(expandKey),
-                      statusLabel: adminCheckoutGroupStatusLabel(g),
-                      expandedFooter: masterDetail
-                          ? null
-                          : _buildExpandedFooter(context, g),
-                      onRequestMutated: _load,
-                    );
-                  },
-                ),
-        ),
-      ],
+    List<TransactionRequestModel> group,
+  ) {
+    final expandKey = checkoutGroupExpandKey(group);
+    return AdminExpandableOrderCard(
+      key: ValueKey<String>('admin-order-detail-card-$expandKey'),
+      workspaceDetail: true,
+      request: group.first,
+      checkoutGroupLines: group.length > 1 ? group : null,
+      expanded: true,
+      onToggle: () => setState(() => _expandedRequestId = null),
+      statusLabel: adminCheckoutGroupStatusLabel(group),
+      expandedFooter: _buildExpandedFooter(context, group),
+      onRequestMutated: _load,
     );
   }
 }
-
-/// Ancho del panel para mostrar lista + detalle de pedido lado a lado.
-const double _kOrdersMasterDetailMinWidth = 1080;
-const double _kOrdersMasterListWidth = 440;

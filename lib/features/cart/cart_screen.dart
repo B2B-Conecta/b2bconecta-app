@@ -290,12 +290,20 @@ class _CartScreenState extends State<CartScreen> {
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                         color: AppColors.textPrimary))),
+            if (entry.value.any((l) => l.part.ownerPagoSoloDivisas)) ...[
+              const SizedBox(width: 8),
+              _CartOfferChip(
+                  label: 'Solo divisas',
+                  bg: AppColors.infoSurface,
+                  fg: AppColors.brandLink,
+                  border: AppColors.borderSubtle),
+            ],
             if (_importerGroupHasPromo(entry.value)) ...[
               const SizedBox(width: 8),
               _CartOfferChip(
                   label: 'Promoción',
                   bg: AppColors.brandBlueContainer,
-                  fg: AppColors.brandBlue,
+                  fg: AppColors.brandLink,
                   border: AppColors.divider),
             ],
           ]),
@@ -704,7 +712,12 @@ class _CartLineCard extends StatelessWidget {
     final part = line.part;
     final cover = part.coverImageUrl?.trim();
     final sku = (part.sku ?? '').trim();
-    final unit = _cartUnitDollars(line, modo);
+    // Solo-divisas: siempre precio/importe en USD, aunque el resumen esté en Bs.
+    final displayModo =
+        part.ownerPagoSoloDivisas ? _PagoMoneda.usd : modo;
+    final unit = _cartUnitDollars(line, displayModo);
+    final showBsBreakdown =
+        displayModo == _PagoMoneda.bolivares && !part.ownerPagoSoloDivisas;
     final promo = ProductCatalogPricing.campaignDiscountChipEs(
         part.activeCampaignDiscountPercent,
         discountRules: part.discountRules,
@@ -738,24 +751,31 @@ class _CartLineCard extends StatelessWidget {
       ],
       const SizedBox(height: 4),
       Text(
-          modo == _PagoMoneda.bolivares
+          showBsBreakdown
               ? '${formatRefAmount(unit)} REF / ud'
-              : '${_cartMoney(unit, modo, tasa)} / ud',
+              : '${_cartMoney(unit, displayModo, tasa)} / ud',
           style: TextStyle(
-              fontSize: 12, height: 1.3, color: AppColors.textSecondary)),
-      if (modo == _PagoMoneda.bolivares) ...[
+              fontSize: 12,
+              height: 1.3,
+              fontWeight: part.ownerPagoSoloDivisas
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+              color: part.ownerPagoSoloDivisas
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary)),
+      if (showBsBreakdown) ...[
         const SizedBox(height: 2),
-        Text(_cartMoney(unit, modo, tasa),
+        Text(_cartMoney(unit, displayModo, tasa),
             style: TextStyle(
                 fontSize: 11, height: 1.3, color: AppColors.textSecondary)),
       ],
       if (promo != null ||
-          (modo == _PagoMoneda.usd && part.tieneOfertaDirecta)) ...[
+          (displayModo == _PagoMoneda.usd && part.tieneOfertaDirecta)) ...[
         const SizedBox(height: 6),
         _CartOfferChip(
             label: promo ?? 'Oferta aplicada',
             bg: AppColors.brandBlueContainer,
-            fg: AppColors.brandBlue,
+            fg: AppColors.brandLink,
             border: AppColors.divider),
       ],
     ]);
@@ -773,7 +793,7 @@ class _CartLineCard extends StatelessWidget {
       Text('Mín. ${part.minOrderQtyEffective} · Disp. ${part.stockForSale}',
           style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
     ]);
-    final amountValue = _cartMoney(unit * line.quantity, modo, tasa);
+    final amountValue = _cartMoney(unit * line.quantity, displayModo, tasa);
     final amountStyle = TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,
@@ -788,7 +808,7 @@ class _CartLineCard extends StatelessWidget {
           Text('Importe',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 3),
-          if (modo == _PagoMoneda.bolivares) ...[
+          if (showBsBreakdown) ...[
             _CartMoneyText(
                 value: '${formatRefAmount(unit * line.quantity)} REF',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),

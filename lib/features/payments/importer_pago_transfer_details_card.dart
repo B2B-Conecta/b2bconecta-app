@@ -26,9 +26,9 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.brandBlueContainer.withOpacity(0.45),
+        color: AppColors.brandBlueContainer,
         borderRadius: AppDecorations.radius12,
-        border: Border.all(color: AppColors.brandBlue.withOpacity(0.28)),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
@@ -38,10 +38,10 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.account_balance_wallet_outlined,
                   size: 18,
-                  color: AppColors.brandBlue,
+                  color: AppColors.brandLink,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -50,10 +50,10 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
                     children: [
                       Text(
                         'Datos para ${PagoMetodo.labelEs(metodo)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.brandBlue,
+                          color: AppColors.brandLink,
                         ),
                       ),
                       if (importadorNombre != null &&
@@ -71,8 +71,6 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
                 if (hasText)
                   IconButton(
                     visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                     tooltip: 'Copiar datos',
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: text));
@@ -84,18 +82,24 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.copy_outlined, size: 18),
+                    icon: Icon(
+                      Icons.copy_outlined,
+                      size: 18,
+                      color: AppColors.brandLink,
+                    ),
                   ),
               ],
             ),
             const SizedBox(height: 8),
             if (hasText)
-              SelectableText(
+              // Text (not SelectableText): avoids Flutter-web EditableText
+              // TypeError bool↛double? in this card; copy via icon above.
+              Text(
                 text,
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.45,
-                  color: Colors.grey.shade900,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w500,
                 ),
               )
@@ -108,7 +112,7 @@ class ImporterPagoTransferDetailsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   height: 1.35,
-                  color: AppColors.brandBlue,
+                  color: AppColors.brandLink,
                   fontWeight: FontWeight.w600,
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'aliado_order_grouping.dart';
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
@@ -23,7 +24,10 @@ class OrderWorkspace extends StatelessWidget {
       required this.onRefresh,
       required this.resetKey,
       required this.onClearFilters,
-      this.loading = false});
+      this.loading = false,
+      this.viewerRole = AppHomeRole.aliado,
+      this.groupKey,
+      this.emptyMessage});
   final List<List<TransactionRequestModel>> groups;
   final String? selectedKey;
   final ValueChanged<String> onSelect;
@@ -34,13 +38,22 @@ class OrderWorkspace extends StatelessWidget {
   final Object resetKey;
   final VoidCallback onClearFilters;
   final bool loading;
+  final AppHomeRole viewerRole;
+
+  /// Clave de fila; por defecto [checkoutGroupExpandKey].
+  final String Function(List<TransactionRequestModel>)? groupKey;
+
+  /// Mensaje cuando la lista está vacía (p. ej. alcance sin resultados).
+  final String? emptyMessage;
+
+  String _keyOf(List<TransactionRequestModel> g) =>
+      (groupKey ?? checkoutGroupExpandKey)(g);
 
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
-        final selected = groups
-            .where((g) => checkoutGroupExpandKey(g) == selectedKey)
-            .firstOrNull;
+        final selected =
+            groups.where((g) => _keyOf(g) == selectedKey).firstOrNull;
         final detailOpen = selected != null;
         return PopScope<Object?>(
           canPop: !detailOpen,
@@ -89,18 +102,31 @@ class OrderWorkspace extends StatelessWidget {
                                                   CrossAxisAlignment.stretch,
                                               children: [
                                                 if (table)
-                                                  const OrderListColumnsHeader(),
+                                                  OrderListColumnsHeader(
+                                                    partyLabel:
+                                                        switch (viewerRole) {
+                                                      AppHomeRole.aliado =>
+                                                        'Proveedor',
+                                                      AppHomeRole.importador =>
+                                                        'Tienda',
+                                                      AppHomeRole
+                                                          .administrador =>
+                                                        'Partes',
+                                                    },
+                                                  ),
                                                 Expanded(
                                                     child: groups.isEmpty
                                                         ? _OrdersEmpty(
                                                             onClear:
-                                                                onClearFilters)
+                                                                onClearFilters,
+                                                            message:
+                                                                emptyMessage,
+                                                          )
                                                         : PagedItems<
                                                             List<
                                                                 TransactionRequestModel>>(
                                                             items: groups,
-                                                            itemKey:
-                                                                checkoutGroupExpandKey,
+                                                            itemKey: _keyOf,
                                                             pagerAtBottom: true,
                                                             pageBarBottomPadding:
                                                                 0,
@@ -118,19 +144,20 @@ class OrderWorkspace extends StatelessWidget {
                                                                     bottom: 8),
                                                             onRefresh:
                                                                 onRefresh,
-                                                            itemBuilder: (g) => OrderListRow(
-                                                                entry:
-                                                                    OrderListEntry(
-                                                                        g),
-                                                                table: table,
-                                                                selected:
-                                                                    checkoutGroupExpandKey(
-                                                                            g) ==
-                                                                        selectedKey,
-                                                                onOpen: () =>
-                                                                    onSelect(
-                                                                        checkoutGroupExpandKey(
-                                                                            g))),
+                                                            itemBuilder: (g) =>
+                                                                OrderListRow(
+                                                                    entry: OrderListEntry(
+                                                                        g,
+                                                                        viewerRole:
+                                                                            viewerRole),
+                                                                    table:
+                                                                        table,
+                                                                    selected:
+                                                                        _keyOf(g) ==
+                                                                            selectedKey,
+                                                                    onOpen: () =>
+                                                                        onSelect(
+                                                                            _keyOf(g))),
                                                           )),
                                               ]);
                                         }))))),
@@ -152,7 +179,7 @@ class OrderWorkspace extends StatelessWidget {
                                                       Icons.arrow_back)),
                                               Expanded(
                                                   child: Text(
-                                                      'Pedido ${OrderListEntry(selected).reference}',
+                                                      'Pedido ${OrderListEntry(selected, viewerRole: viewerRole).reference}',
                                                       style: TextStyle(
                                                           fontSize: 16,
                                                           fontWeight:
@@ -164,7 +191,7 @@ class OrderWorkspace extends StatelessWidget {
                                         Expanded(
                                             child: SingleChildScrollView(
                                                 key: ValueKey(
-                                                    'order-detail-${checkoutGroupExpandKey(selected)}'),
+                                                    'order-detail-${_keyOf(selected)}'),
                                                 padding: const EdgeInsets.only(
                                                     bottom: 20),
                                                 child:
@@ -192,8 +219,9 @@ class OrderWorkspace extends StatelessWidget {
 }
 
 class _OrdersEmpty extends StatelessWidget {
-  const _OrdersEmpty({required this.onClear});
+  const _OrdersEmpty({required this.onClear, this.message});
   final VoidCallback onClear;
+  final String? message;
   @override
   Widget build(BuildContext context) => Center(
       child: Padding(
@@ -201,8 +229,11 @@ class _OrdersEmpty extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.search_off, size: 32, color: AppColors.textSecondary),
             const SizedBox(height: 12),
-            const Text('No encontramos pedidos con estos filtros.',
-                textAlign: TextAlign.center),
+            Text(
+              message ?? 'No encontramos pedidos con estos filtros.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, height: 1.35),
+            ),
             const SizedBox(height: 8),
             TextButton(
                 onPressed: onClear, child: const Text('Ver todos los pedidos')),

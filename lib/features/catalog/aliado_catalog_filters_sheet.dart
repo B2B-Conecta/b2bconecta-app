@@ -7,9 +7,11 @@ import 'aliado_catalog_reputation_filter_presets.dart';
 import 'catalog_filters.dart';
 import 'catalog_sort_mode.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 
 /// Panel único de filtros del catálogo aliado.
+/// Móvil: bottom sheet. Escritorio web: diálogo flotante centrado.
 class AliadoCatalogFiltersSheet extends StatefulWidget {
   const AliadoCatalogFiltersSheet({
     super.key,
@@ -22,7 +24,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
 
   final AliadoCatalogFiltersDraft initial;
   final List<ImporterOption> importers;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
   final List<String> categories;
   final ValueChanged<String>? onOpenImporterStore;
 
@@ -33,25 +35,20 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     List<String> categories = const [],
     ValueChanged<String>? onOpenImporterStore,
   }) {
-    return showModalBottomSheet<AliadoCatalogFiltersDraft>(
+    return showAdaptiveAdminSheet<AliadoCatalogFiltersDraft>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.96,
-        expand: false,
-        builder: (_, scrollController) => AliadoCatalogFiltersSheet(
-          initial: initial,
-          importers: importers,
-          scrollController: scrollController,
-          categories: categories,
-          onOpenImporterStore: onOpenImporterStore,
-        ),
+      showDragHandle: false,
+      draggable: true,
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.96,
+      desktopMaxWidth: 760,
+      builder: (_, scrollController) => AliadoCatalogFiltersSheet(
+        initial: initial,
+        importers: importers,
+        scrollController: scrollController,
+        categories: categories,
+        onOpenImporterStore: onOpenImporterStore,
       ),
     );
   }
@@ -335,28 +332,34 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     final importerSummary = _importerIds.isEmpty
         ? 'Todos'
         : '${_importerIds.length} seleccionado${_importerIds.length == 1 ? '' : 's'}';
+    final desktop = isAdminDesktopLayout(context);
 
     return Material(
-      color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      color: AppColors.card,
+      borderRadius: desktop
+          ? BorderRadius.circular(20)
+          : const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            padding: EdgeInsets.fromLTRB(24, desktop ? 20 : 12, 16, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.borderSubtle,
-                      borderRadius: BorderRadius.circular(2),
+                if (!desktop) ...[
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderSubtle,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -364,17 +367,19 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Filtros',
+                            'Filtros del catálogo',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
-                              fontSize: 22,
+                              fontSize: desktop ? 20 : 22,
                               letterSpacing: -0.4,
                               color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Afiná el catálogo por categoría, orden y proveedor.',
+                            desktop
+                                ? 'Ajuste categoría, orden, reputación y proveedor. Los cambios se aplican al confirmar.'
+                                : 'Afiná el catálogo por categoría, orden y proveedor.',
                             style: TextStyle(
                               fontSize: 13,
                               height: 1.35,
@@ -400,7 +405,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
           Expanded(
             child: ListView(
               controller: widget.scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
               children: [
                 _sectionHeader(
                   'Categoría',
@@ -437,10 +442,29 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   icon: Icons.swap_vert_rounded,
                   hint: 'Cómo se listan los productos en el catálogo.',
                 ),
-                for (final mode in CatalogSortMode.values) ...[
-                  _sortCard(mode),
-                  const SizedBox(height: 8),
-                ],
+                if (desktop)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const gap = 10.0;
+                      final colW = (constraints.maxWidth - gap) / 2;
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final mode in CatalogSortMode.values)
+                            SizedBox(
+                              width: colW,
+                              child: _sortCard(mode),
+                            ),
+                        ],
+                      );
+                    },
+                  )
+                else
+                  for (final mode in CatalogSortMode.values) ...[
+                    _sortCard(mode),
+                    const SizedBox(height: 8),
+                  ],
                 _sectionHeader(
                   'Reputación del proveedor',
                   icon: Icons.star_outline_rounded,
@@ -675,17 +699,24 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
           ),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.card,
               border: Border(top: BorderSide(color: AppColors.borderSubtle)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
+              boxShadow: desktop
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
             ),
-            padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 16),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              14,
+              24,
+              desktop ? 18 : bottom + 16,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -702,7 +733,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  flex: 2,
+                  flex: desktop ? 1 : 2,
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(_buildDraft()),
                     style: ElevatedButton.styleFrom(

@@ -6,7 +6,6 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
 import 'package:motolink_pro_app/features/payments/motolink_volume_discount.dart';
@@ -19,6 +18,7 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_filt
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
 import 'aliado_expandable_order_card.dart';
+import 'aliado_order_detail_view.dart';
 import 'aliado_confirmar_recepcion_section.dart';
 import 'package:motolink_pro_app/features/reputation/aliado_experience_utils.dart';
 import 'package:motolink_pro_app/features/payments/aliado_order_pago_section.dart';
@@ -43,6 +43,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_status_label.dart'
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 
 class AliadoPedidosPanel extends StatefulWidget {
   const AliadoPedidosPanel({super.key});
@@ -206,7 +207,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   Future<void> _refreshExpandedCard() => _load(silent: true);
 
   void _onSearchTextChanged() {
-    if (mounted) setState(() {});
+    if (mounted) setState(() => _expandedRequestId = null);
   }
 
   AliadoPedidosFiltersDraft _currentFiltersDraft() {
@@ -235,6 +236,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   void _applyFiltersDraft(AliadoPedidosFiltersDraft draft) {
     setState(() {
+      _expandedRequestId = null;
       if (draft.hasStatusFilter || draft.morosoOnly) {
         _scope = PedidosListScope.todos;
       }
@@ -1077,10 +1079,122 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     );
   }
 
+  AliadoOrderDetailSections _detailSections(
+    BuildContext context,
+    List<TransactionRequestModel> chunk,
+    int index,
+    int total,
+    String? checkoutGroupId,
+  ) {
+    final r = chunk.first;
+    final cg = r.checkoutGroupId?.trim() ?? '';
+    final unified = chunk.length > 1 &&
+        cg.isNotEmpty &&
+        chunk.every((line) => line.checkoutGroupId?.trim() == cg);
+    final deliveryActions = r.status == TransactionRequestStatus.pedidoListo ||
+        r.hasPickupConfirmed ||
+        r.aliadoMuestraSeccionFleteSeparado;
+    final delivered = lineasEntregadasParaValorar(chunk).isNotEmpty;
+    final hasAfterSales =
+        delivered || chunk.any((l) => l.postventaDevolucionAt != null);
+    return AliadoOrderDetailSections(
+      attention: chunk.any((l) => l.qtyAdjustmentPendienteAliado)
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final line
+                  in chunk.where((l) => l.qtyAdjustmentPendienteAliado))
+                AliadoQtyAdjustmentActions(
+                  key: ValueKey('qty-adj-${line.id}'),
+                  request: line,
+                  onChanged: _refreshExpandedCard,
+                ),
+            ])
+          : null,
+      receipt: _buildRecepcionLeading(context, chunk),
+      deliveryActions: deliveryActions
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              AliadoPedidoCarrierSelectionSection(
+                  request: r, onChanged: _refreshExpandedCard),
+              if ((r.status == TransactionRequestStatus.pedidoListo ||
+                      r.hasPickupConfirmed) &&
+                  r.carrierDecisionResolved)
+                PickupLocationDisplaySection(request: r),
+              if (r.aliadoMuestraSeccionFleteSeparado)
+                AliadoFleteSeparadoSection(
+                    request: r, onChanged: _refreshExpandedCard, compact: true),
+            ])
+          : null,
+      paymentStatus: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),
+      paymentOpen:
+          chunk.any((l) => l.hasProveedorFactura && !l.pedidoEntregadoYPagado),
+      payment:
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        AliadoImportadorFacturaSection(lines: chunk, compact: true),
+        const SizedBox(height: 16),
+        _PasarelaPagoMotoLinkCard(
+          lineCount: chunk.length,
+          singleComprobantePorProveedor: unified,
+          importerName: r.ownerBusinessName,
+          pagoIndex: total > 1 ? index : null,
+          pagoTotal: total > 1 ? total : null,
+          montoRef: chunk.length == 1
+              ? (r.refBaseTotalForPago > 0
+                  ? r.refBaseTotalForPago
+                  : r.precioTotal)
+              : refSubtotalBloqueImportador(chunk),
+          previewLines: chunk.length == 1 || unified ? chunk : null,
+          currencyLabel: orderAmountCurrency(chunk),
+          childBuilder: unified
+              ? (onPreview) => _columnPagoUnificadoImportador(chunk, onPreview)
+              : chunk.length == 1
+                  ? (onPreview) => AliadoOrderPagoSection(
+                        key: ValueKey('pago-${r.id}'),
+                        request: r,
+                        profile: _profile,
+                        onChanged: _refreshExpandedCard,
+                        onPagoMetodoPreviewChanged: onPreview,
+                        suppressPrimaryTitle: true,
+                        suppressNegotiationIntro: true,
+                      )
+                  : null,
+          child: !unified && chunk.length > 1
+              ? Column(children: [
+                  for (final line in chunk)
+                    AliadoOrderPagoSection(
+                      key: ValueKey('pago-${line.id}'),
+                      request: line,
+                      profile: _profile,
+                      onChanged: _refreshExpandedCard,
+                      suppressPrimaryTitle: true,
+                      suppressNegotiationIntro: true,
+                    ),
+                ])
+              : null,
+        ),
+      ]),
+      afterSales: hasAfterSales
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (delivered)
+                _buildAliadoRatingBar(context, chunk,
+                    bundleCheckoutGroupId: checkoutGroupId,
+                    importadorId: r.ownerId,
+                    importadorLabel: r.ownerBusinessName),
+              OrderReturnButtons(
+                lines: chunk,
+                allowReplyAsAliado: orderLinesAllowChatReply(chunk),
+                allowReplyAsImportador: false,
+                showReplacementTracker: false,
+                onChanged: _refreshExpandedCard,
+              ),
+            ])
+          : null,
+    );
+  }
+
   Widget _buildOrderCard(
     BuildContext context,
-    List<TransactionRequestModel> g,
-  ) {
+    List<TransactionRequestModel> g, {
+    bool workspaceDetail = false,
+  }) {
     final expandKey = checkoutGroupExpandKey(g);
     final primary = g.first;
     final isMulti = g.length > 1;
@@ -1090,6 +1204,11 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         : null;
 
     return AliadoExpandableOrderCard(
+      workspaceDetail: workspaceDetail,
+      detailSectionsBuilder: workspaceDetail
+          ? (ctx, chunk, index, total) =>
+              _detailSections(ctx, chunk, index, total, cgForBundle)
+          : null,
       request: primary,
       checkoutGroupLines: isMulti ? g : null,
       expanded: _expandedRequestId == expandKey,
@@ -1132,24 +1251,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
   void _selectScope(PedidosListScope scope) {
     setState(() {
+      _expandedRequestId = null;
       _scope = scope;
       if (scope != PedidosListScope.todos) _statusFilter = null;
     });
-  }
-
-  Widget _sectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
-          fontSize: 13,
-          color: AppColors.textSecondary,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
   }
 
   @override
@@ -1196,7 +1301,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final filtered = _filtered;
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
     final activeFilterChips = _buildActiveFilterChipsRow();
-    final screenWidth = MediaQuery.sizeOf(context).width;
     final enCursoGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => _esEnCurso(r.status)).toList(),
     );
@@ -1223,153 +1327,34 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       creditOnly: _creditOnly,
       replacementOnly: _replacementOnly,
     );
-    final scopeEmpty = switch (_scope) {
-      PedidosListScope.todos => enCursoGroups.isEmpty && cerradosGroups.isEmpty,
-      PedidosListScope.enCurso => enCursoGroups.isEmpty,
-      PedidosListScope.entregados => entregadosGroups.isEmpty,
-      PedidosListScope.cancelados => canceladosGroups.isEmpty,
-    };
-    final scopeEmptyLabel = switch (_scope) {
-      PedidosListScope.enCurso => 'No hay pedidos en curso.',
-      PedidosListScope.entregados => 'No hay pedidos entregados.',
-      PedidosListScope.cancelados => 'No hay pedidos cancelados.',
-      PedidosListScope.todos => 'Ningún pedido coincide con los filtros.',
-    };
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              B2bOrdersPanelLayout.listColumn(
-                  context, OrdersListHeading(count: visibleGroups.length)),
-              B2bOrdersPanelLayout.listColumn(
-                  context,
-                  OrderListFilterBar(
-                    searchController: _searchCtrl,
-                    onSearchChanged: (_) => setState(() {}),
-                    hintText: 'Buscar producto o proveedor…',
-                    padding: const EdgeInsets.only(bottom: 8),
-                    onFilters: _openPedidosFiltersSheet,
-                    activeFilterCount: filterBadge,
-                  )),
-              B2bOrdersPanelLayout.listColumn(
-                  context,
-                  PedidosScopeBar(
-                    selected: _scope,
-                    onSelected: _selectScope,
-                  )),
-              const SizedBox(height: 8),
-              if (activeFilterChips != null)
-                B2bOrdersPanelLayout.listColumn(context, activeFilterChips),
-              Expanded(
-                child: filtered.isEmpty
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          const SizedBox(height: 48),
-                          Center(
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Ningún pedido coincide con los filtros.',
-                                  style:
-                                      TextStyle(color: AppColors.textSecondary),
-                                ),
-                                TextButton(
-                                  onPressed: _clearFilters,
-                                  child: const Text('Limpiar filtros'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    : B2bOrdersPanelLayout.listColumn(
-                        context,
-                        scopeEmpty || visibleGroups.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: [
-                                  const SizedBox(height: 48),
-                                  Center(
-                                    child: Text(
-                                      visibleGroups.isEmpty && !scopeEmpty
-                                          ? 'Ningún pedido coincide con los filtros.'
-                                          : scopeEmptyLabel,
-                                      style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : PagedItems(
-                                items: visibleGroups,
-                                itemKey: checkoutGroupExpandKey,
-                                alwaysShow: false,
-                                pagerAtBottom: true,
-                                resetKey: Object.hash(
-                                  _scope,
-                                  _statusFilter,
-                                  _morosoOnly,
-                                  _creditOnly,
-                                  _replacementOnly,
-                                  _dateFrom,
-                                  _dateTo,
-                                  _searchCtrl.text,
-                                ),
-                                padding: EdgeInsets.only(
-                                  bottom:
-                                      B2bOrdersPanelLayout.listBottomPadding(
-                                          screenWidth),
-                                ),
-                                onRefresh: _load,
-                                itemBuilder: (g) {
-                                  String? header;
-                                  if (_scope == PedidosListScope.todos) {
-                                    final enCurso = _esEnCurso(g.first.status);
-                                    final section = enCurso
-                                        ? enCursoGroups
-                                        : cerradosGroups;
-                                    if (section.isNotEmpty &&
-                                        identical(section.first, g)) {
-                                      header =
-                                          enCurso ? 'En curso' : 'Cerrados';
-                                    }
-                                  }
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (header != null) _sectionTitle(header),
-                                      _buildOrderCard(context, g),
-                                    ],
-                                  );
-                                },
-                              ),
-                      ),
-              ),
-            ],
-          ),
+    return OrderWorkspace(
+      groups: visibleGroups,
+      selectedKey: _expandedRequestId,
+      onSelect: (key) => setState(() => _expandedRequestId = key),
+      onClose: () => setState(() => _expandedRequestId = null),
+      onClearFilters: _clearFilters,
+      loading: _loading,
+      onRefresh: _load,
+      resetKey: Object.hash(_scope, _statusFilter, _morosoOnly, _creditOnly,
+          _replacementOnly, _dateFrom, _dateTo, _searchCtrl.text),
+      detailBuilder: (group) =>
+          _buildOrderCard(context, group, workspaceDetail: true),
+      controls:
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        OrdersListHeading(count: visibleGroups.length),
+        OrderListFilterBar(
+          softStyle: true,
+          searchController: _searchCtrl,
+          onSearchChanged: (_) => setState(() {}),
+          hintText: 'Buscar producto, código o proveedor…',
+          padding: const EdgeInsets.only(bottom: 8),
+          onFilters: _openPedidosFiltersSheet,
+          activeFilterCount: filterBadge,
         ),
-        if (_loading)
-          const Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppColors.brand,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
+        PedidosScopeBar(
+            selected: _scope, onSelected: _selectScope, filledStyle: true),
+        if (activeFilterChips != null) activeFilterChips,
+      ]),
     );
   }
 }

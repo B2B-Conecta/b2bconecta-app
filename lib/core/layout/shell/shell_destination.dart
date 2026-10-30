@@ -8,6 +8,7 @@ class ShellDestination {
     required this.label,
     required this.title,
     this.subtitle,
+    this.bottomContentPadding = 28,
   });
 
   final IconData icon;
@@ -15,4 +16,5 @@ class ShellDestination {
   final String label;
   final String title;
   final String? subtitle;
+  final double bottomContentPadding;
 }

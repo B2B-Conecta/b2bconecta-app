@@ -47,6 +47,7 @@ class ListPageBar extends StatelessWidget {
     this.hasMore = false,
     this.pageSizeOptions = listPageSizeOptions,
     this.alwaysShow = false,
+    this.bottomPadding = 10,
   });
 
   final int total;
@@ -63,9 +64,12 @@ class ListPageBar extends StatelessWidget {
 
   /// Muestra la barra aunque la lista quepa en una página.
   final bool alwaysShow;
+  final double bottomPadding;
 
   @override
   Widget build(BuildContext context) {
+    // Subscribe to theme changes even when callers keep this widget constant.
+    Theme.of(context);
     final options =
         pageSizeOptions.isEmpty ? listPageSizeOptions : pageSizeOptions;
     final smallest = options.reduce(math.min);
@@ -94,7 +98,7 @@ class ListPageBar extends StatelessWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: bottomPadding),
       child: LayoutBuilder(builder: (context, constraints) {
         return Wrap(
             alignment: WrapAlignment.spaceBetween,
@@ -186,6 +190,10 @@ class _SizeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark
+        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
+        : AppColors.brand;
     return Material(
       color: selected ? AppColors.brand : AppColors.brandBlueContainer,
       borderRadius: BorderRadius.circular(8),
@@ -201,7 +209,7 @@ class _SizeChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: selected ? AppColors.white : AppColors.brand,
+              color: selected ? AppColors.white : accent,
             ),
           ),
         ),
@@ -225,6 +233,10 @@ class _StepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark
+        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
+        : AppColors.brand;
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
@@ -234,7 +246,9 @@ class _StepButton extends StatelessWidget {
         minWidth: 44,
         minHeight: 44,
       ),
-      icon: Icon(icon, size: wide ? 30 : 20, color: AppColors.brand),
+      icon: Icon(icon,
+          size: wide ? 26 : 20,
+          color: onPressed == null ? accent.withOpacity(.3) : accent),
     );
   }
 }
@@ -256,6 +270,8 @@ class PagedItems<T> extends StatefulWidget {
     this.pageSizeOptions = listPageSizeOptions,
     this.alwaysShow = false,
     this.pagerAtBottom = false,
+    this.pageBarBuilder,
+    this.pageBarBottomPadding = 10,
   });
 
   final List<T> items;
@@ -279,6 +295,8 @@ class PagedItems<T> extends StatefulWidget {
   /// Muestra «Por vista» aunque la lista quepa en una página.
   final bool alwaysShow;
   final bool pagerAtBottom;
+  final Widget Function(Widget bar)? pageBarBuilder;
+  final double pageBarBottomPadding;
 
   @override
   State<PagedItems<T>> createState() => _PagedItemsState<T>();
@@ -332,6 +350,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       }),
       pageSizeOptions: widget.pageSizeOptions,
       alwaysShow: widget.alwaysShow,
+      bottomPadding: widget.pageBarBottomPadding,
     );
     Widget buildItem(int i) {
       final item = page[i];
@@ -349,10 +368,11 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
     }
 
     final resolved = widget.padding.resolve(Directionality.of(context));
-    final barInset = Padding(
+    final inset = Padding(
       padding: EdgeInsets.only(left: resolved.left, right: resolved.right),
       child: bar,
     );
+    final barInset = widget.pageBarBuilder?.call(inset) ?? inset;
     if (widget.embedded) {
       return Column(
         mainAxisSize: MainAxisSize.min,

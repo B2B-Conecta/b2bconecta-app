@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'order_list_colors.dart';
 
 /// Opción de chip para filtrar por `transaction_requests.status`.
 class OrderStatusFilterOption {
@@ -28,6 +29,7 @@ class OrderListFilterBar extends StatefulWidget {
     this.onFilters,
     this.activeFilterCount = 0,
     this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    this.softStyle = false,
   });
 
   final TextEditingController searchController;
@@ -41,6 +43,7 @@ class OrderListFilterBar extends StatefulWidget {
   final VoidCallback? onFilters;
   final int activeFilterCount;
   final EdgeInsetsGeometry padding;
+  final bool softStyle;
 
   @override
   State<OrderListFilterBar> createState() => _OrderListFilterBarState();
@@ -85,6 +88,7 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           LayoutBuilder(builder: (context, constraints) {
+            final colors = OrderListColors.of(context);
             final search = TextField(
               controller: widget.searchController,
               onChanged: widget.onSearchChanged,
@@ -93,7 +97,9 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
               cursorColor: AppColors.brandAccent,
               decoration: InputDecoration(
                 hintText: widget.hintText,
-                hintStyle: AppColors.hintStyle,
+                hintStyle: widget.softStyle
+                    ? TextStyle(color: colors.secondary, fontSize: 14)
+                    : AppColors.hintStyle,
                 prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                 suffixIcon: widget.searchController.text.isNotEmpty
                     ? IconButton(
@@ -106,18 +112,24 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                       )
                     : null,
                 filled: true,
-                fillColor: AppColors.fieldFill,
+                fillColor: widget.softStyle ? colors.soft : AppColors.fieldFill,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 10,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.borderSubtle),
+                  borderSide: BorderSide(
+                      color: widget.softStyle
+                          ? colors.border
+                          : AppColors.borderSubtle),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.borderSubtle),
+                  borderSide: BorderSide(
+                      color: widget.softStyle
+                          ? colors.border
+                          : AppColors.borderSubtle),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -135,6 +147,14 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
                   ? 'Filtros (${widget.activeFilterCount})'
                   : 'Filtros'),
               style: OutlinedButton.styleFrom(
+                  foregroundColor: widget.softStyle ? colors.accent : null,
+                  side: widget.softStyle
+                      ? BorderSide(color: colors.border)
+                      : null,
+                  shape: widget.softStyle
+                      ? RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12))
+                      : null,
                   minimumSize: const Size(0, 48),
                   padding: const EdgeInsets.symmetric(horizontal: 10)),
             );

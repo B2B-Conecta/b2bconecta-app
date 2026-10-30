@@ -7,6 +7,7 @@ import 'importer_order_date.dart';
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
 import 'order_status_label.dart';
+import 'order_detail_overview.dart';
 
 /// Presentation only: all business actions remain owned by the order panels.
 class OrderSummaryHeader extends StatelessWidget {
@@ -19,6 +20,8 @@ class OrderSummaryHeader extends StatelessWidget {
       required this.statusLabel,
       required this.chatAction,
       this.onCancel,
+      this.showToggle = true,
+      this.detailSummary = false,
       this.cancelBusy = false});
 
   final List<TransactionRequestModel> lines;
@@ -29,6 +32,8 @@ class OrderSummaryHeader extends StatelessWidget {
   final Widget chatAction;
   final VoidCallback? onCancel;
   final bool cancelBusy;
+  final bool showToggle;
+  final bool detailSummary;
 
   @override
   Widget build(BuildContext context) {
@@ -80,11 +85,35 @@ class OrderSummaryHeader extends StatelessWidget {
             ? 'Revisar cantidad'
             : 'Ver pedido';
     final amount = '${formatRefAmount(total)} ${orderAmountCurrency(lines)}';
+    final cancelAction = PopupMenuButton<String>(
+      tooltip: 'Más opciones del pedido',
+      enabled: !cancelBusy,
+      onSelected: (_) => onCancel!(),
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'cancel', child: Text('Cancelar pedido'))
+      ],
+      icon: cancelBusy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.more_horiz),
+    );
+    if (detailSummary) {
+      return OrderDetailOverview(
+          lines: lines,
+          nextStep: step,
+          chatAction: chatAction,
+          cancelAction: onCancel == null ? null : cancelAction);
+    }
     final productSummary = InkWell(
-      onTap: onToggle,
+      onTap: showToggle ? onToggle : null,
       borderRadius: BorderRadius.circular(4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title,
+        Text(
+            detailSummary
+                ? '${products.length} ${products.length == 1 ? 'repuesto' : 'repuestos'} · $quantities ${quantities == 1 ? 'unidad' : 'unidades'}'
+                : title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -92,10 +121,12 @@ class OrderSummaryHeader extends StatelessWidget {
                 height: 1.25,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary)),
-        const SizedBox(height: 5),
-        Text(
-            '$quantities ${quantities == 1 ? 'unidad' : 'unidades'}${products.length > 1 ? ' · ${products.length} productos' : ''}',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        if (!detailSummary) ...[
+          const SizedBox(height: 5),
+          Text(
+              '$quantities ${quantities == 1 ? 'unidad' : 'unidades'}${products.length > 1 ? ' · ${products.length} productos' : ''}',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ],
         const SizedBox(height: 4),
         Text(partyLabel,
             maxLines: 2,
@@ -179,7 +210,7 @@ class OrderSummaryHeader extends StatelessWidget {
             Expanded(flex: 2, child: amountSummary(CrossAxisAlignment.end)),
           ]);
         }),
-        if (step.isNotEmpty) ...[
+        if (!detailSummary && step.isNotEmpty) ...[
           const SizedBox(height: 10),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(
@@ -201,43 +232,53 @@ class OrderSummaryHeader extends StatelessWidget {
           ]),
         ],
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-              child: OutlinedButton(
-            onPressed: onToggle,
-            style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                foregroundColor: scheme.primary,
-                side: BorderSide(color: AppColors.borderSubtle)),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(expanded ? Icons.expand_less : Icons.arrow_forward,
-                      size: 18),
-                  const SizedBox(width: 8),
-                  Flexible(
-                      child: Text(buttonLabel, textAlign: TextAlign.center)),
-                ]),
-          )),
-          const SizedBox(width: 8),
-          chatAction,
-          if (onCancel != null)
-            PopupMenuButton<String>(
-              tooltip: 'Más opciones del pedido',
-              enabled: !cancelBusy,
-              onSelected: (_) => onCancel!(),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'cancel', child: Text('Cancelar pedido'))
-              ],
-              icon: cancelBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.more_horiz),
-            ),
-        ]),
+        if (detailSummary)
+          Row(children: [
+            Expanded(
+                child: Text(step,
+                    style: TextStyle(
+                        fontSize: 13,
+                        height: 1.3,
+                        color:
+                            warning ? scheme.error : AppColors.textSecondary))),
+            const SizedBox(width: 8),
+            chatAction,
+            if (onCancel != null) cancelAction,
+          ])
+        else
+          Row(children: [
+            if (showToggle)
+              Expanded(
+                  child: OutlinedButton(
+                onPressed: onToggle,
+                style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    foregroundColor: scheme.primary,
+                    side: BorderSide(color: AppColors.borderSubtle)),
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(expanded ? Icons.expand_less : Icons.arrow_forward,
+                          size: 18),
+                      const SizedBox(width: 8),
+                      Flexible(
+                          child:
+                              Text(buttonLabel, textAlign: TextAlign.center)),
+                    ]),
+              )),
+            if (!showToggle)
+              Expanded(
+                  child: Text(
+                      lines.map((line) => line.ownerId).toSet().length > 1
+                          ? 'Mensajes del pedido'
+                          : 'Consultar al proveedor',
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.textSecondary))),
+            const SizedBox(width: 8),
+            chatAction,
+            if (onCancel != null) cancelAction,
+          ]),
       ]),
     );
   }

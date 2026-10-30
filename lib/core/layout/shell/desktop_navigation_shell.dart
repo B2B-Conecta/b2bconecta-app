@@ -111,7 +111,7 @@ class DesktopNavigationShell extends StatelessWidget {
                 ),
                 Expanded(
                   child: AdminContentFrame(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                    padding: EdgeInsets.fromLTRB(24, 0, 24, dest.bottomContentPadding),
                     child: IndexedStack(
                       index: safeIndex,
                       children: pages,

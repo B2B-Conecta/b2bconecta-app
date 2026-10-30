@@ -325,6 +325,7 @@ class _MainShellState extends State<MainShell> {
       label: 'Pedidos',
       title: 'Pedidos',
       subtitle: 'En curso · entregas',
+      bottomContentPadding: 8,
     ),
     ShellDestination(
       icon: Icons.star_outline,

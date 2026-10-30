@@ -1,4 +1,5 @@
 import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
@@ -10,6 +11,7 @@ import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'aliado_multi_importer_order_tabs.dart';
+import 'aliado_order_detail_view.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
@@ -34,6 +36,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     this.multiImporterPanelBuilder,
     this.ratingBar,
     this.onChatChanged,
+    this.workspaceDetail = false,
+    this.detailSectionsBuilder,
   });
 
   final TransactionRequestModel request;
@@ -41,6 +45,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   /// Varias filas del mismo carrito (mismo `checkout_group_id`). Si es una sola fila, dejar null.
   final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
+  final bool workspaceDetail;
+  final AliadoDetailSectionsBuilder? detailSectionsBuilder;
   final VoidCallback onToggle;
   final String statusLabel;
 
@@ -86,48 +92,63 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     final porImportador = useMultiImporterTabs
         ? groupCheckoutLinesByImportador(lines)
         : const <List<TransactionRequestModel>>[];
+    final summary = OrderSummaryHeader(
+      lines: lines,
+      viewerRole: AppHomeRole.aliado,
+      expanded: expanded,
+      onToggle: onToggle,
+      statusLabel: statusLabel,
+      showToggle: !workspaceDetail,
+      detailSummary: workspaceDetail,
+      onCancel: onCancelarSolicitudPendiente != null &&
+              lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)
+          ? onCancelarSolicitudPendiente
+          : null,
+      cancelBusy: cancelarSolicitudPendienteBusy,
+      chatAction: OrderChatIconButton(
+        showLabel: workspaceDetail,
+        relatedOrderIds: lines.map((e) => e.id).toList(),
+        onOpen: () {
+          final counterpart = lines.first.ownerBusinessName?.trim();
+          showOrderChatSheet(
+            context: context,
+            transactionRequestId: lines.first.id,
+            mergedThreadRequestIds:
+                isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+            orderLines: lines,
+            allowReplyAsAliado: orderLinesAllowChatReply(lines),
+            allowReplyAsAdmin: false,
+            deliveryGrace: orderLinesChatDeliveryGrace(lines),
+            title: (counterpart != null && counterpart.isNotEmpty)
+                ? 'Chat · $counterpart'
+                : 'Chat del pedido',
+            onThreadChanged: onChatChanged,
+          );
+        },
+      ),
+    );
+    if (workspaceDetail && detailSectionsBuilder != null) {
+      return B2bOrderCardDensityScope(
+        density: density,
+        child: AliadoOrderDetailView(
+          key: ValueKey(checkoutGroupExpandKey(lines)),
+          lines: lines,
+          summary: summary,
+          sectionsBuilder: detailSectionsBuilder!,
+        ),
+      );
+    }
     return B2bOrderCardDensityScope(
       density: density,
-      child: Card(
+      child: _AliadoOrderSurface(
+        embedded: workspaceDetail,
         margin: EdgeInsets.only(bottom: density.cardMarginBottom),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            OrderSummaryHeader(
-              lines: lines,
-              viewerRole: AppHomeRole.aliado,
-              expanded: expanded,
-              onToggle: onToggle,
-              statusLabel: statusLabel,
-              onCancel: onCancelarSolicitudPendiente != null &&
-                      lines.every(
-                          (l) => l.aliadoPuedeCancelarHastaFacturaProveedor)
-                  ? onCancelarSolicitudPendiente
-                  : null,
-              cancelBusy: cancelarSolicitudPendienteBusy,
-              chatAction: OrderChatIconButton(
-                relatedOrderIds: lines.map((e) => e.id).toList(),
-                onOpen: () {
-                  final counterpart = lines.first.ownerBusinessName?.trim();
-                  showOrderChatSheet(
-                    context: context,
-                    transactionRequestId: lines.first.id,
-                    mergedThreadRequestIds: isCheckoutGroup
-                        ? lines.map((e) => e.id).toList()
-                        : null,
-                    orderLines: lines,
-                    allowReplyAsAliado: orderLinesAllowChatReply(lines),
-                    allowReplyAsAdmin: false,
-                    deliveryGrace: orderLinesChatDeliveryGrace(lines),
-                    title: (counterpart != null && counterpart.isNotEmpty)
-                        ? 'Chat · $counterpart'
-                        : 'Chat del pedido',
-                    onThreadChanged: onChatChanged,
-                  );
-                },
-              ),
-            ),
+            summary,
+            if (workspaceDetail) OrderFulfilmentProgress(lines: lines),
             AnimatedSize(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeInOut,
@@ -145,11 +166,13 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(height: sectionGap),
+                                if (!workspaceDetail)
+                                  SizedBox(height: sectionGap),
                                 if (expandedLeading != null) expandedLeading!,
                                 if (!useMultiImporterTabs &&
                                     expandedFooter != null) ...[
-                                  SizedBox(height: sectionGap),
+                                  if (!workspaceDetail)
+                                    SizedBox(height: sectionGap),
                                   expandedFooter!,
                                 ],
                                 if (lines.any((x) => x.esPedidoMoroso)) ...[
@@ -353,6 +376,22 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AliadoOrderSurface extends StatelessWidget {
+  const _AliadoOrderSurface(
+      {required this.embedded,
+      required this.margin,
+      required this.clipBehavior,
+      required this.child});
+  final bool embedded;
+  final EdgeInsetsGeometry margin;
+  final Clip clipBehavior;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => embedded
+      ? child
+      : Card(margin: margin, clipBehavior: clipBehavior, child: child);
 }
 
 /// Tras el timeline: contacto por importador (si no está unificado arriba) y bloques de recogida por línea en tránsito.

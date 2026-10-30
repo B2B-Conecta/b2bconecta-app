@@ -47,6 +47,7 @@ class ListPageBar extends StatelessWidget {
     this.hasMore = false,
     this.pageSizeOptions = listPageSizeOptions,
     this.alwaysShow = false,
+    this.bottomPadding = 10,
   });
 
   final int total;
@@ -63,15 +64,16 @@ class ListPageBar extends StatelessWidget {
 
   /// Muestra la barra aunque la lista quepa en una página.
   final bool alwaysShow;
+  final double bottomPadding;
 
   @override
   Widget build(BuildContext context) {
-    final options = pageSizeOptions.isEmpty
-        ? listPageSizeOptions
-        : pageSizeOptions;
+    // Subscribe to theme changes even when callers keep this widget constant.
+    Theme.of(context);
+    final options =
+        pageSizeOptions.isEmpty ? listPageSizeOptions : pageSizeOptions;
     final smallest = options.reduce(math.min);
-    if (total <= 0 ||
-        (!alwaysShow && total <= smallest && !hasMore)) {
+    if (total <= 0 || (!alwaysShow && total <= smallest && !hasMore)) {
       return const SizedBox.shrink();
     }
 
@@ -96,30 +98,37 @@ class ListPageBar extends StatelessWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          if (showSizes) _sizeChoices(size, options),
-          const Spacer(),
-          pager,
-        ],
-      ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: LayoutBuilder(builder: (context, constraints) {
+        return Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              if (showSizes)
+                _sizeChoices(size, options,
+                    showLabel: constraints.maxWidth >= 480),
+              pager,
+            ]);
+      }),
     );
   }
 
-  Widget _sizeChoices(int size, List<int> options) {
+  Widget _sizeChoices(int size, List<int> options, {bool showLabel = true}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Por vista',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
+        if (showLabel)
+          Text(
+            'Por vista',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
+        if (showLabel) const SizedBox(width: 8),
         for (final option in options) ...[
           _SizeChip(
             label: '$option',
@@ -181,20 +190,26 @@ class _SizeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark
+        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
+        : AppColors.brand;
     return Material(
       color: selected ? AppColors.brand : AppColors.brandBlueContainer,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: selected ? AppColors.white : AppColors.brand,
+              color: selected ? AppColors.white : accent,
             ),
           ),
         ),
@@ -218,16 +233,22 @@ class _StepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark
+        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
+        : AppColors.brand;
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
       visualDensity: wide ? VisualDensity.standard : VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: BoxConstraints(
-        minWidth: wide ? 44 : 28,
-        minHeight: wide ? 44 : 28,
+      constraints: const BoxConstraints(
+        minWidth: 44,
+        minHeight: 44,
       ),
-      icon: Icon(icon, size: wide ? 30 : 20, color: AppColors.brand),
+      icon: Icon(icon,
+          size: wide ? 26 : 20,
+          color: onPressed == null ? accent.withOpacity(.3) : accent),
     );
   }
 }
@@ -248,6 +269,9 @@ class PagedItems<T> extends StatefulWidget {
     this.onRefresh,
     this.pageSizeOptions = listPageSizeOptions,
     this.alwaysShow = false,
+    this.pagerAtBottom = false,
+    this.pageBarBuilder,
+    this.pageBarBottomPadding = 10,
   });
 
   final List<T> items;
@@ -270,6 +294,9 @@ class PagedItems<T> extends StatefulWidget {
 
   /// Muestra «Por vista» aunque la lista quepa en una página.
   final bool alwaysShow;
+  final bool pagerAtBottom;
+  final Widget Function(Widget bar)? pageBarBuilder;
+  final double pageBarBottomPadding;
 
   @override
   State<PagedItems<T>> createState() => _PagedItemsState<T>();
@@ -323,6 +350,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       }),
       pageSizeOptions: widget.pageSizeOptions,
       alwaysShow: widget.alwaysShow,
+      bottomPadding: widget.pageBarBottomPadding,
     );
     Widget buildItem(int i) {
       final item = page[i];
@@ -340,17 +368,19 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
     }
 
     final resolved = widget.padding.resolve(Directionality.of(context));
-    final barInset = Padding(
+    final inset = Padding(
       padding: EdgeInsets.only(left: resolved.left, right: resolved.right),
       child: bar,
     );
+    final barInset = widget.pageBarBuilder?.call(inset) ?? inset;
     if (widget.embedded) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          barInset,
+          if (!widget.pagerAtBottom) barInset,
           for (var i = 0; i < page.length; i++) buildItem(i),
+          if (widget.pagerAtBottom) barInset,
         ],
       );
     }
@@ -374,8 +404,9 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        barInset,
+        if (!widget.pagerAtBottom) barInset,
         Expanded(child: list),
+        if (widget.pagerAtBottom) barInset,
       ],
     );
   }

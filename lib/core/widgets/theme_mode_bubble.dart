@@ -3,14 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
-/// Burbuja circular: menú con **solo Claro y Oscuro** (sin sistema).
-/// Al elegir, [ThemeController] cambia la estética de toda la app.
+/// Burbuja circular: menú con iconos **claro** / **oscuro**.
 class ThemeModeBubble extends StatelessWidget {
   const ThemeModeBubble({super.key, this.compact = false});
 
   final bool compact;
 
   static const _modes = <ThemeMode>[ThemeMode.light, ThemeMode.dark];
+
+  static IconData _icon(ThemeMode mode) => mode == ThemeMode.dark
+      ? Icons.dark_mode_outlined
+      : Icons.light_mode_outlined;
+
+  static String _tooltip(ThemeMode mode) =>
+      mode == ThemeMode.dark ? 'Oscuro' : 'Claro';
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +27,7 @@ class ThemeModeBubble extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final mode = controller.mode;
+        final scheme = Theme.of(context).colorScheme;
         return PopupMenuButton<ThemeMode>(
           tooltip: 'Claro / Oscuro',
           padding: EdgeInsets.zero,
@@ -31,8 +38,9 @@ class ThemeModeBubble extends StatelessWidget {
             side: BorderSide(color: AppColors.borderSubtle),
           ),
           color: AppColors.card,
+          onOpened: () => FocusManager.instance.primaryFocus?.unfocus(),
           onSelected: (m) {
-            // Ignorar async: el notify es síncrono al inicio de setMode.
+            FocusManager.instance.primaryFocus?.unfocus();
             controller.setMode(m);
           },
           itemBuilder: (context) {
@@ -42,30 +50,31 @@ class ThemeModeBubble extends StatelessWidget {
                   value: m,
                   height: 48,
                   padding: EdgeInsets.zero,
-                  child: Center(
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: mode == m
-                            ? AppColors.brandAccent.withOpacity(0.16)
-                            : Colors.transparent,
-                        border: mode == m
-                            ? Border.all(
-                                color: AppColors.brandAccent,
-                                width: 1.5,
-                              )
-                            : null,
-                      ),
-                      child: Icon(
-                        m == ThemeMode.dark
-                            ? Icons.dark_mode_outlined
-                            : Icons.light_mode_outlined,
-                        size: 20,
-                        color: mode == m
-                            ? AppColors.brandAccent
-                            : AppColors.textPrimary,
+                  child: Tooltip(
+                    message: _tooltip(m),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: mode == m
+                              ? AppColors.brandAccent.withOpacity(0.16)
+                              : Colors.transparent,
+                          border: mode == m
+                              ? Border.all(
+                                  color: AppColors.brandAccent,
+                                  width: 1.5,
+                                )
+                              : null,
+                        ),
+                        child: Icon(
+                          _icon(m),
+                          size: 20,
+                          color: mode == m
+                              ? AppColors.brandAccent
+                              : AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ),
@@ -91,9 +100,7 @@ class ThemeModeBubble extends StatelessWidget {
             child: Icon(
               controller.currentIcon,
               size: compact ? 18 : 20,
-              color: controller.isDark
-                  ? AppColors.brandAccent
-                  : AppColors.brandBlue,
+              color: controller.isDark ? scheme.primary : AppColors.brandBlue,
             ),
           ),
         );

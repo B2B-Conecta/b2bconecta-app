@@ -324,7 +324,7 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.brandBlue.withOpacity(0.95),
+              color: AppColors.brandLink.withOpacity(0.95),
               height: 1.25,
             ),
           ),
@@ -402,7 +402,10 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
           if (metodosPermitidos.isEmpty)
             Text(
               'Sin métodos disponibles.',
-              style: TextStyle(fontSize: 12, color: Colors.red.shade800),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
             )
           else if (puedeCambiarMetodo)
             DropdownButtonFormField<String>(
@@ -566,7 +569,9 @@ class _AliadoOrderPagoSectionState extends State<AliadoOrderPagoSection> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Colors.green.shade800,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.green.shade300
+                      : Colors.green.shade800,
                 ),
               ),
             ),

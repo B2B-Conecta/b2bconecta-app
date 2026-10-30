@@ -81,6 +81,8 @@ double? parseUsdPaymentDiscountPct(Map<String, dynamic>? rules) {
   if (rules == null || rules.isEmpty) return null;
   final raw =
       rules['usd_payment_discount_pct'] ?? rules['applied_usd_payment_discount_pct'];
+  // JSON / PostgREST can surface booleans; never implicit-cast dynamic → double?.
+  if (raw is bool) return null;
   final pct = raw is num
       ? raw.toDouble()
       : double.tryParse(raw?.toString() ?? '');
@@ -141,6 +143,7 @@ ProductVolumeTier? nextProductVolumeTier(
 double? appliedVolumeDiscountPctFromSnapshot(Map<String, dynamic>? rules) {
   if (rules == null) return null;
   final v = rules['applied_volume_discount_pct'];
+  if (v is bool) return null;
   if (v is num) return v.toDouble();
   return double.tryParse(v?.toString() ?? '');
 }

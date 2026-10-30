@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'aliado_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
 
 String formatAliadoPedidosFilterDate(DateTime d) {
   final local = d.toLocal();
@@ -13,6 +15,7 @@ String formatAliadoPedidosFilterDate(DateTime d) {
 }
 
 /// Panel único de filtros de pedidos del aliado.
+/// Móvil: bottom sheet. Escritorio web: diálogo flotante centrado.
 class AliadoPedidosFiltersSheet extends StatefulWidget {
   const AliadoPedidosFiltersSheet({
     super.key,
@@ -23,30 +26,25 @@ class AliadoPedidosFiltersSheet extends StatefulWidget {
 
   final AliadoPedidosFiltersDraft initial;
   final List<OrderStatusFilterOption> statusOptions;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
 
   static Future<AliadoPedidosFiltersDraft?> show(
     BuildContext context, {
     required AliadoPedidosFiltersDraft initial,
     required List<OrderStatusFilterOption> statusOptions,
   }) {
-    return showModalBottomSheet<AliadoPedidosFiltersDraft>(
+    return showAdaptiveAdminSheet<AliadoPedidosFiltersDraft>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.72,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (_, scrollController) => AliadoPedidosFiltersSheet(
-          initial: initial,
-          statusOptions: statusOptions,
-          scrollController: scrollController,
-        ),
+      showDragHandle: false,
+      draggable: true,
+      initialChildSize: 0.72,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      desktopMaxWidth: 560,
+      builder: (_, scrollController) => AliadoPedidosFiltersSheet(
+        initial: initial,
+        statusOptions: statusOptions,
+        scrollController: scrollController,
       ),
     );
   }
@@ -59,6 +57,8 @@ class AliadoPedidosFiltersSheet extends StatefulWidget {
 class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
   String? _status;
   bool _morosoOnly = false;
+  bool _creditOnly = false;
+  bool _replacementOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -67,6 +67,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     super.initState();
     _status = widget.initial.statusFilter;
     _morosoOnly = widget.initial.morosoOnly;
+    _creditOnly = widget.initial.creditOnly;
+    _replacementOnly = widget.initial.replacementOnly;
     _dateFrom = widget.initial.dateFrom;
     _dateTo = widget.initial.dateTo;
   }
@@ -75,6 +77,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     return AliadoPedidosFiltersDraft(
       statusFilter: _status,
       morosoOnly: _morosoOnly,
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
       dateFrom: _dateFrom,
       dateTo: _dateTo,
     );
@@ -84,6 +88,8 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     setState(() {
       _status = null;
       _morosoOnly = false;
+      _creditOnly = false;
+      _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -103,12 +109,14 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
     setState(() {
       if (isFrom) {
         _dateFrom = picked;
-        if (_dateTo != null && _dateOnly(_dateTo!).isBefore(_dateOnly(picked))) {
+        if (_dateTo != null &&
+            _dateOnly(_dateTo!).isBefore(_dateOnly(picked))) {
           _dateTo = picked;
         }
       } else {
         _dateTo = picked;
-        if (_dateFrom != null && _dateOnly(_dateFrom!).isAfter(_dateOnly(picked))) {
+        if (_dateFrom != null &&
+            _dateOnly(_dateFrom!).isAfter(_dateOnly(picked))) {
           _dateFrom = picked;
         }
       }
@@ -153,44 +161,69 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewPadding.bottom;
+    final desktop = isAdminDesktopLayout(context);
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
 
     return Material(
-      color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      color: AppColors.card,
+      borderRadius: desktop
+          ? BorderRadius.circular(20)
+          : const BorderRadius.vertical(top: Radius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            padding: EdgeInsets.fromLTRB(20, desktop ? 20 : 12, 12, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.borderSubtle,
-                      borderRadius: BorderRadius.circular(2),
+                if (!desktop) ...[
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderSubtle,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Filtros de pedidos',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Puede acotar por un paso, por fechas o por pagos pendientes.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filtros de pedidos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Encuentra tus pedidos por fecha, estado o tipo.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -238,6 +271,15 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                     }),
                   ],
                 ),
+                _sectionTitle('TIPO DE PEDIDO'),
+                OrderSignalFilterBar(
+                  creditOnly: _creditOnly,
+                  replacementOnly: _replacementOnly,
+                  onChanged: (credit, replacement) => setState(() {
+                    _creditOnly = credit;
+                    _replacementOnly = replacement;
+                  }),
+                ),
                 _sectionTitle('PAGO PENDIENTE'),
                 SwitchListTile(
                   value: _morosoOnly,
@@ -267,6 +309,9 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    ActionChip(
+                        label: const Text('Hoy'),
+                        onPressed: () => _applyPresetDays(1)),
                     ActionChip(
                       label: const Text('7 días'),
                       onPressed: () => _applyPresetDays(7),
@@ -312,8 +357,17 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
               ],
             ),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, bottom + 16),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              border: Border(top: BorderSide(color: AppColors.borderSubtle)),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              desktop ? 18 : bottom + 16,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -331,9 +385,15 @@ class _AliadoPedidosFiltersSheetState extends State<AliadoPedidosFiltersSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_buildDraft()),
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.brand,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(_buildDraft()),
                     child: const Text('Aplicar filtros'),
                   ),
                 ),

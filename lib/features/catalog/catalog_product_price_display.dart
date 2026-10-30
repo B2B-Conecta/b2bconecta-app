@@ -5,7 +5,10 @@ import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'product_catalog_pricing.dart';
 
-/// Published prices: promotional USD first, original REF and its Bs equivalent.
+/// Published prices: promotional USD first, then list (REF or USD) and optional Bs.
+///
+/// With [ownerPagoSoloDivisas], the list price is labeled **USD** (same amount)
+/// and the Bs line is hidden — checkout is divisas-only for that supplier.
 class CatalogProductPriceDisplay extends StatelessWidget {
   const CatalogProductPriceDisplay({
     super.key,
@@ -37,19 +40,21 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     // Keep the published prices distinct. Cart discounts must not relabel the
     // USD offer as REF or replace the base used for the Bs equivalent.
-    final ref = listPriceUsd;
+    final list = listPriceUsd;
+    final listCurrency = ownerPagoSoloDivisas ? 'USD' : 'REF';
     final usd = ProductCatalogPricing.aliadoUnitUsdPaymentLine(
-        refUnitUsd: ref,
+        refUnitUsd: list,
         salePriceUsd: salePriceUsd,
         discountRules: discountRules,
         ownerPagoSoloDivisas: ownerPagoSoloDivisas);
-    final hasUsdPrice = ProductCatalogPricing.hasDirectSale(
+    final hasPromoUsd = ProductCatalogPricing.hasDirectSale(
         listPriceUsd: listPriceUsd, salePriceUsd: usd);
     final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
         listPriceUsd: listPriceUsd, salePriceUsd: usd);
     final mainSize = catalogGrid
         ? (prominent ? 20.0 : (compact ? 14.0 : 16.0))
         : (compact ? 20.0 : 22.0);
+    final secondarySize = compact || catalogGrid ? 13.0 : 16.0;
 
     Widget amount(double value, String currency, double size, Color color) =>
         Tooltip(
@@ -68,7 +73,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (hasUsdPrice) ...[
+          if (hasPromoUsd) ...[
             Wrap(
                 spacing: 6,
                 runSpacing: 2,
@@ -79,15 +84,22 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                     _UsdDiscountChip(label: discountLabel),
                 ]),
             const SizedBox(height: 4),
-            amount(ref, 'REF', compact || catalogGrid ? 13 : 16,
-                AppColors.textSecondary),
+            amount(list, listCurrency, secondarySize, AppColors.textSecondary),
           ] else
-            amount(ref, 'REF', mainSize, AppColors.textPrimary),
-          _BasePriceBsLine(
-              refUsd: ref,
-              fontSize: compact || catalogGrid ? 11 : 12,
-              compact: true,
-              rate: bcvRate),
+            amount(
+              list,
+              listCurrency,
+              mainSize,
+              ownerPagoSoloDivisas
+                  ? AppColors.successGreen
+                  : AppColors.textPrimary,
+            ),
+          if (!ownerPagoSoloDivisas)
+            _BasePriceBsLine(
+                refUsd: list,
+                fontSize: compact || catalogGrid ? 11 : 12,
+                compact: true,
+                rate: bcvRate),
           if (showPromotionChips)
             CatalogProductOfferChips(
                 listPriceUsd: listPriceUsd,

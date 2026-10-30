@@ -409,6 +409,9 @@ class TransactionRequestModel {
   bool get hasCheckoutPriceSnapshot =>
       discountRules?['checkout_pricing_version']?.toString() == '1';
 
+  bool get hasAppliedVolumeDiscount =>
+      (appliedVolumeDiscountPctFromSnapshot(discountRules) ?? 0) > 0;
+
   String get amountCurrencyLabel =>
       hasCheckoutPriceSnapshot && metodoPagoMoneda == 'DIVISAS' ? 'USD' : 'REF';
 
@@ -1294,7 +1297,7 @@ class TransactionRequestModel {
   }
 
   static double? _asNullableDouble(dynamic v) {
-    if (v == null) return null;
+    if (v == null || v is bool) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString());
   }

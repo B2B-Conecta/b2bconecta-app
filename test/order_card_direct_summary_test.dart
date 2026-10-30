@@ -290,12 +290,12 @@ void main() {
 
     expect(find.text('Ruedas del Este'), findsWidgets);
     expect(find.text('Pastillas freno'), findsWidgets);
-    expect(find.textContaining('×6'), findsWidgets);
-    expect(find.text('En preparación'), findsOneWidget);
-    expect(find.text('Detalle'), findsOneWidget);
+    expect(find.text('6 unidades'), findsOneWidget);
+    expect(find.text('Preparando'), findsOneWidget);
+    expect(find.text('Ver pedido'), findsOneWidget);
     expect(find.text('Ver detalle y seguimiento'), findsNothing);
     expect(find.byTooltip('Chat del pedido'), findsOneWidget);
-    expect(find.byIcon(Icons.expand_more), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
     expect(find.byIcon(Icons.expand_less), findsNothing);
   });
 

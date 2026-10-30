@@ -33,9 +33,8 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
     final pagados = importadoresConPagoConfirmado(porImportador);
     final totalRef = allLines.fold<double>(0, (s, r) => s + r.precioTotal);
     final cg = allLines.first.checkoutGroupId?.trim();
-    final refCorta = (cg != null && cg.length >= 8)
-        ? '${cg.substring(0, 8)}…'
-        : null;
+    final refCorta =
+        (cg != null && cg.length >= 8) ? '${cg.substring(0, 8)}…' : null;
     final ranks = porImportador
         .map((c) => motoconectaEnvioTimelineRank(c.first.status))
         .toSet();
@@ -64,7 +63,8 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.hub_outlined, color: AppColors.brandBlue, size: 22),
+              const Icon(Icons.hub_outlined,
+                  color: AppColors.brandBlue, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -97,7 +97,8 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.brandBlue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.brandBlue.withOpacity(0.35)),
+                  border:
+                      Border.all(color: AppColors.brandBlue.withOpacity(0.35)),
                 ),
                 child: Text(
                   estadoMaestro,
@@ -121,7 +122,8 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
               value: nImp > 0 ? pagados / nImp : 0,
               minHeight: 7,
               backgroundColor: Colors.grey.shade200,
-              color: pagados == nImp ? Colors.green.shade600 : AppColors.brandBlue,
+              color:
+                  pagados == nImp ? Colors.green.shade600 : AppColors.brandBlue,
             ),
           ),
           const SizedBox(height: 4),
@@ -130,9 +132,8 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: pagados == nImp
-                  ? Colors.green.shade800
-                  : AppColors.brandBlue,
+              color:
+                  pagados == nImp ? Colors.green.shade800 : AppColors.brandBlue,
             ),
           ),
         ],
@@ -166,7 +167,8 @@ class AliadoMultiImporterOrderTabs extends StatefulWidget {
       _AliadoMultiImporterOrderTabsState();
 }
 
-class _AliadoMultiImporterOrderTabsState extends State<AliadoMultiImporterOrderTabs> {
+class _AliadoMultiImporterOrderTabsState
+    extends State<AliadoMultiImporterOrderTabs> {
   int _selected = 0;
 
   @override
@@ -330,9 +332,8 @@ class _ImporterSelectorChip extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 12,
-                    backgroundColor: selected
-                        ? AppColors.brandBlue
-                        : Colors.grey.shade400,
+                    backgroundColor:
+                        selected ? AppColors.brandBlue : Colors.grey.shade400,
                     child: Text(
                       '$index',
                       style: const TextStyle(
@@ -447,7 +448,8 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
               color: AppColors.brandBlue.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,7 +465,7 @@ class _AliadoImporterUnifiedPanel extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${chunk.length} ${chunk.length == 1 ? "línea" : "líneas"} · '
-                  '${formatRefAmount(monto)} REF · Envío: $envio',
+                  '${formatRefAmount(monto)} ${orderAmountCurrency(chunk)} · Envío: $envio',
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,

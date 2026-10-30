@@ -30,6 +30,7 @@ Future<T?> showAdaptiveAdminSheet<T>({
   double minChildSize = 0.35,
   double maxChildSize = 0.92,
   bool isDismissible = true,
+  double? desktopMaxWidth,
 }) {
   if (!isAdminDesktopLayout(context)) {
     return showModalBottomSheet<T>(
@@ -60,6 +61,7 @@ Future<T?> showAdaptiveAdminSheet<T>({
     barrierColor: Colors.black.withOpacity(0.28),
     builder: (ctx) => _AdminDesktopDialog(
       draggable: draggable,
+      maxWidth: desktopMaxWidth ?? kAdminDialogMaxWidth,
       builder: builder,
     ),
   );
@@ -69,9 +71,11 @@ class _AdminDesktopDialog extends StatefulWidget {
   const _AdminDesktopDialog({
     required this.draggable,
     required this.builder,
+    this.maxWidth = kAdminDialogMaxWidth,
   });
 
   final bool draggable;
+  final double maxWidth;
   final Widget Function(BuildContext context, ScrollController? scroll) builder;
 
   @override
@@ -96,7 +100,7 @@ class _AdminDesktopDialogState extends State<_AdminDesktopDialog> {
     );
     // Contenido con Expanded necesita altura fija; los formularios se ajustan.
     content = widget.draggable
-        ? SizedBox(height: maxHeight * 0.8, child: content)
+        ? SizedBox(height: maxHeight * 0.88, child: content)
         : content;
 
     return BackdropFilter(
@@ -107,13 +111,13 @@ class _AdminDesktopDialogState extends State<_AdminDesktopDialog> {
         insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: kAdminDialogMaxWidth,
+            maxWidth: widget.maxWidth,
             maxHeight: maxHeight,
           ),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: AppColors.card,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.borderSubtle),
               boxShadow: [
                 BoxShadow(
@@ -124,13 +128,10 @@ class _AdminDesktopDialogState extends State<_AdminDesktopDialog> {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: content,
-                ),
+              borderRadius: BorderRadius.circular(20),
+              child: Material(
+                type: MaterialType.transparency,
+                child: content,
               ),
             ),
           ),

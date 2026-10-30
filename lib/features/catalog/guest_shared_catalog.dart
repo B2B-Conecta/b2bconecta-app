@@ -531,12 +531,13 @@ class _GuestImagePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return ColoredBox(
-      color: AppColors.surfaceTinted,
+      color: AppColors.surfaceTintedFor(b),
       child: Icon(
         Icons.image_outlined,
         size: 32,
-        color: AppColors.textMuted,
+        color: AppColors.textMutedFor(b),
       ),
     );
   }

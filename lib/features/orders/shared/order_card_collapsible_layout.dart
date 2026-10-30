@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
@@ -72,14 +73,11 @@ String orderCardTimelineSubtitle(
 
 /// Al abrir la ficha, los productos solo se despliegan si el paso actual es alistarlos.
 bool orderCardProductsInitiallyExpanded(String status) {
-  return status == TransactionRequestStatus.pendiente ||
-      status == TransactionRequestStatus.enPreparacion ||
-      status == TransactionRequestStatus.pedidoListo;
+  return false;
 }
 
 bool orderCardTimelineInitiallyExpanded(TransactionRequestModel r) {
-  return r.status != TransactionRequestStatus.entregado &&
-      r.status != TransactionRequestStatus.rechazado;
+  return false;
 }
 
 /// Bloque colapsable reutilizable en fichas de pedido.
@@ -105,14 +103,35 @@ class OrderCardCollapsibleSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProfileCollapsibleSection(
-      title: title,
-      subtitle: subtitle,
-      initiallyExpanded: initiallyExpanded,
-      infoMessage: infoMessage,
-      infoTitle: infoTitle ?? title,
-      trailingActions: trailingActions,
-      child: child,
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        maintainState: true,
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        shape: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
+        collapsedShape:
+            Border(bottom: BorderSide(color: AppColors.borderSubtle)),
+        title: Row(children: [
+          Expanded(
+              child: Text(title,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary))),
+          ...trailingActions,
+          if (infoMessage != null)
+            ProfileInfoIcon(title: infoTitle ?? title, message: infoMessage!),
+        ]),
+        subtitle: subtitle == null
+            ? null
+            : Text(subtitle!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        children: [SizedBox(width: double.infinity, child: child)],
+      ),
     );
   }
 }

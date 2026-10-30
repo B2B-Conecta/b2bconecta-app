@@ -51,9 +51,8 @@ class AliadoCatalogQuickFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final border = AppColors.brightness == Brightness.dark
-        ? AppColors.borderSubtle
-        : const Color(0xFFE2E8F0);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final border = dark ? AppColors.borderSubtle : const Color(0xFFE2E8F0);
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
       child: SingleChildScrollView(

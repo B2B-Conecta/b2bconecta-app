@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/layout/admin_content_frame.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 import 'desktop_nav_rail_preference.dart';
 import 'desktop_shell_top_bar.dart';
+import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import 'shell_destination.dart';
 
 /// Layout escritorio: rail lateral (ocultable), barra superior y contenido.
@@ -81,7 +82,8 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
     final width = MediaQuery.sizeOf(context).width;
     final extended = width >= AppBreakpoints.desktopRailExtended;
     final safeIndex = widget.selectedIndex.clamp(0, widget.pages.length - 1);
-    final dest = widget.destinations[safeIndex.clamp(0, widget.destinations.length - 1)];
+    final dest =
+        widget.destinations[safeIndex.clamp(0, widget.destinations.length - 1)];
     final showRail = !_prefReady || _railVisible;
 
     return Scaffold(
@@ -108,77 +110,104 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                 : const SizedBox(width: 0),
           ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DesktopShellTopBar(
-                  unreadNotifications: widget.unreadNotifications,
-                  onNotificationTap: widget.onNotificationTap,
-                  onMessagesTap: widget.onMessagesTap,
-                  unreadMessages: widget.unreadMessages,
-                  trailingActions: widget.trailingActions,
-                  leading: showRail
-                      ? null
-                      : IconButton(
-                          tooltip: 'Mostrar menú',
-                          onPressed: () => _setRailVisible(true),
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(44, 44),
-                          ),
-                          icon: Icon(
-                            Icons.menu,
-                            color: AppColors.textSecondary,
-                          ),
+            child: ScrollCompactLayout(
+                enabled: dest.compactHeaderOnScroll,
+                resetKey: safeIndex,
+                builder: (context, compact) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        DesktopShellTopBar(
+                          unreadNotifications: widget.unreadNotifications,
+                          onNotificationTap: widget.onNotificationTap,
+                          onMessagesTap: widget.onMessagesTap,
+                          unreadMessages: widget.unreadMessages,
+                          trailingActions: widget.trailingActions,
+                          leading: showRail
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Mostrar menú',
+                                  onPressed: () => _setRailVisible(true),
+                                  style: IconButton.styleFrom(
+                                    minimumSize: const Size(44, 44),
+                                  ),
+                                  icon: Icon(
+                                    Icons.menu,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
                         ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 22, 28, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dest.title,
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.4,
-                          height: 1.15,
-                        ),
-                      ),
-                      if (dest.subtitle != null && dest.subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: Text(
-                            dest.subtitle!,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              height: 1.45,
-                              color: AppColors.textSecondary,
+                        _DesktopPageHeading(
+                            destination: dest,
+                            compact: compact,
+                            hidden: ScrollCompactState.hideHeadingOf(context)),
+                        Expanded(
+                          child: AdminContentFrame(
+                            padding: EdgeInsets.fromLTRB(
+                                24, 0, 24, dest.bottomContentPadding),
+                            child: IndexedStack(
+                              index: safeIndex,
+                              children: widget.pages,
                             ),
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: AdminContentFrame(
-                    padding: EdgeInsets.fromLTRB(
-                        24, 0, 24, dest.bottomContentPadding),
-                    child: IndexedStack(
-                      index: safeIndex,
-                      children: widget.pages,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                    )),
           ),
         ],
       ),
     );
+  }
+}
+
+class _DesktopPageHeading extends StatelessWidget {
+  const _DesktopPageHeading({
+    required this.destination,
+    required this.compact,
+    required this.hidden,
+  });
+
+  final ShellDestination destination;
+  final bool compact;
+  final bool hidden;
+
+  @override
+  Widget build(BuildContext context) {
+    final heading = hidden
+        ? const SizedBox(key: ValueKey('desktop-page-heading'), height: 0)
+        : Padding(
+            key: const ValueKey('desktop-page-heading'),
+            padding:
+                EdgeInsets.fromLTRB(28, compact ? 8 : 22, 28, compact ? 6 : 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(destination.title,
+                    style: TextStyle(
+                        fontSize: compact ? 20 : 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.4,
+                        height: 1.15)),
+                if (!compact && destination.subtitle?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Text(destination.subtitle!,
+                          style: TextStyle(
+                              fontSize: 14.5,
+                              height: 1.45,
+                              color: AppColors.textSecondary))),
+                ],
+              ],
+            ),
+          );
+    // Flutter 3.24 AnimatedSize cannot safely lay out a zero-duration change.
+    if (MediaQuery.disableAnimationsOf(context)) return heading;
+    return AnimatedSize(
+        alignment: Alignment.topLeft,
+        duration: ScrollCompactLayout.motionDuration(context),
+        curve: Curves.easeOutCubic,
+        child: heading);
   }
 }
 
@@ -282,7 +311,8 @@ class _DesktopSideRail extends StatelessWidget {
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 itemCount: destinations.length,
                 itemBuilder: (context, i) {
                   final d = destinations[i];
@@ -378,14 +408,14 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
                         color: AppColors.brandLink,
                       ),
                       const SizedBox(width: 6),
-                      Text(
+                      Expanded(child: Text(
                         'Ajustes de cuenta',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.brandLink,
                         ),
-                      ),
+                      )),
                     ],
                   ),
                 ],
@@ -431,9 +461,8 @@ class _RailNavTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected
-        ? AppColors.brand.withOpacity(0.12)
-        : Colors.transparent;
+    final bg =
+        selected ? AppColors.brand.withOpacity(0.12) : Colors.transparent;
     final fg = selected ? AppColors.brand : AppColors.textPrimary;
     final iconColor = selected ? AppColors.brand : AppColors.textSecondary;
 

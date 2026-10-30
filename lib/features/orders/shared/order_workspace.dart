@@ -264,7 +264,7 @@ class _OrdersEmpty extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.search_off, size: 32, color: AppColors.textSecondary),
-            SizedBox(height: compact ? 4 : 12),
+            const SizedBox(height: 12),
             Text(
               message ?? 'No encontramos pedidos con estos filtros.',
               textAlign: TextAlign.center,

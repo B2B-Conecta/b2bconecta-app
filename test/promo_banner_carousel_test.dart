@@ -22,7 +22,9 @@ void main() {
       WidgetTester tester,
       List<PromoCampaignModel> campaigns,
       ValueChanged<PromoCampaignModel> onTap,
-      {bool reduceMotion = false}) async {
+      {bool reduceMotion = false,
+      double width = 360,
+      VoidCallback? onViewAll}) async {
     await tester.pumpWidget(MaterialApp(
       home: MediaQuery(
         data: MediaQueryData(disableAnimations: reduceMotion),
@@ -30,10 +32,11 @@ void main() {
           body: Align(
             alignment: Alignment.topCenter,
             child: SizedBox(
-              width: 360,
+              width: width,
               child: AliadoPromoBannerCarousel(
                 campaigns: campaigns,
                 onPromoCampaignSelected: onTap,
+                onViewAll: onViewAll,
               ),
             ),
           ),
@@ -46,13 +49,38 @@ void main() {
   testWidgets('one campaign has no footer or dots and artwork opens its store',
       (tester) async {
     final selected = <String>[];
-    await showBanner(tester, [campaign('one')], (c) => selected.add(c.id));
+    await showBanner(tester, [campaign('one')], (c) => selected.add(c.id),
+        onViewAll: () => fail('Single campaign must not show view all'));
+    expect(find.byTooltip('Ver todas las promociones (1)'), findsNothing);
     expect(find.text('Ver promoción'), findsNothing);
     expect(find.bySemanticsLabel('Promoción 1 de 1'), findsNothing);
     await tester.tapAt(tester.getCenter(find.byType(PageView)));
     expect(selected, ['one']);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final width in [320.0, 720.0]) {
+    testWidgets('view all opens the list without activating artwork at $width',
+        (tester) async {
+      var listOpened = 0;
+      var campaignOpened = 0;
+      await showBanner(
+          tester, [campaign('one'), campaign('two')], (_) => campaignOpened++,
+          width: width, onViewAll: () => listOpened++);
+      final access = find.byTooltip('Ver todas las promociones (2)');
+      expect(access, findsOneWidget);
+      expect(
+          find.text('Ver todas'), width < 600 ? findsNothing : findsOneWidget);
+      final dots = find.bySemanticsLabel('Promoción 2 de 2');
+      expect(tester.getRect(dots).right,
+          lessThanOrEqualTo(tester.getRect(access).left));
+      await tester.tap(access);
+      expect(listOpened, 1);
+      expect(campaignOpened, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets(
       'dots and swipes select a campaign without opening its destination',

@@ -275,12 +275,14 @@ class AliadoPromoBannerCarousel extends StatefulWidget {
     super.key,
     required this.campaigns,
     this.onPromoCampaignSelected,
+    this.onViewAll,
     this.compact = false,
     this.padding,
   });
 
   final List<PromoCampaignModel> campaigns;
   final ValueChanged<PromoCampaignModel>? onPromoCampaignSelected;
+  final VoidCallback? onViewAll;
   final bool compact;
   final EdgeInsetsGeometry? padding;
 
@@ -405,6 +407,10 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
           }
           final imageSize =
               promoBannerImageSize(constraints.maxWidth, _ratios[url] ?? 3);
+          final hasViewAll = items.length > 1 && widget.onViewAll != null;
+          final compactAccess = imageSize.width < 600;
+          final indicatorInset =
+              hasViewAll ? (compactAccess ? 62.0 : 132.0) : 12.0;
           return Align(
             alignment: Alignment.center,
             child: SizedBox(
@@ -471,8 +477,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                         if (items.length > 1)
                           Positioned(
                             bottom: 6,
-                            left: 12,
-                            right: 12,
+                            left: indicatorInset,
+                            right: indicatorInset,
                             child: Center(
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -543,6 +549,52 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                                       }),
                                     ),
                                   ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (hasViewAll)
+                          Positioned(
+                            bottom: 6,
+                            right: 8,
+                            child: Tooltip(
+                              message:
+                                  'Ver todas las promociones (${items.length})',
+                              child: Semantics(
+                                label:
+                                    'Ver todas las promociones (${items.length})',
+                                button: true,
+                                onTap: widget.onViewAll,
+                                excludeSemantics: true,
+                                child: TextButton(
+                                  onPressed: widget.onViewAll,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    backgroundColor:
+                                        Colors.black.withOpacity(.38),
+                                    minimumSize: const Size(44, 44),
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: compactAccess ? 10 : 12),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(22)),
+                                  ),
+                                  child: compactAccess
+                                      ? const Icon(Icons.grid_view_rounded,
+                                          size: 18)
+                                      : const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text('Ver todas',
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                            SizedBox(width: 6),
+                                            Icon(Icons.north_east_rounded,
+                                                size: 15),
+                                          ],
+                                        ),
                                 ),
                               ),
                             ),

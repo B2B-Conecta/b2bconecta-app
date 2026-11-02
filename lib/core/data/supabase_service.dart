@@ -1104,9 +1104,12 @@ class SupabaseService {
   static Future<void> deletePromoCampaign({
     required String id,
     String? imageStoragePath,
+    String? mobileImageStoragePath,
   }) =>
       CatalogService.deletePromoCampaign(
-          id: id, imageStoragePath: imageStoragePath);
+          id: id,
+          imageStoragePath: imageStoragePath,
+          mobileImageStoragePath: mobileImageStoragePath);
 
   static Future<({String path, String publicUrl})> uploadPromoCampaignImage({
     required Uint8List bytes,

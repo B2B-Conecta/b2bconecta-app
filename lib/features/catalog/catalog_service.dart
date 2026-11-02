@@ -18,32 +18,32 @@ class CatalogService {
 
   static Future<List<ImporterOption>> fetchImporterOptions() async {
     return retryOnJwtIssuedAtFuture(() async {
-    final response = await SupabaseAccess.client
-        .from('profiles')
-        .select(
-          'id, business_name, estado, ciudad, catalog_featured_until, logo_storage_path',
-        )
-        .eq('role', 'importador')
-        .order('business_name', ascending: true);
-    final list = response as List<dynamic>;
-    return list
-        .map((row) {
-          final m = Map<String, dynamic>.from(row as Map);
-          final id = m['id']?.toString() ?? '';
-          final name = m['business_name']?.toString().trim() ?? '';
-          return ImporterOption(
-            id: id,
-            businessName: name,
-            estado: m['estado']?.toString(),
-            ciudad: m['ciudad']?.toString(),
-            catalogFeaturedUntil: m['catalog_featured_until'] != null
-                ? DateTime.tryParse(m['catalog_featured_until'].toString())
-                : null,
-            logoStoragePath: m['logo_storage_path']?.toString(),
-          );
-        })
-        .where((o) => o.id.isNotEmpty && o.businessName.isNotEmpty)
-        .toList();
+      final response = await SupabaseAccess.client
+          .from('profiles')
+          .select(
+            'id, business_name, estado, ciudad, catalog_featured_until, logo_storage_path',
+          )
+          .eq('role', 'importador')
+          .order('business_name', ascending: true);
+      final list = response as List<dynamic>;
+      return list
+          .map((row) {
+            final m = Map<String, dynamic>.from(row as Map);
+            final id = m['id']?.toString() ?? '';
+            final name = m['business_name']?.toString().trim() ?? '';
+            return ImporterOption(
+              id: id,
+              businessName: name,
+              estado: m['estado']?.toString(),
+              ciudad: m['ciudad']?.toString(),
+              catalogFeaturedUntil: m['catalog_featured_until'] != null
+                  ? DateTime.tryParse(m['catalog_featured_until'].toString())
+                  : null,
+              logoStoragePath: m['logo_storage_path']?.toString(),
+            );
+          })
+          .where((o) => o.id.isNotEmpty && o.businessName.isNotEmpty)
+          .toList();
     });
   }
 
@@ -114,7 +114,8 @@ class CatalogService {
 
   /// Número total de filas que cumplen [filters] (respeta RLS).
   static Future<int> fetchProductsCount({CatalogFilters? filters}) {
-    return retryOnJwtIssuedAtFuture(() => _fetchProductsCount(filters: filters));
+    return retryOnJwtIssuedAtFuture(
+        () => _fetchProductsCount(filters: filters));
   }
 
   static Future<int> _fetchProductsCount({CatalogFilters? filters}) async {
@@ -196,8 +197,8 @@ class CatalogService {
   static Future<Map<String, ({String campaignId, double percent})>>
       fetchActivePromoProductDiscounts() async {
     try {
-      final res = await SupabaseAccess.client
-          .rpc('get_active_promo_product_discounts');
+      final res =
+          await SupabaseAccess.client.rpc('get_active_promo_product_discounts');
       if (res is! Map) return const {};
       final out = <String, ({String campaignId, double percent})>{};
       res.forEach((key, value) {
@@ -283,8 +284,7 @@ class CatalogService {
         .toList();
   }
 
-  static Future<List<ImporterSalesSnapshot>>
-      adminListImporterSalesSnapshots({
+  static Future<List<ImporterSalesSnapshot>> adminListImporterSalesSnapshots({
     int days = 30,
     int? limit,
     int offset = 0,
@@ -396,16 +396,19 @@ class CatalogService {
   static Future<void> deletePromoCampaign({
     required String id,
     String? imageStoragePath,
+    String? mobileImageStoragePath,
   }) async {
-    final path = imageStoragePath?.trim();
-    if (path != null && path.isNotEmpty) {
-      try {
-        await SupabaseAccess.client.storage
-            .from(SupabaseAccess.promoCampaignsBucket)
-            .remove([path]);
-      } catch (_) {}
-    }
     await SupabaseAccess.client.from('promo_campaigns').delete().eq('id', id);
+    for (final candidate in {imageStoragePath, mobileImageStoragePath}) {
+      final path = candidate?.trim();
+      if (path != null && path.isNotEmpty) {
+        try {
+          await SupabaseAccess.client.storage
+              .from(SupabaseAccess.promoCampaignsBucket)
+              .remove([path]);
+        } catch (_) {}
+      }
+    }
   }
 
   /// Sube creativo al bucket [promo-campaigns] (solo admin vía RLS).
@@ -851,8 +854,7 @@ class CatalogService {
   /// Categorías distintas del catálogo visible para la tienda minorista.
   static Future<List<String>> fetchAliadoCatalogCategories() {
     return retryOnJwtIssuedAtFuture(() async {
-      final res =
-          await SupabaseAccess.client.rpc('aliado_catalog_categories');
+      final res = await SupabaseAccess.client.rpc('aliado_catalog_categories');
       final list = SupabaseAccess.decodeRpcJsonArray(res);
       final out = <String>[];
       for (final row in list) {

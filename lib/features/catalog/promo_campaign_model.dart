@@ -7,6 +7,8 @@ class PromoCampaignModel {
     required this.campaignType,
     required this.imageStoragePath,
     required this.imagePublicUrl,
+    this.mobileImageStoragePath,
+    this.mobileImagePublicUrl,
     this.importadorId,
     this.productId,
     this.productIds = const [],
@@ -45,10 +47,20 @@ class PromoCampaignModel {
   final String campaignType;
   final String imageStoragePath;
   final String imagePublicUrl;
+  final String? mobileImageStoragePath;
+  final String? mobileImagePublicUrl;
+
+  String imageUrlForWidth(double width) {
+    final mobile = mobileImagePublicUrl?.trim() ?? '';
+    return width < 600 && mobile.isNotEmpty ? mobile : imagePublicUrl;
+  }
+
   final String? importadorId;
+
   /// Compat: primer producto de [productIds].
   final String? productId;
   final List<String> productIds;
+
   /// % general de la valla. Si un producto no tiene el suyo, usa este.
   final double? discountPercent;
 
@@ -72,10 +84,8 @@ class PromoCampaignModel {
   bool get isImporterSponsored => sponsorType == sponsorImportador;
 
   List<String> get resolvedProductIds {
-    final fromList = productIds
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final fromList =
+        productIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     if (fromList.isNotEmpty) return fromList;
     final single = productId?.trim();
     if (single != null && single.isNotEmpty) return [single];
@@ -89,9 +99,7 @@ class PromoCampaignModel {
 
   bool get opensExternalUrl {
     final url = externalUrl?.trim();
-    return actionType == actionExternalUrl &&
-        url != null &&
-        url.isNotEmpty;
+    return actionType == actionExternalUrl && url != null && url.isNotEmpty;
   }
 
   bool get opensStore =>
@@ -228,6 +236,8 @@ class PromoCampaignModel {
       campaignType: json['campaign_type']?.toString() ?? typeBanner,
       imageStoragePath: json['image_storage_path']?.toString() ?? '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
+      mobileImagePublicUrl: json['mobile_image_public_url']?.toString(),
+      mobileImageStoragePath: json['mobile_image_storage_path']?.toString(),
       importadorId: json['importador_id']?.toString(),
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
@@ -265,12 +275,18 @@ class PromoCampaignModel {
     final ids = resolvedProductIds;
     return {
       'internal_title': internalTitle.trim(),
-      'display_title': displayTitle?.trim().isEmpty ?? true
-          ? null
-          : displayTitle!.trim(),
+      'display_title':
+          displayTitle?.trim().isEmpty ?? true ? null : displayTitle!.trim(),
       'campaign_type': campaignType,
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
+      'mobile_image_public_url': mobileImagePublicUrl?.trim().isNotEmpty == true
+          ? mobileImagePublicUrl!.trim()
+          : null,
+      'mobile_image_storage_path':
+          mobileImageStoragePath?.trim().isNotEmpty == true
+              ? mobileImageStoragePath!.trim()
+              : null,
       'importador_id': importadorId,
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
@@ -286,9 +302,8 @@ class PromoCampaignModel {
       'advertiser_name': advertiserName?.trim().isEmpty ?? true
           ? null
           : advertiserName!.trim(),
-      'external_url': externalUrl?.trim().isEmpty ?? true
-          ? null
-          : externalUrl!.trim(),
+      'external_url':
+          externalUrl?.trim().isEmpty ?? true ? null : externalUrl!.trim(),
       'created_by': createdBy,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
@@ -298,12 +313,18 @@ class PromoCampaignModel {
     final ids = resolvedProductIds;
     return {
       'internal_title': internalTitle.trim(),
-      'display_title': displayTitle?.trim().isEmpty ?? true
-          ? null
-          : displayTitle!.trim(),
+      'display_title':
+          displayTitle?.trim().isEmpty ?? true ? null : displayTitle!.trim(),
       'campaign_type': campaignType,
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
+      'mobile_image_public_url': mobileImagePublicUrl?.trim().isNotEmpty == true
+          ? mobileImagePublicUrl!.trim()
+          : null,
+      'mobile_image_storage_path':
+          mobileImageStoragePath?.trim().isNotEmpty == true
+              ? mobileImageStoragePath!.trim()
+              : null,
       'importador_id': importadorId,
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
@@ -319,9 +340,8 @@ class PromoCampaignModel {
       'advertiser_name': advertiserName?.trim().isEmpty ?? true
           ? null
           : advertiserName!.trim(),
-      'external_url': externalUrl?.trim().isEmpty ?? true
-          ? null
-          : externalUrl!.trim(),
+      'external_url':
+          externalUrl?.trim().isEmpty ?? true ? null : externalUrl!.trim(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
   }
@@ -342,6 +362,8 @@ class PromoCampaignModel {
       campaignType: json['campaign_type']?.toString() ?? typeBanner,
       imageStoragePath: '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
+      mobileImagePublicUrl: json['mobile_image_public_url']?.toString(),
+      mobileImageStoragePath: json['mobile_image_storage_path']?.toString(),
       importadorId: json['importador_id']?.toString(),
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
@@ -370,6 +392,8 @@ class PromoCampaignModel {
       campaignType: json['campaign_type']?.toString() ?? typeBanner,
       imageStoragePath: '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
+      mobileImagePublicUrl: json['mobile_image_public_url']?.toString(),
+      mobileImageStoragePath: json['mobile_image_storage_path']?.toString(),
       importadorId: null,
       actionType: actionNone,
       startsAt: DateTime.parse(json['starts_at'].toString()).toLocal(),

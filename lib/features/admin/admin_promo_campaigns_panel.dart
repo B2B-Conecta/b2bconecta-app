@@ -104,6 +104,8 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           campaignType: c.campaignType,
           imageStoragePath: c.imageStoragePath,
           imagePublicUrl: c.imagePublicUrl,
+          mobileImageStoragePath: c.mobileImageStoragePath,
+          mobileImagePublicUrl: c.mobileImagePublicUrl,
           importadorId: c.importadorId,
           productId: c.productId,
           productIds: c.productIds,
@@ -154,6 +156,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
       await SupabaseService.deletePromoCampaign(
         id: c.id,
         imageStoragePath: c.imageStoragePath,
+        mobileImageStoragePath: c.mobileImageStoragePath,
       );
       await _bootstrap();
     } catch (e) {
@@ -242,75 +245,76 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                   separator: 8,
                   onRefresh: _bootstrap,
                   itemBuilder: (c) {
-                      final imp = _importers
-                          .where((o) => o.id == c.importadorId)
-                          .map((o) => o.businessName)
-                          .firstOrNull;
-                      final sponsorLabel =
-                          c.isThirdParty ? 'Tercero' : 'Proveedor';
-                      final audienceLabel =
-                          PromoCampaignModel.audienceLabelEs(c.audience);
-                      return Card(
-                        child: ListTile(
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              c.imagePublicUrl,
+                    final imp = _importers
+                        .where((o) => o.id == c.importadorId)
+                        .map((o) => o.businessName)
+                        .firstOrNull;
+                    final sponsorLabel =
+                        c.isThirdParty ? 'Tercero' : 'Proveedor';
+                    final audienceLabel =
+                        PromoCampaignModel.audienceLabelEs(c.audience);
+                    return Card(
+                      child: ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            c.imagePublicUrl,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
                               width: 56,
                               height: 56,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 56,
-                                height: 56,
-                                color: AppColors.fieldFill,
-                                child: const Icon(Icons.image_outlined),
-                              ),
+                              color: AppColors.fieldFill,
+                              child: const Icon(Icons.image_outlined),
                             ),
                           ),
-                          title: Text(
-                            c.internalTitle,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          subtitle: Text(
-                            '${c.badgeLabel} · $sponsorLabel · $audienceLabel · '
-                            '${c.isBanner ? 'Banner' : 'Pop-up'} · '
-                            '${_formatPromoDate(c.startsAt)} – ${_formatPromoDate(c.endsAt)}\n'
-                            'Prioridad ${c.priority}'
-                            '${c.isThirdParty && c.advertiserName != null ? ' · ${c.advertiserName}' : ''}'
-                            '${imp != null ? ' · $imp' : ''}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          isThreeLine: true,
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (v) async {
-                              switch (v) {
-                                case 'edit':
-                                  await _openEditor(existing: c);
-                                case 'toggle':
-                                  await _toggleActive(c);
-                                case 'delete':
-                                  await _delete(c);
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Editar'),
-                              ),
-                              PopupMenuItem(
-                                value: 'toggle',
-                                child: Text(c.isActive ? 'Desactivar' : 'Activar'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Eliminar'),
-                              ),
-                            ],
-                          ),
                         ),
-                      );
-                    },
-                  ),
+                        title: Text(
+                          c.internalTitle,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          '${c.badgeLabel} · $sponsorLabel · $audienceLabel · '
+                          '${c.isBanner ? 'Banner' : 'Pop-up'} · '
+                          '${_formatPromoDate(c.startsAt)} – ${_formatPromoDate(c.endsAt)}\n'
+                          'Prioridad ${c.priority}'
+                          '${c.isThirdParty && c.advertiserName != null ? ' · ${c.advertiserName}' : ''}'
+                          '${imp != null ? ' · $imp' : ''}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        isThreeLine: true,
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (v) async {
+                            switch (v) {
+                              case 'edit':
+                                await _openEditor(existing: c);
+                              case 'toggle':
+                                await _toggleActive(c);
+                              case 'delete':
+                                await _delete(c);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Editar'),
+                            ),
+                            PopupMenuItem(
+                              value: 'toggle',
+                              child:
+                                  Text(c.isActive ? 'Desactivar' : 'Activar'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Eliminar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -352,12 +356,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late bool _isActive;
   String? _imagePath;
   String? _imageUrl;
+  String? _mobileImagePath;
+  String? _mobileImageUrl;
   String? _uploadError;
   bool _uploading = false;
   bool _saving = false;
 
-  bool get _isThirdParty =>
-      _sponsorType == PromoCampaignModel.sponsorTercero;
+  bool get _isThirdParty => _sponsorType == PromoCampaignModel.sponsorTercero;
 
   bool get _needsImporter =>
       !_isThirdParty &&
@@ -399,8 +404,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     final e = widget.existing;
     _internalTitleCtrl = TextEditingController(text: e?.internalTitle ?? '');
     _displayTitleCtrl = TextEditingController(text: e?.displayTitle ?? '');
-    _advertiserNameCtrl =
-        TextEditingController(text: e?.advertiserName ?? '');
+    _advertiserNameCtrl = TextEditingController(text: e?.advertiserName ?? '');
     _externalUrlCtrl = TextEditingController(text: e?.externalUrl ?? '');
     _priorityCtrl = TextEditingController(
       text: '${e?.priority ?? 0}',
@@ -434,6 +438,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _isActive = e?.isActive ?? true;
     _imagePath = e?.imageStoragePath;
     _imageUrl = e?.imagePublicUrl;
+    _mobileImagePath = e?.mobileImageStoragePath;
+    _mobileImageUrl = e?.mobileImagePublicUrl;
     if (_actionType == PromoCampaignModel.actionOpenProduct &&
         _importadorId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -496,7 +502,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage({bool mobile = false}) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       withData: true,
@@ -532,8 +538,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       );
       if (!mounted) return;
       setState(() {
-        _imagePath = uploaded.path;
-        _imageUrl = uploaded.publicUrl;
+        if (mobile) {
+          _mobileImagePath = uploaded.path;
+          _mobileImageUrl = uploaded.publicUrl;
+        } else {
+          _imagePath = uploaded.path;
+          _imageUrl = uploaded.publicUrl;
+        }
         _uploadError = null;
       });
     } catch (e) {
@@ -592,8 +603,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   PromoCampaignModel _buildDraft() {
     final priority = int.tryParse(_priorityCtrl.text.trim()) ?? 0;
     final thirdParty = _isThirdParty;
-    final openProduct = !thirdParty &&
-        _actionType == PromoCampaignModel.actionOpenProduct;
+    final openProduct =
+        !thirdParty && _actionType == PromoCampaignModel.actionOpenProduct;
     final discountPct = openProduct
         ? PromoCampaignModel.parseDiscountPercent(_discountPctCtrl.text.trim())
         : null;
@@ -604,6 +615,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       campaignType: _type,
       imageStoragePath: _imagePath ?? '',
       imagePublicUrl: _imageUrl ?? '',
+      mobileImageStoragePath: _mobileImagePath,
+      mobileImagePublicUrl: _mobileImageUrl,
       importadorId: _needsImporter ? _importadorId : null,
       productId: openProduct && _selectedProductIds.isNotEmpty
           ? _selectedProductIds.first
@@ -619,12 +632,11 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       isActive: _isActive,
       sponsorType: _sponsorType,
       audience: thirdParty ? _audience : PromoCampaignModel.audienceAliado,
-      advertiserName:
-          thirdParty ? _advertiserNameCtrl.text : null,
-      externalUrl: thirdParty &&
-              _actionType == PromoCampaignModel.actionExternalUrl
-          ? _externalUrlCtrl.text
-          : null,
+      advertiserName: thirdParty ? _advertiserNameCtrl.text : null,
+      externalUrl:
+          thirdParty && _actionType == PromoCampaignModel.actionExternalUrl
+              ? _externalUrlCtrl.text
+              : null,
     );
   }
 
@@ -648,8 +660,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       );
       return;
     }
-    if (!_isThirdParty &&
-        _actionType == PromoCampaignModel.actionOpenProduct) {
+    if (!_isThirdParty && _actionType == PromoCampaignModel.actionOpenProduct) {
       final selected = _selectedProductIds
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
@@ -749,7 +760,9 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    widget.existing == null ? 'Nueva campaña' : 'Editar campaña',
+                    widget.existing == null
+                        ? 'Nueva campaña'
+                        : 'Editar campaña',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 18,
@@ -790,7 +803,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               items: [
                 DropdownMenuItem(
                   value: PromoCampaignModel.sponsorImportador,
-                  child: _promoDropdownLabel('Proveedor (catálogo tienda minorista)'),
+                  child: _promoDropdownLabel(
+                      'Proveedor (catálogo tienda minorista)'),
                 ),
                 DropdownMenuItem(
                   value: PromoCampaignModel.sponsorTercero,
@@ -819,11 +833,11 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                   ),
                   DropdownMenuItem(
                     value: PromoCampaignModel.audienceAmbos,
-                    child: _promoDropdownLabel('Tiendas tiendas minoristas e importadores'),
+                    child: _promoDropdownLabel(
+                        'Tiendas tiendas minoristas e importadores'),
                   ),
                 ],
-                onChanged: (v) =>
-                    setState(() => _audience = v ?? _audience),
+                onChanged: (v) => setState(() => _audience = v ?? _audience),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -1015,8 +1029,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                                       ),
                                       child: TextField(
                                         controller: _pctCtrlFor(p.id),
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(
                                           decimal: true,
                                         ),
                                         decoration: const InputDecoration(
@@ -1099,19 +1113,27 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               title: const Text('Activa'),
             ),
             const SizedBox(height: 8),
-            if (_imageUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  _imageUrl!,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+            const Text(
+              'Escritorio: 2100 × 300 px (7:1). Móvil: 1500 × 500 px (3:1). '
+              'Use textos grandes y deje margen alrededor de los logos. Sin imagen móvil se usa la de escritorio.',
+              style: TextStyle(fontSize: 12, height: 1.4),
+            ),
+            if (_imageUrl != null) ...[
+              const SizedBox(height: 8),
+              const Text('Escritorio · imagen completa'),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: Image.network(_imageUrl!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const Text('No se pudo cargar la vista previa.')),
                 ),
               ),
+            ],
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: _uploading ? null : _pickImage,
+              onPressed: _uploading || _saving ? null : _pickImage,
               icon: _uploading
                   ? const SizedBox(
                       width: 18,
@@ -1119,8 +1141,45 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.upload),
-              label: Text(_imageUrl == null ? 'Subir imagen' : 'Cambiar imagen'),
+              label: Text(_imageUrl == null
+                  ? 'Subir imagen de escritorio'
+                  : 'Cambiar imagen de escritorio'),
             ),
+            const SizedBox(height: 16),
+            const Text('Móvil · imagen opcional'),
+            if (_mobileImageUrl != null) ...[
+              const SizedBox(height: 8),
+              Center(
+                  child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: 360, maxHeight: 160),
+                child: Image.network(_mobileImageUrl!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) =>
+                        const Text('No se pudo cargar la vista previa móvil.')),
+              )),
+            ],
+            Wrap(spacing: 8, children: [
+              OutlinedButton.icon(
+                onPressed: _uploading || _saving
+                    ? null
+                    : () => _pickImage(mobile: true),
+                icon: const Icon(Icons.phone_android),
+                label: Text(_mobileImageUrl == null
+                    ? 'Subir imagen móvil'
+                    : 'Cambiar imagen móvil'),
+              ),
+              if (_mobileImageUrl != null)
+                TextButton(
+                  onPressed: _uploading || _saving
+                      ? null
+                      : () => setState(() {
+                            _mobileImagePath = null;
+                            _mobileImageUrl = null;
+                          }),
+                  child: const Text('Usar imagen de escritorio'),
+                ),
+            ]),
             if (_uploadError != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -1144,7 +1203,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: FilledButton(
-                    onPressed: _saving ? null : _save,
+                    onPressed: _saving || _uploading ? null : _save,
                     child: Text(_saving ? 'Guardando…' : 'Guardar'),
                   ),
                 ),

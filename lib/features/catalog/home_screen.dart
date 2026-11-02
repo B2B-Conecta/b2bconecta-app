@@ -972,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       )
                     : null,
-                promotions: promos.isNotEmpty
+                promotions: promos.length > 1
                     ? Padding(
                         padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 4),
                         child: Align(
@@ -980,7 +980,7 @@ class _HomeScreenState extends State<HomeScreen>
                           child: TextButton.icon(
                             onPressed: () => _openActivePromotionsSheet(promos),
                             icon: const Icon(Icons.campaign_outlined, size: 18),
-                            label: Text('Promociones (${promos.length})'),
+                            label: Text('Ver todas (${promos.length})'),
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.brand,
                               textStyle: const TextStyle(

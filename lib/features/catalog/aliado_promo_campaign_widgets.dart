@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'catalog_product_price_display.dart';
 import 'part_model.dart';
 import 'promo_campaign_model.dart';
+import 'promo_banner_layout.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'product_catalog_pricing.dart';
 
@@ -25,6 +26,26 @@ const _promoMonthShort = [
   'nov',
   'dic',
 ];
+
+/// Remove generic campaign labels only when separated from the actual title.
+/// Paid third-party placements retain their advertising disclosure.
+String promoBannerCaption(PromoCampaignModel campaign) {
+  if (campaign.isThirdParty) {
+    final advertiser = campaign.advertiserName?.trim() ?? '';
+    return advertiser.isEmpty ? 'Publicidad' : 'Publicidad · $advertiser';
+  }
+  var title = campaign.promoLabel.trim();
+  final prefix = RegExp(r'^(promoci[oó]n|publicidad|anuncio)\s*[-–—:·|]\s*',
+      caseSensitive: false);
+  final suffix = RegExp(r'\s*[-–—:·|]\s*(promoci[oó]n|publicidad|anuncio)$',
+      caseSensitive: false);
+  String previous;
+  do {
+    previous = title;
+    title = title.replaceFirst(prefix, '').replaceFirst(suffix, '').trim();
+  } while (title != previous);
+  return title.isEmpty ? campaign.badgeLabel : title;
+}
 
 String _promoDayMonth(DateTime d, {required bool withYear}) {
   final monthDay = '${d.day} ${_promoMonthShort[d.month - 1]}';
@@ -202,10 +223,12 @@ class PromoCreativeImage extends StatelessWidget {
     super.key,
     required this.url,
     this.fit = BoxFit.contain,
+    this.mobileUrl,
   });
 
   final String url;
   final BoxFit fit;
+  final String? mobileUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +240,9 @@ class PromoCreativeImage extends StatelessWidget {
             : MediaQuery.sizeOf(context).width;
         final cacheWidth = (logicalWidth * dpr).clamp(480.0, 1440.0).round();
         return Image.network(
-          url,
+          constraints.maxWidth < 600 && mobileUrl?.trim().isNotEmpty == true
+              ? mobileUrl!
+              : url,
           width: double.infinity,
           height: double.infinity,
           fit: fit,
@@ -250,12 +275,14 @@ class AliadoPromoBannerCarousel extends StatefulWidget {
     super.key,
     required this.campaigns,
     this.onPromoCampaignSelected,
+    this.onViewAll,
     this.compact = false,
     this.padding,
   });
 
   final List<PromoCampaignModel> campaigns;
   final ValueChanged<PromoCampaignModel>? onPromoCampaignSelected;
+  final VoidCallback? onViewAll;
   final bool compact;
   final EdgeInsetsGeometry? padding;
 
@@ -267,7 +294,37 @@ class AliadoPromoBannerCarousel extends StatefulWidget {
 class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
   late final PageController _pageController;
   Timer? _autoplay;
+  bool _interacting = false;
   int _page = 0;
+  final Map<String, double> _ratios = {};
+  final Set<String> _failedImages = {};
+  String _creativeUrl = '';
+  ImageStream? _creativeStream;
+  ImageStreamListener? _creativeListener;
+
+  void _resolveCreative(String url) {
+    if (!mounted || _creativeUrl == url) return;
+    _creativeUrl = url;
+    if (_creativeListener != null) {
+      _creativeStream?.removeListener(_creativeListener!);
+    }
+    final stream =
+        NetworkImage(url).resolve(createLocalImageConfiguration(context));
+    final listener = ImageStreamListener((info, _) {
+      final ratio = info.image.width / info.image.height;
+      info.dispose();
+      if (mounted && _ratios[url] != ratio) {
+        setState(() => _ratios[url] = ratio);
+      }
+    }, onError: (Object error, StackTrace? stack) {
+      if (mounted && !_failedImages.contains(url)) {
+        setState(() => _failedImages.add(url));
+      }
+    });
+    _creativeStream = stream;
+    _creativeListener = listener;
+    stream.addListener(listener);
+  }
 
   @override
   void initState() {
@@ -279,28 +336,39 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
   @override
   void didUpdateWidget(covariant AliadoPromoBannerCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.campaigns.length == oldWidget.campaigns.length) return;
-    if (_page < widget.campaigns.length) return;
-    _page = 0;
-    if (_pageController.hasClients) _pageController.jumpToPage(0);
+    if (_page >= widget.campaigns.length) {
+      _page = 0;
+      if (_pageController.hasClients) _pageController.jumpToPage(0);
+    }
   }
 
   @override
   void dispose() {
     _autoplay?.cancel();
+    if (_creativeListener != null) {
+      _creativeStream?.removeListener(_creativeListener!);
+    }
     _pageController.dispose();
     super.dispose();
   }
 
   void _advance() {
     if (!mounted || widget.campaigns.length <= 1) return;
+    if (_interacting || MediaQuery.disableAnimationsOf(context)) return;
     if (!_pageController.hasClients) return;
     final next = (_page + 1) % widget.campaigns.length;
-    _pageController.animateToPage(
-      next,
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOut,
-    );
+    _goToPage(next);
+  }
+
+  void _goToPage(int page, {bool animate = true}) {
+    if (!_pageController.hasClients) return;
+    if (!animate || MediaQuery.disableAnimationsOf(context)) {
+      _pageController.jumpToPage(page);
+    } else {
+      _pageController.animateToPage(page,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic);
+    }
   }
 
   Future<void> _onTap(PromoCampaignModel c) async {
@@ -318,134 +386,225 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
     final items = widget.campaigns;
     if (items.isEmpty) return const SizedBox.shrink();
 
-    // En web el carrusel es más alto para que el creativo se lea.
+    final current = items[_page];
     final horizontalPadding = widget.compact ? 0.0 : 16.0;
-    final maxBannerHeight = widget.compact ? 240.0 : 168.0;
-    final minBannerHeight = widget.compact ? 150.0 : 112.0;
-
     return Padding(
       padding: widget.padding ??
           EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          // Preferencia panorámica (~3.5:1), limitada para no comerse el catálogo.
-          final idealHeight = width / (widget.compact ? 3.2 : 3.5);
-          final bannerHeight =
-              idealHeight.clamp(minBannerHeight, maxBannerHeight).toDouble();
+          String selectedImage(PromoCampaignModel campaign) {
+            final preferred = campaign.imageUrlForWidth(constraints.maxWidth);
+            return _failedImages.contains(preferred)
+                ? campaign.imagePublicUrl
+                : preferred;
+          }
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: bannerHeight,
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: items.length,
-                  // Evita que el PageView “robe” el scroll vertical del catálogo.
-                  allowImplicitScrolling: true,
-                  physics: items.length <= 1
-                      ? const NeverScrollableScrollPhysics()
-                      : const PageScrollPhysics(),
-                  onPageChanged: (i) => setState(() => _page = i),
-                  itemBuilder: (context, index) {
-                    final c = items[index];
-                    return Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: c.isTappable ? () => _onTap(c) : null,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ColoredBox(color: AppColors.fieldFill),
-                            PromoCreativeImage(url: c.imagePublicUrl),
-                            Positioned(
-                              left: 8,
-                              top: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.brand.withOpacity(0.92),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  c.badgeLabel,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              left: 8,
-                              bottom: 8,
-                              right: c.isTappable ? 128 : 8,
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: PromoActivePeriodChip(
-                                  startsAt: c.startsAt,
-                                  endsAt: c.endsAt,
-                                  onPhoto: true,
+          final url = selectedImage(current);
+          if (_creativeUrl != url) {
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _resolveCreative(url));
+          }
+          final imageSize =
+              promoBannerImageSize(constraints.maxWidth, _ratios[url] ?? 3);
+          final hasViewAll = items.length > 1 && widget.onViewAll != null;
+          final compactAccess = imageSize.width < 600;
+          final indicatorInset =
+              hasViewAll ? (compactAccess ? 62.0 : 132.0) : 12.0;
+          return Align(
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: imageSize.width,
+              height: imageSize.height,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: MouseRegion(
+                  onEnter: (_) => _interacting = true,
+                  onExit: (_) => _interacting = false,
+                  child: Listener(
+                    onPointerDown: (_) => _interacting = true,
+                    onPointerUp: (_) => _interacting = false,
+                    onPointerCancel: (_) => _interacting = false,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        PageView.builder(
+                          controller: _pageController,
+                          itemCount: items.length,
+                          allowImplicitScrolling: true,
+                          physics: items.length <= 1
+                              ? const NeverScrollableScrollPhysics()
+                              : const PageScrollPhysics(),
+                          onPageChanged: (i) => setState(() => _page = i),
+                          itemBuilder: (context, index) {
+                            final c = items[index];
+                            return Semantics(
+                              label: '${promoBannerCaption(c)}. '
+                                  '${promoActivePeriodLabel(c.startsAt, c.endsAt)}',
+                              button: c.isTappable,
+                              child: InkWell(
+                                onTap: c.isTappable ? () => _onTap(c) : null,
+                                child: ExcludeSemantics(
+                                  child:
+                                      PromoCreativeImage(url: selectedImage(c)),
                                 ),
                               ),
-                            ),
-                            if (c.isTappable)
-                              Positioned(
-                                right: 8,
-                                bottom: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.55),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    c.promoLabel,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                            );
+                          },
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              if (items.length > 1) ...[
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    items.length,
-                    (i) => Container(
-                      width: 6,
-                      height: 6,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            i == _page ? AppColors.brand : Colors.grey.shade400,
-                      ),
+                        if (current.isThirdParty)
+                          Positioned(
+                            top: 8,
+                            left: 10,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(.45),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 3),
+                                  child: Text('Publicidad',
+                                      style: TextStyle(
+                                          color: Colors.white, fontSize: 10)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (items.length > 1)
+                          Positioned(
+                            bottom: 6,
+                            left: indicatorInset,
+                            right: indicatorInset,
+                            child: Center(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      top: 12,
+                                      bottom: 12,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(.22),
+                                          borderRadius:
+                                              BorderRadius.circular(24),
+                                        ),
+                                      ),
+                                    ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children:
+                                          List.generate(items.length, (i) {
+                                        final selected = i == _page;
+                                        return Semantics(
+                                          button: true,
+                                          selected: selected,
+                                          label:
+                                              'Promoción ${i + 1} de ${items.length}',
+                                          onTap: () =>
+                                              _goToPage(i, animate: false),
+                                          child: InkWell(
+                                            excludeFromSemantics: true,
+                                            borderRadius:
+                                                BorderRadius.circular(22),
+                                            onTap: () => _goToPage(i,
+                                                animate: FocusManager.instance
+                                                        .highlightMode !=
+                                                    FocusHighlightMode
+                                                        .traditional),
+                                            child: SizedBox(
+                                              width: 44,
+                                              height: 44,
+                                              child: Center(
+                                                child: AnimatedContainer(
+                                                  duration: MediaQuery
+                                                          .disableAnimationsOf(
+                                                              context)
+                                                      ? Duration.zero
+                                                      : const Duration(
+                                                          milliseconds: 180),
+                                                  curve: Curves.easeOutCubic,
+                                                  width: selected ? 24 : 7,
+                                                  height: 7,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    color: Colors.white
+                                                        .withOpacity(
+                                                            selected ? 1 : .55),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (hasViewAll)
+                          Positioned(
+                            bottom: 6,
+                            right: 8,
+                            child: Tooltip(
+                              message:
+                                  'Ver todas las promociones (${items.length})',
+                              child: Semantics(
+                                label:
+                                    'Ver todas las promociones (${items.length})',
+                                button: true,
+                                onTap: widget.onViewAll,
+                                excludeSemantics: true,
+                                child: TextButton(
+                                  onPressed: widget.onViewAll,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    backgroundColor:
+                                        Colors.black.withOpacity(.38),
+                                    minimumSize: const Size(44, 44),
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: compactAccess ? 10 : 12),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(22)),
+                                  ),
+                                  child: compactAccess
+                                      ? const Icon(Icons.grid_view_rounded,
+                                          size: 18)
+                                      : const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text('Ver todas',
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                            SizedBox(width: 6),
+                                            Icon(Icons.north_east_rounded,
+                                                size: 15),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ],
+              ),
+            ),
           );
         },
       ),
@@ -484,7 +643,9 @@ Future<void> showAliadoPromoPopupDialog({
                   width: double.infinity,
                   child: ColoredBox(
                     color: AppColors.fieldFill,
-                    child: PromoCreativeImage(url: campaign.imagePublicUrl),
+                    child: PromoCreativeImage(
+                        url: campaign.imagePublicUrl,
+                        mobileUrl: campaign.mobileImagePublicUrl),
                   ),
                 ),
               ),
@@ -717,6 +878,7 @@ Future<void> showAliadoActivePromotionsSheet({
                                   color: AppColors.fieldFill,
                                   child: PromoCreativeImage(
                                     url: c.imagePublicUrl,
+                                    mobileUrl: c.mobileImagePublicUrl,
                                     fit: BoxFit.cover,
                                   ),
                                 ),

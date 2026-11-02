@@ -972,26 +972,6 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       )
                     : null,
-                promotions: promos.isNotEmpty
-                    ? Padding(
-                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 4),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: () => _openActivePromotionsSheet(promos),
-                            icon: const Icon(Icons.campaign_outlined, size: 18),
-                            label: Text('Promociones (${promos.length})'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.brand,
-                              textStyle: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    : null,
                 content: FutureBuilder<List<PartModel>>(
                   future: _partsFuture,
                   builder: (context, snapshot) {
@@ -1045,6 +1025,7 @@ class _HomeScreenState extends State<HomeScreen>
                           if (promos.isNotEmpty)
                             AliadoPromoBannerCarousel(
                               campaigns: promos,
+                              onViewAll: () => _openActivePromotionsSheet(promos),
                               onPromoCampaignSelected: _onPromoCampaignSelected,
                               compact: isDesktopCatalog,
                             ),
@@ -1087,6 +1068,7 @@ class _HomeScreenState extends State<HomeScreen>
                           SliverToBoxAdapter(
                             child: AliadoPromoBannerCarousel(
                               campaigns: promos,
+                              onViewAll: () => _openActivePromotionsSheet(promos),
                               onPromoCampaignSelected: _onPromoCampaignSelected,
                               compact: isDesktopCatalog,
                             ),

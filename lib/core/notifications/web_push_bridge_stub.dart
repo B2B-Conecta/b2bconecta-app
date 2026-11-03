@@ -4,9 +4,17 @@ bool webPushBridgeHasApi() => false;
 
 bool webPushBridgeIsIos() => false;
 
+bool webPushBridgeIsAndroid() => false;
+
+bool webPushBridgeIsDesktopWeb() => false;
+
 bool webPushBridgeIsStandalone() => false;
 
 String webPushBridgePermission() => 'unsupported';
+
+String webPushBridgeUserAgent() => '';
+
+String webPushBridgePlatformHint() => 'unsupported';
 
 Future<String> webPushBridgeRequestPermission() async => 'denied';
 

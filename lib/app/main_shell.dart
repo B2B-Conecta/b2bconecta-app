@@ -39,6 +39,7 @@ import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/core/layout/shell/shell_destination.dart';
 import 'package:motolink_pro_app/core/notifications/notification_center_sheet.dart';
+import 'package:motolink_pro_app/core/notifications/web_push_enable_banner.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_b2b_form.dart';
 import 'package:motolink_pro_app/features/profile/account_settings_screen.dart';
@@ -498,25 +499,34 @@ class _MainShellState extends State<MainShell> {
     final dest = _adminDestinations;
     final index = _tabIndex.clamp(0, dest.length - 1);
     final panels = _adminPanelWidgets();
-    return AdminDesktopShell(
-      selectedIndex: index,
-      onDestinationSelected: (i) => setState(() => _tabIndex = i),
-      destinations: dest,
-      profile: _profile,
-      unreadNotifications: _notifications.unreadCount,
-      onNotificationTap: _openNotificationCenter,
-      onMessagesTap: _openMessagesInbox,
-      unreadMessages: _notifications.unreadChatCount,
-      onOpenSettings: _openAccountSettings,
-      railStatusBuilder: canQueryAdminPresence(_profile.role)
-          ? (extended) => AdminDailyPresenceCard(
-                extended: extended,
-                onOpenDetails: MainShellTabController.navigateToAdminPresence,
-              )
-          : null,
-      pages: [
-        ...panels,
-        _adminProfileBody(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const WebPushEnableBanner(),
+        Expanded(
+          child: AdminDesktopShell(
+            selectedIndex: index,
+            onDestinationSelected: (i) => setState(() => _tabIndex = i),
+            destinations: dest,
+            profile: _profile,
+            unreadNotifications: _notifications.unreadCount,
+            onNotificationTap: _openNotificationCenter,
+            onMessagesTap: _openMessagesInbox,
+            unreadMessages: _notifications.unreadChatCount,
+            onOpenSettings: _openAccountSettings,
+            railStatusBuilder: canQueryAdminPresence(_profile.role)
+                ? (extended) => AdminDailyPresenceCard(
+                      extended: extended,
+                      onOpenDetails:
+                          MainShellTabController.navigateToAdminPresence,
+                    )
+                : null,
+            pages: [
+              ...panels,
+              _adminProfileBody(),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -526,22 +536,30 @@ class _MainShellState extends State<MainShell> {
     final index = _tabIndex.clamp(0, dest.length - 1);
     final panels = _adminPanelWidgets();
     return Scaffold(
-      body: IndexedStack(
-        index: index,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < panels.length; i++)
-            _adminOrdersScaffold(
-              title: dest[i].title,
-              child: panels[i],
+          const WebPushEnableBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: index,
+              children: [
+                for (var i = 0; i < panels.length; i++)
+                  _adminOrdersScaffold(
+                    title: dest[i].title,
+                    child: panels[i],
+                  ),
+                _ProfileTab(
+                  profile: _profile,
+                  homeRole: AppHomeRole.administrador,
+                  onProfileSaved: _refreshProfile,
+                  onNotificationTap: _openNotificationCenter,
+                  unreadNotifications: _notifications.unreadCount,
+                  onMessagesTap: _openMessagesInbox,
+                  unreadMessages: _notifications.unreadChatCount,
+                ),
+              ],
             ),
-          _ProfileTab(
-            profile: _profile,
-            homeRole: AppHomeRole.administrador,
-            onProfileSaved: _refreshProfile,
-            onNotificationTap: _openNotificationCenter,
-            unreadNotifications: _notifications.unreadCount,
-            onMessagesTap: _openMessagesInbox,
-            unreadMessages: _notifications.unreadChatCount,
           ),
         ],
       ),
@@ -741,6 +759,7 @@ class _MainShellState extends State<MainShell> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const WebPushEnableBanner(),
             if (_showAliadoAccessApprovedBanner && role == AppHomeRole.aliado)
               AliadoAccessApprovedBanner(
                 message: _aliadoAccessApprovedMessage,
@@ -788,6 +807,7 @@ class _MainShellState extends State<MainShell> {
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const WebPushEnableBanner(),
               if (_showAliadoAccessApprovedBanner && role == AppHomeRole.aliado)
                 AliadoAccessApprovedBanner(
                   message: _aliadoAccessApprovedMessage,

@@ -95,6 +95,7 @@ class OrdersService {
     precio_unitario_aliado,
     metodo_pago_moneda,
     tasa_bcv_aplicada,
+    tasa_bcv_recalc_at,
     total_ref,
     total_bs,
     commission_rate_snapshot,
@@ -1475,6 +1476,18 @@ class OrdersService {
     final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  /// Admin: reaplica una sola vez la tasa BCV vigente a `total_bs` del pedido/grupo.
+  static Future<Map<String, dynamic>> adminRecalcPedidoTasaBcv({
+    required String transactionRequestId,
+  }) async {
+    final raw = await SupabaseAccess.client.rpc(
+      'admin_recalc_pedido_tasa_bcv',
+      params: <String, dynamic>{'p_request_id': transactionRequestId},
+    );
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{};
   }
 
   /// Admin: borra la línea. Con [deleteCheckoutGroup] borra el carrito completo.

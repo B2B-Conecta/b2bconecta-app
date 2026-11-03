@@ -19,9 +19,17 @@ abstract final class WebPushBridge {
 
   static bool get isIos => webPushBridgeIsIos();
 
+  static bool get isAndroid => webPushBridgeIsAndroid();
+
+  static bool get isDesktopWeb => webPushBridgeIsDesktopWeb();
+
   static bool get isStandalone => webPushBridgeIsStandalone();
 
   static String permission() => webPushBridgePermission();
+
+  static String userAgent() => webPushBridgeUserAgent();
+
+  static String platformHint() => webPushBridgePlatformHint();
 
   static Future<String> requestPermission() => webPushBridgeRequestPermission();
 

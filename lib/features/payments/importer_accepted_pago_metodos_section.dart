@@ -70,8 +70,15 @@ class _ImporterAcceptedPagoMetodosSectionState
   }
 
   Set<String> _initialSelection(ProfileModel profile) {
-    final accepted = profile.effectiveAcceptedPagoMetodos;
-    return accepted.toSet();
+    // Sin config guardada: ninguno marcado (los métodos son opcionales).
+    final saved = profile.acceptedPagoMetodos;
+    if (saved == null || saved.every((m) => m.trim().isEmpty)) {
+      return <String>{};
+    }
+    return PagoMetodo.filterByImporterAccepted(
+      saved,
+      pagoSoloDivisas: profile.pagoSoloDivisas,
+    ).toSet();
   }
 
   Map<String, TextEditingController> _buildControllers(ProfileModel profile) {
@@ -104,33 +111,18 @@ class _ImporterAcceptedPagoMetodosSectionState
     return PagoMetodo.valuesMotoconecta;
   }
 
-  int get _selectedDivisasCount => _selected
-      .where((m) => !PagoMetodo.isBolivares(m))
-      .length;
-
   Future<void> _onSoloDivisasChanged(bool? value) async {
     if (value == null || _saving) return;
     if (value == _pagoSoloDivisas) return;
 
     if (value) {
-      if (_selectedDivisasCount == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Active al menos un método en divisas (Zelle, USDT o efectivo) '
-              'antes de deshabilitar pagos en Bs.',
-            ),
-            duration: Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Solo pagos en divisas (USD)'),
           content: const Text(
-            'Las tiendas minoristas ya no podrán pagar en bolívares (Pago Móvil ni transferencia en Bs).\n\n¿Continuar?',
+            'Las tiendas minoristas ya no podrán pagar en bolívares (Pago Móvil ni transferencia en Bs).\n\n'
+            'Los métodos de pago en divisas siguen siendo opcionales.\n\n¿Continuar?',
           ),
           actions: [
             TextButton(
@@ -158,42 +150,6 @@ class _ImporterAcceptedPagoMetodosSectionState
   }
 
   Future<void> _save() async {
-    if (_selected.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccione al menos un método de pago.')),
-      );
-      return;
-    }
-
-    if (_pagoSoloDivisas && _selectedDivisasCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Con pagos solo en USD debe tener al menos un método en divisas activo.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final sinDatos = _selected.where((code) {
-      final t = _instruccionesControllers[code]?.text.trim() ?? '';
-      return t.isEmpty;
-    }).toList();
-    if (sinDatos.isNotEmpty) {
-      final labels = sinDatos.map(PagoMetodo.labelEs).join(', ');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Complete los datos de transferencia para: $labels. '
-            'La tienda minorista los verá al elegir cada método.',
-          ),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-      return;
-    }
-
     setState(() => _saving = true);
     try {
       if (_soloDivisasDirty) {
@@ -251,8 +207,9 @@ class _ImporterAcceptedPagoMetodosSectionState
       subtitle: _pagoSectionSubtitle(),
       initiallyExpanded: false,
       infoMessage:
-          'Active los métodos que acepta e indique los datos de cada cuenta. '
-          'La tienda minorista los verá al pagar el pedido.',
+          'Opcional: active los métodos que acepta y, si quiere, los datos de cada cuenta. '
+          'Puede publicar precios REF y USD sin configurar pagos. '
+          'La tienda minorista verá estos datos al pagar el pedido.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

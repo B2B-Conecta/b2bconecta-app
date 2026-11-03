@@ -35,9 +35,15 @@
     params.set("b2b_nt", data.type || "mensaje");
     if (data.related_id) params.set("b2b_nr", data.related_id);
     if (data.notification_id) params.set("b2b_nid", data.notification_id);
-    return "./?" + params.toString();
+    var scope = self.registration && self.registration.scope
+      ? self.registration.scope
+      : "./";
+    var base = scope.replace(/\/?$/, "/");
+    return base + "?" + params.toString();
   }
 
+  // Always show a system notification. Required for background / minimized tabs
+  // (Safari macOS, Chrome, Edge) and keeps userVisibleOnly:true valid.
   self.addEventListener("push", function (event) {
     var data = parsePayload(event);
     var title = data.title || "B2B Conecta";
@@ -49,6 +55,7 @@
         badge: BADGE,
         tag: data.notification_id || data.type || "b2b-conecta",
         renotify: true,
+        silent: false,
         data: {
           type: data.type,
           related_id: data.related_id,
@@ -62,26 +69,35 @@
   self.addEventListener("notificationclick", function (event) {
     event.notification.close();
     var payload = event.notification.data || {};
-    var url = payload.url || "./";
+    var url = payload.url || (self.registration && self.registration.scope) || "./";
     event.waitUntil(
-      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
-        var message = {
-          source: "b2b-web-push",
-          type: payload.type || "mensaje",
-          related_id: payload.related_id || "",
-          notification_id: payload.notification_id || "",
-        };
-        for (var i = 0; i < clientList.length; i++) {
-          var client = clientList[i];
-          if ("focus" in client) {
-            client.postMessage(message);
-            return client.focus();
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then(function (clientList) {
+          var message = {
+            source: "b2b-web-push",
+            type: payload.type || "mensaje",
+            related_id: payload.related_id || "",
+            notification_id: payload.notification_id || "",
+          };
+          for (var i = 0; i < clientList.length; i++) {
+            var client = clientList[i];
+            try {
+              client.postMessage(message);
+            } catch (_) {}
+            if ("focus" in client) {
+              return client.focus();
+            }
           }
-        }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(url);
-        }
-      })
+          if (self.clients.openWindow) {
+            return self.clients.openWindow(url);
+          }
+        })
     );
+  });
+
+  self.addEventListener("pushsubscriptionchange", function (event) {
+    // Browser rotated the subscription; client will re-upsert on next session.
+    event.waitUntil(Promise.resolve());
   });
 })();

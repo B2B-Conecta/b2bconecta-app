@@ -109,7 +109,12 @@ bash scripts/configure_supabase_push_secrets.sh staging
 
 Android/iOS nativo siguen usando FCM (`device_push_tokens`).
 
-La PWA usa Web Push + VAPID (`web_push_subscriptions`). En iPhone/iPad hay que **Añadir a pantalla de inicio** y activar el permiso en Cuenta y seguridad. El build web inyecta los handlers en el Service Worker de Flutter (`scripts/inject_web_push_sw.sh`) sin reemplazar la caché.
+La web usa **Web Push estándar (VAPID)** (`web_push_subscriptions`), no FCM en el navegador:
+
+- **Escritorio** (Safari 16+ en macOS 13+, Chrome/Edge): activar con el botón *Activar notificaciones en esta Mac/PC* (gesto de usuario obligatorio). Las alertas van al Centro de Notificaciones con la pestaña en segundo plano.
+- **iPhone/iPad**: **Añadir a pantalla de inicio** y activar el permiso en Cuenta y seguridad.
+
+Service worker: `web/firebase-messaging-sw.js` (scope raíz) + handlers en `web/push/handlers.js`. El build de producción también inyecta los handlers en `flutter_service_worker.js` (`scripts/inject_web_push_sw.sh`).
 
 Variables:
 

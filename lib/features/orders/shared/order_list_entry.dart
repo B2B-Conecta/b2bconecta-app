@@ -95,6 +95,8 @@ class OrderListEntry {
       : null;
   bool get needsAttention =>
       lines.any((l) => l.qtyAdjustmentPendienteAliado || l.esPedidoMoroso);
+  bool get awaitingConfirmation =>
+      lines.any((l) => l.status == TransactionRequestStatus.pendiente);
   String get status {
     if (lines.any((l) => l.qtyAdjustmentPendienteAliado)) {
       return 'Revisar cantidad';
@@ -103,6 +105,9 @@ class OrderListEntry {
     if (lines.every((l) => l.pedidoEntregadoYPagado)) return 'Completado';
     if (lines.any((l) => l.status != lines.first.status)) {
       return 'Varios estados';
+    }
+    if (awaitingConfirmation && viewerRole == AppHomeRole.aliado) {
+      return 'Esperando al proveedor';
     }
     return orderStatusLabel(lines.first.status);
   }

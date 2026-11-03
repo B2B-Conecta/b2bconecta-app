@@ -57,7 +57,7 @@ class OrderWorkspace extends StatelessWidget {
             groups.where((g) => _keyOf(g) == selectedKey).firstOrNull;
         final detailOpen = selected != null;
         return ScrollCompactLayout(
-            enabled: viewerRole == AppHomeRole.aliado,
+            enabled: viewerRole != AppHomeRole.administrador,
             resetKey: (selectedKey, resetKey),
             collapseHeadingWhenCompact: true,
             builder: (context, compact) => PopScope<Object?>(

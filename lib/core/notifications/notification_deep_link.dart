@@ -82,7 +82,8 @@ void navigateFromNotificationPayload({
         MainShellTabController.navigateToAdminComisionesForNotification();
         return;
       case AppHomeRole.importador:
-        MainShellTabController.navigateToImporterCommissionSettlementsForNotification();
+        MainShellTabController
+            .navigateToImporterCommissionSettlementsForNotification();
         return;
       case AppHomeRole.aliado:
         return;
@@ -95,7 +96,11 @@ void navigateFromNotificationPayload({
   if (t0 == 'promocion' || t0 == 'inventario') {
     switch (homeRole) {
       case AppHomeRole.importador:
-        MainShellTabController.navigateToImporterInventoryForNotification();
+        if (t0 == 'inventario') {
+          MainShellTabController.navigateToImporterInventoryForNotification();
+        } else {
+          MainShellTabController.navigateToImporterHomeForNotification();
+        }
         return;
       case AppHomeRole.aliado:
         MainShellTabController.navigateToHomeTab();

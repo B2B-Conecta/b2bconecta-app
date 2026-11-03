@@ -1,3 +1,4 @@
+import '../shared/order_priority_controls.dart';
 import 'package:flutter/material.dart';
 
 import 'aliado_pedidos_filters_draft.dart';
@@ -60,6 +61,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   String? _expandedRequestId;
   late final TextEditingController _searchCtrl;
   String? _statusFilter;
+  bool _pendingOnly = false;
+  bool _pendingFirst = true;
   PedidosListScope _scope = PedidosListScope.todos;
   bool _morosoOnly = false;
   bool _creditOnly = false;
@@ -127,10 +130,12 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     setState(() {
       if (notifType == 'morosidad') {
         _morosoOnly = true;
+        _pendingOnly = false;
         _scope = PedidosListScope.entregados;
       } else if (match != null) {
         _statusFilter = null;
         _morosoOnly = false;
+        _pendingOnly = false;
         _scope = switch (match.status) {
           TransactionRequestStatus.entregado => PedidosListScope.entregados,
           TransactionRequestStatus.rechazado => PedidosListScope.cancelados,
@@ -139,6 +144,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       } else {
         _statusFilter = null;
         _morosoOnly = false;
+        _pendingOnly = false;
         _scope = PedidosListScope.todos;
       }
     });
@@ -225,6 +231,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     _searchCtrl.clear();
     setState(() {
       _statusFilter = null;
+      _pendingOnly = false;
+      _pendingOnly = false;
       _scope = PedidosListScope.todos;
       _morosoOnly = false;
       _creditOnly = false;
@@ -238,8 +246,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     setState(() {
       _expandedRequestId = null;
       if (draft.hasStatusFilter || draft.morosoOnly) {
+        _pendingOnly = false;
         _scope = PedidosListScope.todos;
       }
+      _pendingOnly = false;
       _statusFilter = draft.statusFilter;
       _morosoOnly = draft.morosoOnly;
       _creditOnly = draft.creditOnly;
@@ -1254,7 +1264,9 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   void _selectScope(PedidosListScope scope) {
     setState(() {
       _expandedRequestId = null;
+      _pendingOnly = false;
       _scope = scope;
+      _pendingOnly = false;
       if (scope != PedidosListScope.todos) _statusFilter = null;
     });
   }
@@ -1319,7 +1331,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final cerradosGroups = groupAliadoOrdersByCheckout(
       filtered.where((r) => !_esEnCurso(r.status)).toList(),
     );
-    final visibleGroups = filterOrderGroupsBySignals(
+    var visibleGroups = filterOrderGroupsBySignals(
       switch (_scope) {
         PedidosListScope.todos => [...enCursoGroups, ...cerradosGroups],
         PedidosListScope.enCurso => enCursoGroups,
@@ -1329,6 +1341,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       creditOnly: _creditOnly,
       replacementOnly: _replacementOnly,
     );
+    final pendingCount = filterOrderGroupsBySignals(
+      [...enCursoGroups, ...cerradosGroups],
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    ).where((g) => OrderListEntry(g).awaitingConfirmation).length;
+    if (_pendingOnly) {
+      visibleGroups = visibleGroups
+          .where((g) => OrderListEntry(g).awaitingConfirmation)
+          .toList();
+    }
+    if (_pendingFirst) visibleGroups = prioritizePendingOrders(visibleGroups);
     return OrderWorkspace(
       groups: visibleGroups,
       selectedKey: _expandedRequestId,
@@ -1337,8 +1360,17 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       onClearFilters: _clearFilters,
       loading: _loading,
       onRefresh: _load,
-      resetKey: Object.hash(_scope, _statusFilter, _morosoOnly, _creditOnly,
-          _replacementOnly, _dateFrom, _dateTo, _searchCtrl.text),
+      resetKey: Object.hash(
+          _pendingOnly,
+          _pendingFirst,
+          _scope,
+          _statusFilter,
+          _morosoOnly,
+          _creditOnly,
+          _replacementOnly,
+          _dateFrom,
+          _dateTo,
+          _searchCtrl.text),
       detailBuilder: (group) =>
           _buildOrderCard(context, group, workspaceDetail: true),
       controls:
@@ -1353,8 +1385,21 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           onFilters: _openPedidosFiltersSheet,
           activeFilterCount: filterBadge,
         ),
-        PedidosScopeBar(
-            selected: _scope, onSelected: _selectScope, filledStyle: true),
+        OrderPriorityControls(
+          scope: _scope,
+          onScope: _selectScope,
+          pendingOnly: _pendingOnly,
+          pendingCount: pendingCount,
+          onPending: () => setState(() {
+            _expandedRequestId = null;
+            _pendingOnly = false;
+            _scope = PedidosListScope.todos;
+            _statusFilter = null;
+            _pendingOnly = true;
+          }),
+          pendingFirst: _pendingFirst,
+          onSort: (value) => setState(() => _pendingFirst = value),
+        ),
         if (activeFilterChips != null) activeFilterChips,
       ]),
     );

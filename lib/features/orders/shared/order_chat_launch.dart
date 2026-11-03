@@ -233,8 +233,11 @@ class OrderChatIconButton extends StatelessWidget {
           );
         }
         return IconButton(
-          tooltip: unread > 0 ? 'Chat ($unread sin leer)' : 'Chat del pedido',
-          visualDensity: VisualDensity.compact,
+          tooltip: unread > 0
+              ? 'Mensajes del pedido ($unread sin leer)'
+              : 'Mensajes del pedido',
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          visualDensity: VisualDensity.standard,
           onPressed: onOpen,
           icon: Badge(
             isLabelVisible: unread > 0,

@@ -26,7 +26,7 @@ class ImporterPedidosFiltersSheet extends StatefulWidget {
   final ImporterPedidosFiltersDraft initial;
   final ScrollController? scrollController;
 
-  /// Importador: chip «Pedido nuevo». Admin lo oculta.
+  /// Importador: filtro «Por confirmar». Admin lo oculta.
   final bool showOnlyNuevos;
 
   static Future<ImporterPedidosFiltersDraft?> show(
@@ -239,7 +239,7 @@ class _ImporterPedidosFiltersSheetState
                     onChanged: (v) => setState(() => _onlyNuevos = v),
                     contentPadding: EdgeInsets.zero,
                     title: const Text(
-                      'Solo pedidos nuevos',
+                      'Solo pedidos por confirmar',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,

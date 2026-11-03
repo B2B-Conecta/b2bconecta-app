@@ -22,4 +22,8 @@ class OrderListColors {
       ? Color.lerp(AppColors.black, AppColors.brandBlue, .26)!
       : Color.lerp(AppColors.white, AppColors.brandBlue, .035)!;
   Color get border => ink.withOpacity(dark ? .15 : .085);
+  Color get pendingAccent =>
+      dark ? AppColors.warningAmberOnDark : AppColors.warningAmber;
+  Color get pendingSurface =>
+      Color.alphaBlend(pendingAccent.withOpacity(dark ? .10 : .045), surface);
 }

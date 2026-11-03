@@ -47,10 +47,7 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
   static String partiesSubtitle(TransactionRequestModel r) {
     final aliado = r.aliadoBusinessName?.trim();
     final imp = r.ownerBusinessName?.trim();
-    if (aliado != null &&
-        aliado.isNotEmpty &&
-        imp != null &&
-        imp.isNotEmpty) {
+    if (aliado != null && aliado.isNotEmpty && imp != null && imp.isNotEmpty) {
       return '$aliado · $imp';
     }
     return aliado ?? imp ?? 'Ver contacto B2B';
@@ -60,19 +57,19 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = request;
     final aliadoProfile = TransactionRequestCounterpartyProfileSection(
-          profileId: r.aliadoId,
-          partyLabel: 'Tienda minorista',
-          businessName: r.aliadoBusinessName,
-          rif: r.aliadoRif,
-          phone: r.aliadoPhone,
-          estado: r.aliadoEstado,
-          ciudad: r.aliadoCiudad,
-          direccion: r.aliadoDireccion,
-          fiscalMapsUrl: r.aliadoFiscalMapsUrl,
-          logoStoragePath: r.aliadoLogoStoragePath,
-          kycStatus: r.aliadoKycStatus,
-          loadApprovedDocuments: !embedded,
-        );
+      profileId: r.aliadoId,
+      partyLabel: 'Tienda minorista',
+      businessName: r.aliadoBusinessName,
+      rif: r.aliadoRif,
+      phone: r.aliadoPhone,
+      estado: r.aliadoEstado,
+      ciudad: r.aliadoCiudad,
+      direccion: r.aliadoDireccion,
+      fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+      logoStoragePath: r.aliadoLogoStoragePath,
+      kycStatus: r.aliadoKycStatus,
+      loadApprovedDocuments: !embedded,
+    );
     final importadorProfile = TransactionRequestCounterpartyProfileSection(
       profileId: r.ownerId,
       partyLabel: 'Importador',
@@ -125,10 +122,12 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
     super.key,
     required this.request,
     this.embedded = false,
+    this.showFiscalAddress = true,
   });
 
   final TransactionRequestModel request;
   final bool embedded;
+  final bool showFiscalAddress;
 
   static bool kycAprobadoPara(TransactionRequestModel r) =>
       r.aliadoKycStatus?.trim() == KycStatus.aprobado;
@@ -156,9 +155,9 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
       businessName: r.aliadoBusinessName,
       rif: r.aliadoRif,
       phone: r.aliadoPhone,
-      estado: r.aliadoEstado,
-      ciudad: r.aliadoCiudad,
-      direccion: r.aliadoDireccion,
+      estado: showFiscalAddress ? r.aliadoEstado : null,
+      ciudad: showFiscalAddress ? r.aliadoCiudad : null,
+      direccion: showFiscalAddress ? r.aliadoDireccion : null,
       fiscalMapsUrl: r.aliadoFiscalMapsUrl,
       logoStoragePath: r.aliadoLogoStoragePath,
       kycStatus: r.aliadoKycStatus,
@@ -275,9 +274,8 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
     final at = r.aliadoExperienceSubmittedAt;
     final stars = r.aliadoExperienceStars;
     final comment = r.aliadoExperienceComment?.trim();
-    final canAdminRate = at == null &&
-        onMutated != null &&
-        lineaElegibleValoracionAliado(r);
+    final canAdminRate =
+        at == null && onMutated != null && lineaElegibleValoracionAliado(r);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,9 +300,8 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
                 : AppColors.brandBlueContainer,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: at != null
-                  ? Colors.purple.shade200
-                  : AppColors.borderSubtle,
+              color:
+                  at != null ? Colors.purple.shade200 : AppColors.borderSubtle,
             ),
           ),
           child: at == null
@@ -834,7 +831,9 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     isDone: r.createdAt != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: r.anuladoPorMotolink
                         ? 'Anulado por B2B Conecta (post-aprobación)'
@@ -891,7 +890,9 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     isDone: r.createdAt != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Aprobado por B2B Conecta',
                     value: formatEsShortDateTime(r.atAprobadoAdmin),
@@ -900,14 +901,18 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                         r.status == TransactionRequestStatus.pendiente,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'En preparación (importador)',
                     value: _prepValue(r),
                     isDone: r.atEnPreparacion != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Pedido listo para recolección (importador)',
                     value: formatEsShortDateTime(r.atPedidoListo),
@@ -915,14 +920,18 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     highlight: r.status == TransactionRequestStatus.pedidoListo,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Factura importador a la tienda minorista',
                     value: _facturaImportadorTimeline(r),
                     isDone: r.hasProveedorFactura,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Respaldo cobro en efectivo',
                     value: _efectivoRespaldoTimeline(r),
@@ -930,14 +939,18 @@ class TransactionRequestLifecycleSection extends StatelessWidget {
                     mutedIfEmpty: true,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'En tránsito (B2B Conecta)',
                     value: _transitoValue(r),
                     isDone: r.atEnTransito != null,
                   ),
                   Divider(
-                      height: 16, thickness: 0.5, color: AppColors.borderSubtle),
+                      height: 16,
+                      thickness: 0.5,
+                      color: AppColors.borderSubtle),
                   _TimelineRow(
                     label: 'Entregado',
                     value: _entregadoTimeline(r),
@@ -1057,7 +1070,8 @@ class _TimelineRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.35,
-                  color: empty ? AppColors.textSecondary : AppColors.textPrimary,
+                  color:
+                      empty ? AppColors.textSecondary : AppColors.textPrimary,
                 ),
               ),
             ],

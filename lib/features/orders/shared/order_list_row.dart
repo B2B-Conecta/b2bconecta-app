@@ -23,7 +23,7 @@ class OrderListColumnsHeader extends StatelessWidget {
           const SizedBox(width: 16),
           Expanded(flex: 3, child: Text(partyLabel)),
           const SizedBox(width: 16),
-          const SizedBox(width: 176, child: Text('Estado del envío')),
+          const SizedBox(width: 176, child: Text('Estado')),
           const SizedBox(width: 16),
           const SizedBox(
               width: 150, child: Text('Total', textAlign: TextAlign.right)),
@@ -82,6 +82,8 @@ class _OrderListRowState extends State<OrderListRow> {
     final colors = OrderListColors.of(context);
     final entry = widget.entry;
     final active = _hover || _focus || widget.selected;
+    final pending = entry.awaitingConfirmation && !entry.needsAttention;
+    final baseSurface = pending ? colors.pendingSurface : colors.surface;
     final reducedMotion = MediaQuery.of(context).disableAnimations;
     final amount =
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -153,9 +155,8 @@ class _OrderListRowState extends State<OrderListRow> {
             reducedMotion ? Duration.zero : const Duration(milliseconds: 120),
         decoration: BoxDecoration(
           color: active
-              ? Color.alphaBlend(
-                  colors.accent.withOpacity(.045), colors.surface)
-              : colors.surface,
+              ? Color.alphaBlend(colors.accent.withOpacity(.045), baseSurface)
+              : baseSurface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
               color: _focus
@@ -164,83 +165,98 @@ class _OrderListRowState extends State<OrderListRow> {
                       ? colors.accent.withOpacity(.35)
                       : colors.border),
         ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: widget.onOpen,
-            onHover: (value) => setState(() => _hover = value),
-            onFocusChange: (value) => setState(() => _focus = value),
+        child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: widget.table
-                  ? Row(children: [
-                      Expanded(flex: 5, child: identity),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 3, child: provider),
-                      const SizedBox(width: 16),
-                      SizedBox(
-                          width: 176,
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+                    border: pending
+                        ? Border(
+                            left: BorderSide(
+                                color: colors.pendingAccent, width: 3))
+                        : null),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: widget.onOpen,
+                    onHover: (value) => setState(() => _hover = value),
+                    onFocusChange: (value) => setState(() => _focus = value),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: widget.table
+                          ? Row(children: [
+                              Expanded(flex: 5, child: identity),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 3, child: provider),
+                              const SizedBox(width: 16),
+                              SizedBox(
+                                  width: 176,
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        OrderStatusTag(entry: entry),
+                                        if (entry.shippingPhase != null) ...[
+                                          const SizedBox(height: 10),
+                                          _ShippingMarks(entry: entry),
+                                        ],
+                                      ])),
+                              const SizedBox(width: 16),
+                              SizedBox(width: 150, child: amount),
+                              const SizedBox(width: 16),
+                              arrow,
+                            ])
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                OrderStatusTag(entry: entry),
-                                if (entry.shippingPhase != null) ...[
-                                  const SizedBox(height: 10),
-                                  _ShippingMarks(entry: entry),
-                                ],
-                              ])),
-                      const SizedBox(width: 16),
-                      SizedBox(width: 150, child: amount),
-                      const SizedBox(width: 16),
-                      arrow,
-                    ])
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                          Row(children: [
-                            Flexible(child: OrderStatusTag(entry: entry)),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Text(entry.date,
-                                    textAlign: TextAlign.right,
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: colors.secondary))),
-                          ]),
-                          const SizedBox(height: 14),
-                          identity,
-                          const SizedBox(height: 14),
-                          LayoutBuilder(builder: (context, constraints) {
-                            final stack = constraints.maxWidth < 340 ||
-                                MediaQuery.textScalerOf(context).scale(14) > 19;
-                            final end = Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Flexible(child: amount),
-                                  const SizedBox(width: 12),
-                                  arrow,
-                                ]);
-                            return stack
-                                ? Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                        provider,
-                                        const SizedBox(height: 12),
-                                        end
-                                      ])
-                                : Row(children: [
-                                    Expanded(child: provider),
+                                  Row(children: [
+                                    Flexible(
+                                        child: OrderStatusTag(entry: entry)),
                                     const SizedBox(width: 12),
-                                    Flexible(child: end)
-                                  ]);
-                          }),
-                        ]),
-            ),
-          ),
-        ),
+                                    Expanded(
+                                        child: Text(entry.date,
+                                            textAlign: TextAlign.right,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: colors.secondary))),
+                                  ]),
+                                  const SizedBox(height: 14),
+                                  identity,
+                                  const SizedBox(height: 14),
+                                  LayoutBuilder(
+                                      builder: (context, constraints) {
+                                    final stack = constraints.maxWidth < 340 ||
+                                        MediaQuery.textScalerOf(context)
+                                                .scale(14) >
+                                            19;
+                                    final end = Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Flexible(child: amount),
+                                          const SizedBox(width: 12),
+                                          arrow,
+                                        ]);
+                                    return stack
+                                        ? Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                                provider,
+                                                const SizedBox(height: 12),
+                                                end
+                                              ])
+                                        : Row(children: [
+                                            Expanded(child: provider),
+                                            const SizedBox(width: 12),
+                                            Flexible(child: end)
+                                          ]);
+                                  }),
+                                ]),
+                    ),
+                  ),
+                ))),
       ),
     );
   }

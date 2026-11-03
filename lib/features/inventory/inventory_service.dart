@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -99,12 +98,23 @@ class InventoryService {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return InventoryMetrics.zero;
 
-    final rows = await SupabaseAccess.client
-        .from('products')
-        .select('stock, is_active, image_url, image_urls, stock_covers_min_order')
-        .eq('owner_id', uid);
-
-    final list = rows as List<dynamic>;
+    // No depender del límite de filas de PostgREST para los totales ni categorías.
+    final list = <dynamic>[];
+    const batchSize = 500;
+    var offset = 0;
+    while (true) {
+      final rows = await SupabaseAccess.client
+          .from('products')
+          .select(
+              'stock, is_active, image_url, image_urls, stock_covers_min_order, category')
+          .eq('owner_id', uid)
+          .order('id')
+          .range(offset, offset + batchSize - 1);
+      if (rows.isEmpty) break;
+      list.addAll(rows);
+      offset += rows.length;
+    }
+    final categories = <String>{};
     var total = 0;
     var outOfStock = 0;
     var lowStock = 0;
@@ -114,6 +124,8 @@ class InventoryService {
     for (final row in list) {
       final m = Map<String, dynamic>.from(row as Map);
       total++;
+      final category = m['category']?.toString().trim();
+      if (category != null && category.isNotEmpty) categories.add(category);
       final s = m['stock'];
       final stock = s is int ? s : int.tryParse(s?.toString() ?? '') ?? 0;
       if (stock <= 0) outOfStock++;
@@ -132,6 +144,8 @@ class InventoryService {
     }
     return InventoryMetrics(
       totalProducts: total,
+      categories: (categories.toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()))),
       outOfStock: outOfStock,
       lowStock: lowStock,
       paused: paused,
@@ -221,6 +235,7 @@ class InventoryService {
     String? searchQuery,
     String? category,
     bool onlyLowStock = false,
+    bool onlyOutOfStock = false,
     bool onlyInactive = false,
     bool onlyActive = false,
     ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
@@ -246,6 +261,8 @@ class InventoryService {
     if (onlyLowStock) {
       query = query.eq('stock_covers_min_order', false);
     }
+
+    if (onlyOutOfStock) query = query.lte('stock', 0);
 
     if (onlyInactive) {
       query = query.eq('is_active', false);
@@ -354,9 +371,8 @@ class InventoryService {
     if (id.isEmpty) return Future.value(const ProductDeleteBatchResult());
     return deleteProductsBulk(
       productIds: [id],
-      labelsById: label == null || label.trim().isEmpty
-          ? null
-          : {id: label.trim()},
+      labelsById:
+          label == null || label.trim().isEmpty ? null : {id: label.trim()},
     );
   }
 
@@ -698,6 +714,7 @@ class InventoryMetrics {
     this.lowStock = 0,
     this.withPhotos = 0,
     this.withoutPhotos = 0,
+    this.categories = const [],
   });
 
   static const InventoryMetrics zero = InventoryMetrics(
@@ -706,6 +723,7 @@ class InventoryMetrics {
     paused: 0,
   );
 
+  final List<String> categories;
   final int totalProducts;
   final int outOfStock;
 

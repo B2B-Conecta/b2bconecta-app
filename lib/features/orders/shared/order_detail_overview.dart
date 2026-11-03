@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:flutter/material.dart';
 import 'order_list_colors.dart';
 import 'order_list_entry.dart';
@@ -11,16 +12,20 @@ class OrderDetailOverview extends StatelessWidget {
       required this.lines,
       required this.nextStep,
       required this.chatAction,
+      this.viewerRole = AppHomeRole.aliado,
+      this.actionsInHeader = false,
       this.cancelAction});
   final List<TransactionRequestModel> lines;
   final String nextStep;
   final Widget chatAction;
   final Widget? cancelAction;
+  final AppHomeRole viewerRole;
+  final bool actionsInHeader;
 
   @override
   Widget build(BuildContext context) {
     final colors = OrderListColors.of(context);
-    final entry = OrderListEntry(lines);
+    final entry = OrderListEntry(lines, viewerRole: viewerRole);
     final count = entry.products.length;
     final identity =
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -93,7 +98,14 @@ class OrderDetailOverview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (compact) ...[
-                identity,
+                if (actionsInHeader)
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: identity),
+                    const SizedBox(width: 8),
+                    actions,
+                  ])
+                else
+                  identity,
                 const SizedBox(height: 14),
                 if (constraints.maxWidth >= 300 &&
                     MediaQuery.textScalerOf(context).scale(14) <= 20)
@@ -121,20 +133,30 @@ class OrderDetailOverview extends StatelessWidget {
                           child: OrderStatusTag(entry: entry))),
                   const SizedBox(width: 28),
                   Expanded(flex: 2, child: amount),
+                  if (actionsInHeader) ...[
+                    const SizedBox(width: 12),
+                    actions,
+                  ],
                 ]),
-              Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Divider(height: 1, color: colors.border)),
-              if (compact) ...[
-                note,
-                const SizedBox(height: 12),
-                Align(alignment: Alignment.centerRight, child: actions),
-              ] else
-                Row(children: [
-                  Expanded(child: note),
-                  const SizedBox(width: 20),
-                  actions
-                ]),
+              if (!actionsInHeader || nextStep.isNotEmpty) ...[
+                Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1, color: colors.border)),
+                if (actionsInHeader)
+                  note
+                else if (nextStep.isEmpty)
+                  Align(alignment: Alignment.centerRight, child: actions)
+                else if (compact) ...[
+                  note,
+                  const SizedBox(height: 12),
+                  Align(alignment: Alignment.centerRight, child: actions),
+                ] else
+                  Row(children: [
+                    Expanded(child: note),
+                    const SizedBox(width: 20),
+                    actions
+                  ]),
+              ],
             ]);
       }),
     );

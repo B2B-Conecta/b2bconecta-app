@@ -17,8 +17,10 @@ class ImporterOrderInvoiceSection extends StatefulWidget {
     required this.request,
     required this.onChanged,
     this.hideMajorTitle = false,
+
     /// Junto a [hideMajorTitle] en carritos multi-línea: evita repetir el párrafo largo en cada línea.
     this.useCompactHelp = false,
+
     /// Mismo carrito (`checkout_group_id`): una factura para todas las líneas; debe incluir [request].
     this.invoiceBundleLines,
   });
@@ -149,24 +151,27 @@ class _ImporterOrderInvoiceSectionState
           ),
           const SizedBox(height: 6),
         ],
-        Text(
-          soloLectura
-              ? OrderPaymentFlowCopy.importadorFacturaSoloLectura
-              : (_unArchivoVariasLineas
-                  ? OrderPaymentFlowCopy.importadorFacturaAyudaCarrito
-                  : (widget.useCompactHelp
-                      ? OrderPaymentFlowCopy.importadorFacturaAyudaCompacta
-                      : OrderPaymentFlowCopy.importadorFacturaAyuda)),
-          style: TextStyle(
-            fontSize: 11,
-            height: 1.35,
-            color: AppColors.textSecondary,
+        if (!widget.useCompactHelp) ...[
+          Text(
+            soloLectura
+                ? OrderPaymentFlowCopy.importadorFacturaSoloLectura
+                : (_unArchivoVariasLineas
+                    ? OrderPaymentFlowCopy.importadorFacturaAyudaCarrito
+                    : (widget.useCompactHelp
+                        ? OrderPaymentFlowCopy.importadorFacturaAyudaCompacta
+                        : OrderPaymentFlowCopy.importadorFacturaAyuda)),
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8)
+        ],
         if (_algunaLineaConFactura) ...[
           Text(
-            _filaFacturaVisual.proveedorFacturaFileName?.trim().isNotEmpty == true
+            _filaFacturaVisual.proveedorFacturaFileName?.trim().isNotEmpty ==
+                    true
                 ? 'Archivo: ${_filaFacturaVisual.proveedorFacturaFileName}'
                 : OrderPaymentFlowCopy.importadorFacturaRegistrada,
             style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
@@ -214,6 +219,28 @@ class _ImporterOrderInvoiceSectionState
             ),
           ),
         ],
+        if (widget.useCompactHelp)
+          ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Instrucciones de factura',
+                  style: TextStyle(fontSize: 12)),
+              children: [
+                Text(
+                  soloLectura
+                      ? OrderPaymentFlowCopy.importadorFacturaSoloLectura
+                      : (_unArchivoVariasLineas
+                          ? OrderPaymentFlowCopy.importadorFacturaAyudaCarrito
+                          : (widget.useCompactHelp
+                              ? OrderPaymentFlowCopy
+                                  .importadorFacturaAyudaCompacta
+                              : OrderPaymentFlowCopy.importadorFacturaAyuda)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              ]),
       ],
     );
   }

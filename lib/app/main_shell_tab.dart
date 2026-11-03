@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
+import 'importer_shell_tabs.dart';
 
 /// Permite cambiar la pestaña del [MainShell] desde hijos o rutas apiladas
 /// (p. ej. importador → tab Pedidos tras marcar en preparación).
@@ -10,6 +11,17 @@ class MainShellTabController {
 
   static void Function(int index)? _goTo;
   static VoidCallback? _refreshImporterInventory;
+  static VoidCallback? _refreshImporterHome;
+  static final importerInventoryRequest = ValueNotifier<String?>(null);
+
+  static void registerImporterHomeReload(VoidCallback? reload) =>
+      _refreshImporterHome = reload;
+  static void notifyImporterHomeReload() => _refreshImporterHome?.call();
+  static void navigateToImporterInventory({String? filter}) {
+    _goTo?.call(ImporterShellTabs.inventario);
+    importerInventoryRequest.value = filter ?? 'todos';
+  }
+
   static VoidCallback? _refreshImporterPedidos;
   static String? _pendingNotificationRelatedId;
   static VoidCallback? _pedidosNotificationDeepLink;
@@ -43,6 +55,9 @@ class MainShellTabController {
 
   static void unregister() {
     _goTo = null;
+    _refreshImporterInventory = null;
+    _refreshImporterHome = null;
+    importerInventoryRequest.value = null;
     _refreshImporterPedidos = null;
     _pendingNotificationRelatedId = null;
     _pedidosNotificationDeepLink = null;
@@ -222,12 +237,17 @@ class MainShellTabController {
     _importadorValidadosNotificationDeepLink = onNavigate;
   }
 
-  /// Importador: pestaña Inventario (índice 0) tras notificación de campaña promocional.
   static void navigateToImporterInventoryForNotification() {
-    _goTo?.call(0);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      notifyImporterInventoryReload();
-    });
+    navigateToImporterInventory();
+    SchedulerBinding.instance
+        .addPostFrameCallback((_) => notifyImporterInventoryReload());
+  }
+
+  /// Las campañas ahora se consultan en Inicio.
+  static void navigateToImporterHomeForNotification() {
+    navigateToHomeTab();
+    SchedulerBinding.instance
+        .addPostFrameCallback((_) => notifyImporterHomeReload());
   }
 
   /// Importador: pestaña Pedidos (índice 1), filtro Nuevos + expande fila.

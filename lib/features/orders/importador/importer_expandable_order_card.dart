@@ -1,3 +1,6 @@
+import '../shared/order_detail_layout.dart';
+import '../shared/order_delivery_stepper.dart';
+import '../shared/order_list_colors.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
 import 'package:flutter/material.dart';
 
@@ -38,6 +41,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     this.onNotifyQtyAdjustment,
     this.qtyAdjustmentDisabledHint,
     this.expandedFooter,
+    this.deliveryActions,
     this.onThreadChanged,
     this.ratingBar,
     this.aliadoCreditRemaining,
@@ -66,6 +70,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
   final VoidCallback? onNotifyQtyAdjustment;
   final String? qtyAdjustmentDisabledHint;
   final Widget? expandedFooter;
+  final Widget? deliveryActions;
   final VoidCallback? onThreadChanged;
   final Widget? ratingBar;
 
@@ -107,10 +112,203 @@ class ImporterExpandableOrderCard extends StatelessWidget {
         : r.pagoPendienteRiesgoCuentaTresDiasHabiles;
 
     final showBody = workspaceDetail || expanded;
+    if (workspaceDetail) {
+      final colors = OrderListColors.of(context);
+      final tracking = OrderDetailSection(
+        title: 'Seguimiento',
+        icon: Icons.local_shipping_outlined,
+        tonal: true,
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          OrderDeliveryStepper(lines: lines),
+          const SizedBox(height: 8),
+          ExpansionTile(
+            key: PageStorageKey('importer-history-${r.id}'),
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Historial del envío',
+                style: TextStyle(fontSize: 13)),
+            children: [
+              _SeguimientoBody(
+                  lines: lines,
+                  isCheckoutGroup: isCheckoutGroup,
+                  uid: uid,
+                  single: r)
+            ],
+          ),
+        ]),
+      );
+      final products = OrderDetailSection(
+          title: 'Productos',
+          icon: Icons.shopping_bag_outlined,
+          child: TransactionRequestProductosDesgloseSection(
+              lines: lines,
+              compact: true,
+              viewer: PedidoDesgloseViewer.importador,
+              hideSectionTitle: true,
+              showPrecioHelp: false));
+      final delivery = OrderDetailSection(
+          title: 'Entrega',
+          icon: Icons.location_on_outlined,
+          flat: true,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            TransactionRequestDestinoEntregaSection(
+                request: lines.first, hideSectionTitle: true),
+            if (deliveryActions != null) ...[
+              const SizedBox(height: 12),
+              deliveryActions!
+            ],
+          ]));
+      final contact = OrderDetailSection(
+          title: 'Contacto',
+          icon: Icons.storefront_outlined,
+          flat: true,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            TransactionRequestAliadoContactSection(
+                request: lines.first,
+                embedded: true,
+                showFiscalAddress: !lines.first.destinoEntregaUsaPerfil),
+            if (TransactionRequestAliadoContactSection.kycAprobadoPara(
+                lines.first))
+              TextButton.icon(
+                  onPressed: () => showImporterAliadoKycDetailSheet(context,
+                      aliado:
+                          TransactionRequestAliadoContactSection.kycModelPara(
+                              lines.first)),
+                  icon: const Icon(Icons.verified_user_outlined, size: 18),
+                  label: const Text('Ver expediente KYC')),
+          ]));
+      final payment = OrderDetailSection(
+          title: 'Pago y factura',
+          icon: Icons.account_balance_wallet_outlined,
+          child: expandedFooter ?? const SizedBox.shrink());
+      final actions = OrderDetailSection(
+          title: 'Gestión del pedido',
+          icon: Icons.inventory_2_outlined,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (nextStatus != null &&
+                nextActionLabel != null &&
+                onAdvance != null)
+              FilledButton(onPressed: onAdvance, child: Text(nextActionLabel!)),
+            if (canNotifyQtyAdjustment ||
+                qtyAdjustmentDisabledHint != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                  onPressed: onNotifyQtyAdjustment,
+                  icon: const Icon(Icons.inventory_2_outlined, size: 19),
+                  label: const Text('Proponer ajuste de cantidad')),
+              if (qtyAdjustmentDisabledHint != null &&
+                  onNotifyQtyAdjustment == null)
+                Text(qtyAdjustmentDisabledHint!,
+                    style: TextStyle(fontSize: 12, color: colors.secondary)),
+            ],
+            if (lines.any((l) => l.qtyAdjustmentPendienteAliado))
+              const Text(
+                  'Cantidad pendiente de respuesta de la tienda minorista.'),
+          ]));
+      final hasAfterSales = lines.any((l) =>
+          l.postventaDevolucionAt != null ||
+          l.postventaQuejaAt != null ||
+          l.postventaResolucion != null);
+      final afterSales = OrderDetailSection(
+          title: 'Posventa',
+          icon: Icons.assignment_return_outlined,
+          child: OrderReturnButtons(
+              lines: lines,
+              allowReplyAsAliado: false,
+              allowReplyAsImportador: orderLinesAllowChatReply(lines),
+              dispatchReplacementAsImporter: true,
+              onChanged: onThreadChanged));
+      final commission = orderCardCommissionSubtitle(lines) == null
+          ? null
+          : OrderDetailSection(
+              title: 'Comisión B2B Conecta',
+              icon: Icons.receipt_long_outlined,
+              child: OrderCommissionSummary(
+                  lines: orderLinesEligibleForCommission(lines),
+                  suppressOuterTitle: true));
+      final primary = <Widget>[
+        if (nextStatus != null ||
+            canNotifyQtyAdjustment ||
+            qtyAdjustmentDisabledHint != null)
+          actions,
+        tracking,
+        products,
+        payment,
+      ];
+      final secondary = <Widget>[
+        delivery,
+        contact,
+        if (commission != null) commission,
+        if (hasAfterSales) afterSales
+      ];
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Card(
+            margin: EdgeInsets.zero,
+            elevation: 0,
+            color: colors.surface,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: colors.border)),
+            child: OrderSummaryHeader(
+                lines: lines,
+                viewerRole: AppHomeRole.importador,
+                expanded: true,
+                onToggle: onToggle,
+                statusLabel: statusLabel,
+                showToggle: false,
+                detailSummary: true,
+                showRoutineGuidance: false,
+                actionsInHeader: true,
+                onCancel: canCancelByImporter ? onCancelByImporter : null,
+                cancelBusy: cancelBusy,
+                chatAction: OrderChatIconButton(
+                    showLabel: false,
+                    relatedOrderIds: lines.map((e) => e.id).toList(),
+                    onOpen: () => _openChat(context, lines, isCheckoutGroup)))),
+        const SizedBox(height: 16),
+        if (promoChip != null) ...[promoChip, const SizedBox(height: 12)],
+        if (creditApplied > 0) ...[
+          Text('Saldo aplicado: ${formatRefAmount(creditApplied)} REF'),
+          const SizedBox(height: 12)
+        ],
+        if ((aliadoCreditRemaining ?? 0) > 0) ...[
+          _OrderCreditNotice(
+              amount: aliadoCreditRemaining!,
+              storeName: lines.first.aliadoBusinessName),
+          const SizedBox(height: 12)
+        ],
+        if (anyPagoPendienteTrasEntrega) ...[
+          MorosoOrderCardNotice(
+              request: lines.firstWhere((x) => x.esPedidoMoroso),
+              expanded: true,
+              riskWarningChild: anyPagoRiesgo
+                  ? const _InfoBanner(
+                      color: Colors.red,
+                      text:
+                          '>3 días hábiles sin pago aprobado: posible restricción de nuevos pedidos.')
+                  : null),
+          const SizedBox(height: 12)
+        ],
+        OrderDetailColumns(
+            primary: primary,
+            secondary: secondary,
+            mobileOrder: [
+              ...primary.where((w) => !identical(w, payment)),
+              delivery,
+              contact,
+              payment,
+              if (commission != null) commission,
+              if (hasAfterSales) afterSales
+            ]),
+        if (ratingBar != null) ...[const SizedBox(height: 16), ratingBar!],
+      ]);
+    }
     return Card(
-      margin: workspaceDetail
-          ? EdgeInsets.zero
-          : const EdgeInsets.only(bottom: 10),
+      margin:
+          workspaceDetail ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
       elevation: 0,
       color: highlighted ? AppColors.brandBlueContainer : null,
       shape: RoundedRectangleBorder(
@@ -185,8 +383,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               ),
             ),
           AnimatedSize(
-            duration: Duration(
-                milliseconds: workspaceDetail ? 0 : 220),
+            duration: Duration(milliseconds: workspaceDetail ? 0 : 220),
             curve: Curves.easeInOut,
             alignment: Alignment.topCenter,
             child: showBody

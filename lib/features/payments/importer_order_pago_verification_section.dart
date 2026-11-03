@@ -18,8 +18,11 @@ class ImporterOrderPagoVerificationSection extends StatefulWidget {
     super.key,
     required this.request,
     required this.onChanged,
+
     /// En el mismo panel, varias líneas: el padre muestra el producto; oculta el título repetido.
     this.hideMajorTitle = false,
+    this.compactHelp = false,
+
     /// Mismo carrito e importador: un comprobante y una revisión para todas las líneas.
     this.bundleLines,
   });
@@ -27,6 +30,7 @@ class ImporterOrderPagoVerificationSection extends StatefulWidget {
   final TransactionRequestModel request;
   final VoidCallback onChanged;
   final bool hideMajorTitle;
+  final bool compactHelp;
 
   /// Si se informa con 2+ filas, la UI y la acción de aprobar/rechazar aplican a todas.
   final List<TransactionRequestModel>? bundleLines;
@@ -155,12 +159,14 @@ class _ImporterOrderPagoVerificationSectionState
     if (r.status == TransactionRequestStatus.rechazado) return false;
 
     final pe = r.pagoEstadoRevisionEfectivo;
-    if (pe == PagoRevisionEstado.aprobado || pe == PagoRevisionEstado.rechazado) {
+    if (pe == PagoRevisionEstado.aprobado ||
+        pe == PagoRevisionEstado.rechazado) {
       return false;
     }
 
     final enRevision = pe == PagoRevisionEstado.enRevision;
-    final morosoConComprobante = r.status == TransactionRequestStatus.entregado &&
+    final morosoConComprobante = r.status ==
+            TransactionRequestStatus.entregado &&
         r.esPedidoMoroso &&
         pe == PagoRevisionEstado.pendiente &&
         (r.hasComprobantePago || r.pagoMetodo?.trim() == PagoMetodo.efectivo);
@@ -190,6 +196,18 @@ class _ImporterOrderPagoVerificationSectionState
       default:
         return pe;
     }
+  }
+
+  Widget _paymentHelp(String text, {TextStyle? style}) {
+    final message = Text(text, style: style);
+    if (!widget.compactHelp) return message;
+    return ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: const Text('Cómo registrar el pago',
+            style: TextStyle(fontSize: 12)),
+        children: [
+          Padding(padding: const EdgeInsets.only(bottom: 8), child: message)
+        ]);
   }
 
   @override
@@ -328,7 +346,7 @@ class _ImporterOrderPagoVerificationSectionState
           if (!_lines.any(_puedeConfirmarPago))
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(
+              child: _paymentHelp(
                 ref.pagoMetodo?.trim() == PagoMetodo.efectivo
                     ? 'La tienda minorista puede declarar pago en efectivo desde su ficha del pedido.'
                     : 'La tienda minorista declara método y comprobante en su ficha del pedido.',
@@ -440,7 +458,7 @@ class _ImporterOrderPagoVerificationSectionState
               pe != PagoRevisionEstado.rechazado)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(
+              child: _paymentHelp(
                 r.pagoMetodo?.trim() == PagoMetodo.efectivo
                     ? 'La tienda minorista puede declarar pago en efectivo desde su ficha del pedido.'
                     : 'La tienda minorista puede declarar método y adjuntar comprobante desde su ficha del pedido.',

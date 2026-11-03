@@ -3,50 +3,32 @@ import 'package:flutter/material.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
-import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_share_link.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
-import 'importer_onboarding_checklist.dart';
-import 'importer_onboarding_checklist_card.dart';
-import 'importer_priority_actions.dart';
 import 'importer_product_edit_screen.dart';
 import 'catalog_import_orchestrator.dart';
 import 'excel_catalog_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'importer_bulk_photos_screen.dart';
 import 'importer_flexible_import_screen.dart';
-import 'product_custom_fields_section.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'importer_inventory_layout.dart';
-import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
+import 'inventory_product_tile.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
-import 'importer_sales_snapshot.dart';
 import 'product_delete_outcome_sheet.dart';
 import 'product_delete_result.dart';
 import 'product_images.dart';
 
 enum _InventorySelectionMode { none, visibility, delete }
 
-/// Categorías alineadas al seed / Excel (orden para el filtro).
-const _kInventoryCategories = <String>[
-  'Todas',
-  'Accesorios',
-  'Chasis',
-  'Eléctrico',
-  'Frenos',
-  'Motor',
-  'Transmisión',
-];
-
-/// Vista "Mi inventario" para importadores: métricas, lista, carga masiva, FAB.
+/// Gestión de productos, precios, stock y publicación del importador.
 class ImporterInventoryDashboard extends StatefulWidget {
   const ImporterInventoryDashboard({super.key});
 
@@ -55,28 +37,27 @@ class ImporterInventoryDashboard extends StatefulWidget {
       _ImporterInventoryDashboardState();
 }
 
-class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard> {
+class _ImporterInventoryDashboardState
+    extends State<ImporterInventoryDashboard> {
   final _searchController = TextEditingController();
   final _inventoryScrollController = ScrollController();
   Future<InventoryMetrics>? _metricsFuture;
-  Future<ImporterSalesSnapshot>? _salesSnapshotFuture;
-  int _salesSnapshotDays = 30;
   Future<List<PartModel>>? _partsFuture;
   final List<PartModel> _loadedParts = <PartModel>[];
   int _productPageIndex = 0;
   int _productPageSize = listPageSizeOptions.first;
+  int _inventoryRequestId = 0;
   bool _hasMoreInventory = true;
   bool _loadingMoreInventory = false;
   String _categoryFilter = 'Todas';
   bool _filterLowStock = false;
+  bool _filterOutOfStock = false;
   bool _filterHidden = false;
   bool _filterActiveOnly = false;
   ProductPhotoListFilter _photoFilter = ProductPhotoListFilter.all;
   _InventorySelectionMode _selectionMode = _InventorySelectionMode.none;
   bool _pagoSoloDivisas = false;
   ProfileModel? _priorityProfile;
-  Future<int?>? _newOrdersCount;
-  Future<int?>? _pendingInvoicesCount;
   final Set<String> _selectedIds = <String>{};
   final Set<String> _togglingProductIds = <String>{};
 
@@ -88,6 +69,9 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     _reload();
     _loadImporterPagoPolicy();
     MainShellTabController.registerImporterInventoryReload(_reload);
+    MainShellTabController.importerInventoryRequest
+        .addListener(_onInventoryRequest);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onInventoryRequest());
   }
 
   Future<void> _loadImporterPagoPolicy() async {
@@ -104,6 +88,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
   @override
   void dispose() {
     MainShellTabController.registerImporterInventoryReload(null);
+    MainShellTabController.importerInventoryRequest
+        .removeListener(_onInventoryRequest);
     _searchController.dispose();
     _inventoryScrollController.dispose();
     super.dispose();
@@ -113,7 +99,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
 
   double? _keptInventoryOffset;
 
-  void _reloadInventory({bool preserveScroll = false}) {
+  void _reloadInventory(
+      {bool preserveScroll = false, bool refreshMetrics = true}) {
     final kept = preserveScroll && _inventoryScrollController.hasClients
         ? _inventoryScrollController.offset
         : null;
@@ -124,11 +111,9 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       }
       _productPageIndex = 0;
       _hasMoreInventory = true;
-      _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
-      _newOrdersCount = SupabaseService.countMyNewOrders();
-      _pendingInvoicesCount = SupabaseService.countMyPendingCommissionInvoices();
-      _salesSnapshotFuture =
-          SupabaseService.fetchMySalesSnapshot(days: _salesSnapshotDays);
+      if (refreshMetrics) {
+        _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
+      }
       _partsFuture = _fetchInventoryPage(
         reset: true,
         preserveScroll: preserveScroll,
@@ -151,6 +136,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     required bool reset,
     bool preserveScroll = false,
   }) async {
+    final requestId = reset ? ++_inventoryRequestId : _inventoryRequestId;
     if (reset && !preserveScroll) {
       _loadedParts.clear();
       _hasMoreInventory = true;
@@ -171,10 +157,14 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       searchQuery: _searchController.text,
       category: _categoryFilter,
       onlyLowStock: _filterLowStock,
+      onlyOutOfStock: _filterOutOfStock,
       onlyInactive: _filterHidden,
       onlyActive: _filterActiveOnly,
       photoFilter: _photoFilter,
     );
+    if (!mounted || requestId != _inventoryRequestId) {
+      return List<PartModel>.unmodifiable(_loadedParts);
+    }
     if (batch.length < ImporterInventoryLayout.pageSize) {
       _hasMoreInventory = false;
     }
@@ -274,9 +264,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         final list = ListView.separated(
           controller: scroll,
           shrinkWrap: !scrollable,
-          physics: scrollable
-              ? null
-              : const NeverScrollableScrollPhysics(),
+          physics: scrollable ? null : const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.only(top: 4, bottom: 4),
           itemCount: products.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -330,9 +318,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                count == 1
-                    ? 'Eliminar producto'
-                    : 'Eliminar $count productos',
+                count == 1 ? 'Eliminar producto' : 'Eliminar $count productos',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -488,191 +474,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
   }
 
-  Widget _inventoryToolbarIcon({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback? onPressed,
-    Color? backgroundColor,
-    Color? foregroundColor,
-    Widget? iconWidget,
-  }) {
-    return IconButton(
-      style: IconButton.styleFrom(
-        backgroundColor: backgroundColor ?? AppColors.fieldFill,
-        foregroundColor: foregroundColor,
-        minimumSize: const Size(40, 40),
-        padding: EdgeInsets.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: iconWidget ?? Icon(icon, size: 20),
-    );
-  }
-
-  List<Widget> _inventoryToolbarButtons() {
-    return [
-      _inventoryToolbarIcon(
-        icon: Icons.qr_code_2,
-        tooltip: 'Compartir QR de la vitrina',
-        onPressed: _shareStoreQr,
-        backgroundColor: AppColors.brandBlue,
-        foregroundColor: Colors.white,
-      ),
-      _inventoryToolbarIcon(
-        icon: Icons.help_outline,
-        tooltip: 'Cómo funciona la carga masiva',
-        onPressed: _showHelpDialog,
-      ),
-      _inventoryToolbarIcon(
-        icon: Icons.download_outlined,
-        tooltip: 'Exportar inventario a Excel',
-        onPressed: _exportRegisteredInventory,
-        backgroundColor: AppColors.brandBlue,
-        foregroundColor: Colors.white,
-      ),
-    ];
-  }
-
-  Widget _bulkActionsPanel({required bool isDesktop}) {
-    final cards = [
-      _bulkCatalogCard(isDesktop: isDesktop),
-      _bulkPhotosCard(isDesktop: isDesktop),
-    ];
-    if (!isDesktop) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          cards[0],
-          const SizedBox(height: 10),
-          cards[1],
-        ],
-      );
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: cards[0]),
-        const SizedBox(width: 12),
-        Expanded(child: cards[1]),
-      ],
-    );
-  }
-
-  Widget _bulkCatalogCard({required bool isDesktop}) {
-    return Material(
-      color: AppColors.successGreen.withOpacity(0.08),
-      borderRadius: AppDecorations.radius12,
-      child: InkWell(
-        borderRadius: AppDecorations.radius12,
-        onTap: _startBulkImport,
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(isDesktop ? 16 : 14),
-          decoration: BoxDecoration(
-            borderRadius: AppDecorations.radius12,
-            border: Border.all(color: AppColors.successGreen.withOpacity(0.35)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.upload_file, color: AppColors.successGreen.withOpacity(0.9)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Catálogo',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Excel o CSV del ERP → productos, precios y stock.',
-                style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _startBulkImport,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.successGreen,
-                  minimumSize: const Size(0, 40),
-                ),
-                icon: const Icon(Icons.folder_open_outlined, size: 18),
-                label: const Text('Elegir Excel / CSV'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _downloadImportTemplate,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 40),
-                ),
-                icon: const Icon(Icons.download_outlined, size: 18),
-                label: const Text('Descargar plantilla'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _bulkPhotosCard({required bool isDesktop}) {
-    return Material(
-      color: AppColors.brandBlue.withOpacity(0.06),
-      borderRadius: AppDecorations.radius12,
-      child: InkWell(
-        borderRadius: AppDecorations.radius12,
-        onTap: _startBulkPhotos,
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(isDesktop ? 16 : 14),
-          decoration: BoxDecoration(
-            borderRadius: AppDecorations.radius12,
-            border: Border.all(color: AppColors.brandBlue.withOpacity(0.3)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.photo_library_outlined, color: AppColors.brandBlue.withOpacity(0.9)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Fotos',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'ZIP con fotos nombradas por SKU (hasta 3 por producto).',
-                style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _startBulkPhotos,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.brandBlue,
-                  minimumSize: const Size(0, 40),
-                ),
-                icon: const Icon(Icons.archive_outlined, size: 18),
-                label: const Text('Elegir ZIP de fotos'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _startBulkPhotos() async {
     final result = await ImporterBulkPhotosScreen.open(context);
     if (!mounted || result == null) return;
@@ -687,10 +488,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         ),
       );
     }
-  }
-
-  Widget _bulkImportBanner({required bool isDesktop}) {
-    return _bulkActionsPanel(isDesktop: isDesktop);
   }
 
   Future<void> _exportRegisteredInventory() async {
@@ -782,8 +579,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                       step: '2',
                       icon: Icons.view_column_outlined,
                       title: 'Confirma las columnas',
-                      body:
-                          'B2B Conecta propone SKU, nombre, precio y stock. '
+                      body: 'B2B Conecta propone SKU, nombre, precio y stock. '
                           'Revisa el mapeo; el resto puede quedar como dato interno.',
                     ),
                     _helpGuideStep(
@@ -799,8 +595,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                       step: '4',
                       icon: Icons.photo_library_outlined,
                       title: 'Añade fotos (opcional)',
-                      body:
-                          'ZIP con el nombre del SKU de cada producto: '
+                      body: 'ZIP con el nombre del SKU de cada producto: '
                           'ACE-4.jpg, ACE-4_2.jpg, ACE-4_3.jpg (máx. 3). '
                           'En variantes, usa el SKU de cada opción.',
                       isLast: true,
@@ -827,8 +622,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     _helpCallout(
                       icon: Icons.tune_outlined,
                       title: 'Pedido mínimo a tu medida',
-                      body:
-                          'Si dejas cantidad_minima vacía, queda en 5. '
+                      body: 'Si dejas cantidad_minima vacía, queda en 5. '
                           'Si pones 1, 2 u otro valor, esa cantidad manda.',
                     ),
                   ],
@@ -1065,9 +859,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     final isCsv = name.toLowerCase().endsWith('.csv');
     final fileMeta = CatalogImportFileMeta(
       name: name,
-      format: isCsv
-          ? CatalogImportFileFormat.csv
-          : CatalogImportFileFormat.xlsx,
+      format:
+          isCsv ? CatalogImportFileFormat.csv : CatalogImportFileFormat.xlsx,
     );
 
     CatalogImportPreview preview;
@@ -1118,14 +911,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
   }
 
-  String? _commercialTermsLine(PartModel p) {
-    final parts = <String>[];
-    if (p.tieneOfertaDirecta) parts.add('Promoción USD');
-    parts.add(p.minOrderQtyLabelEs);
-    if (parts.isEmpty) return null;
-    return parts.join(' · ');
-  }
-
   Future<void> _openEditor(PartModel? part) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -1140,14 +925,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
       if (_selectionMode != mode) _selectedIds.clear();
       _selectionMode = mode;
       if (mode == _InventorySelectionMode.none) _selectedIds.clear();
-    });
-  }
-
-  void _enterDeleteSelection({PartModel? initial}) {
-    setState(() {
-      _selectionMode = _InventorySelectionMode.delete;
-      _selectedIds.clear();
-      if (initial != null) _selectedIds.add(initial.id);
     });
   }
 
@@ -1289,61 +1066,6 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     }
   }
 
-  Widget _visibilitySwitch(PartModel p) {
-    final busy = _togglingProductIds.contains(p.id);
-    return Tooltip(
-      message: p.isActive
-          ? 'Publicado. Las tiendas lo ven. Pausa para ocultarlo de inmediato.'
-          : 'Pausado. No aparece en el catálogo de las tiendas.',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            p.isActive ? 'Publicado' : 'Pausado',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: p.isActive
-                  ? AppColors.successGreen
-                  : AppColors.brandAccent,
-            ),
-          ),
-          const SizedBox(height: 2),
-          SwitchTheme(
-            data: SwitchThemeData(
-              trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.disabled)) {
-                  return AppColors.borderSubtle;
-                }
-                return AppColors.brand.withOpacity(0.85);
-              }),
-              trackOutlineWidth: WidgetStateProperty.all(1.8),
-              thumbColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.disabled)) {
-                  return Colors.grey.shade400;
-                }
-                if (states.contains(WidgetState.selected)) {
-                  return AppColors.brand;
-                }
-                return Colors.white;
-              }),
-              trackColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return AppColors.brand.withOpacity(0.22);
-                }
-                return Colors.transparent;
-              }),
-            ),
-            child: Switch(
-              value: p.isActive,
-              onChanged: busy ? null : (v) => _toggleActive(p, v),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _productThumbnail(PartModel p, {required bool desktop}) {
     final size = desktop ? 72.0 : 56.0;
     return ClipRRect(
@@ -1354,7 +1076,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         child: p.coverImageUrl != null && p.coverImageUrl!.isNotEmpty
             ? Image.network(
                 p.coverImageUrl!,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => _thumbPlaceholder(size),
               )
             : _thumbPlaceholder(size),
@@ -1373,305 +1095,19 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     );
   }
 
-  Widget _buildProductInfoColumn(PartModel p) {
-    final lowStock = !p.stockCoversMinOrder;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          p.nombre,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 15,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'SKU: ${p.sku ?? p.id}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 2,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              '${p.precio.toStringAsFixed(2)} '
-              '${_pagoSoloDivisas ? 'USD' : 'REF'}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.brand,
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (lowStock) ...[
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 18,
-                    color: Colors.red.shade700,
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                Text(
-                  '${p.stock} u.',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: lowStock
-                        ? Colors.red.shade800
-                        : AppColors.textPrimary,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        if (_commercialTermsLine(p) != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              _commercialTermsLine(p)!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                height: 1.25,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-        if (p.category != null && p.category!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              p.category!,
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.brandAccent,
-              ),
-            ),
-          ),
-        ProductCustomFieldsChips(customFields: p.customFields),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _photoStatusChip(p.hasPhotos),
-              if (!p.hasPhotos && !_inSelectionMode)
-                TextButton(
-                  onPressed: () => _openEditor(p),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    foregroundColor: AppColors.brand,
-                  ),
-                  child: const Text('Agregar fotos'),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _photoStatusChip(bool hasPhotos) {
-    final color = hasPhotos ? AppColors.successGreen : Colors.orange.shade800;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.45)),
-      ),
-      child: Text(
-        hasPhotos ? 'Con fotos' : 'Sin fotos',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  String _inventoryFilterSummary() {
-    final parts = <String>[];
-    if (_categoryFilter != 'Todas') parts.add(_categoryFilter);
-    switch (_photoFilter) {
-      case ProductPhotoListFilter.withPhotos:
-        parts.add('Con fotos');
-      case ProductPhotoListFilter.withoutPhotos:
-        parts.add('Sin fotos');
-      case ProductPhotoListFilter.all:
-        break;
-    }
-    if (_filterLowStock) parts.add('Stock bajo');
-    if (_filterActiveOnly) parts.add('Publicados');
-    if (_filterHidden) parts.add('Pausados');
-    if (parts.isEmpty) return 'Categoría, fotos y vista';
-    return parts.join(' · ');
-  }
-
-  String _photoFilterLabel(
-    ProductPhotoListFilter filter,
-    InventoryMetrics? metrics,
-  ) {
-    switch (filter) {
-      case ProductPhotoListFilter.all:
-        return 'Todos';
-      case ProductPhotoListFilter.withPhotos:
-        if (metrics == null) return 'Con fotos';
-        return 'Con fotos (${metrics.withPhotos})';
-      case ProductPhotoListFilter.withoutPhotos:
-        if (metrics == null) return 'Sin fotos';
-        return 'Sin fotos (${metrics.withoutPhotos})';
-    }
-  }
-
   Widget _buildProductTile(PartModel p, {required bool desktop}) {
-    return Material(
-      color: AppColors.card,
-      borderRadius: AppDecorations.radius12,
-      elevation: 0,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: AppDecorations.radius12,
-          border: Border.all(color: AppColors.borderSubtle),
-          boxShadow: desktop ? AppDecorations.cardShadow : null,
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: desktop ? 12 : 4,
-            vertical: desktop ? 10 : 4,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_inSelectionMode)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, top: 4),
-                  child: Checkbox(
-                    value: _selectedIds.contains(p.id),
-                    onChanged: (_) => _toggleRowSelected(p),
-                    fillColor: WidgetStateProperty.resolveWith((s) {
-                      if (s.contains(WidgetState.selected)) {
-                        return AppColors.brand;
-                      }
-                      return null;
-                    }),
-                  ),
-                ),
-              if (desktop) ...[
-                _productThumbnail(p, desktop: true),
-                const SizedBox(width: 14),
-              ],
-              Expanded(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: AppDecorations.radius12,
-                    onTap: _inSelectionMode
-                        ? () => _toggleRowSelected(p)
-                        : () => _openEditor(p),
-                    onLongPress: _inSelectionMode
-                        ? null
-                        : () => _enterDeleteSelection(initial: p),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!desktop) ...[
-                            _productThumbnail(p, desktop: false),
-                            const SizedBox(width: 10),
-                          ],
-                          Expanded(child: _buildProductInfoColumn(p)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (!_inSelectionMode) ...[
-                Padding(
-                  padding: const EdgeInsets.only(right: 4, top: 4),
-                  child: _visibilitySwitch(p),
-                ),
-                IconButton(
-                  tooltip: 'Compartir producto',
-                  onPressed: () => showProductShareSheet(context, p),
-                  icon: const Icon(
-                    Icons.ios_share_rounded,
-                    color: AppColors.brand,
-                    size: 22,
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Eliminar',
-                  onSelected: (value) {
-                    if (value == 'one') _deleteSingle(p);
-                    if (value == 'many') _enterDeleteSelection(initial: p);
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'one',
-                      child: Text(
-                        'Eliminar este',
-                        style: TextStyle(color: Colors.red.shade700),
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'many',
-                      child: Text('Elegir varios'),
-                    ),
-                  ],
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: Colors.red.shade700,
-                    size: 22,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _applyVista(int index) {
-    setState(() {
-      _filterLowStock = index == 1;
-      _filterActiveOnly = index == 2;
-      _filterHidden = index == 3;
-    });
-    _reloadInventory();
-  }
-
-  String _countLabel(AsyncSnapshot<int?> snap) {
-    if (snap.connectionState != ConnectionState.done) return '…';
-    final value = snap.data;
-    if (snap.hasError || value == null) return '—';
-    return '$value';
+    return InventoryProductTile(
+        part: p,
+        soloDivisas: _pagoSoloDivisas,
+        selecting: _inSelectionMode,
+        selected: _selectedIds.contains(p.id),
+        onSelect: () => _toggleRowSelected(p),
+        onEdit: () => _openEditor(p),
+        onShare: () => showProductShareSheet(context, p),
+        onDelete: () => _deleteSingle(p),
+        onVisibilityChanged: _togglingProductIds.contains(p.id)
+            ? null
+            : (v) => _toggleActive(p, v));
   }
 
   void _shareStoreQr() {
@@ -1686,410 +1122,346 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     );
   }
 
-  static const _inventorySectionGap = 12.0;
+  void _onInventoryRequest() {
+    if (!mounted) return;
+    final request = MainShellTabController.importerInventoryRequest.value;
+    if (request == null) return;
+    MainShellTabController.importerInventoryRequest.value = null;
+    if (request == 'agregar') {
+      _openEditor(null);
+      return;
+    }
+    setState(() {
+      _searchController.clear();
+      _categoryFilter = 'Todas';
+      _photoFilter = ProductPhotoListFilter.all;
+      _filterLowStock = false;
+      _filterActiveOnly = false;
+      _filterHidden = request == 'pausados';
+      _filterOutOfStock = request == 'sin_stock';
+    });
+    _reloadInventory(refreshMetrics: false);
+  }
 
-  Widget _inventorySection({
-    required double hPad,
-    required Widget child,
-  }) {
+  int get _quickView => _filterOutOfStock
+      ? 3
+      : _filterHidden
+          ? 2
+          : _filterActiveOnly
+              ? 1
+              : 0;
+
+  void _selectQuickView(int index) {
+    setState(() {
+      _filterActiveOnly = index == 1;
+      _filterHidden = index == 2;
+      _filterOutOfStock = index == 3;
+    });
+    _reloadInventory(refreshMetrics: false);
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _categoryFilter = 'Todas';
+      _photoFilter = ProductPhotoListFilter.all;
+      _filterLowStock =
+          _filterOutOfStock = _filterHidden = _filterActiveOnly = false;
+      _searchController.clear();
+    });
+    _reloadInventory(refreshMetrics: false);
+  }
+
+  int get _advancedFilterCount =>
+      (_categoryFilter != 'Todas' ? 1 : 0) +
+      (_photoFilter != ProductPhotoListFilter.all ? 1 : 0) +
+      (_filterLowStock ? 1 : 0);
+
+  Future<void> _openFilters() async {
+    InventoryMetrics? metrics;
+    try {
+      metrics = await _metricsFuture;
+    } catch (_) {/* La hoja sigue siendo usable. */}
+    if (!mounted) return;
+    final categories =
+        <String>{'Todas', ...?metrics?.categories, _categoryFilter}.toList();
+    var category = _categoryFilter;
+    var photo = _photoFilter;
+    var lowStock = _filterLowStock;
+    final applied = await showAdaptiveAdminSheet<bool>(
+      context: context,
+      draggable: true,
+      initialChildSize: 0.7,
+      minChildSize: 0.45,
+      maxChildSize: 0.94,
+      builder: (ctx, scroll) => StatefulBuilder(
+          builder: (ctx, update) => Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      const Expanded(
+                          child: Text('Filtrar productos',
+                              style: TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.w800))),
+                      IconButton(
+                          tooltip: 'Cerrar filtros',
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close)),
+                    ]),
+                    Expanded(
+                        child: ListView(controller: scroll, children: [
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                          value: category,
+                          isExpanded: true,
+                          decoration:
+                              const InputDecoration(labelText: 'Categoría'),
+                          items: categories
+                              .map((value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value,
+                                      overflow: TextOverflow.ellipsis)))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) update(() => category = value);
+                          }),
+                      if (metrics == null)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                                'No se pudieron cargar todas las categorías. Actualiza el inventario para reintentar.',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12))),
+                      const SizedBox(height: 24),
+                      const Text('Fotos',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 8, children: [
+                        for (final option in ProductPhotoListFilter.values)
+                          ChoiceChip(
+                              label: Text(switch (option) {
+                                ProductPhotoListFilter.all => 'Todas',
+                                ProductPhotoListFilter.withPhotos =>
+                                  'Con fotos',
+                                ProductPhotoListFilter.withoutPhotos =>
+                                  'Sin fotos',
+                              }),
+                              selected: photo == option,
+                              onSelected: (_) => update(() => photo = option)),
+                      ]),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('No alcanza la compra mínima'),
+                          subtitle: const Text(
+                              'El stock disponible no cubre el mínimo de unidades del producto.'),
+                          value: lowStock,
+                          onChanged: (value) => update(() => lowStock = value)),
+                    ])),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      TextButton(
+                          onPressed: () => update(() {
+                                category = 'Todas';
+                                photo = ProductPhotoListFilter.all;
+                                lowStock = false;
+                              }),
+                          child: const Text('Restablecer')),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Aplicar filtros'))),
+                    ]),
+                  ]))),
+    );
+    if (applied != true || !mounted) return;
+    setState(() {
+      _categoryFilter = category;
+      _photoFilter = photo;
+      _filterLowStock = lowStock;
+    });
+    _reloadInventory(refreshMetrics: false);
+  }
+
+  Widget _toolsMenu() => PopupMenuButton<String>(
+        tooltip: 'Herramientas de inventario',
+        onSelected: (action) {
+          switch (action) {
+            case 'import':
+              _startBulkImport();
+            case 'photos':
+              _startBulkPhotos();
+            case 'template':
+              _downloadImportTemplate();
+            case 'export':
+              _exportRegisteredInventory();
+            case 'share':
+              _shareStoreQr();
+            case 'select':
+              _setSelectionMode(_InventorySelectionMode.visibility);
+            case 'delete':
+              _setSelectionMode(_InventorySelectionMode.delete);
+            case 'help':
+              _showHelpDialog();
+          }
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'import', child: Text('Importar Excel / CSV')),
+          PopupMenuItem(value: 'photos', child: Text('Importar ZIP de fotos')),
+          PopupMenuItem(value: 'template', child: Text('Descargar plantilla')),
+          PopupMenuDivider(),
+          PopupMenuItem(value: 'export', child: Text('Exportar a Excel')),
+          PopupMenuItem(value: 'share', child: Text('Compartir vitrina / QR')),
+          PopupMenuDivider(),
+          PopupMenuItem(
+              value: 'select', child: Text('Publicar o pausar varios')),
+          PopupMenuItem(value: 'delete', child: Text('Eliminar varios')),
+          PopupMenuItem(value: 'help', child: Text('Ayuda de importación')),
+        ],
+        child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.more_horiz, size: 20),
+              SizedBox(width: 6),
+              Text('Herramientas'),
+            ])),
+      );
+
+  Widget _buildInventoryHeader(
+      {required bool isDesktop, required double hPad}) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, _inventorySectionGap, hPad, 0),
-      child: child,
-    );
-  }
-
-  EdgeInsets _inventoryNoticePadding(double hPad) =>
-      EdgeInsets.fromLTRB(hPad, _inventorySectionGap, hPad, 0);
-
-  InputDecoration _inventorySearchDecoration() {
-    return InputDecoration(
-      hintText: 'Buscar por nombre, SKU, categoría…',
-      hintStyle: AppColors.hintStyle,
-      prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
-      suffixIcon: IconButton(
-        tooltip: 'Buscar',
-        onPressed: () => _reloadInventory(preserveScroll: true),
-        icon: Icon(Icons.arrow_forward_rounded, color: AppColors.brandBlue),
-      ),
-      isDense: true,
-      filled: true,
-      fillColor: AppColors.fieldFill,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: AppDecorations.radius12,
-        borderSide: BorderSide(color: AppColors.borderSubtle),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.radius12,
-        borderSide: BorderSide(color: AppColors.borderSubtle),
-      ),
-    );
-  }
-
-  Widget _inventorySearchField() {
-    return TextField(
-      controller: _searchController,
-      decoration: _inventorySearchDecoration(),
-      textInputAction: TextInputAction.search,
-      onSubmitted: (_) => _reloadInventory(preserveScroll: true),
-    );
-  }
-
-  Widget _buildInventoryHeader({required bool isDesktop, required double hPad}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-              if (!isDesktop)
-                _inventorySection(
-                  hPad: hPad,
-                  child: const ImporterStoreCountCard(
-                    extended: true,
-                    inline: true,
-                  ),
-                ),
-              FutureBuilder<InventoryMetrics>(
-                future: _metricsFuture,
-                builder: (context, metricsSnap) {
-                  final metrics = metricsSnap.data;
-                  final steps = ImporterOnboardingChecklist.evaluate(
-                    profile: _priorityProfile,
-                    metrics: metrics,
-                  );
-                  if (steps.isComplete) return const SizedBox.shrink();
-                  return _inventorySection(
-                    hPad: hPad,
-                    child: ImporterOnboardingChecklistCard(
-                      checklist: steps,
-                      onOpenProfile: MainShellTabController.navigateToProfileKycDocumentation,
-                      onAddProduct: () => _openEditor(null),
-                    ),
-                  );
-                },
-              ),
-              FutureBuilder<int?>(
-                future: _newOrdersCount,
-                builder: (context, ordersSnap) {
-                  return FutureBuilder<int?>(
-                    future: _pendingInvoicesCount,
-                    builder: (context, invoicesSnap) {
-                      return FutureBuilder<InventoryMetrics>(
-                        future: _metricsFuture,
-                        builder: (context, metricsSnap) {
-                          final metrics = metricsSnap.data;
-                          return _inventorySection(
-                            hPad: hPad,
-                            child: ImporterPriorityActions(
-                            actions: [
-                              ImporterPriorityAction(
-                                label: 'Pedidos nuevos',
-                                value: _countLabel(ordersSnap),
-                                icon: Icons.inbox_outlined,
-                                onTap: () =>
-                                    MainShellTabController.navigateToImporterPedidosExplore(
-                                      'nuevos',
-                                    ),
-                              ),
-                              ImporterPriorityAction(
-                                label: 'Facturas pendientes',
-                                value: _countLabel(invoicesSnap),
-                                icon: Icons.receipt_long_outlined,
-                                onTap: MainShellTabController
-                                    .navigateToImporterPendingCommissions,
-                              ),
-                              ImporterPriorityAction(
-                                label: 'Stock bajo',
-                                value: metrics == null ? '…' : '${metrics.lowStock}',
-                                icon: Icons.inventory_outlined,
-                                onTap: () => _applyVista(1),
-                              ),
-                              ImporterPriorityAction(
-                                label: 'Pausados',
-                                value: metrics == null ? '…' : '${metrics.paused}',
-                                icon: Icons.pause_circle_outline,
-                                onTap: () => _applyVista(3),
-                              ),
-                            ],
-                          ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            FutureBuilder<ImporterSalesSnapshot>(
-                future: _salesSnapshotFuture,
-                builder: (context, snap) {
-                  final data = snap.data;
-                  if (data == null) {
-                    return const SizedBox.shrink();
-                  }
-                  final revenue = data.revenueRef.toStringAsFixed(2);
-                  final currency = _pagoSoloDivisas ? 'USD' : 'REF';
-                  return _inventorySection(
-                    hPad: hPad,
-                    child: _InventoryDisclosure(
-                      title: 'Desempeño de ventas',
-                      subtitle:
-                          '${data.ordersEntregados} entregados · $revenue $currency',
-                      icon: Icons.auto_graph_rounded,
-                      child: ImporterSalesSnapshotCard(
-                        snapshot: data,
-                        selectedDays: _salesSnapshotDays,
-                        onDaysChanged: (days) {
-                          setState(() {
-                            _salesSnapshotDays = days;
-                            _salesSnapshotFuture =
-                                SupabaseService.fetchMySalesSnapshot(days: days);
-                          });
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-            _inventorySection(
-              hPad: hPad,
-              child: _InventoryDisclosure(
-                title: 'Cargar catálogo y fotos',
-                subtitle: 'Excel, CSV o un ZIP de imágenes',
-                icon: Icons.upload_file_outlined,
-                child: _bulkImportBanner(isDesktop: isDesktop),
-              ),
-            ),
-            ImporterThirdPartyAdsCarousel(
-              padding: _inventoryNoticePadding(hPad),
-            ),
-            ImporterActivePromoBanner(
-              padding: _inventoryNoticePadding(hPad),
-            ),
-            _inventorySection(
-              hPad: hPad,
-              child: isDesktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(child: _inventorySearchField()),
-                        const SizedBox(width: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.end,
-                          children: _inventoryToolbarButtons(),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _inventorySearchField(),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.start,
-                          children: _inventoryToolbarButtons(),
-                        ),
-                      ],
-                    ),
-            ),
-            _inventorySection(
-              hPad: hPad,
-              child: _InventoryDisclosure(
-                title: 'Filtros',
-                subtitle: _inventoryFilterSummary(),
-                icon: Icons.filter_list,
-                child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Categoría',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _categoryFilter,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppColors.fieldFill,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: AppDecorations.radius12,
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    borderRadius: AppDecorations.radius12,
-                    items: _kInventoryCategories
-                        .map(
-                          (c) => DropdownMenuItem<String>(
-                            value: c,
-                            child: Text(c),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _categoryFilter = v);
-                      _reloadInventory(preserveScroll: true);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Fotos',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  FutureBuilder<InventoryMetrics>(
+        padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 0),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(
+                child: FutureBuilder<InventoryMetrics>(
                     future: _metricsFuture,
-                    builder: (context, snap) {
-                      final metrics = snap.data;
-                      const options = ProductPhotoListFilter.values;
-                      return SegmentedFilterBar(
-                        labels: [
-                          for (final option in options)
-                            _photoFilterLabel(option, metrics),
-                        ],
-                        selectedIndex: options.indexOf(_photoFilter),
-                        onSelected: (index) {
-                          final option = options[index];
-                          if (_photoFilter == option) return;
-                          setState(() => _photoFilter = option);
-                          _reloadInventory(preserveScroll: true);
-                        },
-                      );
-                    },
-                  ),
-                  Text(
-                    'Vista',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  SegmentedFilterBar(
-                    labels: const [
-                      'Todos',
-                      'Stock bajo',
-                      'Publicados',
-                      'Pausados',
-                    ],
-                    selectedIndex: _filterLowStock
-                        ? 1
-                        : _filterActiveOnly
-                            ? 2
-                            : _filterHidden
-                                ? 3
-                                : 0,
-                    onSelected: (index) {
-                      setState(() {
-                        _filterLowStock = index == 1;
-                        _filterActiveOnly = index == 2;
-                        _filterHidden = index == 3;
-                      });
-                      _reloadInventory(preserveScroll: true);
-                    },
-                  ),
-                ],
-              ),
-              ),
-            ),
-            _inventorySection(
-              hPad: hPad,
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.brandAccent,
-                      visualDensity: VisualDensity.compact,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 8,
-                      ),
-                    ),
-                    onPressed: () => _reload(),
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Actualizar lista'),
-                  ),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.brandAccent,
-                      visualDensity: VisualDensity.compact,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 8,
-                      ),
-                    ),
-                    onPressed: () => _setSelectionMode(
-                      _selectionMode == _InventorySelectionMode.visibility
-                          ? _InventorySelectionMode.none
-                          : _InventorySelectionMode.visibility,
-                    ),
-                    icon: Icon(
-                      _selectionMode == _InventorySelectionMode.visibility
-                          ? Icons.close
-                          : Icons.checklist_outlined,
-                      size: 18,
-                    ),
-                    label: Text(
-                      _selectionMode == _InventorySelectionMode.visibility
-                          ? 'Salir de selección'
-                          : 'Gestionar visibilidad',
-                    ),
-                  ),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red.shade700,
-                      visualDensity: VisualDensity.compact,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 8,
-                      ),
-                    ),
-                    onPressed: () => _setSelectionMode(
-                      _selectionMode == _InventorySelectionMode.delete
-                          ? _InventorySelectionMode.none
-                          : _InventorySelectionMode.delete,
-                    ),
-                    icon: Icon(
-                      _selectionMode == _InventorySelectionMode.delete
-                          ? Icons.close
-                          : Icons.delete_outline,
-                      size: 18,
-                      color: Colors.red.shade700,
-                    ),
-                    label: Text(
-                      _selectionMode == _InventorySelectionMode.delete
-                          ? 'Cancelar'
-                          : 'Eliminar varios',
-                      style: TextStyle(color: Colors.red.shade700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-      ],
-    );
+                    builder: (context, snapshot) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (!isDesktop)
+                                const Text('Inventario',
+                                    style: TextStyle(
+                                        fontSize: 21,
+                                        fontWeight: FontWeight.w800)),
+                              Text(
+                                  snapshot.hasData
+                                      ? '${snapshot.data!.totalProducts} productos registrados'
+                                      : 'Tus productos',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary)),
+                            ]))),
+            IconButton(
+                tooltip: 'Actualizar inventario',
+                onPressed: _reload,
+                icon: const Icon(Icons.refresh, size: 21)),
+            const SizedBox(width: 4),
+            FilledButton.icon(
+                onPressed: _inSelectionMode ? null : () => _openEditor(null),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Agregar'),
+                style: FilledButton.styleFrom(minimumSize: const Size(44, 44))),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+                child: TextField(
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _reloadInventory(refreshMetrics: false),
+                    decoration: InputDecoration(
+                        hintText: 'Buscar nombre o SKU…',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: AppColors.fieldFill,
+                        suffixIcon: _searchController.text.isEmpty
+                            ? IconButton(
+                                tooltip: 'Buscar productos',
+                                onPressed: () =>
+                                    _reloadInventory(refreshMetrics: false),
+                                icon: const Icon(Icons.arrow_forward, size: 20))
+                            : IconButton(
+                                tooltip: 'Borrar búsqueda',
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _reloadInventory(refreshMetrics: false);
+                                },
+                                icon: const Icon(Icons.close, size: 20)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none)))),
+            const SizedBox(width: 8),
+            IconButton.outlined(
+                tooltip: 'Filtrar productos',
+                onPressed: _openFilters,
+                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                icon: Badge(
+                    isLabelVisible: _advancedFilterCount > 0,
+                    label: Text('$_advancedFilterCount'),
+                    child: const Icon(Icons.tune, size: 20))),
+          ]),
+          const SizedBox(height: 6),
+          if (_inSelectionMode)
+            Row(children: [
+              const Expanded(
+                  child: Text('Selecciona los productos',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+              TextButton(
+                  onPressed: () =>
+                      _setSelectionMode(_InventorySelectionMode.none),
+                  child: const Text('Cancelar')),
+            ])
+          else
+            Row(children: [
+              Expanded(
+                  child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: [
+                        for (final (index, label) in const [
+                          'Todos',
+                          'Publicados',
+                          'Pausados',
+                          'Sin stock'
+                        ].indexed)
+                          Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                  showCheckmark: false,
+                                  label: Text(label),
+                                  selected: _quickView == index,
+                                  onSelected: (_) => _selectQuickView(index))),
+                      ]))),
+              if (isDesktop) _toolsMenu(),
+            ]),
+          if (!isDesktop && !_inSelectionMode)
+            Align(alignment: Alignment.centerRight, child: _toolsMenu()),
+          if (_advancedFilterCount > 0)
+            Row(children: [
+              Expanded(
+                  child: Text(
+                      [
+                        if (_categoryFilter != 'Todas') _categoryFilter,
+                        if (_photoFilter == ProductPhotoListFilter.withPhotos)
+                          'Con fotos',
+                        if (_photoFilter ==
+                            ProductPhotoListFilter.withoutPhotos)
+                          'Sin fotos',
+                        if (_filterLowStock) 'No alcanza el mínimo',
+                      ].join(' · '),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary))),
+              TextButton(
+                  onPressed: _resetFilters, child: const Text('Restablecer')),
+            ]),
+        ]));
   }
 
   List<Widget> _inventoryBodySlivers(
@@ -2114,10 +1486,13 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         SliverFillRemaining(
           hasScrollBody: false,
           child: Center(
-            child: Text(
-              'Error: ${snapshot.error}',
-              textAlign: TextAlign.center,
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('No se pudieron cargar los productos.'),
+              TextButton.icon(
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar')),
+            ]),
           ),
         ),
       ];
@@ -2126,7 +1501,8 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
     final parts = _pageParts;
 
     if (parts.isEmpty) {
-      final hasFilters = _filterLowStock ||
+      final hasFilters = _filterOutOfStock ||
+          _filterLowStock ||
           _filterHidden ||
           _filterActiveOnly ||
           _photoFilter != ProductPhotoListFilter.all ||
@@ -2165,6 +1541,10 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
+                  if (hasFilters)
+                    TextButton(
+                        onPressed: _resetFilters,
+                        child: const Text('Restablecer filtros')),
                   if (!hasFilters) ...[
                     const SizedBox(height: 20),
                     FilledButton.icon(
@@ -2174,7 +1554,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                         minimumSize: const Size(0, 44),
                       ),
                       icon: const Icon(Icons.upload_file),
-                      label: const Text('Carga masiva'),
+                      label: const Text('Importar productos'),
                     ),
                   ],
                 ],
@@ -2215,6 +1595,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         child: Padding(
           padding: EdgeInsets.fromLTRB(hPad, 12, hPad, listBottomPadding),
           child: ListPageBar(
+            bottomPadding: 0,
             total: _loadedParts.length,
             hasMore: _hasMoreInventory,
             pageIndex: _productPageIndex,
@@ -2241,7 +1622,7 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
         _loadedParts.every((p) => _selectedIds.contains(p.id));
     final isDelete = _selectionMode == _InventorySelectionMode.delete;
     final hint = isDelete
-        ? 'Marca los productos. También puedes mantener pulsada una fila.'
+        ? 'Marca los productos que quieres eliminar.'
         : 'Toca filas o casillas para cambiar visibilidad.';
 
     return Positioned(
@@ -2372,132 +1753,34 @@ class _ImporterInventoryDashboardState extends State<ImporterInventoryDashboard>
                         onRefresh: _pullToRefresh,
                         color: AppColors.brand,
                         child: CustomScrollView(
-                            controller: _inventoryScrollController,
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            slivers: [
-                              SliverToBoxAdapter(
-                                child: _buildInventoryHeader(
-                                  isDesktop: isDesktop,
-                                  hPad: hPad,
-                                ),
-                              ),
-                              ..._inventoryBodySlivers(
-                                snapshot,
+                          controller: _inventoryScrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: _buildInventoryHeader(
                                 isDesktop: isDesktop,
                                 hPad: hPad,
-                                listBottomPadding: listBottomPadding,
                               ),
-                            ],
-                          ),
+                            ),
+                            ..._inventoryBodySlivers(
+                              snapshot,
+                              isDesktop: isDesktop,
+                              hPad: hPad,
+                              listBottomPadding: listBottomPadding,
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),
                 ),
               ],
             ),
-            if (_inSelectionMode) _buildSelectionBottomBar(isDesktop: isDesktop),
-            Positioned(
-              right: isDesktop ? 24 : 16,
-              bottom: _inSelectionMode
-                  ? (_selectionMode == _InventorySelectionMode.delete
-                      ? (isDesktop ? 148 : 128)
-                      : (isDesktop ? 200 : 160))
-                  : (isDesktop ? 24 : 16),
-              child: FloatingActionButton.extended(
-                onPressed: _inSelectionMode ? null : () => _openEditor(null),
-                backgroundColor: AppColors.brand,
-                icon: const Icon(Icons.add),
-                label: const Text('Añadir'),
-              ),
-            ),
+            if (_inSelectionMode)
+              _buildSelectionBottomBar(isDesktop: isDesktop),
           ],
         );
       },
-    );
-  }
-}
-
-class _InventoryDisclosure extends StatefulWidget {
-  const _InventoryDisclosure({
-    required this.title,
-    required this.icon,
-    required this.child,
-    this.subtitle,
-  });
-
-  final String title;
-  final String? subtitle;
-  final IconData icon;
-  final Widget child;
-
-  @override
-  State<_InventoryDisclosure> createState() => _InventoryDisclosureState();
-}
-
-class _InventoryDisclosureState extends State<_InventoryDisclosure> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _open ? AppColors.brand : AppColors.borderSubtle,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            onTap: () => setState(() => _open = !_open),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-              child: Row(
-                children: [
-                  Icon(widget.icon, size: 18, color: AppColors.brand),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        if (widget.subtitle != null)
-                          Text(
-                            widget.subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    _open ? Icons.expand_less : Icons.expand_more,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_open)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: widget.child,
-            ),
-        ],
-      ),
     );
   }
 }

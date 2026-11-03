@@ -42,9 +42,10 @@ class ImporterOnboardingChecklist {
         detail: 'Nombre del negocio, RIF y domicilio fiscal.',
       ),
       ImporterOnboardingStep(
-        title: 'Configurar cuentas de pago',
+        title: 'Configurar cuentas de pago (opcional)',
         done: _hasPaymentSetup(p),
-        detail: 'Medios y datos que la tienda usa para pagarle.',
+        detail:
+            'Opcional. Medios y datos que la tienda usa para pagarle; no bloquea publicar precios.',
       ),
       ImporterOnboardingStep(
         title: 'Definir pedido mínimo de compra',

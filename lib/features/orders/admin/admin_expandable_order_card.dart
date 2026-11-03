@@ -10,6 +10,10 @@ import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_delivery_stepper.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_detail_layout.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_list_colors.dart';
+import 'admin_recalc_tasa_bcv_button.dart';
 import 'transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 
@@ -50,10 +54,18 @@ class AdminExpandableOrderCard extends StatelessWidget {
     final isCheckoutGroup = lines.length > 1;
     final r = request;
     final showBody = workspaceDetail || expanded;
+
+    if (workspaceDetail) {
+      return _buildWorkspaceDetail(
+        context,
+        lines: lines,
+        isCheckoutGroup: isCheckoutGroup,
+        r: r,
+      );
+    }
+
     return Card(
-      margin: workspaceDetail
-          ? EdgeInsets.zero
-          : const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.hardEdge,
       color: highlighted ? AppColors.brandBlueContainer : null,
       shape: highlighted
@@ -64,12 +76,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
                 width: 1.5,
               ),
             )
-          : workspaceDetail
-              ? RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: AppColors.borderSubtle),
-                )
-              : null,
+          : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,26 +87,15 @@ class AdminExpandableOrderCard extends StatelessWidget {
             expanded: showBody,
             onToggle: onToggle,
             statusLabel: statusLabel,
-            showToggle: !workspaceDetail,
-            detailSummary: workspaceDetail,
+            showToggle: true,
+            detailSummary: false,
             onCancel: null,
             cancelBusy: false,
-            chatAction: OrderChatIconButton(
-              showLabel: workspaceDetail,
-              relatedOrderIds: lines.map((e) => e.id).toList(),
-              onOpen: () {
-                showOrderChatSheet(
-                  context: context,
-                  transactionRequestId: lines.first.id,
-                  mergedThreadRequestIds:
-                      isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
-                  orderLines: lines,
-                  allowReplyAsAliado: false,
-                  allowReplyAsAdmin: true,
-                  title: 'Chat del pedido',
-                  onThreadChanged: onRequestMutated,
-                );
-              },
+            chatAction: _chatButton(
+              context,
+              lines: lines,
+              isCheckoutGroup: isCheckoutGroup,
+              showLabel: false,
             ),
           ),
           if (showBody) ...[
@@ -111,106 +107,17 @@ class AdminExpandableOrderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: kOrderCardSectionGap),
+                  AdminRecalcTasaBcvButton(
+                    lines: lines,
+                    onDone: onRequestMutated,
+                  ),
                   if (isCheckoutGroup)
                     AdminCheckoutGroupMasterHeader(
                       lines: lines,
                       onMutated: onRequestMutated,
                     )
-                  else ...[
-                    OrderCardCollapsibleSection(
-                      title: 'Partes del pedido',
-                      subtitle: TransactionRequestPartiesContactSection
-                          .partiesSubtitle(
-                        r,
-                      ),
-                      infoMessage:
-                          'Tienda minorista solicitante e importador proveedor del pedido.',
-                      child: TransactionRequestPartiesContactSection(
-                        request: r,
-                        embedded: true,
-                      ),
-                    ),
-                    const SizedBox(height: kOrderCardSectionGap),
-                    OrderCardCollapsibleSection(
-                      title: 'Entrega',
-                      subtitle: r.destinoEntregaLineaCompactaEs,
-                      child: TransactionRequestDestinoEntregaSection(
-                        request: r,
-                        hideSectionTitle: true,
-                      ),
-                    ),
-                    const SizedBox(height: kOrderCardSectionGap),
-                    OrderCardCollapsibleSection(
-                      title: 'Productos',
-                      subtitle: orderCardProductosSubtitle(
-                        [r],
-                        viewer: PedidoDesgloseViewer.importador,
-                      ),
-                      initiallyExpanded:
-                          orderCardProductsInitiallyExpanded(r.status),
-                      child: TransactionRequestProductosDesgloseSection(
-                        lines: [r],
-                        compact: true,
-                        viewer: PedidoDesgloseViewer.importador,
-                        hideSectionTitle: true,
-                        showPrecioHelp: false,
-                      ),
-                    ),
-                    if (orderCardCommissionSubtitle([r]) != null) ...[
-                      const SizedBox(height: kOrderCardSectionGap),
-                      OrderCardCollapsibleSection(
-                        title: 'Comisión B2B Conecta',
-                        subtitle: orderCardCommissionSubtitle([r]),
-                        infoMessage:
-                            'Comisión devengada o estimada según el estado del pedido.',
-                        child: OrderCommissionSummary(
-                          lines: orderLinesEligibleForCommission([r]),
-                          suppressOuterTitle: true,
-                        ),
-                      ),
-                    ],
-                    if (r.aliadoExperienceSubmittedAt != null ||
-                        lineaElegibleValoracionAliado(r)) ...[
-                      const SizedBox(height: kOrderCardSectionGap),
-                      OrderCardCollapsibleSection(
-                        title: 'Valoración de la tienda minorista',
-                        subtitle: r.aliadoExperienceStars != null
-                            ? '${r.aliadoExperienceStars}/5 post-entrega'
-                            : (r.aliadoExperienceSubmittedAt != null
-                                ? 'Comentario registrado'
-                                : 'Pendiente — admin puede registrar'),
-                        child: TransactionRequestAliadoExperienceAdminSection(
-                          request: r,
-                          hideSectionTitle: true,
-                          onMutated: onRequestMutated,
-                        ),
-                      ),
-                    ],
-                    if (lineaElegibleValoracionImportador(r) ||
-                        r.aliadoExperienceSubmittedAt != null) ...[
-                      const SizedBox(height: kOrderCardSectionGap),
-                      OrderCardCollapsibleSection(
-                        title: 'Valoración del mayorista',
-                        subtitle: 'A la tienda minorista de este pedido',
-                        child: TransactionRequestImporterRatingAdminSection(
-                          request: r,
-                          onMutated: onRequestMutated,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: kOrderCardSectionGap),
-                    OrderCardCollapsibleSection(
-                      title: 'Seguimiento',
-                      subtitle: orderCardTimelineSubtitle(r),
-                      initiallyExpanded: orderCardTimelineInitiallyExpanded(r),
-                      child: CourierTimelineWidget(
-                        request: r,
-                        compact: true,
-                        viewerRole: AppHomeRole.administrador,
-                        showHeading: false,
-                      ),
-                    ),
-                  ],
+                  else
+                    ..._legacyAccordionSections(r),
                   if (expandedFooter != null) ...[
                     const SizedBox(height: 12),
                     expandedFooter!,
@@ -223,28 +130,331 @@ class AdminExpandableOrderCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _RiesgoMorosoBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+  Widget _buildWorkspaceDetail(
+    BuildContext context, {
+    required List<TransactionRequestModel> lines,
+    required bool isCheckoutGroup,
+    required TransactionRequestModel r,
+  }) {
+    final colors = OrderListColors.of(context);
+    final tracking = OrderDetailSection(
+      title: 'Seguimiento',
+      icon: Icons.local_shipping_outlined,
+      tonal: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OrderDeliveryStepper(lines: lines),
+          const SizedBox(height: 8),
+          ExpansionTile(
+            key: PageStorageKey('admin-history-${r.id}'),
+            tilePadding: EdgeInsets.zero,
+            title: const Text(
+              'Historial del envío',
+              style: TextStyle(fontSize: 13),
+            ),
+            children: [
+              for (final line in lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: CourierTimelineWidget(
+                    request: line,
+                    compact: true,
+                    viewerRole: AppHomeRole.administrador,
+                    showHeading: lines.length > 1,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
-      child: Text(
-        '>3 días hábiles sin pago: puede aplicarse restricción de cuenta.',
-        style: TextStyle(
-          fontSize: 11,
-          height: 1.3,
-          fontWeight: FontWeight.w600,
-          color: Colors.red.shade900,
+    );
+    final products = OrderDetailSection(
+      title: 'Productos',
+      icon: Icons.shopping_bag_outlined,
+      child: TransactionRequestProductosDesgloseSection(
+        lines: lines,
+        compact: true,
+        viewer: PedidoDesgloseViewer.importador,
+        hideSectionTitle: true,
+        showPrecioHelp: false,
+      ),
+    );
+    final delivery = OrderDetailSection(
+      title: 'Entrega',
+      icon: Icons.location_on_outlined,
+      flat: true,
+      child: TransactionRequestDestinoEntregaSection(
+        request: lines.first,
+        hideSectionTitle: true,
+      ),
+    );
+    final parties = OrderDetailSection(
+      title: 'Partes del pedido',
+      icon: Icons.groups_outlined,
+      flat: true,
+      child: TransactionRequestPartiesContactSection(
+        request: lines.first,
+        embedded: true,
+      ),
+    );
+    final management = OrderDetailSection(
+      title: 'Gestión administrativa',
+      icon: Icons.admin_panel_settings_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AdminRecalcTasaBcvButton(
+            lines: lines,
+            onDone: onRequestMutated,
+          ),
+          if (isCheckoutGroup) ...[
+            AdminCheckoutGroupMasterHeader(
+              lines: lines,
+              onMutated: onRequestMutated,
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (expandedFooter != null) expandedFooter!,
+        ],
+      ),
+    );
+    final commission = orderCardCommissionSubtitle(lines) == null
+        ? null
+        : OrderDetailSection(
+            title: 'Comisión B2B Conecta',
+            icon: Icons.receipt_long_outlined,
+            child: OrderCommissionSummary(
+              lines: orderLinesEligibleForCommission(lines),
+              suppressOuterTitle: true,
+            ),
+          );
+    final ratings = <Widget>[
+      if (lines.any((l) =>
+          l.aliadoExperienceSubmittedAt != null ||
+          lineaElegibleValoracionAliado(l)))
+        OrderDetailSection(
+          title: 'Valoración de la tienda minorista',
+          icon: Icons.star_outline,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final line in lines.where((l) =>
+                  l.aliadoExperienceSubmittedAt != null ||
+                  lineaElegibleValoracionAliado(l)))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TransactionRequestAliadoExperienceAdminSection(
+                    request: line,
+                    hideSectionTitle: true,
+                    onMutated: onRequestMutated,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      if (lines.any((l) =>
+          lineaElegibleValoracionImportador(l) ||
+          l.aliadoExperienceSubmittedAt != null))
+        OrderDetailSection(
+          title: 'Valoración del mayorista',
+          icon: Icons.rate_review_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final line in lines.where((l) =>
+                  lineaElegibleValoracionImportador(l) ||
+                  l.aliadoExperienceSubmittedAt != null))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TransactionRequestImporterRatingAdminSection(
+                    request: line,
+                    onMutated: onRequestMutated,
+                  ),
+                ),
+            ],
+          ),
+        ),
+    ];
+
+    final primary = <Widget>[
+      management,
+      tracking,
+      products,
+    ];
+    final secondary = <Widget>[
+      delivery,
+      parties,
+      if (commission != null) commission,
+      ...ratings,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          color: colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colors.border),
+          ),
+          child: OrderSummaryHeader(
+            lines: lines,
+            viewerRole: AppHomeRole.administrador,
+            expanded: true,
+            onToggle: onToggle,
+            statusLabel: statusLabel,
+            showToggle: false,
+            detailSummary: true,
+            showRoutineGuidance: false,
+            actionsInHeader: true,
+            onCancel: null,
+            cancelBusy: false,
+            chatAction: _chatButton(
+              context,
+              lines: lines,
+              isCheckoutGroup: isCheckoutGroup,
+              showLabel: false,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        OrderDetailColumns(
+          primary: primary,
+          secondary: secondary,
+          mobileOrder: [
+            management,
+            tracking,
+            products,
+            delivery,
+            parties,
+            if (commission != null) commission,
+            ...ratings,
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _legacyAccordionSections(TransactionRequestModel r) {
+    return [
+      OrderCardCollapsibleSection(
+        title: 'Partes del pedido',
+        subtitle: TransactionRequestPartiesContactSection.partiesSubtitle(r),
+        infoMessage:
+            'Tienda minorista solicitante e importador proveedor del pedido.',
+        child: TransactionRequestPartiesContactSection(
+          request: r,
+          embedded: true,
         ),
       ),
+      const SizedBox(height: kOrderCardSectionGap),
+      OrderCardCollapsibleSection(
+        title: 'Entrega',
+        subtitle: r.destinoEntregaLineaCompactaEs,
+        child: TransactionRequestDestinoEntregaSection(
+          request: r,
+          hideSectionTitle: true,
+        ),
+      ),
+      const SizedBox(height: kOrderCardSectionGap),
+      OrderCardCollapsibleSection(
+        title: 'Productos',
+        subtitle: orderCardProductosSubtitle(
+          [r],
+          viewer: PedidoDesgloseViewer.importador,
+        ),
+        initiallyExpanded: orderCardProductsInitiallyExpanded(r.status),
+        child: TransactionRequestProductosDesgloseSection(
+          lines: [r],
+          compact: true,
+          viewer: PedidoDesgloseViewer.importador,
+          hideSectionTitle: true,
+          showPrecioHelp: false,
+        ),
+      ),
+      if (orderCardCommissionSubtitle([r]) != null) ...[
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Comisión B2B Conecta',
+          subtitle: orderCardCommissionSubtitle([r]),
+          infoMessage:
+              'Comisión devengada o estimada según el estado del pedido.',
+          child: OrderCommissionSummary(
+            lines: orderLinesEligibleForCommission([r]),
+            suppressOuterTitle: true,
+          ),
+        ),
+      ],
+      if (r.aliadoExperienceSubmittedAt != null ||
+          lineaElegibleValoracionAliado(r)) ...[
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Valoración de la tienda minorista',
+          subtitle: r.aliadoExperienceStars != null
+              ? '${r.aliadoExperienceStars}/5 post-entrega'
+              : (r.aliadoExperienceSubmittedAt != null
+                  ? 'Comentario registrado'
+                  : 'Pendiente — admin puede registrar'),
+          child: TransactionRequestAliadoExperienceAdminSection(
+            request: r,
+            hideSectionTitle: true,
+            onMutated: onRequestMutated,
+          ),
+        ),
+      ],
+      if (lineaElegibleValoracionImportador(r) ||
+          r.aliadoExperienceSubmittedAt != null) ...[
+        const SizedBox(height: kOrderCardSectionGap),
+        OrderCardCollapsibleSection(
+          title: 'Valoración del mayorista',
+          subtitle: 'A la tienda minorista de este pedido',
+          child: TransactionRequestImporterRatingAdminSection(
+            request: r,
+            onMutated: onRequestMutated,
+          ),
+        ),
+      ],
+      const SizedBox(height: kOrderCardSectionGap),
+      OrderCardCollapsibleSection(
+        title: 'Seguimiento',
+        subtitle: orderCardTimelineSubtitle(r),
+        initiallyExpanded: orderCardTimelineInitiallyExpanded(r),
+        child: CourierTimelineWidget(
+          request: r,
+          compact: true,
+          viewerRole: AppHomeRole.administrador,
+          showHeading: false,
+        ),
+      ),
+    ];
+  }
+
+  Widget _chatButton(
+    BuildContext context, {
+    required List<TransactionRequestModel> lines,
+    required bool isCheckoutGroup,
+    required bool showLabel,
+  }) {
+    return OrderChatIconButton(
+      showLabel: showLabel,
+      relatedOrderIds: lines.map((e) => e.id).toList(),
+      onOpen: () {
+        showOrderChatSheet(
+          context: context,
+          transactionRequestId: lines.first.id,
+          mergedThreadRequestIds:
+              isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
+          orderLines: lines,
+          allowReplyAsAliado: false,
+          allowReplyAsAdmin: true,
+          title: 'Chat del pedido',
+          onThreadChanged: onRequestMutated,
+        );
+      },
     );
   }
 }

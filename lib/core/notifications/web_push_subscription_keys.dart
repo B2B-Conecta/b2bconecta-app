@@ -40,12 +40,27 @@ bool isWebPushKeyValid(String? raw) {
   return !RegExp(r'\s').hasMatch(v);
 }
 
-String webPushPlatformFromUserAgent(String ua, {required bool isIos}) {
+String webPushPlatformFromUserAgent(
+  String ua, {
+  required bool isIos,
+  String? platformHint,
+}) {
+  final hint = platformHint?.trim().toLowerCase() ?? '';
+  if (hint.isNotEmpty &&
+      hint != 'web' &&
+      hint != 'unsupported' &&
+      hint != 'desktop') {
+    return hint;
+  }
   final t = ua.toLowerCase();
   if (isIos) return 'ios';
   if (t.contains('android')) return 'android';
   if (t.contains('iphone') || t.contains('ipad') || t.contains('ipod')) {
     return 'ios';
   }
+  if (t.contains('edg/') || t.contains('edgios')) return 'edge';
+  if (t.contains('chrome/') && !t.contains('edg/')) return 'chrome';
+  if (t.contains('safari/') && !t.contains('chrome/')) return 'safari';
+  if (t.contains('firefox/')) return 'firefox';
   return 'desktop';
 }

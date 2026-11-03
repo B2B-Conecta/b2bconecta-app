@@ -5,7 +5,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_service.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_status.dart';
 
-/// Ajustes de avisos en la PWA (solo web).
+/// Ajustes de avisos en la PWA / panel web (solo web).
 class WebPushSettingsCard extends StatelessWidget {
   const WebPushSettingsCard({super.key});
 
@@ -17,6 +17,7 @@ class WebPushSettingsCard extends StatelessWidget {
       animation: service,
       builder: (context, _) {
         final status = service.status;
+        final desktop = service.isDesktopWeb;
         return DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.card,
@@ -53,7 +54,9 @@ class WebPushSettingsCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Avisos en este dispositivo',
+                            desktop
+                                ? 'Notificaciones en esta Mac/PC'
+                                : 'Avisos en este dispositivo',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
@@ -69,7 +72,7 @@ class WebPushSettingsCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _copy(status),
+                  _copy(status, desktop: desktop),
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.45,
@@ -95,7 +98,11 @@ class WebPushSettingsCard extends StatelessWidget {
                     if (status.canActivate)
                       FilledButton(
                         onPressed: () => service.enableFromUserGesture(),
-                        child: const Text('Activar avisos'),
+                        child: Text(
+                          desktop
+                              ? 'Activar notificaciones en esta Mac/PC'
+                              : 'Activar avisos',
+                        ),
                       ),
                     if (status == WebPushUiStatus.subscribed) ...[
                       OutlinedButton(
@@ -108,9 +115,11 @@ class WebPushSettingsCard extends StatelessWidget {
                             await service.sendTestNotification();
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
-                                    'Te enviamos un aviso de prueba. Bloquea el iPhone para verlo fuera de la app.',
+                                    desktop
+                                        ? 'Te enviamos un aviso de prueba. Minimiza o cambia de pestaña para verlo en el Centro de Notificaciones.'
+                                        : 'Te enviamos un aviso de prueba. Bloquea el iPhone para verlo fuera de la app.',
                                   ),
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -147,22 +156,34 @@ class WebPushSettingsCard extends StatelessWidget {
     );
   }
 
-  static String _copy(WebPushUiStatus status) {
+  static String _copy(WebPushUiStatus status, {required bool desktop}) {
     switch (status) {
       case WebPushUiStatus.unsupported:
-        return 'Este dispositivo no puede mostrar avisos de B2B Conecta. En iPhone usa Safari, añade la app a inicio y ábrela desde el icono.';
+        return desktop
+            ? 'Este navegador no admite notificaciones push. Usa Safari 16+ en macOS 13+, o Chrome/Edge actualizados.'
+            : 'Este dispositivo no puede mostrar avisos de B2B Conecta. En iPhone usa Safari, añade la app a inicio y ábrela desde el icono.';
       case WebPushUiStatus.iosNeedsInstall:
         return 'En iPhone o iPad: toca Compartir y luego “Añadir a pantalla de inicio”. Abre B2B Conecta desde el icono y vuelve aquí para activar los avisos.';
       case WebPushUiStatus.permissionDefault:
-        return 'Te avisamos de pedidos y mensajes aunque no tengas la app abierta. Solo pedimos permiso cuando toques Activar avisos.';
+        return desktop
+            ? 'Recibe pedidos, inventario y mensajes en el Centro de Notificaciones del sistema aunque la pestaña esté en segundo plano. Solo pedimos permiso al pulsar el botón.'
+            : 'Te avisamos de pedidos y mensajes aunque no tengas la app abierta. Solo pedimos permiso cuando toques Activar avisos.';
       case WebPushUiStatus.permissionDenied:
-        return 'Los avisos están bloqueados. En Ajustes del iPhone busca B2B Conecta y permite las notificaciones.';
+        return desktop
+            ? 'Las notificaciones están bloqueadas. En Safari: Ajustes → Sitios web → Notificaciones. En Chrome/Edge: icono del candado en la barra de direcciones → Notificaciones → Permitir.'
+            : 'Los avisos están bloqueados. En Ajustes del iPhone busca B2B Conecta y permite las notificaciones.';
       case WebPushUiStatus.subscribed:
-        return 'Listo. Te llegarán pedidos y mensajes aunque dejes la app en segundo plano o bloquees el iPhone.';
+        return desktop
+            ? 'Listo. Las alertas aparecerán en el Centro de Notificaciones de tu Mac/PC cuando la pestaña esté minimizada o en segundo plano.'
+            : 'Listo. Te llegarán pedidos y mensajes aunque dejes la app en segundo plano o bloquees el iPhone.';
       case WebPushUiStatus.expired:
-        return 'Hay que volver a activar los avisos en este dispositivo. Toca Activar avisos para continuar.';
+        return desktop
+            ? 'Hay que volver a activar las notificaciones en este equipo. Pulsa el botón para continuar.'
+            : 'Hay que volver a activar los avisos en este dispositivo. Toca Activar avisos para continuar.';
       case WebPushUiStatus.error:
-        return 'No pudimos activar los avisos. Revisa la conexión e inténtalo de nuevo.';
+        return desktop
+            ? 'No pudimos activar las notificaciones. Revisa la conexión e inténtalo de nuevo.'
+            : 'No pudimos activar los avisos. Revisa la conexión e inténtalo de nuevo.';
     }
   }
 }

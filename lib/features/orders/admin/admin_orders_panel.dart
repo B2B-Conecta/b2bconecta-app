@@ -34,6 +34,8 @@ import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_list_entry.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_priority_controls.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
@@ -60,6 +62,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   bool _replacementOnly = false;
   Map<String, AdminAliadoMorosidadFlag> _morosidadFlags = {};
   PedidosListScope _scope = PedidosListScope.enCurso;
+  bool _pendingOnly = false;
+  bool _pendingFirst = true;
   String? _loadedKind;
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -319,10 +323,10 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   }
 
   void _onScopeChanged(PedidosListScope next) {
-    if (next == _scope) return;
     setState(() {
       _expandedRequestId = null;
       _scope = next;
+      _pendingOnly = false;
       _statusFilter = null;
       if (next != PedidosListScope.entregados &&
           next != PedidosListScope.todos) {
@@ -359,11 +363,18 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     if (_showMorosoChip && _morosoOnly) {
       groups = groups.where((g) => g.any((r) => r.esPedidoMoroso)).toList();
     }
-    return filterOrderGroupsBySignals(
+    groups = filterOrderGroupsBySignals(
       groups,
       creditOnly: _creditOnly,
       replacementOnly: _replacementOnly,
     );
+    if (_pendingOnly) {
+      groups = groups
+          .where((g) => OrderListEntry(g).awaitingConfirmation)
+          .toList();
+    }
+    if (_pendingFirst) groups = prioritizePendingOrders(groups);
+    return groups;
   }
 
   bool _groupHasOperational(List<TransactionRequestModel> g) => g.any(
@@ -771,6 +782,13 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     final groups = _displayGroups;
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
     final activeFilterChips = _buildActiveFilterChipsRow();
+    final pendingBase = filterOrderGroupsBySignals(
+      groupAdminOrdersForDisplay(_filteredFlat),
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    );
+    final pendingCount =
+        pendingBase.where((g) => OrderListEntry(g).awaitingConfirmation).length;
 
     return OrderWorkspace(
       viewerRole: AppHomeRole.administrador,
@@ -781,9 +799,15 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       onClearFilters: _clearFilters,
       loading: _loading,
       onRefresh: _load,
-      emptyMessage: groups.isEmpty ? _emptyMessage : null,
+      emptyMessage: groups.isEmpty
+          ? (_pendingOnly
+              ? 'No hay pedidos por confirmar.'
+              : _emptyMessage)
+          : null,
       resetKey: Object.hash(
         _scope,
+        _pendingOnly,
+        _pendingFirst,
         _statusFilter,
         _morosoOnly,
         _creditOnly,
@@ -808,10 +832,19 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
             onFilters: _openPedidosFiltersSheet,
             activeFilterCount: filterBadge,
           ),
-          PedidosScopeBar(
-            selected: _scope,
-            onSelected: _onScopeChanged,
-            filledStyle: true,
+          OrderPriorityControls(
+            scope: _scope,
+            onScope: _onScopeChanged,
+            pendingOnly: _pendingOnly,
+            pendingCount: pendingCount,
+            onPending: () => setState(() {
+              _expandedRequestId = null;
+              _scope = PedidosListScope.todos;
+              _statusFilter = null;
+              _pendingOnly = true;
+            }),
+            pendingFirst: _pendingFirst,
+            onSort: (value) => setState(() => _pendingFirst = value),
           ),
           if (activeFilterChips != null) activeFilterChips,
         ],

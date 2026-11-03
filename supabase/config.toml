@@ -423,3 +423,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # Receptor stock_only DEV: autenticacion propia por instalacion en handler/RPC.
 [functions.profit-stock-sync]
 verify_jwt = false
+
+# Cron / service_role: sincroniza tasa BCV desde bcv.today cada 30 min.
+[functions.sync-tasa-bcv]
+verify_jwt = false

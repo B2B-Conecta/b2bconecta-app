@@ -1,3 +1,5 @@
+import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
+import '../shared/order_priority_controls.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
 import 'package:flutter/material.dart';
 
@@ -51,6 +53,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   late final TextEditingController _searchCtrl;
   PedidosListScope _scope = PedidosListScope.enCurso;
   bool _onlyNuevos = false;
+  bool _pendingFirst = true;
   bool _morosoOnly = false;
   bool _creditOnly = false;
   bool _replacementOnly = false;
@@ -342,12 +345,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   Widget? _buildActiveFilterChipsRow() {
     final draft = _currentFiltersDraft();
     final chips = <Widget>[];
-    if (draft.onlyNuevos) {
-      chips.add(_activeFilterChip(
-        label: 'Pedido nuevo',
-        onDeleted: () => setState(() => _onlyNuevos = false),
-      ));
-    }
     if (draft.morosoOnly) {
       chips.add(_activeFilterChip(
         label: 'Pago pendiente',
@@ -415,7 +412,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
   }
 
-  List<TransactionRequestModel> get _filtered {
+  List<TransactionRequestModel> get _searched {
     final searched = TransactionRequestFilterUtils.apply(
       _rows,
       searchQuery: _searchCtrl.text,
@@ -425,7 +422,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       dateTo: _dateTo,
       useOrderPanelDate: true,
     );
-    final list = searched.where(_matchesScope).where((r) {
+    return searched..sort(ImporterOrderDate.compareByFechaReciente);
+  }
+
+  List<TransactionRequestModel> get _filtered {
+    final list = _searched.where(_matchesScope).where((r) {
       if (!_onlyNuevos) return true;
       return r.status == TransactionRequestStatus.pendiente;
     }).toList()
@@ -438,7 +439,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   void _onScopeChanged(PedidosListScope next) {
     setState(() {
       _expandedRequestId = null;
-      if (next != _scope) _onlyNuevos = false;
+      _onlyNuevos = false;
       _scope = next;
       if (next != PedidosListScope.entregados &&
           next != PedidosListScope.todos) {
@@ -719,75 +720,96 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
 
     final filtered = _filtered;
-    final groups = filterOrderGroupsBySignals(
+    var groups = filterOrderGroupsBySignals(
       _groupsForDisplay(filtered),
       creditOnly: _creditOnly,
       replacementOnly: _replacementOnly,
     );
+    if (_pendingFirst) groups = prioritizePendingOrders(groups);
+    final pendingCount = filterOrderGroupsBySignals(
+      _groupsForDisplay(_searched
+          .where((r) => r.status == TransactionRequestStatus.pendiente)
+          .toList()),
+      creditOnly: _creditOnly,
+      replacementOnly: _replacementOnly,
+    ).length;
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
     final activeFilterChips = _buildActiveFilterChipsRow();
     final detailOpen = _expandedRequestId != null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!detailOpen) ...[
-          const ImporterThirdPartyAdsCarousel(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-          ),
-          const ImporterActivePromoBanner(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-          ),
-        ],
-        Expanded(
-          child: OrderWorkspace(
-            viewerRole: AppHomeRole.importador,
-            groups: groups,
-            selectedKey: _expandedRequestId,
-            groupKey: _displayGroupKey,
-            onSelect: (key) => setState(() => _expandedRequestId = key),
-            onClose: () => setState(() => _expandedRequestId = null),
-            onClearFilters: _clearFilters,
-            loading: _loading,
-            onRefresh: _load,
-            resetKey: Object.hash(
-              _scope,
-              _onlyNuevos,
-              _morosoOnly,
-              _creditOnly,
-              _replacementOnly,
-              _dateFrom,
-              _dateTo,
-              _searchCtrl.text,
-            ),
-            detailBuilder: (group) => _orderCard(context, group),
-            controls: Column(
+    return ScrollCompactLayout(
+        resetKey: _expandedRequestId,
+        builder: (context, compact) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                OrdersListHeading(count: groups.length),
-                OrderListFilterBar(
-                  softStyle: true,
-                  searchController: _searchCtrl,
-                  onSearchChanged: (_) => setState(() {
-                    _expandedRequestId = null;
-                  }),
-                  hintText: 'Buscar por producto, SKU o tienda minorista…',
-                  padding: const EdgeInsets.only(bottom: 8),
-                  onFilters: _openPedidosFiltersSheet,
-                  activeFilterCount: filterBadge,
+                if (!detailOpen && !compact) ...[
+                  const ImporterThirdPartyAdsCarousel(
+                    padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  ),
+                  const ImporterActivePromoBanner(
+                    padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  ),
+                ],
+                Expanded(
+                  child: OrderWorkspace(
+                    viewerRole: AppHomeRole.importador,
+                    groups: groups,
+                    selectedKey: _expandedRequestId,
+                    groupKey: _displayGroupKey,
+                    onSelect: (key) => setState(() => _expandedRequestId = key),
+                    onClose: () => setState(() => _expandedRequestId = null),
+                    onClearFilters: _clearFilters,
+                    loading: _loading,
+                    onRefresh: _load,
+                    resetKey: Object.hash(
+                      _scope,
+                      _onlyNuevos,
+                      _pendingFirst,
+                      _morosoOnly,
+                      _creditOnly,
+                      _replacementOnly,
+                      _dateFrom,
+                      _dateTo,
+                      _searchCtrl.text,
+                    ),
+                    detailBuilder: (group) => _orderCard(context, group),
+                    controls: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        OrdersListHeading(count: groups.length),
+                        OrderListFilterBar(
+                          softStyle: true,
+                          searchController: _searchCtrl,
+                          onSearchChanged: (_) => setState(() {
+                            _expandedRequestId = null;
+                          }),
+                          hintText:
+                              'Buscar por producto, SKU o tienda minorista…',
+                          padding: const EdgeInsets.only(bottom: 8),
+                          onFilters: _openPedidosFiltersSheet,
+                          activeFilterCount: filterBadge,
+                        ),
+                        OrderPriorityControls(
+                          scope: _scope,
+                          onScope: _onScopeChanged,
+                          pendingOnly: _onlyNuevos,
+                          pendingCount: pendingCount,
+                          onPending: () => setState(() {
+                            _expandedRequestId = null;
+                            _scope = PedidosListScope.enCurso;
+                            _onlyNuevos = true;
+                          }),
+                          pendingFirst: _pendingFirst,
+                          onSort: (value) =>
+                              setState(() => _pendingFirst = value),
+                        ),
+                        if (activeFilterChips != null) activeFilterChips,
+                      ],
+                    ),
+                  ),
                 ),
-                PedidosScopeBar(
-                  selected: _scope,
-                  onSelected: _onScopeChanged,
-                  filledStyle: true,
-                ),
-                if (activeFilterChips != null) activeFilterChips,
               ],
-            ),
-          ),
-        ),
-      ],
-    );
+            ));
   }
 
   Widget _orderCard(
@@ -852,7 +874,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       qtyAdjustmentDisabledHint: qtyAdjHint,
       onThreadChanged: _load,
       aliadoCreditRemaining: _creditFor(primary.aliadoId),
-      expandedFooter: Column(
+      deliveryActions: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (g.any(
@@ -868,12 +890,19 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               ),
             ],
           ],
+        ],
+      ),
+      expandedFooter: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           if (g.length == 1) ...[
             ImporterOrderPagoVerificationSection(
+              compactHelp: true,
               request: g.single,
               onChanged: _load,
             ),
             ImporterOrderInvoiceSection(
+              useCompactHelp: true,
               request: g.single,
               onChanged: _load,
             ),
@@ -888,12 +917,14 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
             ),
           ] else ...[
             ImporterOrderPagoVerificationSection(
+              compactHelp: true,
               request: g.first,
               bundleLines: g,
               onChanged: _load,
             ),
             const SizedBox(height: 12),
             ImporterOrderInvoiceSection(
+              useCompactHelp: true,
               request: g.first,
               invoiceBundleLines: g,
               onChanged: _load,

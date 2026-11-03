@@ -105,6 +105,7 @@ class TransactionRequestModel {
     this.tasaBcvSnapshot,
     this.metodoPagoMoneda,
     this.tasaBcvAplicada,
+    this.tasaBcvRecalcAt,
     this.totalRef,
     this.totalBs,
     this.importerViewOrderItems = const <OrderItemModel>[],
@@ -363,6 +364,9 @@ class TransactionRequestModel {
 
   /// Tasa BCV congelada al confirmar (`transaction_requests.tasa_bcv_aplicada`).
   final double? tasaBcvAplicada;
+
+  /// Si no es null, un admin ya reaplicó la tasa vigente una vez.
+  final DateTime? tasaBcvRecalcAt;
 
   /// BCV reference total, independent of a new order's USD payment incentive.
   final double? totalRef;
@@ -658,6 +662,17 @@ class TransactionRequestModel {
     final rate = tasaBcvAplicada ?? tasaBcvSnapshot;
     if (rate == null) return null;
     return precioTotal * rate;
+  }
+
+  /// Admin: aún no se usó el recálculo único de tasa.
+  bool get tasaBcvRecalcDisponible => tasaBcvRecalcAt == null;
+
+  /// Admin: la tasa congelada difiere de [liveRate] (tolerancia BCV).
+  bool tasaBcvDesactualizadaRespecto(double? liveRate) {
+    if (liveRate == null || liveRate <= 0) return false;
+    final frozen = tasaBcvAplicada;
+    if (frozen == null || frozen <= 0) return false;
+    return (frozen - liveRate).abs() > 0.00005;
   }
 
   /// Aliado: puede cancelar mientras el pedido sigue pendiente de gestión del importador.
@@ -1235,6 +1250,7 @@ class TransactionRequestModel {
       tasaBcvSnapshot: _asNullableDouble(json['tasa_bcv_snapshot']),
       metodoPagoMoneda: _nullableText(json['metodo_pago_moneda']),
       tasaBcvAplicada: _asNullableDouble(json['tasa_bcv_aplicada']),
+      tasaBcvRecalcAt: _parseDate(json['tasa_bcv_recalc_at']),
       totalRef: _asNullableDouble(json['total_ref']),
       totalBs: _asNullableDouble(json['total_bs']),
       importerViewOrderItems:

@@ -25,6 +25,7 @@ class WebPushService extends ChangeNotifier {
   WebPushUiStatus get status => _status;
   String? get lastError => _lastError;
   bool get isIos => WebPushBridge.isIos;
+  bool get isDesktopWeb => WebPushBridge.isDesktopWeb;
   bool get isStandalone => WebPushBridge.isStandalone;
 
   static String? get vapidPublicKey {
@@ -125,10 +126,7 @@ class WebPushService extends ChangeNotifier {
         p256dh: keys.p256dh,
         auth: keys.auth,
         userAgent: _userAgentHint(),
-        platform: webPushPlatformFromUserAgent(
-          _userAgentHint(),
-          isIos: WebPushBridge.isIos,
-        ),
+        platform: _platformForUpsert(),
         environment: webPushEnvironmentFromSupabaseUrl(
           dotenv.env['NEXT_PUBLIC_SUPABASE_URL'],
         ).wireValue,
@@ -139,8 +137,9 @@ class WebPushService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Web Push subscribe failed: $e');
       _status = WebPushUiStatus.error;
-      _lastError =
-          'No pudimos activar los avisos. Cierra la app, ábrela desde el icono e inténtalo otra vez.';
+      _lastError = WebPushBridge.isDesktopWeb
+          ? 'No pudimos activar las notificaciones. Revisa el permiso del navegador e inténtalo de nuevo.'
+          : 'No pudimos activar los avisos. Cierra la app, ábrela desde el icono e inténtalo otra vez.';
       notifyListeners();
     }
   }
@@ -194,10 +193,7 @@ class WebPushService extends ChangeNotifier {
         p256dh: keys.p256dh,
         auth: keys.auth,
         userAgent: _userAgentHint(),
-        platform: webPushPlatformFromUserAgent(
-          _userAgentHint(),
-          isIos: WebPushBridge.isIos,
-        ),
+        platform: _platformForUpsert(),
         environment: webPushEnvironmentFromSupabaseUrl(
           dotenv.env['NEXT_PUBLIC_SUPABASE_URL'],
         ).wireValue,
@@ -210,10 +206,20 @@ class WebPushService extends ChangeNotifier {
   String _userAgentHint() {
     if (!kIsWeb) return '';
     try {
+      final ua = WebPushBridge.userAgent().trim();
+      if (ua.isNotEmpty) return ua.length > 400 ? ua.substring(0, 400) : ua;
       return WebPushBridge.isIos ? 'ios-safari' : 'web';
     } catch (_) {
       return 'web';
     }
+  }
+
+  String _platformForUpsert() {
+    return webPushPlatformFromUserAgent(
+      _userAgentHint(),
+      isIos: WebPushBridge.isIos,
+      platformHint: WebPushBridge.platformHint(),
+    );
   }
 
   void _dispatchClick(WebPushClickPayload payload) {

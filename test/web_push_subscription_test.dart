@@ -87,6 +87,28 @@ void main() {
       webPushPlatformFromUserAgent('Mozilla/5.0 (Macintosh)', isIos: false),
       'desktop',
     );
+    expect(
+      webPushPlatformFromUserAgent(
+        'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15',
+        isIos: false,
+      ),
+      'safari',
+    );
+    expect(
+      webPushPlatformFromUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0) Chrome/120.0.0.0 Safari/537.36',
+        isIos: false,
+      ),
+      'chrome',
+    );
+    expect(
+      webPushPlatformFromUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0) Chrome/120.0.0.0 Edg/120.0.0.0',
+        isIos: false,
+        platformHint: 'edge',
+      ),
+      'edge',
+    );
   });
 
   test('estados de UI: activar vs activo', () {

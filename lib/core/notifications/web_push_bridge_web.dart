@@ -7,8 +7,12 @@ import 'web_push_bridge.dart';
 extension type _B2bWebPush(JSObject _) implements JSObject {
   external bool hasApi();
   external bool isIos();
+  external bool isAndroid();
+  external bool isDesktopWeb();
   external bool isStandalone();
   external String getPermission();
+  external String getUserAgent();
+  external String getPlatformHint();
   external JSPromise<JSString> requestPermission();
   external JSPromise<JSString> getSubscription();
   external JSPromise<JSString> subscribe(String vapidPublicKey);
@@ -46,6 +50,22 @@ bool webPushBridgeIsIos() {
   }
 }
 
+bool webPushBridgeIsAndroid() {
+  try {
+    return _api?.isAndroid() ?? false;
+  } catch (_) {
+    return false;
+  }
+}
+
+bool webPushBridgeIsDesktopWeb() {
+  try {
+    return _api?.isDesktopWeb() ?? false;
+  } catch (_) {
+    return false;
+  }
+}
+
 bool webPushBridgeIsStandalone() {
   try {
     return _api?.isStandalone() ?? false;
@@ -59,6 +79,22 @@ String webPushBridgePermission() {
     return _api?.getPermission() ?? 'unsupported';
   } catch (_) {
     return 'unsupported';
+  }
+}
+
+String webPushBridgeUserAgent() {
+  try {
+    return _api?.getUserAgent() ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+String webPushBridgePlatformHint() {
+  try {
+    return _api?.getPlatformHint() ?? 'web';
+  } catch (_) {
+    return 'web';
   }
 }
 

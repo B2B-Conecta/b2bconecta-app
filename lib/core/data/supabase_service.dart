@@ -357,6 +357,7 @@ class SupabaseService {
     String? category,
     bool onlyLowStock = false,
     bool onlyOutOfStock = false,
+    bool onlyInStock = false,
     bool onlyInactive = false,
     bool onlyActive = false,
     ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
@@ -368,6 +369,7 @@ class SupabaseService {
           category: category,
           onlyLowStock: onlyLowStock,
           onlyOutOfStock: onlyOutOfStock,
+          onlyInStock: onlyInStock,
           onlyInactive: onlyInactive,
           onlyActive: onlyActive,
           photoFilter: photoFilter);

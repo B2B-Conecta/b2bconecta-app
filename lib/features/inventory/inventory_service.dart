@@ -236,6 +236,7 @@ class InventoryService {
     String? category,
     bool onlyLowStock = false,
     bool onlyOutOfStock = false,
+    bool onlyInStock = false,
     bool onlyInactive = false,
     bool onlyActive = false,
     ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
@@ -263,6 +264,7 @@ class InventoryService {
     }
 
     if (onlyOutOfStock) query = query.lte('stock', 0);
+    if (onlyInStock) query = query.gt('stock', 0);
 
     if (onlyInactive) {
       query = query.eq('is_active', false);

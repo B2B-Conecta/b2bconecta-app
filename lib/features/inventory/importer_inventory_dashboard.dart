@@ -53,6 +53,7 @@ class _ImporterInventoryDashboardState
   String _categoryFilter = 'Todas';
   bool _filterLowStock = false;
   bool _filterOutOfStock = false;
+  bool _filterInStock = false;
   bool _filterHidden = false;
   bool _filterActiveOnly = false;
   ProductPhotoListFilter _photoFilter = ProductPhotoListFilter.all;
@@ -159,6 +160,7 @@ class _ImporterInventoryDashboardState
       category: _categoryFilter,
       onlyLowStock: _filterLowStock,
       onlyOutOfStock: _filterOutOfStock,
+      onlyInStock: _filterInStock,
       onlyInactive: _filterHidden,
       onlyActive: _filterActiveOnly,
       photoFilter: _photoFilter,
@@ -1140,23 +1142,25 @@ class _ImporterInventoryDashboardState
       _filterActiveOnly = false;
       _filterHidden = request == 'pausados';
       _filterOutOfStock = request == 'sin_stock';
+      _filterInStock = false;
     });
     _reloadInventory(refreshMetrics: false);
   }
 
-  int get _quickView => _filterOutOfStock
-      ? 3
-      : _filterHidden
-          ? 2
-          : _filterActiveOnly
-              ? 1
-              : 0;
+  int get _quickView {
+    if (_filterActiveOnly) return 1;
+    if (_filterHidden) return 2;
+    if (_filterInStock) return 3;
+    if (_filterOutOfStock) return 4;
+    return 0;
+  }
 
   void _selectQuickView(int index) {
     setState(() {
       _filterActiveOnly = index == 1;
       _filterHidden = index == 2;
-      _filterOutOfStock = index == 3;
+      _filterInStock = index == 3;
+      _filterOutOfStock = index == 4;
     });
     _reloadInventory(refreshMetrics: false);
   }
@@ -1165,6 +1169,7 @@ class _ImporterInventoryDashboardState
     setState(() {
       _categoryFilter = 'Todas';
       _photoFilter = ProductPhotoListFilter.all;
+      _filterInStock = false;
       _filterLowStock =
           _filterOutOfStock = _filterHidden = _filterActiveOnly = false;
       _searchController.clear();
@@ -1457,7 +1462,8 @@ class _ImporterInventoryDashboardState
                             'Todos',
                             'Publicados',
                             'Pausados',
-                            'Sin stock'
+                            'Con stock',
+                            'Sin stock',
                           ].indexed)
                             Padding(
                                 padding: const EdgeInsets.only(right: 6),
@@ -1533,6 +1539,7 @@ class _ImporterInventoryDashboardState
 
     if (parts.isEmpty) {
       final hasFilters = _filterOutOfStock ||
+          _filterInStock ||
           _filterLowStock ||
           _filterHidden ||
           _filterActiveOnly ||

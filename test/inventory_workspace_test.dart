@@ -70,10 +70,14 @@ void main() {
               };
             } else {
               final query = request.url.queryParameters;
-              var matching = rows
-                  .where(
-                      (row) => query['stock'] != 'lte.0' || row['stock'] == 0)
-                  .toList();
+              var matching = rows.where((row) {
+                final stock = row['stock'] as int;
+                return switch (query['stock']) {
+                  'lte.0' => stock <= 0,
+                  'gt.0' => stock > 0,
+                  _ => true,
+                };
+              }).toList();
               if (query['category']?.startsWith('eq.') == true) {
                 matching = matching
                     .where((row) =>
@@ -138,6 +142,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         requests.any((r) => r.url.queryParameters['stock'] == 'lte.0'), isTrue);
+    expect(find.text('Repuesto 0'), findsOneWidget);
+    expect(find.text('Repuesto 1'), findsNothing);
+
+    final inStock = find.widgetWithText(ChoiceChip, 'Con stock');
+    await tester.ensureVisible(inStock);
+    await tester.tap(inStock);
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChoiceChip>(inStock).selected, isTrue);
+    expect(requests.last.url.queryParameters['stock'], 'gt.0');
+    expect(find.text('Repuesto 0'), findsNothing);
+    expect(find.text('Repuesto 1'), findsOneWidget);
     expect(
         requests
             .where((r) => (r.url.queryParameters['select'] ?? '')

@@ -55,7 +55,7 @@ class ProductStockSummary extends StatelessWidget {
         Icon(short ? Icons.info_outline_rounded : Icons.inventory_2_outlined,
             size: 15, color: color),
         const SizedBox(width: 5),
-        stock,
+        Flexible(child: stock),
       ]),
       minimum,
     ]);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motolink_pro_app/features/orders/aliado/aliado_expandable_order_card.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_order_detail_view.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
@@ -27,6 +28,42 @@ TransactionRequestModel supplierLine(String id, String supplier) =>
     });
 
 void main() {
+  testWidgets('retailer detail places the chat icon in the summary header',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(375, 812);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+            child: AliadoExpandableOrderCard(
+          request: fixture('pending'),
+          expanded: true,
+          onToggle: () {},
+          statusLabel: 'Pendiente',
+          workspaceDetail: true,
+          onCancelarSolicitudPendiente: () {},
+          detailSectionsBuilder: (_, __, ___, ____) =>
+              const AliadoOrderDetailSections(
+            payment: SizedBox.shrink(),
+            paymentStatus: 'Esperando factura',
+          ),
+        )),
+      ),
+    ));
+    final chat = find.byTooltip('Mensajes del pedido');
+    final summary = find.byType(OrderDetailOverview);
+    expect(chat, findsOneWidget);
+    expect(find.text('Mensajes'), findsNothing);
+    expect(tester.getTopLeft(chat).dy,
+        lessThan(tester.getTopLeft(summary).dy + 64));
+    final options = find.byTooltip('Más opciones del pedido');
+    expect(options, findsOneWidget);
+    expect(tester.getCenter(chat).dx, lessThan(tester.getCenter(options).dx));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final dark in [false, true]) {
     for (final width in [320.0, 768.0, 1280.0]) {
       for (final scale in [1.0, 1.8]) {

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_message_attachment.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_message_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';

@@ -51,7 +51,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String? _expandedRequestId;
   String? _cancelBusyKey;
   late final TextEditingController _searchCtrl;
-  PedidosListScope _scope = PedidosListScope.enCurso;
+  PedidosListScope _scope = PedidosListScope.todos;
   bool _onlyNuevos = false;
   bool _pendingFirst = true;
   bool _morosoOnly = false;

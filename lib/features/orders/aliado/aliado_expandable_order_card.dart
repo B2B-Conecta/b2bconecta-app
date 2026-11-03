@@ -100,13 +100,13 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       statusLabel: statusLabel,
       showToggle: !workspaceDetail,
       detailSummary: workspaceDetail,
+      actionsInHeader: workspaceDetail,
       onCancel: onCancelarSolicitudPendiente != null &&
               lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)
           ? onCancelarSolicitudPendiente
           : null,
       cancelBusy: cancelarSolicitudPendienteBusy,
       chatAction: OrderChatIconButton(
-        showLabel: workspaceDetail,
         relatedOrderIds: lines.map((e) => e.id).toList(),
         onOpen: () {
           final counterpart = lines.first.ownerBusinessName?.trim();

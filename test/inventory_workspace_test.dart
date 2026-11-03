@@ -154,6 +154,39 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final width in [390.0, 1100.0]) {
+    testWidgets(
+        'inventory keeps search and filters visible on scroll at $width',
+        (tester) async {
+      rows = List.generate(15, product);
+      tester.view.physicalSize = Size(width, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const MaterialApp(
+          home: Scaffold(body: ImporterInventoryDashboard())));
+      await tester.pumpAndSettle();
+
+      final search = find.byType(TextField);
+      final filter = find.byTooltip('Filtrar productos');
+      final initialSearchTop = tester.getTopLeft(search).dy;
+      final list = find.byType(CustomScrollView);
+      await tester.drag(list, const Offset(0, -420));
+      await tester.pumpAndSettle();
+
+      final compactSearchTop = tester.getTopLeft(search).dy;
+      expect(compactSearchTop, lessThan(initialSearchTop - 20));
+      expect(compactSearchTop, greaterThanOrEqualTo(0));
+      expect(filter.hitTestable(), findsOneWidget);
+      expect(find.text('Todos').hitTestable(), findsOneWidget);
+
+      tester.widget<CustomScrollView>(list).controller!.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(search).dy, closeTo(initialSearchTop, 1));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('real categories can be applied without changing product data',
       (tester) async {
     rows.add(product(1000));

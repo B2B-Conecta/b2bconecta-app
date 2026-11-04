@@ -216,8 +216,15 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     MainShellTabController.consumePendingNotificationType();
   }
 
-  String? _expandKeyForPendingId(String id) =>
-      orderExpandKeyForNotification(_rows, id);
+  String? _expandKeyForPendingId(String id) {
+    for (final group in _groupsForDisplay(_rows)) {
+      if (group.any(
+          (row) => transactionRequestMatchesNotificationRelatedId(row, id))) {
+        return _displayGroupKey(group);
+      }
+    }
+    return null;
+  }
 
   Future<void> _load({bool silent = false}) async {
     if (!silent) {

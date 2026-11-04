@@ -47,9 +47,17 @@ class OrderChatThread {
   final String? importerName;
   final List<TransactionRequestModel> lines;
 
+  String get reference {
+    final checkout = lines.isEmpty ? null : lines.first.checkoutGroupId?.trim();
+    final value =
+        checkout == null || checkout.isEmpty ? primaryRequestId : checkout;
+    return '#${value.substring(0, value.length < 8 ? value.length : 8).toUpperCase()}';
+  }
+
   String get searchBlob {
     final parts = <String>[
       title,
+      reference,
       counterpartName,
       statusLabel,
       status,
@@ -69,7 +77,8 @@ List<OrderChatThread> orderChatThreadsFromOrders(
   final out = <OrderChatThread>[];
   for (final cart in groupAliadoOrdersByCheckout(orders)) {
     final chunks = groupCheckoutLinesByImportador(cart);
-    final groups = chunks.isEmpty ? <List<TransactionRequestModel>>[cart] : chunks;
+    final groups =
+        chunks.isEmpty ? <List<TransactionRequestModel>>[cart] : chunks;
     for (final lines in groups) {
       if (lines.isEmpty) continue;
       out.add(_threadFromLines(lines, role: role));
@@ -95,7 +104,7 @@ OrderChatThread _threadFromLines(
   final counterpart = switch (role) {
     AppHomeRole.aliado => importer.isNotEmpty ? importer : 'Mayorista',
     AppHomeRole.importador => aliado.isNotEmpty ? aliado : 'Tienda minorista',
-      AppHomeRole.administrador => () {
+    AppHomeRole.administrador => () {
         final joined = [
           if (aliado.isNotEmpty) aliado,
           if (importer.isNotEmpty) importer,
@@ -176,6 +185,7 @@ List<OrderChatThread> filterOrderChatThreads({
   required String query,
   required OrderChatInboxFilter filter,
   required int Function(List<String> ids) unreadFor,
+  DateTime? Function(OrderChatThread)? activityFor,
 }) {
   final q = query.trim().toLowerCase();
   var out = threads.where((t) {
@@ -197,8 +207,8 @@ List<OrderChatThread> filterOrderChatThreads({
     final ub = unreadFor(b.requestIds);
     if (ua > 0 && ub == 0) return -1;
     if (ua == 0 && ub > 0) return 1;
-    final ta = a.updatedAt;
-    final tb = b.updatedAt;
+    final ta = activityFor == null ? a.updatedAt : activityFor(a);
+    final tb = activityFor == null ? b.updatedAt : activityFor(b);
     if (ta == null && tb == null) return 0;
     if (ta == null) return 1;
     if (tb == null) return -1;

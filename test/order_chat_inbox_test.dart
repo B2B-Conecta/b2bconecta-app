@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/core/notifications/in_app_notification_model.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
+import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
@@ -45,6 +46,57 @@ TransactionRequestModel _order({
 }
 
 void main() {
+  testWidgets('send accepts text or a prepared attachment', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var sends = 0;
+    Widget screen({bool attached = false}) => MaterialApp(
+          home: Scaffold(
+            body: ChatComposer(
+              controller: controller,
+              onSend: () => sends++,
+              sending: false,
+              hasAttachment: attached,
+            ),
+          ),
+        );
+    final send = find.byTooltip('Enviar mensaje');
+    await tester.pumpWidget(screen());
+    expect(
+        tester.widget<IconButton>(find.byType(IconButton)).onPressed, isNull);
+    await tester.enterText(find.byType(TextField), 'Consulta');
+    await tester.pump();
+    await tester.tap(send);
+    expect(sends, 1);
+
+    controller.clear();
+    await tester.pumpWidget(screen(attached: true));
+    await tester.tap(send);
+    expect(sends, 2);
+  });
+
+  testWidgets('timeline shows one separator per day and latest last',
+      (tester) async {
+    final dates = [
+      DateTime(2026, 10, 12, 8),
+      DateTime(2026, 10, 12, 15),
+      DateTime(2026, 10, 13, 8),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ChatTimeline(
+          itemCount: dates.length,
+          dateAt: (i) => dates[i],
+          messageAt: (i) => Text('Mensaje $i'),
+        ),
+      ),
+    ));
+    expect(find.text('12/10/2026'), findsOneWidget);
+    expect(find.text('13/10/2026'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Mensaje 2')).dy,
+        greaterThan(tester.getTopLeft(find.text('Mensaje 1')).dy));
+  });
+
   test('groups checkout lines by importer into separate threads', () {
     final orders = [
       _order(
@@ -69,7 +121,8 @@ void main() {
       role: AppHomeRole.aliado,
     );
     expect(threads, hasLength(2));
-    expect(threads.map((t) => t.counterpartName), containsAll(['Delta', 'Cúcuta']));
+    expect(threads.map((t) => t.counterpartName),
+        containsAll(['Delta', 'Cúcuta']));
     expect(threads.first.requestIds, isNotEmpty);
   });
 
@@ -256,7 +309,8 @@ void main() {
     expect(opened, isTrue);
   });
 
-  testWidgets('inbox shows empty copy when there are no orders', (tester) async {
+  testWidgets('inbox shows empty copy when there are no orders',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -293,11 +347,13 @@ void main() {
   test('el filtro de fechas incluye el día de inicio y el de cierre', () {
     final day = DateTime(2026, 10, 13, 22);
     expect(
-      chatActivityInRange(at: day, from: DateTime(2026, 10, 13), to: DateTime(2026, 10, 13)),
+      chatActivityInRange(
+          at: day, from: DateTime(2026, 10, 13), to: DateTime(2026, 10, 13)),
       isTrue,
     );
     expect(
-      chatActivityInRange(at: day, from: DateTime(2026, 10, 14), to: DateTime(2026, 10, 14)),
+      chatActivityInRange(
+          at: day, from: DateTime(2026, 10, 14), to: DateTime(2026, 10, 14)),
       isFalse,
     );
     expect(chatActivityInRange(at: null, from: null, to: null), isTrue);
@@ -324,8 +380,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Cadena DID 428'), findsOneWidget);
+    expect(find.text('#ORD-1 · Cadena DID 428'), findsOneWidget);
     expect(find.textContaining('Repuestos Delta'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '#ord-1');
+    await tester.pumpAndSettle();
+    expect(find.text('#ORD-1 · Cadena DID 428'), findsOneWidget);
   });
 
   test('reply flags follow role and active order', () {
@@ -352,7 +411,8 @@ void main() {
       (aliado: true, admin: false, importador: false),
     );
     expect(
-      orderChatInboxReplyFlags(role: AppHomeRole.importador, thread: closedThread),
+      orderChatInboxReplyFlags(
+          role: AppHomeRole.importador, thread: closedThread),
       (aliado: false, admin: false, importador: false),
     );
     expect(

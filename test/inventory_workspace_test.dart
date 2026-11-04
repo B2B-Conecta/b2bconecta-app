@@ -92,6 +92,12 @@ void main() {
               final limit =
                   math.min(int.tryParse(query['limit'] ?? '') ?? 75, 75);
               body = matching.skip(offset).take(limit).toList();
+              return http.Response(jsonEncode(body), 200,
+                  request: request,
+                  headers: {
+                    'content-type': 'application/json',
+                    'content-range': '*/${matching.length}',
+                  });
             }
           }
           return http.Response(jsonEncode(body), 200,

@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
+import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_location_exception.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'cart_service.dart';
@@ -13,6 +17,9 @@ import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
+import 'cart_product_actions.dart';
+import 'cart_suggestions.dart';
+import 'cart_suggestions_section.dart';
 import 'importer_min_order.dart';
 import 'min_order_currency.dart';
 
@@ -22,10 +29,19 @@ class CartScreen extends StatefulWidget {
     super.key,
     required this.profile,
     this.liveTasaBcv,
+    this.loadSuggestionCandidates,
+    this.suggestionAutoPlay = true,
   });
 
   final ProfileModel profile;
   final double? liveTasaBcv;
+
+  /// Sustituye la lectura del catálogo. Las pruebas pasan una lista fija.
+  final Future<List<PartModel>> Function(CartSuggestionQuery query)?
+      loadSuggestionCandidates;
+
+  /// Auto-desplazamiento del carrusel de sugerencias (desactivar en tests).
+  final bool suggestionAutoPlay;
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -66,6 +82,25 @@ class _CartScreenState extends State<CartScreen> {
   DateTime? _tasaEffectiveDate;
   Map<String, ImporterCreditBalance> _credits = const {};
   final Set<String> _creditOptOut = {};
+  bool _loadingSuggestions = false;
+  List<CartSuggestion> _suggestions = const [];
+  List<PartModel> _suggestionPool = const [];
+  String? _suggestionCartKey;
+  String? _suggestionInflightKey;
+  int _suggestionTicket = 0;
+  final Set<String> _confirmingSuggestionIds = {};
+  final Map<String, CartSuggestion> _pinnedSuggestions = {};
+  final Map<String, Timer> _suggestionConfirmTimers = {};
+  final GlobalKey _summaryKey = GlobalKey();
+  double _summaryHeight = 420;
+
+  void _syncSummaryHeight() {
+    final box = _summaryKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final next = box.size.height;
+    if ((next - _summaryHeight).abs() < 1) return;
+    setState(() => _summaryHeight = next);
+  }
 
   @override
   void initState() {
@@ -73,6 +108,8 @@ class _CartScreenState extends State<CartScreen> {
     _tasa = widget.liveTasaBcv;
     _cart.addListener(_onCart);
     _loadCredits();
+    if (_cart.lines.isNotEmpty) _loadingSuggestions = true;
+    _reloadSuggestions();
     SupabaseService.fetchGlobalTasaBcvRecord().then((record) {
       if (!mounted || record == null) return;
       setState(() {
@@ -83,7 +120,123 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _onCart() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    final key = _cartProductKey();
+    if (key == _suggestionCartKey) {
+      _publishSuggestions();
+      return;
+    }
+    if (key == _suggestionInflightKey) return;
+    _reloadSuggestions();
+  }
+
+  String _cartProductKey() {
+    final ids = [for (final line in _cart.lines) line.part.id]..sort();
+    return ids.join(',');
+  }
+
+  Future<List<PartModel>> _loadSuggestionCandidates(
+    CartSuggestionQuery query,
+  ) {
+    final custom = widget.loadSuggestionCandidates;
+    if (custom != null) return custom(query);
+    return CatalogService.fetchCartSuggestionCandidates(
+      excludeProductIds: query.productIds,
+      categoryFragments: query.categoryFragments,
+    );
+  }
+
+  Future<void> _reloadSuggestions() async {
+    final key = _cartProductKey();
+    final parts = [for (final line in _cart.lines) line.part];
+    if (parts.isEmpty) {
+      _suggestionCartKey = key;
+      _suggestionInflightKey = null;
+      _suggestionPool = const [];
+      if (!mounted) return;
+      setState(() {
+        _suggestions = [
+          for (final entry in _pinnedSuggestions.entries)
+            if (_confirmingSuggestionIds.contains(entry.key)) entry.value,
+        ];
+        _loadingSuggestions = false;
+      });
+      return;
+    }
+    final ticket = ++_suggestionTicket;
+    _suggestionInflightKey = key;
+    final skeleton = _suggestions.isEmpty &&
+        _pinnedSuggestions.isEmpty &&
+        !_loadingSuggestions;
+    if (skeleton && mounted) setState(() => _loadingSuggestions = true);
+    try {
+      final candidates = await _loadSuggestionCandidates(
+        CartSuggestionQuery.fromParts(parts),
+      );
+      if (!mounted || ticket != _suggestionTicket) return;
+      _suggestionPool = candidates;
+      _suggestionCartKey = key;
+      _suggestionInflightKey = null;
+      _publishSuggestions();
+    } catch (_) {
+      if (!mounted || ticket != _suggestionTicket) return;
+      _suggestionInflightKey = null;
+      setState(() => _loadingSuggestions = false);
+    }
+  }
+
+  void _publishSuggestions() {
+    final ranked = rankCartSuggestions(
+      cartParts: [for (final line in _cart.lines) line.part],
+      candidates: _suggestionPool,
+    );
+    final visible = <CartSuggestion>[
+      for (final entry in _pinnedSuggestions.entries)
+        if (_confirmingSuggestionIds.contains(entry.key)) entry.value,
+      for (final suggestion in ranked)
+        if (!_confirmingSuggestionIds.contains(suggestion.part.id)) suggestion,
+    ];
+    if (!mounted) return;
+    setState(() {
+      _suggestions = visible;
+      _loadingSuggestions = false;
+    });
+  }
+
+  void _addSuggestion(CartSuggestion suggestion) {
+    if (_confirmingSuggestionIds.contains(suggestion.part.id)) return;
+    final blocked = CartProductActions.blockReason(
+      part: suggestion.part,
+      profile: widget.profile,
+      cart: _cart,
+    );
+    if (blocked != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(blocked)));
+      return;
+    }
+    final added = CartProductActions.addMinimum(
+      part: suggestion.part,
+      profile: widget.profile,
+      cart: _cart,
+    );
+    if (added == 0) return;
+    _pinnedSuggestions[suggestion.part.id] = suggestion;
+    _confirmingSuggestionIds.add(suggestion.part.id);
+    _suggestionConfirmTimers[suggestion.part.id]?.cancel();
+    _suggestionConfirmTimers[suggestion.part.id] = Timer(
+      const Duration(milliseconds: 700),
+      () {
+        if (!mounted) return;
+        _confirmingSuggestionIds.remove(suggestion.part.id);
+        _pinnedSuggestions.remove(suggestion.part.id);
+        _suggestionConfirmTimers.remove(suggestion.part.id);
+        _publishSuggestions();
+      },
+    );
+    _publishSuggestions();
   }
 
   Future<void> _loadCredits() async {
@@ -126,6 +279,9 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   void dispose() {
+    for (final timer in _suggestionConfirmTimers.values) {
+      timer.cancel();
+    }
     _cart.removeListener(_onCart);
     super.dispose();
   }
@@ -638,40 +794,76 @@ class _CartScreenState extends State<CartScreen> {
                         child: _buildSupplierGroup(group, tasa),
                       ),
                   ];
+                  final showSuggestions =
+                      _loadingSuggestions || _suggestions.isNotEmpty;
+                  final suggestions = !showSuggestions
+                      ? null
+                      : CartSuggestionsSection(
+                          suggestions: _suggestions,
+                          loading: _loadingSuggestions,
+                          confirmingIds: _confirmingSuggestionIds,
+                          bcvRate: pagaBolivares ? tasa : null,
+                          autoPlay: widget.suggestionAutoPlay,
+                          onAdd: _submitting || !_cart.canEdit
+                              ? null
+                              : _addSuggestion,
+                        );
                   return Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: wide ? 1100 : 720),
+                      constraints: BoxConstraints(maxWidth: wide ? 1280 : 720),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
-                            wide ? 24 : 16, wide ? 28 : 20, wide ? 24 : 16, 0),
+                            wide ? 28 : 16, wide ? 24 : 20, wide ? 28 : 16, 0),
                         child: wide
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                    heading,
-                                    const SizedBox(height: 24),
-                                    Expanded(
-                                        child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
+                            ? Builder(builder: (context) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
+                                  if (mounted) _syncSummaryHeight();
+                                });
+                                // Scroll de toda la página; arriba = alto del
+                                // resumen. Pedidos extras, dentro de ese alto.
+                                return SingleChildScrollView(
+                                  padding: EdgeInsets.only(
+                                    bottom: 24 +
+                                        MediaQuery.paddingOf(context).bottom,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      heading,
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
                                           Expanded(
+                                            child: SizedBox(
+                                              height: _summaryHeight,
                                               child: ListView(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 24),
-                                                  children: products)),
-                                          const SizedBox(width: 24),
+                                                primary: false,
+                                                padding: EdgeInsets.zero,
+                                                children: products,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 28),
                                           SizedBox(
-                                              width: 312,
-                                              child: SingleChildScrollView(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 24),
-                                                  child: summary)),
-                                        ])),
-                                  ])
+                                            key: _summaryKey,
+                                            width: 340,
+                                            child: summary,
+                                          ),
+                                        ],
+                                      ),
+                                      if (suggestions != null) ...[
+                                        const SizedBox(height: 28),
+                                        suggestions,
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              })
                             : ListView(
                                 padding: EdgeInsets.only(
                                     bottom: 24 +
@@ -682,6 +874,10 @@ class _CartScreenState extends State<CartScreen> {
                                     ...products,
                                     const SizedBox(height: 4),
                                     summary,
+                                    if (suggestions != null) ...[
+                                      const SizedBox(height: 32),
+                                      suggestions,
+                                    ],
                                   ]),
                       ),
                     ),

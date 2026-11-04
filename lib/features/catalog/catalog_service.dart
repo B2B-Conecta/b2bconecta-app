@@ -544,6 +544,96 @@ class CatalogService {
     );
   }
 
+  /// Candidatos del carrusel: complementos por categoría y proveedores con
+  /// más pedidos pagados. Quien llama descarta los SKUs que ya están en el pedido.
+  static Future<List<PartModel>> fetchCartSuggestionCandidates({
+    required List<String> excludeProductIds,
+    required List<String> categoryFragments,
+  }) {
+    return retryOnJwtIssuedAtFuture(
+      () => _fetchCartSuggestionCandidates(
+        excludeProductIds: excludeProductIds,
+        categoryFragments: categoryFragments,
+      ),
+    );
+  }
+
+  static Future<List<PartModel>> _fetchCartSuggestionCandidates({
+    required List<String> excludeProductIds,
+    required List<String> categoryFragments,
+  }) async {
+    final plainEmbed = _catalogProfileSelect(CatalogFilters.empty);
+    final leaderEmbed = _catalogProfileSelect(
+      const CatalogFilters(minOwnerRatingCount: 1),
+    );
+    final fragments = <String>[];
+    for (final raw in categoryFragments) {
+      final safe = SupabaseAccess.sanitizeIlike(raw)
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9 ]'), '')
+          .trim();
+      if (safe.length < 5 || fragments.contains(safe)) continue;
+      fragments.add(safe);
+      if (fragments.length >= 8) break;
+    }
+
+    final excluded = excludeProductIds.toSet();
+    final rows = <String, Map<String, dynamic>>{};
+
+    void keep(List<dynamic> response) {
+      for (final row in response) {
+        if (row is! Map) continue;
+        final mapped = Map<String, dynamic>.from(row);
+        final id = mapped['id']?.toString() ?? '';
+        if (id.isEmpty || excluded.contains(id)) continue;
+        rows.putIfAbsent(id, () => mapped);
+      }
+    }
+
+    if (fragments.isNotEmpty) {
+      try {
+        dynamic complement = SupabaseAccess.client
+            .from('products')
+            .select('*, $plainEmbed')
+            .eq('is_active', true)
+            .gt('stock', 0);
+        complement = complement.or(
+          fragments.map((fragment) => 'category.ilike.*$fragment*').join(','),
+        );
+        keep(await complement.limit(24) as List<dynamic>);
+      } catch (_) {}
+    }
+
+    try {
+      final leaders = await SupabaseAccess.client
+          .from('products')
+          .select('*, $leaderEmbed')
+          .eq('is_active', true)
+          .gt('stock', 0)
+          .filter('profiles.catalog_paid_orders_30d', 'gte', 3)
+          .limit(24);
+      keep(leaders as List<dynamic>);
+    } catch (_) {}
+
+    if (rows.isEmpty) {
+      final fallback = await SupabaseAccess.client
+          .from('products')
+          .select('*, $plainEmbed')
+          .eq('is_active', true)
+          .gt('stock', 0)
+          .limit(24);
+      keep(fallback as List<dynamic>);
+    }
+
+    if (rows.isEmpty) return const [];
+
+    final parts = collapseProductVariants([
+      for (final row in rows.values) PartModel.fromJson(row),
+    ]);
+    final discounts = await fetchActivePromoProductDiscounts();
+    return applyPromoDiscountsToParts(parts, discounts);
+  }
+
   /// Carga filas del catálogo; parte `id.in` en lotes para no saturar la URL.
   static Future<List<dynamic>> _fetchCatalogProductRows({
     required String embed,

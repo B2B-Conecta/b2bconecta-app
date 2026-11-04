@@ -574,8 +574,10 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
                     icon: const Icon(Icons.refresh),
                   ),
                 ]),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     FilterChip(

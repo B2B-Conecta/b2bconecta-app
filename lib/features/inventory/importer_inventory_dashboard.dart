@@ -50,6 +50,9 @@ class _ImporterInventoryDashboardState
   int _inventoryRequestId = 0;
   bool _hasMoreInventory = true;
   bool _loadingMoreInventory = false;
+
+  /// Productos que coinciden con la búsqueda y los filtros, no solo el lote cargado.
+  int? _matchingTotal;
   String _categoryFilter = 'Todas';
   bool _filterLowStock = false;
   bool _filterOutOfStock = false;
@@ -110,6 +113,7 @@ class _ImporterInventoryDashboardState
     setState(() {
       if (!preserveScroll) {
         _loadedParts.clear();
+        _matchingTotal = null;
       }
       _productPageIndex = 0;
       _hasMoreInventory = true;
@@ -153,24 +157,56 @@ class _ImporterInventoryDashboardState
       return List<PartModel>.unmodifiable(_loadedParts);
     }
 
+    final searchQuery = _searchController.text;
+    final category = _categoryFilter;
+    final onlyLowStock = _filterLowStock;
+    final onlyOutOfStock = _filterOutOfStock;
+    final onlyInactive = _filterHidden;
+    final onlyActive = _filterActiveOnly;
+    final onlyInStock = _filterInStock;
+    final photoFilter = _photoFilter;
+    final countFuture = reset
+        ? SupabaseService.countMyInventory(
+            searchQuery: searchQuery,
+            category: category,
+            onlyLowStock: onlyLowStock,
+            onlyOutOfStock: onlyOutOfStock,
+            onlyInStock: onlyInStock,
+            onlyInactive: onlyInactive,
+            onlyActive: onlyActive,
+            photoFilter: photoFilter,
+          ).then<int?>((value) => value).catchError((_) => null)
+        : null;
     final batch = await SupabaseService.fetchMyInventory(
       limit: ImporterInventoryLayout.pageSize,
       offset: reset ? 0 : _loadedParts.length,
-      searchQuery: _searchController.text,
-      category: _categoryFilter,
-      onlyLowStock: _filterLowStock,
-      onlyOutOfStock: _filterOutOfStock,
-      onlyInStock: _filterInStock,
-      onlyInactive: _filterHidden,
-      onlyActive: _filterActiveOnly,
-      photoFilter: _photoFilter,
+      searchQuery: searchQuery,
+      category: category,
+      onlyLowStock: onlyLowStock,
+      onlyOutOfStock: onlyOutOfStock,
+      onlyInStock: onlyInStock,
+      onlyInactive: onlyInactive,
+      onlyActive: onlyActive,
+      photoFilter: photoFilter,
     );
+    int? matching = _matchingTotal;
+    if (countFuture != null) {
+      try {
+        matching = await countFuture;
+      } catch (_) {
+        matching = null;
+      }
+    }
     if (!mounted || requestId != _inventoryRequestId) {
       return List<PartModel>.unmodifiable(_loadedParts);
     }
-    if (batch.length < ImporterInventoryLayout.pageSize) {
-      _hasMoreInventory = false;
-    }
+    if (reset) _matchingTotal = matching;
+    _hasMoreInventory = inventoryHasMore(
+      loaded: reset ? batch.length : _loadedParts.length + batch.length,
+      batchLength: batch.length,
+      fetchSize: ImporterInventoryLayout.pageSize,
+      matching: reset ? matching : _matchingTotal,
+    );
     if (reset) {
       _loadedParts
         ..clear()
@@ -179,6 +215,7 @@ class _ImporterInventoryDashboardState
       _loadedParts.addAll(batch);
     }
     if (preserveScroll) _restoreInventoryOffset();
+    if (mounted && requestId == _inventoryRequestId) setState(() {});
     return List<PartModel>.unmodifiable(_loadedParts);
   }
 
@@ -972,14 +1009,34 @@ class _ImporterInventoryDashboardState
     final excludedByFilter =
         (_filterActiveOnly && !isActive) || (_filterHidden && isActive);
     if (!excludedByFilter) return;
+    final removed = _loadedParts.any((part) => part.id == id);
     _loadedParts.removeWhere((part) => part.id == id);
     _selectedIds.remove(id);
+    if (removed && _matchingTotal != null && _matchingTotal! > 0) {
+      _matchingTotal = _matchingTotal! - 1;
+      _hasMoreInventory = _loadedParts.length < _matchingTotal!;
+    }
     _productPageIndex = clampListPageIndex(
       pageIndex: _productPageIndex,
-      total: _loadedParts.length,
+      total: _pagerTotal,
       pageSize: _productPageSize,
     );
   }
+
+  int get _pagerTotal => inventoryPagerTotal(
+        loaded: _loadedParts.length,
+        matching: _matchingTotal,
+      );
+
+  bool get _inventoryFiltersActive =>
+      _filterOutOfStock ||
+      _filterInStock ||
+      _filterLowStock ||
+      _filterHidden ||
+      _filterActiveOnly ||
+      _photoFilter != ProductPhotoListFilter.all ||
+      _categoryFilter != 'Todas' ||
+      _searchController.text.trim().isNotEmpty;
 
   void _refreshInventoryMetricsQuietly() {
     _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
@@ -1363,9 +1420,13 @@ class _ImporterInventoryDashboardState
                                           fontSize: 21,
                                           fontWeight: FontWeight.w800)),
                                 Text(
-                                    snapshot.hasData
-                                        ? '${snapshot.data!.totalProducts} productos registrados'
-                                        : 'Tus productos',
+                                    inventoryRegisteredLabel(
+                                      registered: snapshot.hasData
+                                          ? snapshot.data!.totalProducts
+                                          : null,
+                                      matching: _matchingTotal,
+                                      filtering: _inventoryFiltersActive,
+                                    ),
                                     style: TextStyle(
                                         fontSize: 12,
                                         color: AppColors.textSecondary)),
@@ -1634,7 +1695,7 @@ class _ImporterInventoryDashboardState
           padding: EdgeInsets.fromLTRB(hPad, 12, hPad, listBottomPadding),
           child: ListPageBar(
             bottomPadding: 0,
-            total: _loadedParts.length,
+            total: _pagerTotal,
             hasMore: _hasMoreInventory,
             pageIndex: _productPageIndex,
             pageSize: _productPageSize,

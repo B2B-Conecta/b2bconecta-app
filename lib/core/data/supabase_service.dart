@@ -352,6 +352,27 @@ class SupabaseService {
         offset: offset,
       );
 
+  static Future<int> countMyInventory({
+    String? searchQuery,
+    String? category,
+    bool onlyLowStock = false,
+    bool onlyOutOfStock = false,
+    bool onlyInStock = false,
+    bool onlyInactive = false,
+    bool onlyActive = false,
+    ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
+  }) =>
+      InventoryService.countMyInventory(
+        searchQuery: searchQuery,
+        category: category,
+        onlyLowStock: onlyLowStock,
+        onlyOutOfStock: onlyOutOfStock,
+        onlyInStock: onlyInStock,
+        onlyInactive: onlyInactive,
+        onlyActive: onlyActive,
+        photoFilter: photoFilter,
+      );
+
   static Future<List<PartModel>> fetchMyInventory({
     int limit = 200,
     int offset = 0,

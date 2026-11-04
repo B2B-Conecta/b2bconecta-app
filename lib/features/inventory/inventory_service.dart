@@ -228,6 +228,40 @@ class InventoryService {
     return const ImporterSalesProductPage();
   }
 
+  /// Cuántos productos coinciden con los mismos filtros que [fetchMyInventory].
+  ///
+  /// El conteo es el total real, no el tamaño del lote ya descargado.
+  static Future<int> countMyInventory({
+    String? searchQuery,
+    String? category,
+    bool onlyLowStock = false,
+    bool onlyOutOfStock = false,
+    bool onlyInStock = false,
+    bool onlyInactive = false,
+    bool onlyActive = false,
+    ProductPhotoListFilter photoFilter = ProductPhotoListFilter.all,
+  }) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return 0;
+    dynamic query = SupabaseAccess.client
+        .from('products')
+        .select('id')
+        .eq('owner_id', uid);
+    query = _applyMyInventoryFilters(
+      query,
+      searchQuery: searchQuery,
+      category: category,
+      onlyLowStock: onlyLowStock,
+      onlyOutOfStock: onlyOutOfStock,
+      onlyInStock: onlyInStock,
+      onlyInactive: onlyInactive,
+      onlyActive: onlyActive,
+      photoFilter: photoFilter,
+    );
+    final res = await query.count(CountOption.exact);
+    return (res as PostgrestResponse<dynamic>).count;
+  }
+
   /// Inventario del importador autenticado (`owner_id = auth.uid()`).
   static Future<List<PartModel>> fetchMyInventory({
     int limit = 200,
@@ -248,7 +282,39 @@ class InventoryService {
         .from('products')
         .select('*, profiles!products_owner_id_fkey(business_name)')
         .eq('owner_id', uid);
+    query = _applyMyInventoryFilters(
+      query,
+      searchQuery: searchQuery,
+      category: category,
+      onlyLowStock: onlyLowStock,
+      onlyOutOfStock: onlyOutOfStock,
+      onlyInStock: onlyInStock,
+      onlyInactive: onlyInactive,
+      onlyActive: onlyActive,
+      photoFilter: photoFilter,
+    );
 
+    final response = await query
+        .order('name', ascending: true)
+        .range(offset, offset + limit - 1);
+    final list = response as List<dynamic>;
+    return list
+        .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Filtros compartidos por el listado y por el conteo del paginador.
+  static dynamic _applyMyInventoryFilters(
+    dynamic query, {
+    required String? searchQuery,
+    required String? category,
+    required bool onlyLowStock,
+    required bool onlyOutOfStock,
+    required bool onlyInStock,
+    required bool onlyInactive,
+    required bool onlyActive,
+    required ProductPhotoListFilter photoFilter,
+  }) {
     final searchOr = InventorySearch.postgrestOrFilter(searchQuery);
     if (searchOr != null) {
       query = query.or(searchOr);
@@ -275,7 +341,6 @@ class InventoryService {
     }
 
     // Misma fila que ya se lee: `image_urls` jsonb y portada `image_url`.
-    // El rango de paginación se aplica después, sobre el conjunto filtrado.
     switch (photoFilter) {
       case ProductPhotoListFilter.all:
         break;
@@ -290,14 +355,7 @@ class InventoryService {
             .or('image_url.is.null,image_url.eq.');
         break;
     }
-
-    final response = await query
-        .order('name', ascending: true)
-        .range(offset, offset + limit - 1);
-    final list = response as List<dynamic>;
-    return list
-        .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
-        .toList();
+    return query;
   }
 
   /// ID del producto con ese [sku] para el dueño actual, o `null`.

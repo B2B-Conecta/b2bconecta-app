@@ -742,14 +742,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         builder: (context, compact) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!detailOpen && !compact) ...[
+                if (!detailOpen && !compact)
                   const ImporterThirdPartyAdsCarousel(
                     padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
                   ),
-                  const ImporterActivePromoBanner(
-                    padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  ),
-                ],
                 Expanded(
                   child: OrderWorkspace(
                     viewerRole: AppHomeRole.importador,

@@ -23,6 +23,7 @@ class SupportTicketsScreen extends StatefulWidget {
 }
 
 class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
+  static const _openLimit = 3;
   List<SupportTicketModel> _rows = [];
   int _openCount = 0;
   bool _loading = true;
@@ -60,21 +61,12 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Future<void> _openCreateSheet() async {
-    if (_openCount >= 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Ya tiene 3 reclamos abiertos. Cierre uno antes de abrir otro.',
-          ),
-        ),
-      );
-      return;
-    }
-
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
+      constraints: const BoxConstraints(maxWidth: 560),
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -83,180 +75,300 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
       ),
     );
 
-    if (created == true) {
+    if (mounted && created == true) {
       await _load();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final active = _rows.where((ticket) => !ticket.isClosed).toList();
+    final closed = _rows.where((ticket) => ticket.isClosed).toList();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text('Atención al cliente'),
+        actions: [
+          IconButton(
+            tooltip: 'Actualizar reclamos',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _loading ? null : _openCreateSheet,
-        icon: const Icon(Icons.add_comment_outlined),
-        label: const Text('Abrir reclamo'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _loading
-            ? ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              )
-            : _error != null
-                ? ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      Text(
-                        _error!,
-                        style: TextStyle(color: Colors.red.shade800),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                children: [
+                  _supportSummary(),
+                  const SizedBox(height: 24),
+                  if (_loading)
+                    const LinearProgressIndicator(
+                      semanticsLabel: 'Cargando reclamos',
+                    )
+                  else if (_error != null)
+                    _messagePanel(
+                      icon: Icons.error_outline,
+                      title: 'No pudimos cargar tus reclamos',
+                      description:
+                          'Intenta actualizar para volver a consultarlos.',
+                      action: TextButton(
                         onPressed: _load,
                         child: const Text('Reintentar'),
                       ),
+                    )
+                  else if (_rows.isEmpty)
+                    _messagePanel(
+                      icon: Icons.forum_outlined,
+                      title: 'Aún no tienes reclamos',
+                      description:
+                          'Cuando abras un reclamo, podrás seguirlo desde aquí.',
+                    )
+                  else ...[
+                    if (active.isNotEmpty) ...[
+                      _sectionHeading('Reclamos activos'),
+                      for (final ticket in active) _ticketRow(ticket),
                     ],
-                  )
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
+                    if (closed.isNotEmpty) ...[
+                      if (active.isNotEmpty) const SizedBox(height: 14),
+                      _sectionHeading('Historial de reclamos'),
+                      for (final ticket in closed) _ticketRow(ticket),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _supportSummary() {
+    final atLimit = _openCount >= _openLimit;
+    final canCreate = !_loading && _error == null && !atLimit;
+    final summary = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.brandBlueContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.support_agent_outlined, color: _accent),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '¿Cómo podemos ayudarte?',
+                style: TextStyle(
+                    fontSize: 22, height: 1.2, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Consulta al equipo B2B Conecta sobre tu cuenta, pagos, pedidos, '
+                'verificación o fallas de la plataforma.',
+                style: TextStyle(height: 1.4, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final action = FilledButton.icon(
+      onPressed: canCreate ? _openCreateSheet : null,
+      icon: const Icon(Icons.add_comment_outlined, size: 19),
+      label: const Text('Abrir reclamo'),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final sideBySide = constraints.maxWidth >= 630 &&
+              MediaQuery.textScalerOf(context).scale(14) <= 18;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (sideBySide)
+                Row(children: [
+                  Expanded(child: summary),
+                  const SizedBox(width: 24),
+                  action,
+                ])
+              else ...[
+                summary,
+                const SizedBox(height: 14),
+                action,
+              ],
+              if (!_loading && _error == null) ...[
+                Divider(height: 24, color: AppColors.borderSubtle),
+                Text(
+                  '$_openCount de $_openLimit reclamos abiertos',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (atLimit)
+                  Text(
+                    'Cierra un reclamo para poder abrir otro.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+              ],
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Color get _accent =>
+      AppColors.isDarkOf(context) ? const Color(0xFFB3C8FF) : AppColors.brand;
+
+  Widget _sectionHeading(String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Semantics(
+          header: true,
+          child: Text(title,
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        ),
+      );
+
+  Widget _messagePanel({
+    required IconData icon,
+    required String title,
+    required String description,
+    Widget? action,
+  }) =>
+      Material(
+        color: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: AppColors.borderSubtle),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(icon, color: _accent, size: 28),
+              const SizedBox(height: 8),
+              Text(title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary)),
+              if (action != null) action,
+            ],
+          ),
+        ),
+      );
+
+  Widget _ticketRow(SupportTicketModel ticket) {
+    final inReview = ticket.status.trim() == SupportTicketStatus.enRevision;
+    final statusColor = ticket.isClosed
+        ? AppColors.textSecondary
+        : inReview
+            ? (AppColors.isDarkOf(context)
+                ? AppColors.warningAmberOnDark
+                : AppColors.warningAmber)
+            : _accent;
+    final status = DecoratedBox(
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(ticket.statusLabel,
+            style: TextStyle(
+                color: statusColor, fontSize: 12, fontWeight: FontWeight.w700)),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppColors.borderSubtle),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () async {
+            await Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => SupportTicketDetailScreen(
+                    ticket: ticket, isAdminView: false),
+              ),
+            );
+            if (mounted) await _load();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                    ticket.isClosed
+                        ? Icons.check_circle_outline
+                        : Icons.forum_outlined,
+                    color: ticket.isClosed ? AppColors.textSecondary : _accent,
+                    size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandBlue.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.brandBlue.withOpacity(0.2),
-                          ),
-                        ),
-                        child: Text(
-                          'Comuníquese con el equipo B2B Conecta por incidencias de '
-                          'cuenta, pagos, pedidos, verificación o fallas de la plataforma. '
-                          'Puede tener hasta 3 reclamos abiertos a la vez.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.4,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
+                      Text(ticket.subject,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 5,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          status,
+                          Text(ticket.categoryLabel,
+                              style: TextStyle(color: AppColors.textSecondary)),
+                          if (ticket.createdAt != null)
+                            Text(formatEsShortDateTime(ticket.createdAt),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary)),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Abiertos: $_openCount / 3',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_rows.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 40),
-                          child: Text(
-                            'No tiene reclamos todavía.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                        )
-                      else
-                        ..._rows.map((t) {
-                          final color = t.isClosed
-                              ? AppColors.textSecondary
-                              : (t.status == SupportTicketStatus.enRevision
-                                  ? AppColors.brandBlue
-                                  : AppColors.brand);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Material(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onTap: () async {
-                                  await Navigator.of(context).push<void>(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => SupportTicketDetailScreen(
-                                        ticket: t,
-                                        isAdminView: false,
-                                      ),
-                                    ),
-                                  );
-                                  await _load();
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: color.withOpacity(0.12),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              t.statusLabel,
-                                              style: TextStyle(
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.w800,
-                                                color: color,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            t.categoryLabel,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        t.subject,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        formatEsShortDateTime(t.createdAt),
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
                     ],
                   ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

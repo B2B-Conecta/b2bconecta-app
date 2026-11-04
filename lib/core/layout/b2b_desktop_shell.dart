@@ -18,6 +18,7 @@ class B2bDesktopShell extends StatelessWidget {
     this.onMessagesTap,
     this.unreadMessages = 0,
     required this.onOpenSettings,
+    required this.onSignOut,
     required this.railBadgeLabel,
     this.trailingActions = const [],
     this.railStatusBuilder,
@@ -33,6 +34,7 @@ class B2bDesktopShell extends StatelessWidget {
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final VoidCallback onOpenSettings;
+  final Future<void> Function() onSignOut;
   final String railBadgeLabel;
   final List<Widget> trailingActions;
 
@@ -52,6 +54,7 @@ class B2bDesktopShell extends StatelessWidget {
       onMessagesTap: onMessagesTap,
       unreadMessages: unreadMessages,
       onOpenSettings: onOpenSettings,
+      onSignOut: onSignOut,
       railBadgeLabel: railBadgeLabel,
       trailingActions: trailingActions,
       railStatusBuilder: railStatusBuilder,

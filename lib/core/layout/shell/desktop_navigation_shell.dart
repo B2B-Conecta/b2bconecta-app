@@ -25,6 +25,7 @@ class DesktopNavigationShell extends StatefulWidget {
     this.onMessagesTap,
     this.unreadMessages = 0,
     required this.onOpenSettings,
+    this.onSignOut,
     required this.railBadgeLabel,
     this.trailingActions = const [],
     this.railStatusBuilder,
@@ -43,6 +44,7 @@ class DesktopNavigationShell extends StatefulWidget {
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final VoidCallback onOpenSettings;
+  final Future<void> Function()? onSignOut;
   final String railBadgeLabel;
   final List<Widget> trailingActions;
 
@@ -53,6 +55,23 @@ class DesktopNavigationShell extends StatefulWidget {
 class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
   bool _railVisible = true;
   bool _prefReady = false;
+  bool _signingOut = false;
+
+  Future<void> _signOut() async {
+    if (_signingOut || widget.onSignOut == null) return;
+    setState(() => _signingOut = true);
+    try {
+      await widget.onSignOut!();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No pudimos cerrar la sesión. Inténtalo de nuevo.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
 
   @override
   void initState() {
@@ -104,6 +123,8 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                     profile: widget.profile,
                     onDestinationSelected: widget.onDestinationSelected,
                     onOpenSettings: widget.onOpenSettings,
+                    onSignOut: widget.onSignOut == null ? null : _signOut,
+                    signingOut: _signingOut,
                     statusBuilder: widget.railStatusBuilder,
                     onHideRail: () => _setRailVisible(false),
                   )
@@ -221,6 +242,8 @@ class _DesktopSideRail extends StatelessWidget {
     required this.onDestinationSelected,
     required this.onOpenSettings,
     required this.onHideRail,
+    this.onSignOut,
+    this.signingOut = false,
     this.statusBuilder,
   });
 
@@ -232,6 +255,8 @@ class _DesktopSideRail extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final VoidCallback onOpenSettings;
   final VoidCallback onHideRail;
+  final VoidCallback? onSignOut;
+  final bool signingOut;
   final Widget Function(bool extended)? statusBuilder;
 
   @override
@@ -335,6 +360,8 @@ class _DesktopSideRail extends StatelessWidget {
               extended: extended,
               profile: profile,
               onOpenSettings: onOpenSettings,
+              onSignOut: onSignOut,
+              signingOut: signingOut,
             ),
           ],
         ),
@@ -348,11 +375,15 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
     required this.extended,
     required this.profile,
     required this.onOpenSettings,
+    this.onSignOut,
+    this.signingOut = false,
   });
 
   final bool extended;
   final ProfileModel profile;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onSignOut;
+  final bool signingOut;
 
   @override
   Widget build(BuildContext context) {
@@ -367,59 +398,65 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
         child: Material(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: onOpenSettings,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    displayName,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      height: 1.25,
-                    ),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    height: 1.25,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    role,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  role,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.settings_outlined,
-                        size: 16,
-                        color: AppColors.brandLink,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(child: Text(
-                        'Ajustes de cuenta',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.brandLink,
-                        ),
-                      )),
-                    ],
+                ),
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: onOpenSettings,
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    foregroundColor: AppColors.brandLink,
+                  ),
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Cuenta y seguridad',
+                      style: TextStyle(fontSize: 12)),
+                ),
+                if (onSignOut != null) ...[
+                  Divider(height: 9, color: AppColors.borderSubtle),
+                  TextButton.icon(
+                    onPressed: signingOut ? null : onSignOut,
+                    style: TextButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      foregroundColor: AppColors.textSecondary,
+                    ),
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: Text(
+                        signingOut ? 'Cerrando sesión…' : 'Cerrar sesión',
+                        style: const TextStyle(fontSize: 12)),
                   ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
@@ -428,18 +465,29 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
-      child: Tooltip(
-        message: '$displayName · $role · Ajustes',
-        child: IconButton(
-          onPressed: onOpenSettings,
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.card,
-            side: BorderSide(color: AppColors.borderSubtle),
-            minimumSize: const Size(48, 48),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Tooltip(
+          message: '$displayName · $role · Cuenta y seguridad',
+          child: IconButton(
+            onPressed: onOpenSettings,
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.card,
+              side: BorderSide(color: AppColors.borderSubtle),
+              minimumSize: const Size(48, 48),
+            ),
+            icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
           ),
-          icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
         ),
-      ),
+        if (onSignOut != null) ...[
+          const SizedBox(height: 4),
+          IconButton(
+            tooltip: signingOut ? 'Cerrando sesión…' : 'Cerrar sesión',
+            onPressed: signingOut ? null : onSignOut,
+            style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+            icon: Icon(Icons.logout, color: AppColors.textSecondary),
+          ),
+        ],
+      ]),
     );
   }
 }

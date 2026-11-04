@@ -294,7 +294,7 @@ void main() {
     expect(find.text('Preparando'), findsOneWidget);
     expect(find.text('Ver pedido'), findsOneWidget);
     expect(find.text('Ver detalle y seguimiento'), findsNothing);
-    expect(find.byTooltip('Chat del pedido'), findsOneWidget);
+    expect(find.byTooltip('Mensajes del pedido'), findsOneWidget);
     expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
     expect(find.byIcon(Icons.expand_less), findsNothing);
   });

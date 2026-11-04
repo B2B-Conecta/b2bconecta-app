@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
+import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_location_exception.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'cart_service.dart';
 import 'cart_quantity_field.dart';
+import 'delivery_destination_dialog.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
@@ -11,9 +16,10 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
-import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
-import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
+import 'cart_product_actions.dart';
+import 'cart_suggestions.dart';
+import 'cart_suggestions_section.dart';
 import 'importer_min_order.dart';
 import 'min_order_currency.dart';
 
@@ -23,10 +29,19 @@ class CartScreen extends StatefulWidget {
     super.key,
     required this.profile,
     this.liveTasaBcv,
+    this.loadSuggestionCandidates,
+    this.suggestionAutoPlay = true,
   });
 
   final ProfileModel profile;
   final double? liveTasaBcv;
+
+  /// Sustituye la lectura del catálogo. Las pruebas pasan una lista fija.
+  final Future<List<PartModel>> Function(CartSuggestionQuery query)?
+      loadSuggestionCandidates;
+
+  /// Auto-desplazamiento del carrusel de sugerencias (desactivar en tests).
+  final bool suggestionAutoPlay;
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -67,6 +82,25 @@ class _CartScreenState extends State<CartScreen> {
   DateTime? _tasaEffectiveDate;
   Map<String, ImporterCreditBalance> _credits = const {};
   final Set<String> _creditOptOut = {};
+  bool _loadingSuggestions = false;
+  List<CartSuggestion> _suggestions = const [];
+  List<PartModel> _suggestionPool = const [];
+  String? _suggestionCartKey;
+  String? _suggestionInflightKey;
+  int _suggestionTicket = 0;
+  final Set<String> _confirmingSuggestionIds = {};
+  final Map<String, CartSuggestion> _pinnedSuggestions = {};
+  final Map<String, Timer> _suggestionConfirmTimers = {};
+  final GlobalKey _summaryKey = GlobalKey();
+  double _summaryHeight = 420;
+
+  void _syncSummaryHeight() {
+    final box = _summaryKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final next = box.size.height;
+    if ((next - _summaryHeight).abs() < 1) return;
+    setState(() => _summaryHeight = next);
+  }
 
   @override
   void initState() {
@@ -74,6 +108,8 @@ class _CartScreenState extends State<CartScreen> {
     _tasa = widget.liveTasaBcv;
     _cart.addListener(_onCart);
     _loadCredits();
+    if (_cart.lines.isNotEmpty) _loadingSuggestions = true;
+    _reloadSuggestions();
     SupabaseService.fetchGlobalTasaBcvRecord().then((record) {
       if (!mounted || record == null) return;
       setState(() {
@@ -84,7 +120,123 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _onCart() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    final key = _cartProductKey();
+    if (key == _suggestionCartKey) {
+      _publishSuggestions();
+      return;
+    }
+    if (key == _suggestionInflightKey) return;
+    _reloadSuggestions();
+  }
+
+  String _cartProductKey() {
+    final ids = [for (final line in _cart.lines) line.part.id]..sort();
+    return ids.join(',');
+  }
+
+  Future<List<PartModel>> _loadSuggestionCandidates(
+    CartSuggestionQuery query,
+  ) {
+    final custom = widget.loadSuggestionCandidates;
+    if (custom != null) return custom(query);
+    return CatalogService.fetchCartSuggestionCandidates(
+      excludeProductIds: query.productIds,
+      categoryFragments: query.categoryFragments,
+    );
+  }
+
+  Future<void> _reloadSuggestions() async {
+    final key = _cartProductKey();
+    final parts = [for (final line in _cart.lines) line.part];
+    if (parts.isEmpty) {
+      _suggestionCartKey = key;
+      _suggestionInflightKey = null;
+      _suggestionPool = const [];
+      if (!mounted) return;
+      setState(() {
+        _suggestions = [
+          for (final entry in _pinnedSuggestions.entries)
+            if (_confirmingSuggestionIds.contains(entry.key)) entry.value,
+        ];
+        _loadingSuggestions = false;
+      });
+      return;
+    }
+    final ticket = ++_suggestionTicket;
+    _suggestionInflightKey = key;
+    final skeleton = _suggestions.isEmpty &&
+        _pinnedSuggestions.isEmpty &&
+        !_loadingSuggestions;
+    if (skeleton && mounted) setState(() => _loadingSuggestions = true);
+    try {
+      final candidates = await _loadSuggestionCandidates(
+        CartSuggestionQuery.fromParts(parts),
+      );
+      if (!mounted || ticket != _suggestionTicket) return;
+      _suggestionPool = candidates;
+      _suggestionCartKey = key;
+      _suggestionInflightKey = null;
+      _publishSuggestions();
+    } catch (_) {
+      if (!mounted || ticket != _suggestionTicket) return;
+      _suggestionInflightKey = null;
+      setState(() => _loadingSuggestions = false);
+    }
+  }
+
+  void _publishSuggestions() {
+    final ranked = rankCartSuggestions(
+      cartParts: [for (final line in _cart.lines) line.part],
+      candidates: _suggestionPool,
+    );
+    final visible = <CartSuggestion>[
+      for (final entry in _pinnedSuggestions.entries)
+        if (_confirmingSuggestionIds.contains(entry.key)) entry.value,
+      for (final suggestion in ranked)
+        if (!_confirmingSuggestionIds.contains(suggestion.part.id)) suggestion,
+    ];
+    if (!mounted) return;
+    setState(() {
+      _suggestions = visible;
+      _loadingSuggestions = false;
+    });
+  }
+
+  void _addSuggestion(CartSuggestion suggestion) {
+    if (_confirmingSuggestionIds.contains(suggestion.part.id)) return;
+    final blocked = CartProductActions.blockReason(
+      part: suggestion.part,
+      profile: widget.profile,
+      cart: _cart,
+    );
+    if (blocked != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(blocked)));
+      return;
+    }
+    final added = CartProductActions.addMinimum(
+      part: suggestion.part,
+      profile: widget.profile,
+      cart: _cart,
+    );
+    if (added == 0) return;
+    _pinnedSuggestions[suggestion.part.id] = suggestion;
+    _confirmingSuggestionIds.add(suggestion.part.id);
+    _suggestionConfirmTimers[suggestion.part.id]?.cancel();
+    _suggestionConfirmTimers[suggestion.part.id] = Timer(
+      const Duration(milliseconds: 700),
+      () {
+        if (!mounted) return;
+        _confirmingSuggestionIds.remove(suggestion.part.id);
+        _pinnedSuggestions.remove(suggestion.part.id);
+        _suggestionConfirmTimers.remove(suggestion.part.id);
+        _publishSuggestions();
+      },
+    );
+    _publishSuggestions();
   }
 
   Future<void> _loadCredits() async {
@@ -127,6 +279,9 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   void dispose() {
+    for (final timer in _suggestionConfirmTimers.values) {
+      timer.cancel();
+    }
     _cart.removeListener(_onCart);
     super.dispose();
   }
@@ -143,9 +298,9 @@ class _CartScreenState extends State<CartScreen> {
     final accountRevision = _cart.accountRevision;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _choosingDelivery = true);
-    final result = await showDialog<_DestinoEntregaResult?>(
+    final result = await showDialog<DeliveryDestinationResult?>(
       context: context,
-      builder: (ctx) => _DestinoEntregaDialog(
+      builder: (ctx) => DeliveryDestinationDialog(
           profile: widget.profile,
           paymentSummary: _pagoMoneda == _PagoMoneda.usd
               ? 'Pago en divisas (USD).'
@@ -639,40 +794,76 @@ class _CartScreenState extends State<CartScreen> {
                         child: _buildSupplierGroup(group, tasa),
                       ),
                   ];
+                  final showSuggestions =
+                      _loadingSuggestions || _suggestions.isNotEmpty;
+                  final suggestions = !showSuggestions
+                      ? null
+                      : CartSuggestionsSection(
+                          suggestions: _suggestions,
+                          loading: _loadingSuggestions,
+                          confirmingIds: _confirmingSuggestionIds,
+                          bcvRate: pagaBolivares ? tasa : null,
+                          autoPlay: widget.suggestionAutoPlay,
+                          onAdd: _submitting || !_cart.canEdit
+                              ? null
+                              : _addSuggestion,
+                        );
                   return Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: wide ? 1100 : 720),
+                      constraints: BoxConstraints(maxWidth: wide ? 1280 : 720),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
-                            wide ? 24 : 16, wide ? 28 : 20, wide ? 24 : 16, 0),
+                            wide ? 28 : 16, wide ? 24 : 20, wide ? 28 : 16, 0),
                         child: wide
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                    heading,
-                                    const SizedBox(height: 24),
-                                    Expanded(
-                                        child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
+                            ? Builder(builder: (context) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
+                                  if (mounted) _syncSummaryHeight();
+                                });
+                                // Scroll de toda la página; arriba = alto del
+                                // resumen. Pedidos extras, dentro de ese alto.
+                                return SingleChildScrollView(
+                                  padding: EdgeInsets.only(
+                                    bottom: 24 +
+                                        MediaQuery.paddingOf(context).bottom,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      heading,
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
                                           Expanded(
+                                            child: SizedBox(
+                                              height: _summaryHeight,
                                               child: ListView(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 24),
-                                                  children: products)),
-                                          const SizedBox(width: 24),
+                                                primary: false,
+                                                padding: EdgeInsets.zero,
+                                                children: products,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 28),
                                           SizedBox(
-                                              width: 312,
-                                              child: SingleChildScrollView(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 24),
-                                                  child: summary)),
-                                        ])),
-                                  ])
+                                            key: _summaryKey,
+                                            width: 340,
+                                            child: summary,
+                                          ),
+                                        ],
+                                      ),
+                                      if (suggestions != null) ...[
+                                        const SizedBox(height: 28),
+                                        suggestions,
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              })
                             : ListView(
                                 padding: EdgeInsets.only(
                                     bottom: 24 +
@@ -683,6 +874,10 @@ class _CartScreenState extends State<CartScreen> {
                                     ...products,
                                     const SizedBox(height: 4),
                                     summary,
+                                    if (suggestions != null) ...[
+                                      const SizedBox(height: 32),
+                                      suggestions,
+                                    ],
                                   ]),
                       ),
                     ),
@@ -1126,338 +1321,6 @@ class _QtyButton extends StatelessWidget {
             ),
           ),
         ));
-  }
-}
-
-/// Resultado del diálogo de destino: se devuelve al confirmar (no al cancelar).
-class _DestinoEntregaResult {
-  const _DestinoEntregaResult({
-    required this.useProfile,
-    this.texto,
-    this.mapsUrl,
-  });
-
-  final bool useProfile;
-  final String? texto;
-  final String? mapsUrl;
-}
-
-/// Destino: dirección fiscal del perfil, o formulario de ubicación alterna.
-class _DestinoEntregaDialog extends StatefulWidget {
-  const _DestinoEntregaDialog(
-      {required this.profile, required this.paymentSummary});
-
-  final ProfileModel profile;
-
-  final String paymentSummary;
-
-  @override
-  State<_DestinoEntregaDialog> createState() => _DestinoEntregaDialogState();
-}
-
-class _DestinoEntregaDialogState extends State<_DestinoEntregaDialog> {
-  bool _usaPerfil = true;
-  final _estado = TextEditingController();
-  final _ciudad = TextEditingController();
-  final _domicilio = TextEditingController();
-  final _maps = TextEditingController();
-
-  @override
-  void dispose() {
-    _estado.dispose();
-    _ciudad.dispose();
-    _domicilio.dispose();
-    _maps.dispose();
-    super.dispose();
-  }
-
-  InputDecoration _field(String label, {String? hint}) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      filled: true,
-      fillColor: AppColors.fieldFill,
-      border: OutlineInputBorder(
-        borderRadius: AppDecorations.radius12,
-        borderSide: BorderSide.none,
-      ),
-    );
-  }
-
-  String _armarTextoEntrega() {
-    final e = _estado.text.trim();
-    final c = _ciudad.text.trim();
-    final d = _domicilio.text.trim();
-    return [
-      if (e.isNotEmpty) 'Estado: $e',
-      if (c.isNotEmpty) 'Ciudad: $c',
-      if (d.isNotEmpty) 'Domicilio: $d',
-    ].join('\n');
-  }
-
-  void _confirmar() {
-    if (_usaPerfil) {
-      if (!widget.profile.hasFiscalMapsShareLink) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Registre el enlace de Google Maps de su domicilio fiscal en Mi perfil.',
-            ),
-          ),
-        );
-        return;
-      }
-    } else {
-      final e = _estado.text.trim();
-      final c = _ciudad.text.trim();
-      final d = _domicilio.text.trim();
-      if (e.isEmpty || c.isEmpty || d.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Complete estado, ciudad y domicilio de la entrega alterna.',
-            ),
-          ),
-        );
-        return;
-      }
-      final m = _maps.text.trim();
-      final u = Uri.tryParse(m);
-      if (m.isEmpty ||
-          u == null ||
-          !u.hasScheme ||
-          (u.scheme != 'http' && u.scheme != 'https')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Indique un enlace válido de Google Maps (http o https) para la entrega alterna.',
-            ),
-          ),
-        );
-        return;
-      }
-    }
-    final text = _usaPerfil ? null : _armarTextoEntrega();
-    final maps = _usaPerfil ? null : _maps.text.trim();
-    Navigator.of(context).pop(
-      _DestinoEntregaResult(
-        useProfile: _usaPerfil,
-        texto: text,
-        mapsUrl: maps,
-      ),
-    );
-  }
-
-  List<String> _envioNotas() {
-    final notes = <String>[];
-    for (final entry in CartService.instance.supplierGroups.entries) {
-      if (entry.value.isEmpty) continue;
-      final line = entry.value.first;
-      final note = EnvioPolitica.notaConfirmacion(
-        tipo: line.part.ownerEnvioTipo,
-        proveedor: CartService.instance.importadorDisplayName(entry.key),
-        minimoGratis: line.part.ownerEnvioGratisMinimo,
-      );
-      if (note != null) notes.add(note);
-    }
-    return notes;
-  }
-
-  String get _fiscalSummary {
-    final parts = <String>[
-      if ((widget.profile.estado ?? '').trim().isNotEmpty)
-        widget.profile.estado!.trim(),
-      if ((widget.profile.ciudad ?? '').trim().isNotEmpty)
-        widget.profile.ciudad!.trim(),
-      if ((widget.profile.direccion ?? '').trim().isNotEmpty)
-        widget.profile.direccion!.trim(),
-    ];
-    if (parts.isEmpty) {
-      return 'Complete la dirección fiscal en Mi perfil.';
-    }
-    return parts.join(' · ');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('¿Dónde entregamos el pedido?'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(widget.paymentSummary,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(
-              'La tienda recibe la mercancía en esta dirección. Puede usar la de su perfil u otra para este pedido.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            EnvioPoliticaNotas(notas: _envioNotas()),
-            _LocationChoice(
-              selected: _usaPerfil,
-              icon: Icons.storefront_outlined,
-              title: 'Dirección de mi perfil',
-              body: widget.profile.hasFiscalMapsShareLink
-                  ? _fiscalSummary
-                  : 'Falta el enlace de Google Maps en Mi perfil.',
-              onTap: () => setState(() => _usaPerfil = true),
-            ),
-            const SizedBox(height: 8),
-            _LocationChoice(
-              selected: !_usaPerfil,
-              icon: Icons.edit_location_alt_outlined,
-              title: 'Otra dirección',
-              body: 'Solo para este pedido. El enlace de mapas es obligatorio.',
-              onTap: () => setState(() => _usaPerfil = false),
-            ),
-            if (!_usaPerfil) ...[
-              const SizedBox(height: 4),
-              const Text(
-                'Ubicación alterna de entrega',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.brandBlue,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Esta dirección sustituye a la fiscal para este pedido. '
-                'El enlace de Google Maps es obligatorio para ubicar el sitio con precisión.',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _estado,
-                textCapitalization: TextCapitalization.words,
-                decoration: _field('Estado'),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _ciudad,
-                textCapitalization: TextCapitalization.words,
-                decoration: _field('Ciudad'),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _domicilio,
-                textCapitalization: TextCapitalization.sentences,
-                minLines: 2,
-                maxLines: 4,
-                decoration: _field('Domicilio (calle, sector, ref.)'),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _maps,
-                keyboardType: TextInputType.url,
-                decoration: _field(
-                  'URL de Google Maps',
-                  hint: 'https://…',
-                ),
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _confirmar(),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: _confirmar,
-          child: const Text('Confirmar pedido'),
-        ),
-      ],
-    );
-  }
-}
-
-class _LocationChoice extends StatelessWidget {
-  const _LocationChoice({
-    required this.selected,
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.onTap,
-  });
-
-  final bool selected;
-  final IconData icon;
-  final String title;
-  final String body;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.brandBlueContainer : AppColors.card,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? AppColors.brand : AppColors.borderSubtle,
-              width: selected ? 1.6 : 1,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: AppColors.brand),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      body,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppColors.brand : AppColors.textSecondary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

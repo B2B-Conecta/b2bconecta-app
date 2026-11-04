@@ -93,8 +93,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(cart.itemCount, 3 + 2);
-    expect(cart.lines.map((line) => line.part.id).toSet(),
-        {'small', 'large'});
+    expect(find.byType(SnackBar), findsNothing);
+    expect(cart.lines.map((line) => line.part.id).toSet(), {'small', 'large'});
 
     // Re-open and cancel leaves cart unchanged.
     final before = cart.itemCount;
@@ -110,18 +110,15 @@ void main() {
       'quick add becomes an editable quantity picker with minimum and stock limits',
       (tester) async {
     final cart = CartService();
-    var opened = false;
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
-            body: CatalogCartButton(
-                part: product,
-                profile: buyer,
-                cart: cart,
-                onOpenCart: () => opened = true))));
+            body:
+                CatalogCartButton(part: product, profile: buyer, cart: cart))));
     await tester.tap(find.text('Agregar al carrito'));
     await tester.pump();
     expect(cart.itemCount, 5);
     expect(cart.totalRef(), 60);
+    expect(find.byType(SnackBar), findsNothing);
     expect(find.byType(FilledButton), findsNothing);
     expect(find.byType(TextField), findsOneWidget);
     expect(
@@ -145,7 +142,6 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
     expect(cart.itemCount, 5);
-    expect(opened, isFalse);
   });
 
   testWidgets(

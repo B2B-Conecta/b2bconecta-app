@@ -1036,6 +1036,34 @@ class OrdersService {
   static const _trMessagesSelectLegacy =
       'id, transaction_request_id, author_id, author_role, body, created_at';
 
+  /// One latest message per visible order line, without downloading histories.
+  static Future<Map<String, TransactionRequestMessageModel>>
+      fetchOrderChatPreviews(Iterable<String> requestIds) async {
+    final ids = requestIds.toSet().toList();
+    final result = <String, TransactionRequestMessageModel>{};
+    const relation = 'transaction_request_messages';
+    for (var start = 0; start < ids.length; start += 60) {
+      final batch = ids.skip(start).take(60).toList();
+      final rows = await retryOnJwtIssuedAtFuture(() async => _selectMessages(
+            (columns) => SupabaseAccess.client
+                .from('transaction_requests')
+                .select('id,$relation($columns)')
+                .inFilter('id', batch)
+                .order('created_at', ascending: false, referencedTable: relation)
+                .order('id', ascending: false, referencedTable: relation)
+                .limit(1, referencedTable: relation),
+          ));
+      for (final row in rows as List) {
+        final messages = row[relation] as List;
+        if (messages.isNotEmpty) {
+          result[row['id'] as String] = TransactionRequestMessageModel.fromJson(
+              Map<String, dynamic>.from(messages.first as Map));
+        }
+      }
+    }
+    return result;
+  }
+
   static Future<List<TransactionRequestMessageModel>>
       fetchTransactionRequestMessages(String transactionRequestId) async {
     if (transactionRequestId.isEmpty) return [];

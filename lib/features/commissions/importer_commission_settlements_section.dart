@@ -23,7 +23,8 @@ enum _ImporterSettlementStatusFilter {
 
 /// Importador: cortes de comisión B2B Conecta, filtros por semana y estado de pago.
 class ImporterCommissionSettlementsSection extends StatefulWidget {
-  const ImporterCommissionSettlementsSection({super.key});
+  const ImporterCommissionSettlementsSection({super.key, this.grouped = false});
+  final bool grouped;
 
   @override
   State<ImporterCommissionSettlementsSection> createState() =>
@@ -37,6 +38,7 @@ class _ImporterCommissionSettlementsSectionState
   bool _loading = true;
   String? _error;
   bool _sectionExpanded = false;
+  final _groupController = ExpansionTileController();
   final Set<String> _expandedSettlementIds = {};
   int _incomeCardEpoch = 0;
   String? _weekFilterKey;
@@ -67,6 +69,7 @@ class _ImporterCommissionSettlementsSectionState
       _sectionExpanded = true;
       _statusFilter = _ImporterSettlementStatusFilter.pendientePago;
     }
+
     if (notify) {
       setState(apply);
     } else {
@@ -76,6 +79,7 @@ class _ImporterCommissionSettlementsSectionState
 
   void _onCommissionNotificationDeepLink() {
     _applyPendingCommissionFilter();
+    if (widget.grouped) _groupController.expand();
     final id = MainShellTabController.consumePendingCommissionSettlementId();
     if (id == null) return;
     setState(() {
@@ -165,11 +169,13 @@ class _ImporterCommissionSettlementsSectionState
   Color _statusColor(String status) {
     switch (status) {
       case 'pagado':
-        return Colors.green.shade700;
+        return AppColors.successGreen;
       case 'emitido':
-        return AppColors.brandAccent;
+        return Theme.of(context).brightness == Brightness.dark
+            ? AppColors.warningAmberOnDark
+            : AppColors.warningAmber;
       default:
-        return AppColors.brandBlue;
+        return AppColors.textSecondary;
     }
   }
 
@@ -180,48 +186,39 @@ class _ImporterCommissionSettlementsSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                FilterChip(
-                  label: const Text('Todas las semanas'),
-                  selected: _weekFilterKey == null,
-                  onSelected: (_) => setState(() => _weekFilterKey = null),
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 6),
-                ...weeks.map(
-                  (k) => Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: FilterChip(
-                      label: Text(
-                        _weekChipLabel(k),
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      selected: _weekFilterKey == k,
-                      onSelected: (_) => setState(() => _weekFilterKey = k),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-              ],
+          DropdownButtonFormField<String>(
+            value: weeks.contains(_weekFilterKey) ? _weekFilterKey : '',
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Período',
+              prefixIcon: Icon(Icons.date_range_outlined, size: 20),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
+            items: [
+              const DropdownMenuItem(
+                  value: '', child: Text('Todas las semanas')),
+              for (final week in weeks)
+                DropdownMenuItem(
+                    value: week,
+                    child: Text(_weekChipLabel(week),
+                        style: const TextStyle(fontSize: 12))),
+            ],
+            onChanged: (value) =>
+                setState(() => _weekFilterKey = value == '' ? null : value),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _statusChip('Todos', _ImporterSettlementStatusFilter.todos),
-                _statusChip('Borrador', _ImporterSettlementStatusFilter.borrador),
-                _statusChip(
-                  'Pago pendiente',
-                  _ImporterSettlementStatusFilter.pendientePago,
-                ),
-                _statusChip('Pagado', _ImporterSettlementStatusFilter.pagado),
-              ],
-            ),
+            child: Row(children: [
+              _statusChip('Todos', _ImporterSettlementStatusFilter.todos),
+              _statusChip('Borrador', _ImporterSettlementStatusFilter.borrador),
+              _statusChip(
+                'Pago pendiente',
+                _ImporterSettlementStatusFilter.pendientePago,
+              ),
+              _statusChip('Pagado', _ImporterSettlementStatusFilter.pagado),
+            ]),
           ),
         ],
       ),
@@ -232,8 +229,9 @@ class _ImporterCommissionSettlementsSectionState
     final sel = _statusFilter == value;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: FilterChip(
-        label: Text(label, style: const TextStyle(fontSize: 11)),
+      child: ChoiceChip(
+        showCheckmark: false,
+        label: Text(label, style: const TextStyle(fontSize: 12)),
         selected: sel,
         onSelected: (_) => setState(() => _statusFilter = value),
         visualDensity: VisualDensity.compact,
@@ -244,10 +242,63 @@ class _ImporterCommissionSettlementsSectionState
     );
   }
 
+  Widget _settlementSummary(CommissionSettlementModel s, bool expanded) {
+    final color = _statusColor(s.status);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(s.periodLabelEs,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 10),
+      Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(.09),
+                    borderRadius: BorderRadius.circular(6)),
+                child: Text(CommissionSettlementModel.statusLabelEs(s.status),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color))),
+            Text('USD ${s.totalCobroUsd.toStringAsFixed(2)}',
+                style:
+                    const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+          ]),
+      const SizedBox(height: 5),
+      Text(
+          expanded
+              ? (s.isBorrador ? 'Total estimado' : 'Total del corte')
+              : (s.isBorrador
+                  ? 'Total estimado · ver desglose'
+                  : 'Total del corte · ver desglose'),
+          style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+    ]);
+  }
+
+  Widget _amountRow(String label, double amount) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              Text(label,
+                  style:
+                      TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              Text('USD ${amount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ]),
+      );
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         CommissionCollectedIncomeCard(
@@ -262,176 +313,202 @@ class _ImporterCommissionSettlementsSectionState
         ),
         const SizedBox(height: 12),
         Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        initiallyExpanded: _sectionExpanded,
-        onExpansionChanged: (v) => setState(() => _sectionExpanded = v),
-        title: const Text(
-          'Cortes de comisión B2B Conecta',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-        ),
-        subtitle: Text(
-          _loading
-              ? 'Cargando…'
-              : '${_rows.length} corte(s) · ${_filtered.length} visible(s)',
-          style: const TextStyle(fontSize: 12),
-        ),
-        children: [
-          if (_volumeContext != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-              child: CommissionVolumeTierBanner(
-                volumeContext: _volumeContext!,
-              ),
+          clipBehavior: Clip.antiAlias,
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ExpansionTile(
+            shape: const Border(),
+            collapsedShape: const Border(),
+            key: ValueKey('commission-section-$_sectionExpanded'),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            initiallyExpanded: _sectionExpanded,
+            onExpansionChanged: (v) => setState(() => _sectionExpanded = v),
+            title: const Text(
+              'Cortes de comisión B2B Conecta',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_error != null)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
-            )
-          else ...[
-            if (_rows.isNotEmpty) _filterBar(),
-            if (_rows.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Text(
-                  'Aún no hay cortes de cuenta. B2B Conecta consolidará las comisiones '
-                  'devengadas en cortes semanales y emitirá la factura correspondiente.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.35,
+            subtitle: Text(
+              _loading
+                  ? 'Cargando…'
+                  : '${_rows.length} ${_rows.length == 1 ? 'corte' : 'cortes'}',
+              style: const TextStyle(fontSize: 12),
+            ),
+            children: [
+              if (_volumeContext != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: CommissionVolumeTierBanner(
+                    volumeContext: _volumeContext!,
+                    compact: true,
                   ),
                 ),
-              )
-            else if (filtered.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Text(
-                  'Ningún corte coincide con los filtros seleccionados.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              )
-            else
-              ...filtered.map((s) {
-                final expanded = _expandedSettlementIds.contains(s.id);
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    elevation: 0,
-                    color: AppColors.card,
-                    child: ExpansionTile(
-                      key: ValueKey('cs-${s.id}'),
-                      initiallyExpanded: expanded,
-                      onExpansionChanged: (v) {
-                        setState(() {
-                          if (v) {
-                            _expandedSettlementIds.add(s.id);
-                          } else {
-                            _expandedSettlementIds.remove(s.id);
-                          }
-                        });
-                      },
-                      title: Text(
-                        s.periodLabelEs,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child:
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                )
+              else ...[
+                if (_rows.isNotEmpty) _filterBar(),
+                if (_rows.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Text(
+                      'Aún no hay cortes de cuenta. B2B Conecta consolidará las comisiones '
+                      'devengadas en cortes semanales y emitirá la factura correspondiente.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.35,
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${CommissionSettlementModel.statusLabelEs(s.status)} · '
-                            '${s.documentTypeEffective.importerDocumentLabelEs} · '
-                            '${s.totalCobroLabelEs}: USD ${s.totalCobroUsd.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _statusColor(s.status),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            s.isDeliveryNote
-                                ? 'Comisión neta (sin IVA en documento): USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
-                                : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
-                                    'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
-                                    'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          if (s.invoiceReference != null &&
-                              s.invoiceReference!.isNotEmpty)
-                            Text(
-                              'Factura: ${s.invoiceReference}',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          if (s.pagoEstadoLabelEs.isNotEmpty)
-                            Text(
-                              s.pagoEstadoLabelEs,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          if (s.paidAt != null)
-                            Text(
-                              'Pagado: ${formatEsShortDateTime(s.paidAt)}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.green.shade700,
-                              ),
-                            ),
-                        ],
-                      ),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              CommissionSettlementLinesSection(
-                                settlementId: s.id,
-                              ),
-                              const SizedBox(height: 10),
-                              ImporterCommissionPagoSection(
-                                settlement: s,
-                                onChanged: _load,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
+                  )
+                else if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Text(
+                      'Ningún corte coincide con los filtros seleccionados.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  )
+                else
+                  ...filtered.map((s) {
+                    final expanded = _expandedSettlementIds.contains(s.id);
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        margin: EdgeInsets.zero,
+                        elevation: 0,
+                        color: AppColors.card,
+                        child: ExpansionTile(
+                          shape: const Border(),
+                          collapsedShape: const Border(),
+                          key: ValueKey('cs-${s.id}-$expanded'),
+                          tilePadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          initiallyExpanded: expanded,
+                          onExpansionChanged: (v) {
+                            setState(() {
+                              if (v) {
+                                _expandedSettlementIds.add(s.id);
+                              } else {
+                                _expandedSettlementIds.remove(s.id);
+                              }
+                            });
+                          },
+                          title: _settlementSummary(s, expanded),
+                          subtitle: expanded
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      s.isBorrador
+                                          ? 'Documento por emitir'
+                                          : s.documentTypeEffective
+                                              .importerDocumentLabelEs,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: _statusColor(s.status),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    if (s.invoiceReference != null &&
+                                        s.invoiceReference!.isNotEmpty)
+                                      Text(
+                                        'Factura: ${s.invoiceReference}',
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    if (s.pagoEstadoLabelEs.isNotEmpty)
+                                      Text(
+                                        s.pagoEstadoLabelEs,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    if (s.paidAt != null)
+                                      Text(
+                                        'Pagado: ${formatEsShortDateTime(s.paidAt)}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.green.shade700,
+                                        ),
+                                      ),
+                                  ],
+                                )
+                              : null,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Divider(color: AppColors.borderSubtle),
+                                  _amountRow('Base de comisión',
+                                      s.baseImponibleComisionUsd),
+                                  _amountRow(
+                                      s.isDeliveryNote
+                                          ? 'IVA no aplicado'
+                                          : 'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %',
+                                      s.ivaComisionUsd),
+                                  const SizedBox(height: 14),
+                                  CommissionSettlementLinesSection(
+                                    settlementId: s.id,
+                                    initiallyCollapsed: true,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ImporterCommissionPagoSection(
+                                    settlement: s,
+                                    onChanged: _load,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+              ],
+              if (!_loading && _error == null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Actualizar'),
                   ),
-                );
-              }),
-          ],
-          if (!_loading && _error == null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Actualizar'),
-              ),
-            ),
-        ],
-      ),
-    ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
+    if (!widget.grouped) return content;
+    return Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+            controller: _groupController,
+            initiallyExpanded: _sectionExpanded,
+            maintainState: true,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            title: const Text('Comisiones',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Cobros confirmados y cortes de cuenta',
+                style: TextStyle(fontSize: 12)),
+            childrenPadding: const EdgeInsets.all(12),
+            children: [content]));
   }
 }

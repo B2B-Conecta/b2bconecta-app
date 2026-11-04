@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_browse_layout.dart';
 
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
@@ -49,9 +50,13 @@ class _ImporterInventoryDashboardState
   int _inventoryRequestId = 0;
   bool _hasMoreInventory = true;
   bool _loadingMoreInventory = false;
+
+  /// Productos que coinciden con la búsqueda y los filtros, no solo el lote cargado.
+  int? _matchingTotal;
   String _categoryFilter = 'Todas';
   bool _filterLowStock = false;
   bool _filterOutOfStock = false;
+  bool _filterInStock = false;
   bool _filterHidden = false;
   bool _filterActiveOnly = false;
   ProductPhotoListFilter _photoFilter = ProductPhotoListFilter.all;
@@ -108,6 +113,7 @@ class _ImporterInventoryDashboardState
     setState(() {
       if (!preserveScroll) {
         _loadedParts.clear();
+        _matchingTotal = null;
       }
       _productPageIndex = 0;
       _hasMoreInventory = true;
@@ -151,23 +157,56 @@ class _ImporterInventoryDashboardState
       return List<PartModel>.unmodifiable(_loadedParts);
     }
 
+    final searchQuery = _searchController.text;
+    final category = _categoryFilter;
+    final onlyLowStock = _filterLowStock;
+    final onlyOutOfStock = _filterOutOfStock;
+    final onlyInactive = _filterHidden;
+    final onlyActive = _filterActiveOnly;
+    final onlyInStock = _filterInStock;
+    final photoFilter = _photoFilter;
+    final countFuture = reset
+        ? SupabaseService.countMyInventory(
+            searchQuery: searchQuery,
+            category: category,
+            onlyLowStock: onlyLowStock,
+            onlyOutOfStock: onlyOutOfStock,
+            onlyInStock: onlyInStock,
+            onlyInactive: onlyInactive,
+            onlyActive: onlyActive,
+            photoFilter: photoFilter,
+          ).then<int?>((value) => value).catchError((_) => null)
+        : null;
     final batch = await SupabaseService.fetchMyInventory(
       limit: ImporterInventoryLayout.pageSize,
       offset: reset ? 0 : _loadedParts.length,
-      searchQuery: _searchController.text,
-      category: _categoryFilter,
-      onlyLowStock: _filterLowStock,
-      onlyOutOfStock: _filterOutOfStock,
-      onlyInactive: _filterHidden,
-      onlyActive: _filterActiveOnly,
-      photoFilter: _photoFilter,
+      searchQuery: searchQuery,
+      category: category,
+      onlyLowStock: onlyLowStock,
+      onlyOutOfStock: onlyOutOfStock,
+      onlyInStock: onlyInStock,
+      onlyInactive: onlyInactive,
+      onlyActive: onlyActive,
+      photoFilter: photoFilter,
     );
+    int? matching = _matchingTotal;
+    if (countFuture != null) {
+      try {
+        matching = await countFuture;
+      } catch (_) {
+        matching = null;
+      }
+    }
     if (!mounted || requestId != _inventoryRequestId) {
       return List<PartModel>.unmodifiable(_loadedParts);
     }
-    if (batch.length < ImporterInventoryLayout.pageSize) {
-      _hasMoreInventory = false;
-    }
+    if (reset) _matchingTotal = matching;
+    _hasMoreInventory = inventoryHasMore(
+      loaded: reset ? batch.length : _loadedParts.length + batch.length,
+      batchLength: batch.length,
+      fetchSize: ImporterInventoryLayout.pageSize,
+      matching: reset ? matching : _matchingTotal,
+    );
     if (reset) {
       _loadedParts
         ..clear()
@@ -176,6 +215,7 @@ class _ImporterInventoryDashboardState
       _loadedParts.addAll(batch);
     }
     if (preserveScroll) _restoreInventoryOffset();
+    if (mounted && requestId == _inventoryRequestId) setState(() {});
     return List<PartModel>.unmodifiable(_loadedParts);
   }
 
@@ -969,14 +1009,34 @@ class _ImporterInventoryDashboardState
     final excludedByFilter =
         (_filterActiveOnly && !isActive) || (_filterHidden && isActive);
     if (!excludedByFilter) return;
+    final removed = _loadedParts.any((part) => part.id == id);
     _loadedParts.removeWhere((part) => part.id == id);
     _selectedIds.remove(id);
+    if (removed && _matchingTotal != null && _matchingTotal! > 0) {
+      _matchingTotal = _matchingTotal! - 1;
+      _hasMoreInventory = _loadedParts.length < _matchingTotal!;
+    }
     _productPageIndex = clampListPageIndex(
       pageIndex: _productPageIndex,
-      total: _loadedParts.length,
+      total: _pagerTotal,
       pageSize: _productPageSize,
     );
   }
+
+  int get _pagerTotal => inventoryPagerTotal(
+        loaded: _loadedParts.length,
+        matching: _matchingTotal,
+      );
+
+  bool get _inventoryFiltersActive =>
+      _filterOutOfStock ||
+      _filterInStock ||
+      _filterLowStock ||
+      _filterHidden ||
+      _filterActiveOnly ||
+      _photoFilter != ProductPhotoListFilter.all ||
+      _categoryFilter != 'Todas' ||
+      _searchController.text.trim().isNotEmpty;
 
   void _refreshInventoryMetricsQuietly() {
     _metricsFuture = SupabaseService.fetchMyInventoryMetrics();
@@ -1139,23 +1199,25 @@ class _ImporterInventoryDashboardState
       _filterActiveOnly = false;
       _filterHidden = request == 'pausados';
       _filterOutOfStock = request == 'sin_stock';
+      _filterInStock = false;
     });
     _reloadInventory(refreshMetrics: false);
   }
 
-  int get _quickView => _filterOutOfStock
-      ? 3
-      : _filterHidden
-          ? 2
-          : _filterActiveOnly
-              ? 1
-              : 0;
+  int get _quickView {
+    if (_filterActiveOnly) return 1;
+    if (_filterHidden) return 2;
+    if (_filterInStock) return 3;
+    if (_filterOutOfStock) return 4;
+    return 0;
+  }
 
   void _selectQuickView(int index) {
     setState(() {
       _filterActiveOnly = index == 1;
       _filterHidden = index == 2;
-      _filterOutOfStock = index == 3;
+      _filterInStock = index == 3;
+      _filterOutOfStock = index == 4;
     });
     _reloadInventory(refreshMetrics: false);
   }
@@ -1164,6 +1226,7 @@ class _ImporterInventoryDashboardState
     setState(() {
       _categoryFilter = 'Todas';
       _photoFilter = ProductPhotoListFilter.all;
+      _filterInStock = false;
       _filterLowStock =
           _filterOutOfStock = _filterHidden = _filterActiveOnly = false;
       _searchController.clear();
@@ -1286,7 +1349,8 @@ class _ImporterInventoryDashboardState
     _reloadInventory(refreshMetrics: false);
   }
 
-  Widget _toolsMenu() => PopupMenuButton<String>(
+  Widget _toolsMenu({required bool compact}) => PopupMenuButton<String>(
+        icon: compact ? const Icon(Icons.more_horiz) : null,
         tooltip: 'Herramientas de inventario',
         onSelected: (action) {
           switch (action) {
@@ -1321,147 +1385,181 @@ class _ImporterInventoryDashboardState
           PopupMenuItem(value: 'delete', child: Text('Eliminar varios')),
           PopupMenuItem(value: 'help', child: Text('Ayuda de importación')),
         ],
-        child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.more_horiz, size: 20),
-              SizedBox(width: 6),
-              Text('Herramientas'),
-            ])),
+        child: compact
+            ? null
+            : const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.more_horiz, size: 20),
+                  SizedBox(width: 6),
+                  Text('Herramientas'),
+                ])),
       );
 
-  Widget _buildInventoryHeader(
-      {required bool isDesktop, required double hPad}) {
-    return Padding(
+  Widget _inventoryBrowseLayout({
+    required bool isDesktop,
+    required double hPad,
+    required Widget content,
+  }) {
+    return CatalogBrowseLayout(
+      heading: Padding(
         padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 0),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Expanded(
-                child: FutureBuilder<InventoryMetrics>(
-                    future: _metricsFuture,
-                    builder: (context, snapshot) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!isDesktop)
-                                const Text('Inventario',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Expanded(
+                  child: FutureBuilder<InventoryMetrics>(
+                      future: _metricsFuture,
+                      builder: (context, snapshot) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (!isDesktop)
+                                  const Text('Inventario',
+                                      style: TextStyle(
+                                          fontSize: 21,
+                                          fontWeight: FontWeight.w800)),
+                                Text(
+                                    inventoryRegisteredLabel(
+                                      registered: snapshot.hasData
+                                          ? snapshot.data!.totalProducts
+                                          : null,
+                                      matching: _matchingTotal,
+                                      filtering: _inventoryFiltersActive,
+                                    ),
                                     style: TextStyle(
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w800)),
-                              Text(
-                                  snapshot.hasData
-                                      ? '${snapshot.data!.totalProducts} productos registrados'
-                                      : 'Tus productos',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary)),
-                            ]))),
-            IconButton(
-                tooltip: 'Actualizar inventario',
-                onPressed: _reload,
-                icon: const Icon(Icons.refresh, size: 21)),
-            const SizedBox(width: 4),
-            FilledButton.icon(
-                onPressed: _inSelectionMode ? null : () => _openEditor(null),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Agregar'),
-                style: FilledButton.styleFrom(minimumSize: const Size(44, 44))),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-                child: TextField(
-                    controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _reloadInventory(refreshMetrics: false),
-                    decoration: InputDecoration(
-                        hintText: 'Buscar nombre o SKU…',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        suffixIcon: _searchController.text.isEmpty
-                            ? IconButton(
-                                tooltip: 'Buscar productos',
-                                onPressed: () =>
-                                    _reloadInventory(refreshMetrics: false),
-                                icon: const Icon(Icons.arrow_forward, size: 20))
-                            : IconButton(
-                                tooltip: 'Borrar búsqueda',
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _reloadInventory(refreshMetrics: false);
-                                },
-                                icon: const Icon(Icons.close, size: 20)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none)))),
-            const SizedBox(width: 8),
-            IconButton.outlined(
-                tooltip: 'Filtrar productos',
-                onPressed: _openFilters,
-                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
-                icon: Badge(
-                    isLabelVisible: _advancedFilterCount > 0,
-                    label: Text('$_advancedFilterCount'),
-                    child: const Icon(Icons.tune, size: 20))),
-          ]),
-          const SizedBox(height: 6),
-          if (_inSelectionMode)
-            Row(children: [
-              const Expanded(
-                  child: Text('Selecciona los productos',
-                      style: TextStyle(fontWeight: FontWeight.w600))),
-              TextButton(
-                  onPressed: () =>
-                      _setSelectionMode(_InventorySelectionMode.none),
-                  child: const Text('Cancelar')),
-            ])
-          else
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary)),
+                              ]))),
+              IconButton(
+                  tooltip: 'Actualizar inventario',
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh, size: 21)),
+              const SizedBox(width: 4),
+              FilledButton.icon(
+                  onPressed: _inSelectionMode ? null : () => _openEditor(null),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Agregar'),
+                  style:
+                      FilledButton.styleFrom(minimumSize: const Size(44, 44))),
+            ]),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+      search: Padding(
+        padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Row(children: [
               Expanded(
-                  child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: [
-                        for (final (index, label) in const [
-                          'Todos',
-                          'Publicados',
-                          'Pausados',
-                          'Sin stock'
-                        ].indexed)
-                          Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                  showCheckmark: false,
-                                  label: Text(label),
-                                  selected: _quickView == index,
-                                  onSelected: (_) => _selectQuickView(index))),
-                      ]))),
-              if (isDesktop) _toolsMenu(),
+                  child: TextField(
+                      controller: _searchController,
+                      textInputAction: TextInputAction.search,
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) =>
+                          _reloadInventory(refreshMetrics: false),
+                      decoration: InputDecoration(
+                          hintText: 'Buscar nombre o SKU…',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          filled: true,
+                          fillColor: AppColors.fieldFill,
+                          suffixIcon: _searchController.text.isEmpty
+                              ? IconButton(
+                                  tooltip: 'Buscar productos',
+                                  onPressed: () =>
+                                      _reloadInventory(refreshMetrics: false),
+                                  icon:
+                                      const Icon(Icons.arrow_forward, size: 20))
+                              : IconButton(
+                                  tooltip: 'Borrar búsqueda',
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _reloadInventory(refreshMetrics: false);
+                                  },
+                                  icon: const Icon(Icons.close, size: 20)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none)))),
+              const SizedBox(width: 8),
+              IconButton.outlined(
+                  tooltip: 'Filtrar productos',
+                  onPressed: _openFilters,
+                  style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                  icon: Badge(
+                      isLabelVisible: _advancedFilterCount > 0,
+                      label: Text('$_advancedFilterCount'),
+                      child: const Icon(Icons.tune, size: 20))),
             ]),
-          if (!isDesktop && !_inSelectionMode)
-            Align(alignment: Alignment.centerRight, child: _toolsMenu()),
-          if (_advancedFilterCount > 0)
-            Row(children: [
-              Expanded(
-                  child: Text(
-                      [
-                        if (_categoryFilter != 'Todas') _categoryFilter,
-                        if (_photoFilter == ProductPhotoListFilter.withPhotos)
-                          'Con fotos',
-                        if (_photoFilter ==
-                            ProductPhotoListFilter.withoutPhotos)
-                          'Sin fotos',
-                        if (_filterLowStock) 'No alcanza el mínimo',
-                      ].join(' · '),
-                      style: TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary))),
-              TextButton(
-                  onPressed: _resetFilters, child: const Text('Restablecer')),
-            ]),
-        ]));
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+      quickFilters: Padding(
+        padding: EdgeInsets.symmetric(horizontal: hPad),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_inSelectionMode)
+              Row(children: [
+                const Expanded(
+                    child: Text('Selecciona los productos',
+                        style: TextStyle(fontWeight: FontWeight.w600))),
+                TextButton(
+                    onPressed: () =>
+                        _setSelectionMode(_InventorySelectionMode.none),
+                    child: const Text('Cancelar')),
+              ])
+            else
+              Row(children: [
+                Expanded(
+                    child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(children: [
+                          for (final (index, label) in const [
+                            'Todos',
+                            'Publicados',
+                            'Pausados',
+                            'Con stock',
+                            'Sin stock',
+                          ].indexed)
+                            Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                    showCheckmark: false,
+                                    label: Text(label),
+                                    selected: _quickView == index,
+                                    onSelected: (_) =>
+                                        _selectQuickView(index))),
+                        ]))),
+                _toolsMenu(compact: !isDesktop),
+              ]),
+            if (_advancedFilterCount > 0)
+              Row(children: [
+                Expanded(
+                    child: Text(
+                        [
+                          if (_categoryFilter != 'Todas') _categoryFilter,
+                          if (_photoFilter == ProductPhotoListFilter.withPhotos)
+                            'Con fotos',
+                          if (_photoFilter ==
+                              ProductPhotoListFilter.withoutPhotos)
+                            'Sin fotos',
+                          if (_filterLowStock) 'No alcanza el mínimo',
+                        ].join(' · '),
+                        style: TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary))),
+                TextButton(
+                    onPressed: _resetFilters, child: const Text('Restablecer')),
+              ]),
+          ],
+        ),
+      ),
+      content: content,
+    );
   }
 
   List<Widget> _inventoryBodySlivers(
@@ -1502,6 +1600,7 @@ class _ImporterInventoryDashboardState
 
     if (parts.isEmpty) {
       final hasFilters = _filterOutOfStock ||
+          _filterInStock ||
           _filterLowStock ||
           _filterHidden ||
           _filterActiveOnly ||
@@ -1596,7 +1695,7 @@ class _ImporterInventoryDashboardState
           padding: EdgeInsets.fromLTRB(hPad, 12, hPad, listBottomPadding),
           child: ListPageBar(
             bottomPadding: 0,
-            total: _loadedParts.length,
+            total: _pagerTotal,
             hasMore: _hasMoreInventory,
             pageIndex: _productPageIndex,
             pageSize: _productPageSize,
@@ -1742,39 +1841,26 @@ class _ImporterInventoryDashboardState
 
         return Stack(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: FutureBuilder<List<PartModel>>(
-                    future: _partsFuture,
-                    builder: (context, snapshot) {
-                      return RefreshIndicator(
-                        onRefresh: _pullToRefresh,
-                        color: AppColors.brand,
-                        child: CustomScrollView(
-                          controller: _inventoryScrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: _buildInventoryHeader(
-                                isDesktop: isDesktop,
-                                hPad: hPad,
-                              ),
-                            ),
-                            ..._inventoryBodySlivers(
-                              snapshot,
-                              isDesktop: isDesktop,
-                              hPad: hPad,
-                              listBottomPadding: listBottomPadding,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+            _inventoryBrowseLayout(
+              isDesktop: isDesktop,
+              hPad: hPad,
+              content: FutureBuilder<List<PartModel>>(
+                future: _partsFuture,
+                builder: (context, snapshot) => RefreshIndicator(
+                  onRefresh: _pullToRefresh,
+                  color: AppColors.brand,
+                  child: CustomScrollView(
+                    controller: _inventoryScrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: _inventoryBodySlivers(
+                      snapshot,
+                      isDesktop: isDesktop,
+                      hPad: hPad,
+                      listBottomPadding: listBottomPadding,
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
             if (_inSelectionMode)
               _buildSelectionBottomBar(isDesktop: isDesktop),

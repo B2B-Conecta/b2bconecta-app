@@ -6,7 +6,7 @@ import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
-import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 
 /// El botón de la vitrina solo lo ve la tienda, y no sobre su propio usuario.
 bool showStoreSupplierChatButton({
@@ -162,7 +162,8 @@ class StoreSupplierChatService {
   static const _messageSelectLegacy =
       'id, thread_id, author_id, author_role, body, created_at';
 
-  static Future<List<StoreSupplierMessage>> fetchMessages(String threadId) async {
+  static Future<List<StoreSupplierMessage>> fetchMessages(
+      String threadId) async {
     final id = threadId.trim();
     if (id.isEmpty) return const [];
     final response = await _selectMessages(id);
@@ -212,13 +213,17 @@ class StoreSupplierChatService {
     };
     if (productId.isNotEmpty) payload['product_id'] = productId;
     try {
-      await SupabaseAccess.client.from('store_supplier_messages').insert(payload);
+      await SupabaseAccess.client
+          .from('store_supplier_messages')
+          .insert(payload);
     } on PostgrestException catch (e) {
       if (productId.isEmpty || !_missingProductColumn(e)) rethrow;
       final label = aboutProduct?.label.trim() ?? '';
       payload.remove('product_id');
       payload['body'] = label.isEmpty ? text : 'Sobre $label\n$text';
-      await SupabaseAccess.client.from('store_supplier_messages').insert(payload);
+      await SupabaseAccess.client
+          .from('store_supplier_messages')
+          .insert(payload);
     }
   }
 
@@ -261,53 +266,54 @@ class StoreSupplierChatService {
   }
 
   static Future<List<StoreSupplierInboxItem>> listInbox() async {
-    final rows = await SupabaseAccess.client
-        .from('store_supplier_threads')
-        .select(
-          'id, aliado_id, importador_id, created_at, '
-          'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name), '
-          'importador:profiles!store_supplier_threads_importador_id_fkey(business_name)',
-        )
-        .order('created_at', ascending: false);
-    final threads = <StoreSupplierThread>[];
-    final created = <String, DateTime?>{};
-    for (final raw in rows as List<dynamic>) {
-      final row = Map<String, dynamic>.from(raw as Map);
-      final id = row['id']?.toString() ?? '';
-      if (id.isEmpty) continue;
-      threads.add(
-        StoreSupplierThread(
-          id: id,
-          aliadoId: row['aliado_id']?.toString() ?? '',
-          importadorId: row['importador_id']?.toString() ?? '',
-          aliadoName: _embeddedName(row['aliado']),
-          importadorName: _embeddedName(row['importador']),
-        ),
-      );
-      created[id] = DateTime.tryParse(row['created_at']?.toString() ?? '');
-    }
-    final latest = <String, StoreSupplierMessage>{};
-    if (threads.isNotEmpty) {
-      final messages = await SupabaseAccess.client
-          .from('store_supplier_messages')
-          .select(_messageSelect)
-          .order('created_at', ascending: false)
-          .limit(300);
-      for (final raw in messages as List<dynamic>) {
-        final message = StoreSupplierMessage.fromJson(
-          Map<String, dynamic>.from(raw as Map),
-        );
-        latest.putIfAbsent(message.threadId, () => message);
+    const relation = 'store_supplier_messages';
+    Future<List<StoreSupplierInboxItem>> load(String messageColumns) async {
+      final result = <StoreSupplierInboxItem>[];
+      const pageSize = 100;
+      for (var offset = 0;; offset += pageSize) {
+        final rows = await SupabaseAccess.client
+            .from('store_supplier_threads')
+            .select(
+              'id, aliado_id, importador_id, created_at, '
+              'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name), '
+              'importador:profiles!store_supplier_threads_importador_id_fkey(business_name), '
+              '$relation($messageColumns)',
+            )
+            .order('id')
+            .order('created_at', ascending: false, referencedTable: relation)
+            .order('id', ascending: false, referencedTable: relation)
+            .limit(1, referencedTable: relation)
+            .range(offset, offset + pageSize - 1);
+        for (final row in rows) {
+          final messages = row[relation] as List;
+          final latest = messages.isEmpty
+              ? null
+              : StoreSupplierMessage.fromJson(
+                  Map<String, dynamic>.from(messages.first as Map));
+          result.add(StoreSupplierInboxItem(
+            thread: StoreSupplierThread(
+              id: row['id'] as String,
+              aliadoId: row['aliado_id'] as String,
+              importadorId: row['importador_id'] as String,
+              aliadoName: _embeddedName(row['aliado']),
+              importadorName: _embeddedName(row['importador']),
+            ),
+            lastBody: latest?.body,
+            lastProduct: latest?.productLabel,
+            lastAt: latest?.createdAt ??
+                DateTime.tryParse(row['created_at']?.toString() ?? ''),
+          ));
+        }
+        if (rows.length < pageSize) return result;
       }
     }
-    return [
-      for (final thread in threads)
-        StoreSupplierInboxItem(
-          thread: thread,
-          lastBody: latest[thread.id]?.body,
-          lastAt: latest[thread.id]?.createdAt ?? created[thread.id],
-        ),
-    ];
+
+    try {
+      return await load(_messageSelect);
+    } on PostgrestException catch (error) {
+      if (!_missingProductColumn(error)) rethrow;
+      return load('id, thread_id, author_id, author_role, body, created_at');
+    }
   }
 
   static String? _embeddedName(dynamic raw) {
@@ -326,11 +332,13 @@ class StoreSupplierInboxItem {
   const StoreSupplierInboxItem({
     required this.thread,
     this.lastBody,
+    this.lastProduct,
     this.lastAt,
   });
 
   final StoreSupplierThread thread;
   final String? lastBody;
+  final String? lastProduct;
   final DateTime? lastAt;
 }
 
@@ -351,15 +359,20 @@ class StoreSupplierChatScreen extends StatefulWidget {
     super.key,
     required this.threadId,
     this.aboutProduct,
+    this.embedded = false,
+    this.onActivity,
   });
 
   final String threadId;
 
   /// Si viene de la ficha, el próximo mensaje queda ligado a ese producto.
   final StoreSupplierProductContext? aboutProduct;
+  final bool embedded;
+  final VoidCallback? onActivity;
 
   @override
-  State<StoreSupplierChatScreen> createState() => _StoreSupplierChatScreenState();
+  State<StoreSupplierChatScreen> createState() =>
+      _StoreSupplierChatScreenState();
 }
 
 class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
@@ -392,8 +405,12 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
       threadId: widget.threadId,
       onInsert: () {
         SchedulerBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _load();
+          if (mounted) {
+            _load();
+            widget.onActivity?.call();
+          }
         });
+        SchedulerBinding.instance.ensureVisualUpdate();
       },
     );
     _load();
@@ -411,27 +428,38 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final thread = await StoreSupplierChatService.fetchThread(widget.threadId);
+      final thread =
+          await StoreSupplierChatService.fetchThread(widget.threadId);
       final items = thread == null
           ? const <StoreSupplierMessage>[]
           : await StoreSupplierChatService.fetchMessages(widget.threadId);
-      if (thread != null) {
-        await StoreSupplierChatService.markRead(widget.threadId);
-        MainShellTabController.requestNotificationsReload();
-      }
       if (!mounted) return;
       setState(() {
         _thread = thread;
         _items = items;
         _loading = false;
-        _error = thread == null ? 'No tienes acceso a esta conversación.' : null;
+        _error =
+            thread == null ? 'No tienes acceso a esta conversación.' : null;
       });
-    } catch (e) {
+      if (thread != null) {
+        try {
+          await StoreSupplierChatService.markRead(widget.threadId);
+          MainShellTabController.requestNotificationsReload();
+        } catch (_) {
+          // The conversation is still available if read receipts fail.
+        }
+      }
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = 'Revisa tu conexión e inténtalo de nuevo.';
       });
     }
   }
@@ -448,12 +476,14 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
         body: text,
         aboutProduct: _aboutProduct,
       );
+      if (!mounted) return;
       _ctrl.clear();
       await _load();
-    } catch (e) {
+      if (mounted) widget.onActivity?.call();
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
+        const SnackBar(content: Text('No se pudo enviar. Inténtalo de nuevo.')),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -464,138 +494,126 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   Widget build(BuildContext context) {
     final uid = SupabaseAccess.currentUserId;
     final title = _thread?.titleFor(uid) ?? 'Mensajes';
+    final product = _aboutProduct;
+    final latestProduct = _items.lastOrNull?.productLabel ?? '';
+    final subtitle = latestProduct.isEmpty
+        ? 'Consulta directa'
+        : 'Último producto: $latestProduct';
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Column(
-        children: [
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.brand),
-                  )
-                : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(_error!, textAlign: TextAlign.center),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final m = _items[i];
-                          final mine = uid != null && m.authorId == uid;
-                          return Align(
-                            alignment: mine
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 320),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: mine
-                                      ? AppColors.brandBlue.withOpacity(0.12)
-                                      : AppColors.card,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppColors.borderSubtle),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        formatEsShortDateTime(m.createdAt),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      if (m.productLabel.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Sobre ${m.productLabel}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 2),
-                                      Text(m.body),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+      appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          PopupMenuButton<void>(
+            tooltip: 'Opciones del chat',
+            itemBuilder: (context) => [
+              PopupMenuItem<void>(
+                onTap: _load,
+                enabled: !_loading,
+                child: const Text('Actualizar mensajes'),
+              ),
+            ],
           ),
-          if (_myRole != null)
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_aboutProduct != null &&
-                        _aboutProduct!.label.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Material(
-                          color: AppColors.brand.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(10),
-                          child: ListTile(
-                            dense: true,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                            title: Text(
-                              'Pregunta sobre ${_aboutProduct!.label}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Divider(height: 1),
+            if (_loading && _items.isNotEmpty)
+              const LinearProgressIndicator(minHeight: 2),
+            if (_error != null && _items.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(_error!,
+                    style: TextStyle(color: AppColors.textSecondary)),
+              ),
+            Expanded(
+              child: _items.isNotEmpty
+                  ? ChatTimeline(
+                      itemCount: _items.length,
+                      dateAt: (i) => _items[i].createdAt,
+                      messageAt: (i) => _messageBubble(_items[i], uid),
+                    )
+                  : _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                          ? ChatConversationNotice(
+                              title: 'No se pudo abrir la consulta',
+                              description: _error,
+                              icon: Icons.info_outline,
+                              onRetry: _load,
+                            )
+                          : const ChatConversationNotice(
+                              title: 'Inicia la conversación',
+                              description: 'Escribe tu consulta aquí abajo.',
                             ),
-                            trailing: IconButton(
-                              tooltip: 'Quitar el producto',
-                              onPressed: () =>
-                                  setState(() => _aboutProduct = null),
-                              icon: const Icon(Icons.close, size: 18),
-                            ),
+            ),
+            if (_myRole != null)
+              ChatComposer(
+                controller: _ctrl,
+                sending: _sending,
+                onSend: _send,
+                contextNote: product == null || product.label.isEmpty
+                    ? null
+                    : Row(
+                        children: [
+                          const Icon(Icons.inventory_2_outlined, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('Sobre ${product.label}',
+                                maxLines: 2, overflow: TextOverflow.ellipsis),
                           ),
-                        ),
+                          IconButton(
+                            tooltip: 'Quitar el producto',
+                            onPressed: _sending
+                                ? null
+                                : () => setState(() => _aboutProduct = null),
+                            icon: const Icon(Icons.close, size: 18),
+                          ),
+                        ],
                       ),
-                    Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _ctrl,
-                        enabled: !_sending,
-                        minLines: 1,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          hintText: _aboutProduct == null
-                              ? 'Escriba su mensaje…'
-                              : 'Pregunte sobre este producto…',
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _sending ? null : _send,
-                      child: const Text('Enviar'),
-                    ),
-                  ],
-                    ),
-                  ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _messageBubble(StoreSupplierMessage message, String? uid) {
+    final product = message.productLabel;
+    return ChatMessageBubble(
+      key: ValueKey(message.id),
+      mine: uid != null && message.authorId == uid,
+      at: message.createdAt,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (product.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Sobre $product',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
+          Text(message.body, style: const TextStyle(height: 1.35)),
         ],
       ),
     );

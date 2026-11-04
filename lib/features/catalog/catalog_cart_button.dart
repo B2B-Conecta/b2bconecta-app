@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
-import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -14,24 +13,13 @@ class CatalogCartButton extends StatelessWidget {
       required this.part,
       required this.profile,
       this.cart,
-      this.onOpenCart,
       this.onChooseVariant});
   final PartModel part;
   final ProfileModel profile;
   final CartService? cart;
-  final VoidCallback? onOpenCart;
 
   /// Override for tests or custom flows. Default opens the multi-qty sheet.
   final VoidCallback? onChooseVariant;
-
-  void _openCart(BuildContext context) {
-    if (onOpenCart != null) {
-      onOpenCart!();
-      return;
-    }
-    Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => CartScreen(profile: profile)));
-  }
 
   Future<void> _openVariantPicker(
       BuildContext context, CartService service) async {
@@ -39,40 +27,19 @@ class CatalogCartButton extends StatelessWidget {
       onChooseVariant!();
       return;
     }
-    final result = await showVariantCartPickerSheet(
+    await showVariantCartPickerSheet(
       context: context,
       part: part,
       profile: profile,
       cart: service,
     );
-    if (result == null || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
-      content: Text(
-        '${result.totalUnits} unidades (${result.addedLines} opción(es)) '
-        'añadidas al carrito.',
-      ),
-      behavior: SnackBarBehavior.floating,
-      action: SnackBarAction(
-          label: 'Ver carrito', onPressed: () => _openCart(context)),
-    ));
   }
 
-  void _activate(BuildContext context, CartService service) {
+  void _activate(CartService service) {
     if (service.lines.any((line) => line.part.id == part.id)) {
       return;
     }
-    final quantity = CartProductActions.addMinimum(
-        part: part, profile: profile, cart: service);
-    if (quantity == 0) return;
-    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
-      content:
-          Text('$quantity unidades de ${part.nombre} añadidas al carrito.'),
-      behavior: SnackBarBehavior.floating,
-      action: SnackBarAction(
-          label: 'Ver carrito', onPressed: () => _openCart(context)),
-    ));
+    CartProductActions.addMinimum(part: part, profile: profile, cart: service);
   }
 
   @override
@@ -170,8 +137,7 @@ class CatalogCartButton extends StatelessWidget {
               message: blocked ??
                   'Agregar el mínimo de ${part.minOrderQtyEffective} unidades',
               child: FilledButton(
-                onPressed:
-                    blocked == null ? () => _activate(context, service) : null,
+                onPressed: blocked == null ? () => _activate(service) : null,
                 style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 44),
                     padding:

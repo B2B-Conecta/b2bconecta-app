@@ -51,7 +51,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   String? _expandedRequestId;
   String? _cancelBusyKey;
   late final TextEditingController _searchCtrl;
-  PedidosListScope _scope = PedidosListScope.enCurso;
+  PedidosListScope _scope = PedidosListScope.todos;
   bool _onlyNuevos = false;
   bool _pendingFirst = true;
   bool _morosoOnly = false;
@@ -216,8 +216,15 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     MainShellTabController.consumePendingNotificationType();
   }
 
-  String? _expandKeyForPendingId(String id) =>
-      orderExpandKeyForNotification(_rows, id);
+  String? _expandKeyForPendingId(String id) {
+    for (final group in _groupsForDisplay(_rows)) {
+      if (group.any(
+          (row) => transactionRequestMatchesNotificationRelatedId(row, id))) {
+        return _displayGroupKey(group);
+      }
+    }
+    return null;
+  }
 
   Future<void> _load({bool silent = false}) async {
     if (!silent) {
@@ -742,14 +749,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         builder: (context, compact) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!detailOpen && !compact) ...[
+                if (!detailOpen && !compact)
                   const ImporterThirdPartyAdsCarousel(
                     padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
                   ),
-                  const ImporterActivePromoBanner(
-                    padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  ),
-                ],
                 Expanded(
                   child: OrderWorkspace(
                     viewerRole: AppHomeRole.importador,

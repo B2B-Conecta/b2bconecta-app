@@ -12,6 +12,17 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 class ProfileService {
   ProfileService._();
 
+  static Future<void> updateMyMinimumOrder({required double amount, required String currency}) async {
+    if (!amount.isFinite || amount < 0 || !{'ref', 'usd'}.contains(currency)) {
+      throw ArgumentError('Indique un monto válido y su moneda.');
+    }
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) throw StateError('Inicie sesión para guardar.');
+    await SupabaseAccess.client.from('profiles').update({
+      'min_order_amount_ref': amount, 'min_order_currency': currency,
+    }).eq('id', uid).select('id').single();
+  }
+
   static RealtimeChannel subscribeToMyProfileAccess({
     required void Function() onAccessActive,
   }) {
@@ -143,6 +154,7 @@ class ProfileService {
     String? legalContactPhone,
     double? minOrderAmountRef,
     String? minOrderCurrency,
+    bool updateMinimumOrder = true,
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) {
@@ -182,10 +194,12 @@ class ProfileService {
       payload['legal_contact_name'] = (ln == null || ln.isEmpty) ? null : ln;
       payload['legal_contact_email'] = (le == null || le.isEmpty) ? null : le;
       payload['legal_contact_phone'] = (lp == null || lp.isEmpty) ? null : lp;
+      if (updateMinimumOrder) {
       final minRef = minOrderAmountRef ?? 0;
       payload['min_order_amount_ref'] = minRef < 0 ? 0 : minRef;
       final cur = (minOrderCurrency ?? 'ref').trim().toLowerCase();
       payload['min_order_currency'] = cur == 'usd' ? 'usd' : 'ref';
+      }
     }
 
     final fmu = normalizeHttpUrl(fiscalMapsUrl);

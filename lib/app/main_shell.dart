@@ -12,6 +12,7 @@ import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/auth/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 import 'package:motolink_pro_app/core/layout/aliado_bottom_nav.dart';
@@ -31,6 +32,7 @@ import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.da
 import 'package:motolink_pro_app/core/notifications/kyc_notification_match.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice_banner.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
@@ -647,7 +649,7 @@ class _MainShellState extends State<MainShell> {
                 unreadNotifications: _notifications.unreadCount,
                 onMessagesTap: _openMessagesInbox,
                 unreadMessages: _notifications.unreadChatCount),
-        body: ImporterHomeDashboard(profile: _profile),
+        body: ImporterHomeDashboard(profile: _profile, embedInDesktopShell: desktop),
       ),
       if (_visitedImporterTabs.contains(ImporterShellTabs.inventario))
         HomeScreen(
@@ -784,6 +786,7 @@ class _MainShellState extends State<MainShell> {
                 onMessagesTap: _openMessagesInbox,
                 unreadMessages: _notifications.unreadChatCount,
                 onOpenSettings: _openAccountSettings,
+                onSignOut: AuthService.signOut,
                 railBadgeLabel: railBadgeLabel,
                 trailingActions: trailingActions,
                 railStatusBuilder: railStatusBuilder,
@@ -906,6 +909,7 @@ class _MainShellState extends State<MainShell> {
             role: AppHomeRole.importador,
             destinations: _importadorDestinations,
             railBadgeLabel: 'Panel importador',
+            railStatusBuilder: (extended) => ImporterStoreCountCard(extended: extended),
           );
         }
         return _buildB2bMobileShell(
@@ -1078,7 +1082,19 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
-  Widget _buildSupportEntryCard() {
+  Widget _buildSupportEntryCard({bool inProfileGroup = false}) {
+    if (inProfileGroup) {
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.support_agent_outlined, color: AppColors.brandLink),
+        title: const Text('Atención al cliente',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: const Text('Gestiona tus reclamos (máx. 3 abiertos).',
+            style: TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+        onTap: () => _openSupportTickets(),
+      );
+    }
     return Material(
       color: AppColors.card,
       borderRadius: BorderRadius.circular(12),
@@ -1208,7 +1224,9 @@ class _ProfileTabState extends State<_ProfileTab> {
               unreadNotifications: widget.unreadNotifications,
               onMessagesTap: widget.onMessagesTap,
               unreadMessages: widget.unreadMessages,
-              extraActions: [
+              extraActions: widget.profile.hasActiveAccountAccess && showSupportEntry
+                  ? const []
+                  : [
                 HeaderIconButton(
                   tooltip: 'Ajustes',
                   icon: Icons.settings_outlined,
@@ -1236,13 +1254,18 @@ class _ProfileTabState extends State<_ProfileTab> {
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: widget.embedInDesktopShell
-                    ? AppBreakpoints.formMaxWidth
+                    ? 1120
                     : double.infinity,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ProfileB2BForm(
+                    summaryFirst: true,
+                    accountActionsInShell: widget.embedInDesktopShell,
+                    overviewSupport: showSupportEntry
+                        ? _buildSupportEntryCard(inProfileGroup: widget.embedInDesktopShell)
+                        : null,
                     key: ValueKey<Object>(
                       '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
                     ),

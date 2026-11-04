@@ -6,7 +6,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 
 /// Conteo fijo de tiendas activas. No es el aviso del día: ese se cierra con
-/// «Entendido». En escritorio va en el rail; en móvil, dentro de Inventario.
+/// «Entendido». Se mantiene al pie del menú de escritorio del importador.
 class ImporterStoreCountCard extends StatefulWidget {
   const ImporterStoreCountCard({
     super.key,

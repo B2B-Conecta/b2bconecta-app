@@ -181,6 +181,7 @@ class SupabaseService {
     String? legalContactPhone,
     double? minOrderAmountRef,
     String? minOrderCurrency,
+    bool updateMinimumOrder = true,
   }) =>
       ProfileService.upsertMyProfile(
           businessName: businessName,
@@ -195,7 +196,8 @@ class SupabaseService {
           legalContactEmail: legalContactEmail,
           legalContactPhone: legalContactPhone,
           minOrderAmountRef: minOrderAmountRef,
-          minOrderCurrency: minOrderCurrency);
+          minOrderCurrency: minOrderCurrency,
+          updateMinimumOrder: updateMinimumOrder);
 
   static String profileSaveErrorMessage(Object error) =>
       ProfileService.profileSaveErrorMessage(error);

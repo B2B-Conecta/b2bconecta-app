@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/app/config/terms_config.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status.dart';
 import 'profile_model.dart';
+import 'profile_overview.dart';
 import 'package:motolink_pro_app/core/auth/auth_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
@@ -37,9 +38,17 @@ class ProfileB2BForm extends StatefulWidget {
     this.afterReputation,
     this.beforeSignOut,
     this.onEnterApp,
+    this.summaryFirst = false,
+    this.accountActionsInShell = false,
+    this.editingOnly = false,
+    this.overviewSupport,
   });
 
   final ProfileModel? initial;
+  final bool summaryFirst;
+  final bool accountActionsInShell;
+  final bool editingOnly;
+  final Widget? overviewSupport;
   final VoidCallback onSaved;
 
   /// Si es true, muestra una barra superior con botón cerrar (edición empujada).
@@ -508,6 +517,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             _isImportadorRole ? _parsedMinOrderAmountRef() : null,
         minOrderCurrency:
             _isImportadorRole ? _minOrderCurrency.dbValue : null,
+        updateMinimumOrder: !widget.editingOnly,
       );
       await _persistAcceptedTermsIfNeeded();
       await _tryGeocodeAndSaveCoordinates();
@@ -680,6 +690,52 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.summaryFirst && (_persistedAsAliado || _persistedAsImportador) &&
+        widget.initial?.hasActiveAccountAccess == true) {
+      return ProfileOverview(
+        profile: widget.initial!,
+        onEdit: () async {
+          await Navigator.of(context).push<void>(MaterialPageRoute(
+            builder: (context) => Scaffold(
+              appBar: AppBar(title: const Text('Editar mi negocio')),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Center(child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: ProfileB2BForm(
+                    editingOnly: true,
+                    initial: widget.initial,
+                    onSaved: () {
+                      widget.onSaved();
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                    onRelatedDataChanged: widget.onRelatedDataChanged,
+                  ),
+                )),
+              ),
+            ),
+          ));
+          if (mounted && _persistedAsAliado) {
+            MainShellTabController.registerKycDocumentationSectionKey(
+                _kycDocumentationSectionKey);
+          }
+        },
+        onSignOut: _signOut,
+        accountActionsInShell: widget.accountActionsInShell,
+        onChanged: widget.onRelatedDataChanged,
+        documents: _showAliadoKycSection ? ProfileKycDocumentsSection(
+          key: _kycDocumentationSectionKey,
+          role: 'aliado', profile: widget.initial,
+          kycStatus: widget.initial?.kycStatus,
+          beforeUpload: _ensureProfileForDocumentUpload,
+          beforeSubmitReview: _persistProfileFromForm,
+          registrationLocked: _aliadoRegistrationLocked,
+          onTermsAccepted: widget.onTermsAccepted,
+          onChanged: widget.onRelatedDataChanged,
+        ) : null,
+        support: widget.overviewSupport ?? widget.afterReputation ?? widget.beforeSignOut,
+      );
+    }
     final email = _emailDisplayController.text.trim().isEmpty
         ? '—'
         : _emailDisplayController.text.trim();
@@ -721,6 +777,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               const SizedBox(height: 8),
             ],
             _ProfileIdentityCard(
+              showIdentity: !widget.editingOnly,
               compact: mobile,
               businessName: businessName.isEmpty
                   ? (mobile ? 'Tu negocio' : 'Mi Perfil B2B')
@@ -780,7 +837,11 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  _RoleChoiceGrid(
+                  if (_roleLocked)
+                    Align(alignment: Alignment.centerLeft,
+                      child: Chip(label: Text(_persistedAsImportador
+                        ? 'Importador' : _persistedAsAliado ? 'Tienda minorista' : 'Administrador')))
+                  else _RoleChoiceGrid(
                     compact: mobile,
                     showAdministrador: _showAdministradorRoleOption,
                     role: _role,
@@ -1102,6 +1163,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                   ],
                 ),
               ),
+              if (!widget.editingOnly) ...[
               const SizedBox(height: 12),
               ProfileCollapsibleSection(
                 title: 'Pedido mínimo',
@@ -1167,6 +1229,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
               ),
             ],
+            ],
             if (!_requiereUbicacionFiscalCompleta) ...[
               const SizedBox(height: 12),
               ProfileCollapsibleSection(
@@ -1184,7 +1247,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                 ),
               ),
             ],
-          if (_roleLocked && _persistedAsImportador) ...[
+          if (!widget.editingOnly && _roleLocked && _persistedAsImportador) ...[
             const SizedBox(height: 12),
             AuthorizationStatusSection(
               key: ValueKey<int>(_authSectionTick),
@@ -1192,7 +1255,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               termsAcceptedLocally: _hasAcceptedTerms || _termsPersisted,
             ),
           ],
-          if (_persistedAsImportador &&
+          if (!widget.editingOnly && _persistedAsImportador &&
               widget.initial != null &&
               widget.initial!.hasActiveAccountAccess) ...[
             const SizedBox(height: 12),
@@ -1211,7 +1274,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               ],
             ],
           ],
-          if (_showAliadoKycSection) ...[
+          if (!widget.editingOnly && _showAliadoKycSection) ...[
             const SizedBox(height: 14),
             if (!mobile)
               const ProfileSectionHeader(
@@ -1308,6 +1371,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 8),
           ],
           if (_showGuardarPerfilButton) ...[
+            if (widget.editingOnly) Align(alignment: Alignment.centerRight,
+              child: TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'))),
             SizedBox(height: mobile ? 18 : 24),
             ElevatedButton(
               onPressed: (_saving || _submittingImportadorReview) ? null : _submit,
@@ -1324,7 +1390,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
           ] else
             const SizedBox(height: 16),
-          if (widget.initial != null &&
+          if (!widget.editingOnly && widget.initial != null &&
               (widget.initial!.isAliado ||
                   widget.initial!.isImportador ||
                   widget.initial!.role?.trim().toLowerCase() ==
@@ -1336,12 +1402,12 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             ),
             const SizedBox(height: 8),
           ],
-          if (widget.beforeSignOut != null) ...[
+          if (!widget.editingOnly && widget.beforeSignOut != null) ...[
             const SizedBox(height: 12),
             widget.beforeSignOut!,
           ],
           const SizedBox(height: 8),
-            TextButton.icon(
+            if (!widget.editingOnly) TextButton.icon(
               onPressed: _saving ? null : _signOut,
               icon: Icon(Icons.logout, color: AppColors.textSecondary, size: 20),
               label: Text(
@@ -1433,6 +1499,7 @@ class _ProfileIdentityCard extends StatelessWidget {
     required this.logo,
     required this.actions,
     this.compact = false,
+    this.showIdentity = true,
   });
 
   final String businessName;
@@ -1440,9 +1507,17 @@ class _ProfileIdentityCard extends StatelessWidget {
   final Widget logo;
   final Widget actions;
   final bool compact;
+  final bool showIdentity;
 
   @override
   Widget build(BuildContext context) {
+    if (!showIdentity) {
+      return Wrap(spacing: 16, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center,
+        children: [logo, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Logo del negocio', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6), actions,
+        ])]);
+    }
     if (compact) {
       return Material(
         color: AppColors.card,

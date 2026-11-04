@@ -74,15 +74,12 @@ Future<void> showOrderChatSheet({
     ),
     builder: (sheetContext) {
       final height = MediaQuery.sizeOf(sheetContext).height * 0.82;
-      return SizedBox(
-        height: height,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 8,
-            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
-          ),
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: SizedBox(
+          height: height,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -123,7 +120,8 @@ Future<void> showOrderChatSheet({
               ),
               const SizedBox(height: 4),
               Expanded(
-                child: SingleChildScrollView(
+                child: SafeArea(
+                  top: false,
                   child: OrderMotolinkThreadSection(
                     key: ValueKey<String>(
                       'sheet-${mergedThreadRequestIds?.join('-') ?? transactionRequestId}',
@@ -138,6 +136,7 @@ Future<void> showOrderChatSheet({
                     onThreadChanged: onThreadChanged,
                     suppressBuiltinTitle: true,
                     suppressInlineHelp: false,
+                    expandMessages: true,
                   ),
                 ),
               ),

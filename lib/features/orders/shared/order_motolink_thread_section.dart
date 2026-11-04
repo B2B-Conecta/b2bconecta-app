@@ -16,11 +16,14 @@ import 'transaction_request_message_model.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
-import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
+
+enum _ChatAction { refresh, help }
+
+enum _ChatAttachment { photoCamera, photoGallery, videoCamera, videoGallery }
 
 /// Hilo de mensajes del pedido: aliado ↔ importador, con supervisión B2B Conecta.
 class OrderMotolinkThreadSection extends StatefulWidget {
@@ -35,7 +38,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.suppressBuiltinTitle = false,
     this.suppressInlineHelp = false,
     this.expandMessages = false,
+    this.conversationContext,
     this.emptyHint,
+
     /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
     this.mergedThreadRequestIds,
     this.orderLines = const [],
@@ -66,6 +71,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
 
   /// La lista de mensajes ocupa el alto libre y el campo queda abajo.
   final bool expandMessages;
+  final Widget? conversationContext;
 
   /// Texto cuando todavía no hay mensajes.
   final String? emptyHint;
@@ -75,13 +81,15 @@ class OrderMotolinkThreadSection extends StatefulWidget {
       _OrderMotolinkThreadSectionState();
 }
 
-class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection> {
+class _OrderMotolinkThreadSectionState
+    extends State<OrderMotolinkThreadSection> {
   final _ctrl = TextEditingController();
   List<TransactionRequestMessageModel> _items = [];
   bool _loading = true;
   bool _sending = false;
+  bool _pickingAttachment = false;
+  PreparedOrderAttachment? _attachment;
   String? _error;
-  String? _composeHint;
   final List<RealtimeChannel> _messageChannels = [];
   final Set<String> _resolvedRequestIds = {};
   String? _resolvingRequestId;
@@ -113,9 +121,14 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _load();
+          if (widget.expandMessages &&
+              ModalRoute.of(context)?.isCurrent == true) {
+            unawaited(_refreshReadReceipt());
+          }
           widget.onThreadChanged?.call();
         }
       });
+      SchedulerBinding.instance.ensureVisualUpdate();
     }
 
     final merge = widget.mergedThreadRequestIds;
@@ -149,14 +162,19 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     }
   }
 
+  Future<void> _refreshReadReceipt() async {
+    try {
+      await _markNotificationsReadAsync();
+      MainShellTabController.requestNotificationsReload();
+    } catch (_) {
+      // A temporary receipt failure should not block message access.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _markNotificationsReadAsync().then((_) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        MainShellTabController.requestNotificationsReload();
-      });
-    });
+    unawaited(_refreshReadReceipt());
     _subscribeChannels();
     _load();
   }
@@ -172,7 +190,8 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
             false) {
       _unsubscribeAll();
       _subscribeChannels();
-      unawaited(_markNotificationsReadAsync());
+      _attachment = null;
+      unawaited(_refreshReadReceipt());
       _load();
     }
   }
@@ -229,7 +248,9 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
 
   String _friendlySendError(Object error) {
     final raw = error.toString();
-    if (raw.contains('plazo') || raw.contains('7 days') || raw.contains('7 días')) {
+    if (raw.contains('plazo') ||
+        raw.contains('7 days') ||
+        raw.contains('7 días')) {
       return OrderReturnRules.closedHint;
     }
     return 'No se pudo enviar. Revise su conexión e intente de nuevo.';
@@ -237,15 +258,28 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
 
   Future<void> _send() async {
     final text = _ctrl.text.trim();
-    if (_sending) return;
-    if (text.isEmpty) {
-      setState(() => _composeHint = 'Escriba el mensaje antes de enviarlo.');
+    final attachment = _attachment;
+    final role = _replyRole;
+    if (_sending ||
+        _pickingAttachment ||
+        role == null ||
+        (text.isEmpty && attachment == null)) {
       return;
     }
 
     setState(() => _sending = true);
     try {
-      if (widget.allowReplyAsAliado) {
+      if (attachment != null) {
+        await SupabaseService.sendOrderChatAttachment(
+          transactionRequestId: widget.transactionRequestId,
+          authorRole: role,
+          body: text,
+          bytes: attachment.bytes,
+          fileName: attachment.fileName,
+          mime: attachment.mime,
+          kind: attachment.kind,
+        );
+      } else if (widget.allowReplyAsAliado) {
         await SupabaseService.insertTransactionRequestMessageAsAliado(
           transactionRequestId: widget.transactionRequestId,
           body: text,
@@ -261,9 +295,16 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
           body: text,
         );
       }
+      if (!mounted) return;
       _ctrl.clear();
-      if (mounted) setState(() => _composeHint = null);
+      setState(() => _attachment = null);
       await _load();
+      if (mounted) widget.onThreadChanged?.call();
+    } on OrderMessageLimitException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -274,56 +315,34 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     }
   }
 
-  Future<void> _sendAttachment({
+  Future<void> _pickAttachment({
     required bool video,
     required bool camera,
   }) async {
-    if (_sending || _replyRole == null) return;
-    PreparedOrderAttachment? prepared;
+    if (_sending || _pickingAttachment || _replyRole == null) return;
+    final requestId = widget.transactionRequestId;
+    setState(() => _pickingAttachment = true);
     try {
-      prepared = video
+      final prepared = video
           ? await prepareOrderChatVideo(fromCamera: camera)
           : await prepareOrderChatImage(fromCamera: camera);
+      if (mounted &&
+          prepared != null &&
+          requestId == widget.transactionRequestId) {
+        setState(() => _attachment = prepared);
+      }
     } on OrderMessageLimitException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
-      return;
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo obtener el archivo: $e')),
-      );
-      return;
-    }
-    if (prepared == null || !mounted) return;
-
-    setState(() => _sending = true);
-    try {
-      await SupabaseService.sendOrderChatAttachment(
-        transactionRequestId: widget.transactionRequestId,
-        authorRole: _replyRole!,
-        body: _ctrl.text.trim(),
-        bytes: prepared.bytes,
-        fileName: prepared.fileName,
-        mime: prepared.mime,
-        kind: prepared.kind,
-      );
-      _ctrl.clear();
-      await _load();
-    } on OrderMessageLimitException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_friendlySendError(e))),
+        const SnackBar(content: Text('No se pudo adjuntar el archivo.')),
       );
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) setState(() => _pickingAttachment = false);
     }
   }
 
@@ -366,11 +385,9 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     } catch (e) {
       if (!mounted) return;
       final raw = e.toString();
-      final message = RegExp(r'message:\s*([^,\n]+)')
-              .firstMatch(raw)
-              ?.group(1)
-              ?.trim() ??
-          'No se pudo registrar el acuerdo.';
+      final message =
+          RegExp(r'message:\s*([^,\n]+)').firstMatch(raw)?.group(1)?.trim() ??
+              'No se pudo registrar el acuerdo.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -384,78 +401,95 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
     final request = OrderReturnRules.parseReturnRequestMessage(m.body);
     final line = request == null ? null : _lineForMessage(m, request);
     final mine = uid != null && m.authorId == uid;
-    final label = mine
-        ? 'Tú'
-        : (m.isFromAdmin
-            ? 'B2B Conecta'
-            : (m.isFromImportador ? 'Importador' : 'Tienda minorista'));
-    final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final bg = m.isFromAdmin
-        ? AppColors.surfaceTinted.withOpacity(0.55)
-        : (m.isFromImportador
-            ? AppColors.brandBlueContainer
-            : (mine
-                ? AppColors.brandBlue.withOpacity(0.12)
-                : Colors.grey.shade200));
-    return Column(
-      crossAxisAlignment: align,
-      children: [
-        Text(
-          '$label · ${formatEsShortDateTime(m.createdAt)}',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
+    final author = m.isFromAdmin
+        ? 'B2B Conecta'
+        : widget.allowReplyAsAdmin && !mine
+            ? (m.isFromImportador ? 'Importador' : 'Tienda minorista')
+            : null;
+    return ChatMessageBubble(
+      key: ValueKey(m.id),
+      mine: mine,
+      at: m.createdAt,
+      author: author,
+      isAction: request != null,
+      showDate: !widget.expandMessages,
+      child: request == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (m.body.trim().isNotEmpty)
+                  Text(m.body, style: const TextStyle(height: 1.35)),
+                OrderMessageMediaStrip(attachments: m.attachments),
+              ],
+            )
+          : OrderPostventaChatCard(
+              data: request,
+              attachments: m.attachments,
+              imageUrl: line == null
+                  ? null
+                  : productCoverImageUrl(line.productImageUrls),
+              creditAmount: line == null
+                  ? 0
+                  : OrderReturnRules.creditAmount(
+                      unitPrice: line.precioUnitarioAliado,
+                      lineTotal: line.precioTotal,
+                      lineQty: line.cantidad,
+                      affectedQty:
+                          request.units > 0 ? request.units : line.cantidad,
+                    ),
+              canDecide: widget.allowReplyAsImportador &&
+                  line != null &&
+                  line.postventaDevolucionAt != null &&
+                  line.postventaResolucion == null &&
+                  !_resolvedRequestIds.contains(line.id),
+              busy: _resolvingRequestId == line?.id,
+              onResolve: (resolution, note) =>
+                  _resolveReturn(line!, resolution, note),
+            ),
+    );
+  }
+
+  void _handleChatAction(_ChatAction action) {
+    if (action == _ChatAction.refresh) {
+      _load();
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Chat del pedido'),
+        content: const Text(OrderSectionHelp.chatPedido),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Entendido'),
           ),
-        ),
-        const SizedBox(height: 2),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.borderSubtle),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child: request == null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (m.body.trim().isNotEmpty)
-                        Text(
-                          m.body,
-                          style: const TextStyle(fontSize: 13, height: 1.35),
-                        ),
-                      OrderMessageMediaStrip(attachments: m.attachments),
-                    ],
-                  )
-                : OrderPostventaChatCard(
-                    data: request,
-                    attachments: m.attachments,
-                    imageUrl: line == null
-                        ? null
-                        : productCoverImageUrl(line.productImageUrls),
-                    creditAmount: line == null
-                        ? 0
-                        : OrderReturnRules.creditAmount(
-                            unitPrice: line.precioUnitarioAliado,
-                            lineTotal: line.precioTotal,
-                            lineQty: line.cantidad,
-                            affectedQty: request.units > 0
-                                ? request.units
-                                : line.cantidad,
-                          ),
-                    canDecide: widget.allowReplyAsImportador &&
-                        line != null &&
-                        line.postventaDevolucionAt != null &&
-                        line.postventaResolucion == null &&
-                        !_resolvedRequestIds.contains(line.id),
-                    busy: _resolvingRequestId == line?.id,
-                    onResolve: (resolution, note) =>
-                        _resolveReturn(line!, resolution, note),
-                  ),
-          ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _attachmentMenu() {
+    return PopupMenuButton<_ChatAttachment>(
+      tooltip: 'Adjuntar foto o video',
+      enabled: !_sending && !_pickingAttachment,
+      icon: const Icon(Icons.attach_file_rounded),
+      position: PopupMenuPosition.over,
+      onSelected: (attachment) => _pickAttachment(
+        video: attachment == _ChatAttachment.videoCamera ||
+            attachment == _ChatAttachment.videoGallery,
+        camera: attachment == _ChatAttachment.photoCamera ||
+            attachment == _ChatAttachment.videoCamera,
+      ),
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+            value: _ChatAttachment.photoCamera, child: Text('Tomar foto')),
+        PopupMenuItem(
+            value: _ChatAttachment.photoGallery, child: Text('Elegir foto')),
+        PopupMenuItem(
+            value: _ChatAttachment.videoCamera, child: Text('Grabar video')),
+        PopupMenuItem(
+            value: _ChatAttachment.videoGallery, child: Text('Elegir video')),
       ],
     );
   }
@@ -463,134 +497,139 @@ class _OrderMotolinkThreadSectionState extends State<OrderMotolinkThreadSection>
   @override
   Widget build(BuildContext context) {
     final uid = SupabaseService.currentUserId;
-    final canReply = widget.allowReplyAsAliado ||
-        widget.allowReplyAsAdmin ||
-        widget.allowReplyAsImportador;
-
+    final canReply = _replyRole != null;
+    final attachment = _attachment;
+    final Widget messages;
+    if (_loading && _items.isEmpty) {
+      messages = const Center(child: CircularProgressIndicator());
+    } else if (_error != null && _items.isEmpty) {
+      messages = ChatConversationNotice(
+        title: 'No se pudo cargar el chat',
+        description: _error,
+        icon: Icons.info_outline,
+        onRetry: _load,
+      );
+    } else if (_items.isEmpty) {
+      messages = ChatConversationNotice(
+        title: canReply
+            ? '¿Tienes una duda sobre este pedido?'
+            : 'Este pedido aún no tiene mensajes',
+        description: widget.emptyHint ??
+            (canReply ? 'Escribe aquí para iniciar la conversación.' : null),
+      );
+    } else if (widget.expandMessages) {
+      messages = ChatTimeline(
+        itemCount: _items.length,
+        dateAt: (i) => _items[i].createdAt,
+        messageAt: (i) => _messageTile(uid, i),
+      );
+    } else {
+      messages = ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, i) => _messageTile(uid, i),
+      );
+    }
     return Column(
-      mainAxisSize:
-          widget.expandMessages ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisSize: widget.expandMessages ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            if (!widget.suppressBuiltinTitle)
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 14, end: 6),
+          child: Row(
+            children: [
               Expanded(
-                child: Text(
-                  'Chat del pedido',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: AppColors.textPrimary,
+                child: widget.conversationContext ??
+                    (widget.suppressBuiltinTitle
+                        ? const SizedBox.shrink()
+                        : const Text('Chat del pedido',
+                            style: TextStyle(fontWeight: FontWeight.w700))),
+              ),
+              PopupMenuButton<_ChatAction>(
+                tooltip: 'Opciones del chat',
+                onSelected: _handleChatAction,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: _ChatAction.refresh,
+                    enabled: !_loading,
+                    child: const Text('Actualizar mensajes'),
                   ),
-                ),
+                  if (!widget.suppressInlineHelp)
+                    const PopupMenuItem(
+                      value: _ChatAction.help,
+                      child: Text('Ayuda del chat'),
+                    ),
+                ],
               ),
-            if (!widget.suppressInlineHelp)
-              const ProfileInfoIcon(
-                title: 'Chat del pedido',
-                message: OrderSectionHelp.chatPedido,
-              ),
-            IconButton(
-              tooltip: 'Actualizar',
-              onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh, size: 20),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 4),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          )
-        else if (_error != null)
-          Text(_error!, style: TextStyle(fontSize: 12, color: Colors.red.shade800))
-        else if (_items.isEmpty)
-          Text(
-            widget.emptyHint ??
-                (canReply
-                    ? 'Aún no hay mensajes. Escriba aquí si tiene dudas sobre este pedido.'
-                    : 'Sin mensajes en este pedido.'),
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          )
-        else if (widget.expandMessages)
-          Expanded(
-            child: ListView.separated(
-              itemCount: _items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) => _messageTile(uid, i),
-            ),
+        const Divider(height: 1),
+        if (_loading && _items.isNotEmpty)
+          const LinearProgressIndicator(minHeight: 2),
+        if (_error != null && _items.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child:
+                Text(_error!, style: TextStyle(color: AppColors.textSecondary)),
+          ),
+        if (widget.expandMessages) Expanded(child: messages) else messages,
+        if (canReply)
+          ChatComposer(
+            controller: _ctrl,
+            onSend: _send,
+            sending: _sending || _pickingAttachment,
+            hasAttachment: attachment != null,
+            hint: widget.allowReplyAsAdmin
+                ? 'Respuesta a la tienda minorista…'
+                : 'Escribe un mensaje…',
+            leading: _attachmentMenu(),
+            contextNote: !widget.deliveryGrace && attachment == null
+                ? null
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.deliveryGrace)
+                        Text(
+                          orderChatDeliveryGraceHint,
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      if (attachment != null)
+                        Row(
+                          children: [
+                            const Icon(Icons.attach_file_rounded, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                attachment.fileName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Quitar adjunto',
+                              onPressed: _sending || _pickingAttachment
+                                  ? null
+                                  : () => setState(() => _attachment = null),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
           )
         else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) => _messageTile(uid, i),
-          ),
-        if (canReply) ...[
-          if (widget.deliveryGrace) ...[
-            const SizedBox(height: 10),
-            Text(
-              orderChatDeliveryGraceHint,
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.35,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          TextField(
-            controller: _ctrl,
-            enabled: !_sending,
-            onChanged: (_) {
-              if (_composeHint != null) setState(() => _composeHint = null);
-            },
-            minLines: 1,
-            maxLines: 4,
-            textInputAction: TextInputAction.newline,
-            decoration: InputDecoration(
-              hintText: widget.allowReplyAsAdmin
-                  ? 'Respuesta a la tienda minorista…'
-                  : 'Escriba su mensaje…',
-              errorText: _composeHint,
-              isDense: true,
-              border: const OutlineInputBorder(),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              'Solo lectura',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
-          OrderMessageAttachButtons(
-            enabled: !_sending,
-            onPhotoCamera: () => _sendAttachment(video: false, camera: true),
-            onPhotoGallery: () => _sendAttachment(video: false, camera: false),
-            onVideoCamera: () => _sendAttachment(video: true, camera: true),
-            onVideoGallery: () => _sendAttachment(video: true, camera: false),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: _sending ? null : _send,
-              child: _sending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Enviar'),
-            ),
-          ),
-        ],
       ],
     );
   }

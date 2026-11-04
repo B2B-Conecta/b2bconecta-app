@@ -1,14 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'support_ticket_message_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 
-/// Hilo de mensajes de un reclamo de soporte.
+/// Conversación de un reclamo, con escritura fija bajo el historial.
 class SupportTicketThreadSection extends StatefulWidget {
   const SupportTicketThreadSection({
     super.key,
@@ -17,6 +15,7 @@ class SupportTicketThreadSection extends StatefulWidget {
     required this.canReplyAsAdmin,
     required this.isTicketClosed,
     this.onThreadChanged,
+    this.refreshVersion = 0,
   });
 
   final String ticketId;
@@ -24,19 +23,22 @@ class SupportTicketThreadSection extends StatefulWidget {
   final bool canReplyAsAdmin;
   final bool isTicketClosed;
   final VoidCallback? onThreadChanged;
+  final int refreshVersion;
 
   @override
   State<SupportTicketThreadSection> createState() =>
       _SupportTicketThreadSectionState();
 }
 
-class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection> {
+class _SupportTicketThreadSectionState
+    extends State<SupportTicketThreadSection> {
   final _ctrl = TextEditingController();
   List<SupportTicketMessageModel> _items = [];
   bool _loading = true;
   bool _sending = false;
   String? _error;
   RealtimeChannel? _channel;
+  int _loadVersion = 0;
 
   bool get _canReply =>
       !widget.isTicketClosed &&
@@ -57,15 +59,23 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
   }
 
   @override
-  void dispose() {
-    if (_channel != null) {
-      SupabaseService.unsubscribeChannel(_channel!);
+  void didUpdateWidget(covariant SupportTicketThreadSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshVersion != widget.refreshVersion ||
+        oldWidget.isTicketClosed != widget.isTicketClosed) {
+      _load(silent: true);
     }
+  }
+
+  @override
+  void dispose() {
+    SupabaseService.unsubscribeChannel(_channel);
     _ctrl.dispose();
     super.dispose();
   }
 
   Future<void> _load({bool silent = false}) async {
+    final version = ++_loadVersion;
     if (!silent) {
       setState(() {
         _loading = true;
@@ -75,15 +85,16 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
     try {
       final rows =
           await SupabaseService.fetchSupportTicketMessages(widget.ticketId);
-      if (!mounted) return;
+      if (!mounted || version != _loadVersion) return;
       setState(() {
         _items = rows;
         _loading = false;
+        _error = null;
       });
-    } catch (e) {
-      if (!mounted) return;
+    } catch (_) {
+      if (!mounted || version != _loadVersion) return;
       setState(() {
-        _error = e.toString();
+        _error = 'Revisa tu conexión e inténtalo de nuevo.';
         _loading = false;
       });
     }
@@ -91,8 +102,7 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
 
   Future<void> _send() async {
     final text = _ctrl.text.trim();
-    if (text.isEmpty || _sending) return;
-
+    if (!_canReply || text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
       if (widget.canReplyAsAdmin) {
@@ -106,13 +116,16 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
           body: text,
         );
       }
+      if (!mounted) return;
       _ctrl.clear();
       await _load(silent: true);
-      widget.onThreadChanged?.call();
-    } catch (e) {
+      if (mounted) widget.onThreadChanged?.call();
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
+        const SnackBar(
+          content: Text('No se pudo enviar el mensaje. Inténtalo de nuevo.'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -122,143 +135,80 @@ class _SupportTicketThreadSectionState extends State<SupportTicketThreadSection>
   @override
   Widget build(BuildContext context) {
     final uid = SupabaseService.currentUserId;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Conversación',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-            IconButton(
-              tooltip: 'Actualizar',
-              onPressed: _loading ? null : () => _load(),
-              icon: const Icon(Icons.refresh, size: 20),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          )
-        else if (_error != null)
-          Text(_error!, style: TextStyle(fontSize: 12, color: Colors.red.shade800))
-        else if (_items.isEmpty)
-          Text(
-            'Sin mensajes en este reclamo.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final m = _items[i];
-              final mine = uid != null && m.authorId == uid;
-              final label = mine
-                  ? 'Tú'
-                  : (m.isFromAdmin
-                      ? 'B2B Conecta'
-                      : (m.isFromImportador ? 'Importador' : 'Tienda minorista'));
-              final align =
-                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-              final bg = m.isFromAdmin
-                  ? AppColors.surfaceTinted
-                  : (mine
-                      ? AppColors.brandBlueContainer
-                      : AppColors.fieldFill);
-
-              return Column(
-                crossAxisAlignment: align,
-                children: [
-                  Text(
-                    '$label · ${formatEsShortDateTime(m.createdAt)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: bg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                      child: Text(
-                        m.body,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.35,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        if (_canReply) ...[
-          const SizedBox(height: 10),
-          TextField(
-            controller: _ctrl,
-            minLines: 1,
-            maxLines: 4,
-            textInputAction: TextInputAction.newline,
-            decoration: InputDecoration(
-              hintText: widget.canReplyAsAdmin
-                  ? 'Respuesta al usuario…'
-                  : 'Escriba su mensaje…',
-              isDense: true,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: _sending ? null : _send,
-              child: _sending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Enviar'),
-            ),
-          ),
-        ] else if (widget.isTicketClosed)
+        if (_loading && _items.isNotEmpty)
+          const LinearProgressIndicator(minHeight: 2),
+        if (_error != null && _items.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(child: Text(_error!)),
+                TextButton(
+                  onPressed: () => _load(),
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: _loading && _items.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null && _items.isEmpty
+                  ? ChatConversationNotice(
+                      title: 'No se pudo cargar la conversación',
+                      description: _error,
+                      icon: Icons.info_outline,
+                      onRetry: () => _load(),
+                    )
+                  : _items.isEmpty
+                      ? const ChatConversationNotice(
+                          title: 'Conversa con B2B Conecta',
+                          description:
+                              'Aquí puedes consultar y seguir tu reclamo.',
+                          icon: Icons.support_agent_outlined,
+                        )
+                      : ChatTimeline(
+                          itemCount: _items.length,
+                          dateAt: (i) => _items[i].createdAt,
+                          messageAt: (i) {
+                            final message = _items[i];
+                            final mine = uid != null && message.authorId == uid;
+                            return ChatMessageBubble(
+                              key: ValueKey(message.id),
+                              mine: mine,
+                              at: message.createdAt,
+                              author: mine
+                                  ? null
+                                  : message.isFromAdmin
+                                      ? 'Soporte B2B Conecta'
+                                      : 'Usuario',
+                              child: Text(
+                                message.body,
+                                style: const TextStyle(height: 1.4),
+                              ),
+                            );
+                          },
+                        ),
+        ),
+        if (_canReply)
+          ChatComposer(
+            controller: _ctrl,
+            onSend: _send,
+            sending: _sending,
+            hint: widget.canReplyAsAdmin
+                ? 'Responde al usuario…'
+                : 'Escribe a soporte…',
+          )
+        else if (widget.isTicketClosed)
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Text(
-              'Este reclamo está cerrado.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              'Reclamo cerrado · Solo lectura',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
       ],

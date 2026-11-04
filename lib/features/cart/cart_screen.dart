@@ -30,6 +30,7 @@ class CartScreen extends StatefulWidget {
     required this.profile,
     this.liveTasaBcv,
     this.loadSuggestionCandidates,
+    this.suggestionAutoPlay = true,
   });
 
   final ProfileModel profile;
@@ -38,6 +39,9 @@ class CartScreen extends StatefulWidget {
   /// Sustituye la lectura del catálogo. Las pruebas pasan una lista fija.
   final Future<List<PartModel>> Function(CartSuggestionQuery query)?
       loadSuggestionCandidates;
+
+  /// Auto-desplazamiento del carrusel de sugerencias (desactivar en tests).
+  final bool suggestionAutoPlay;
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -87,6 +91,16 @@ class _CartScreenState extends State<CartScreen> {
   final Set<String> _confirmingSuggestionIds = {};
   final Map<String, CartSuggestion> _pinnedSuggestions = {};
   final Map<String, Timer> _suggestionConfirmTimers = {};
+  final GlobalKey _summaryKey = GlobalKey();
+  double _summaryHeight = 420;
+
+  void _syncSummaryHeight() {
+    final box = _summaryKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final next = box.size.height;
+    if ((next - _summaryHeight).abs() < 1) return;
+    setState(() => _summaryHeight = next);
+  }
 
   @override
   void initState() {
@@ -779,54 +793,77 @@ class _CartScreenState extends State<CartScreen> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildSupplierGroup(group, tasa),
                       ),
-                    if (_loadingSuggestions || _suggestions.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 16),
-                        child: CartSuggestionsSection(
+                  ];
+                  final showSuggestions =
+                      _loadingSuggestions || _suggestions.isNotEmpty;
+                  final suggestions = !showSuggestions
+                      ? null
+                      : CartSuggestionsSection(
                           suggestions: _suggestions,
                           loading: _loadingSuggestions,
                           confirmingIds: _confirmingSuggestionIds,
                           bcvRate: pagaBolivares ? tasa : null,
+                          autoPlay: widget.suggestionAutoPlay,
                           onAdd: _submitting || !_cart.canEdit
                               ? null
                               : _addSuggestion,
-                        ),
-                      ),
-                  ];
+                        );
                   return Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: wide ? 1100 : 720),
+                      constraints: BoxConstraints(maxWidth: wide ? 1280 : 720),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
-                            wide ? 24 : 16, wide ? 28 : 20, wide ? 24 : 16, 0),
+                            wide ? 28 : 16, wide ? 24 : 20, wide ? 28 : 16, 0),
                         child: wide
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                    heading,
-                                    const SizedBox(height: 24),
-                                    Expanded(
-                                        child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
+                            ? Builder(builder: (context) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
+                                  if (mounted) _syncSummaryHeight();
+                                });
+                                // Scroll de toda la página; arriba = alto del
+                                // resumen. Pedidos extras, dentro de ese alto.
+                                return SingleChildScrollView(
+                                  padding: EdgeInsets.only(
+                                    bottom: 24 +
+                                        MediaQuery.paddingOf(context).bottom,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      heading,
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
                                           Expanded(
+                                            child: SizedBox(
+                                              height: _summaryHeight,
                                               child: ListView(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 24),
-                                                  children: products)),
-                                          const SizedBox(width: 24),
+                                                primary: false,
+                                                padding: EdgeInsets.zero,
+                                                children: products,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 28),
                                           SizedBox(
-                                              width: 312,
-                                              child: SingleChildScrollView(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 24),
-                                                  child: summary)),
-                                        ])),
-                                  ])
+                                            key: _summaryKey,
+                                            width: 340,
+                                            child: summary,
+                                          ),
+                                        ],
+                                      ),
+                                      if (suggestions != null) ...[
+                                        const SizedBox(height: 28),
+                                        suggestions,
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              })
                             : ListView(
                                 padding: EdgeInsets.only(
                                     bottom: 24 +
@@ -837,6 +874,10 @@ class _CartScreenState extends State<CartScreen> {
                                     ...products,
                                     const SizedBox(height: 4),
                                     summary,
+                                    if (suggestions != null) ...[
+                                      const SizedBox(height: 32),
+                                      suggestions,
+                                    ],
                                   ]),
                       ),
                     ),

@@ -167,7 +167,9 @@ List<CartSuggestion> rankCartSuggestions({
               : CartSuggestionKind.leadingSupplier,
           differentSupplier: different,
           leadingSupplier: leading,
-          logisticsNote: different ? _logisticsNote(part) : null,
+          logisticsNote: different
+              ? otherSupplierBadge(part)
+              : sameSupplierBadge(part),
         ),
         complementary: complementary,
         leading: leading,
@@ -206,20 +208,26 @@ class _ScoredSuggestion {
   final double score;
 }
 
-String _logisticsNote(PartModel part) {
+/// Badge corto (máx. 2 líneas) cuando el producto abre otro grupo de proveedor.
+String otherSupplierBadge(PartModel part) {
   final envio = EnvioPolitica.normalize(part.ownerEnvioTipo);
-  final minimo = part.hasOwnerMinOrderAmount
-      ? ' Tiene su propio mínimo de pedido.'
-      : '';
   final flete = switch (envio) {
-    EnvioPolitica.incluido =>
-      'Otro proveedor: este producto se agrupa en un pedido aparte. El flete va incluido.',
-    EnvioPolitica.aparte =>
-      'Otro proveedor: este producto se agrupa en un pedido aparte y el flete se cobra adicional.',
-    _ =>
-      'Otro proveedor: este producto se agrupa en un pedido aparte y puede sumar un costo de envío.',
+    EnvioPolitica.incluido => 'Pedido aparte · Flete incluido',
+    EnvioPolitica.aparte => 'Pedido aparte · Flete adicional',
+    _ => 'Pedido aparte · Puede sumar envío',
   };
-  return '$flete$minimo';
+  if (!part.hasOwnerMinOrderAmount) return flete;
+  return '$flete · Mín. propio';
+}
+
+/// Badge cuando el producto entra en el mismo proveedor del carrito.
+String sameSupplierBadge(PartModel part) {
+  final envio = EnvioPolitica.normalize(part.ownerEnvioTipo);
+  return switch (envio) {
+    EnvioPolitica.incluido => 'Mismo proveedor · Flete incluido',
+    EnvioPolitica.aparte => 'Mismo proveedor · Flete unificado',
+    _ => 'Mismo proveedor · Pedido unificado',
+  };
 }
 
 String _searchKey(PartModel part) {

@@ -115,8 +115,8 @@ void main() {
     expect(ranked.first.kind, CartSuggestionKind.complement);
     expect(ranked.first.leadingSupplier, isTrue);
     expect(ranked.first.differentSupplier, isTrue);
-    expect(ranked.first.logisticsNote, contains('flete se cobra adicional'));
-    expect(ranked.first.logisticsNote, contains('mínimo de pedido'));
+    expect(ranked.first.logisticsNote, contains('Flete adicional'));
+    expect(ranked.first.logisticsNote, contains('Mín. propio'));
     expect(ranked[1].differentSupplier, isTrue);
     expect(ranked[1].logisticsNote, isNot(contains('adicional')));
     expect(
@@ -125,7 +125,7 @@ void main() {
     );
   });
 
-  test('el mismo proveedor no advierte agrupación', () {
+  test('el mismo proveedor muestra badge de pedido unificado', () {
     final cart = [
       _part(
         id: 'engine',
@@ -145,7 +145,7 @@ void main() {
     final ranked = rankCartSuggestions(cartParts: cart, candidates: [filter]);
     expect(ranked, hasLength(1));
     expect(ranked.single.differentSupplier, isFalse);
-    expect(ranked.single.logisticsNote, isNull);
+    expect(ranked.single.logisticsNote, 'Mismo proveedor · Flete incluido');
     expect(ranked.single.kind, CartSuggestionKind.complement);
   });
 
@@ -216,11 +216,18 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Complementa tu pedido'), findsOneWidget);
+    expect(find.text('Sugeridos'), findsOneWidget);
     expect(find.text('Válvula metálica'), findsOneWidget);
     expect(find.text('Mayorista líder'), findsOneWidget);
     expect(find.text('Añadir al pedido'), findsOneWidget);
-    expect(find.textContaining('pedido aparte'), findsOneWidget);
+    expect(find.text('Pedido aparte'), findsOneWidget);
+    expect(find.text('Detalle'), findsOneWidget);
+    await tester.ensureVisible(find.text('Detalle'));
+    await tester.tap(find.text('Detalle'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Flete adicional'), findsOneWidget);
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
     expect(find.text('Bs 500,00'), findsWidgets);
     expect(find.text('Continuar con la entrega'), findsOneWidget);
 
@@ -240,7 +247,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('en escritorio las sugerencias se acomodan en grilla',
+  testWidgets('en escritorio las sugerencias usan carrusel con fichas grandes',
       (tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
@@ -270,23 +277,25 @@ void main() {
           accountAccessStatus: AccountAccessStatus.active,
         ),
         liveTasaBcv: 10,
+        suggestionAutoPlay: false,
         loadSuggestionCandidates: (_) async => [
-          _part(
-            id: 'oil',
-            nombre: 'Aceite 20W50',
-            ownerId: 'top',
-            category: 'Lubricantes',
-            precio: 8,
-            paidOrders: 10,
-            businessName: 'Mayorista líder',
-          ),
+          for (var i = 0; i < 5; i++)
+            _part(
+              id: 'oil-$i',
+              nombre: 'Aceite 20W50 $i',
+              ownerId: 'top',
+              category: 'Lubricantes',
+              precio: 8,
+              paidOrders: 10,
+              businessName: 'Mayorista líder',
+            ),
         ],
       ),
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byType(GridView), findsOneWidget);
-    expect(find.text('Aceite 20W50'), findsOneWidget);
+    expect(find.byTooltip('Siguiente'), findsOneWidget);
+    expect(find.text('Aceite 20W50 0'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
   });
 }

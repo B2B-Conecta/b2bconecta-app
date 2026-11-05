@@ -51,9 +51,15 @@ class PromoCampaignModel {
   final String? mobileImagePublicUrl;
 
   String imageUrlForWidth(double width) {
+    final desktop = imagePublicUrl.trim();
     final mobile = mobileImagePublicUrl?.trim() ?? '';
-    return width < 600 && mobile.isNotEmpty ? mobile : imagePublicUrl;
+    if (width < 600 && mobile.isNotEmpty) return mobile;
+    if (desktop.isNotEmpty) return desktop;
+    return mobile;
   }
+
+  /// Hay creativo usable (desktop o móvil) para mostrar la valla.
+  bool get hasDisplayCreative => imageUrlForWidth(1200).isNotEmpty;
 
   final String? importadorId;
 

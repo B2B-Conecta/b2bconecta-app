@@ -159,6 +159,9 @@ class OrdersService {
     carrier_pago_instrucciones_snapshot,
     carrier_decision,
     carrier_decision_at,
+    shipping_included,
+    shipping_cost_usd,
+    shipping_cost_bs,
     pickup_location_mode,
     pickup_confirmed_at,
     pickup_label,
@@ -948,6 +951,22 @@ class OrdersService {
           DateTime.now().toUtc().toIso8601String(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', transactionRequestId);
+  }
+
+  /// Importador: define flete incluido o monto USD (+ Bs vía tasa BCV).
+  static Future<void> importerSetOrderShipping({
+    required List<String> requestIds,
+    required bool shippingIncluded,
+    double? shippingCostUsd,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'importer_set_order_shipping',
+      params: <String, dynamic>{
+        'p_request_ids': requestIds,
+        'p_shipping_included': shippingIncluded,
+        'p_shipping_cost_usd': shippingCostUsd,
+      },
+    );
   }
 
   /// Importador: `pedido_listo` → `en_transito` con ETA obligatorio (días 0–365, horas 0–23).

@@ -164,6 +164,9 @@ class TransactionRequestModel {
     this.pickupMapsUrl,
     this.pickupLocationId,
     this.pickupCarrierId,
+    this.shippingIncluded,
+    this.shippingCostUsd,
+    this.shippingCostBs,
   });
 
   final String id;
@@ -290,6 +293,49 @@ class TransactionRequestModel {
   final String? pickupMapsUrl;
   final String? pickupLocationId;
   final String? pickupCarrierId;
+
+  /// Flete a criterio del proveedor (`null` = aún no definido en el pedido).
+  final bool? shippingIncluded;
+  final double? shippingCostUsd;
+  final double? shippingCostBs;
+
+  bool get shippingConfigured => shippingIncluded != null;
+
+  bool get hasExtraShippingCost =>
+      shippingIncluded == false &&
+      shippingCostUsd != null &&
+      shippingCostUsd! > 0;
+
+  String get shippingSummaryLabel {
+    if (shippingIncluded == true) return 'Envío incluido por el proveedor';
+    if (shippingIncluded == false) {
+      final usd = shippingCostUsd;
+      if (usd == null) return 'Flete adicional (monto por definir)';
+      final usdLabel = '${usd.toStringAsFixed(2)} USD';
+      final bs = shippingCostBs;
+      if (bs == null) return 'Flete adicional: $usdLabel';
+      return 'Flete adicional: $usdLabel · Bs ${bs.toStringAsFixed(2)}';
+    }
+    return 'Flete: lo define el proveedor en el pedido';
+  }
+
+  /// Total mercancía + flete (USD/REF).
+  double get grandTotalUsd {
+    final base = totalRef ?? precioTotal;
+    if (shippingIncluded == false && shippingCostUsd != null) {
+      return base + shippingCostUsd!;
+    }
+    return base;
+  }
+
+  /// Total mercancía + flete en Bs (si hay tasa o monto congelado).
+  double? get grandTotalBs {
+    final productBs = precioTotalBsUi;
+    if (shippingIncluded == true || shippingIncluded == null) return productBs;
+    final ship = shippingCostBs;
+    if (productBs == null && ship == null) return null;
+    return (productBs ?? 0) + (ship ?? 0);
+  }
 
   bool get hasPickupConfirmed => pickupConfirmedAt != null;
 
@@ -1212,6 +1258,11 @@ class TransactionRequestModel {
       pickupMapsUrl: _nullableText(json['pickup_maps_url']),
       pickupLocationId: _nullableText(json['pickup_location_id']),
       pickupCarrierId: _nullableText(json['pickup_carrier_id']),
+      shippingIncluded: json['shipping_included'] is bool
+          ? json['shipping_included'] as bool
+          : null,
+      shippingCostUsd: _asNullableDouble(json['shipping_cost_usd']),
+      shippingCostBs: _asNullableDouble(json['shipping_cost_bs']),
       proveedorFacturaStoragePath:
           _nullableText(json['proveedor_factura_storage_path']),
       proveedorFacturaFileName:

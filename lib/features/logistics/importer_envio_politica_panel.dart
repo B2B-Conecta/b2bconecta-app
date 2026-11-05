@@ -8,7 +8,7 @@ import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'envio_politica.dart';
 import 'logistics_service.dart';
 
-/// Política de flete y transportistas que ve la tienda en la vitrina.
+/// Política de flete de vitrina (incluido / cobro adicional). Sin catálogo de agencias.
 class ImporterEnvioPoliticaPanel extends StatefulWidget {
   const ImporterEnvioPoliticaPanel({super.key});
 
@@ -23,8 +23,6 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
   String _tipo = EnvioPolitica.noDefinido;
   bool _gratis = false;
   final _minimo = TextEditingController();
-  final Set<String> _elegidos = {};
-  List<String> _opciones = const [];
   bool _loading = true;
   bool _saving = false;
 
@@ -43,39 +41,20 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
   Future<void> _load() async {
     try {
       final profile = await ProfileService.fetchMyProfile();
-      final carriers = await LogisticsService.listMyImporterCarriers();
       if (!mounted) return;
       final tipo = EnvioPolitica.normalize(profile?.envioTipo);
       final minimo = profile?.montoMinimoEnvioGratis;
-      final elegidos = EnvioPolitica.parseNombres(
-        profile?.transportistasHabilitados,
-      );
       setState(() {
         _tipo = tipo;
-        _gratis = minimo != null && minimo > 0 && tipo != EnvioPolitica.noDefinido;
+        _gratis =
+            minimo != null && minimo > 0 && tipo != EnvioPolitica.noDefinido;
         _minimo.text = _gratis ? minimo!.toStringAsFixed(2) : '';
-        _elegidos
-          ..clear()
-          ..addAll(elegidos.map((e) => e.toLowerCase()));
-        _opciones = _opcionesDe(carriers.map((c) => c.companyName));
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
-  }
-
-  List<String> _opcionesDe(Iterable<String> registrados) {
-    final out = <String>[];
-    final seen = <String>{};
-    for (final raw in registrados) {
-      final name = raw.trim();
-      if (name.isEmpty) continue;
-      if (!seen.add(name.toLowerCase())) continue;
-      out.add(name);
-    }
-    return out;
   }
 
   int get _selectedIndex {
@@ -99,16 +78,12 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
         return;
       }
     }
-    final nombres = [
-      for (final name in _opciones)
-        if (_elegidos.contains(name.toLowerCase())) name,
-    ];
     setState(() => _saving = true);
     try {
       await LogisticsService.importadorSetEnvioPolitica(
         tipo: _tipo,
         montoMinimo: minimo,
-        transportistas: _tipo == EnvioPolitica.noDefinido ? const [] : nombres,
+        transportistas: const [],
       );
       if (!mounted) return;
       _snack('Política de envío guardada.');
@@ -151,7 +126,8 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Así lo ve la tienda en el catálogo y al confirmar el pedido.',
+                    'Así lo ve la tienda en el catálogo. El monto final del flete '
+                    'lo define usted en cada pedido.',
                     style: TextStyle(
                       fontSize: 12.5,
                       height: 1.35,
@@ -192,70 +168,14 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
                     ),
                   if (_tipo != EnvioPolitica.noDefinido) ...[
                     const SizedBox(height: 4),
-                    const Text(
-                      'Transportistas',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_opciones.isEmpty)
-                      Text(
-                        'Registre un transportista y aparecerá aquí para mostrarlo en la vitrina.',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.35,
-                          color: AppColors.textSecondary,
-                        ),
-                      )
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                        for (final name in _opciones)
-                          FilterChip(
-                            label: Text(name),
-                            selected: _elegidos.contains(name.toLowerCase()),
-                            onSelected: (selected) {
-                              setState(() {
-                                final key = name.toLowerCase();
-                                if (selected) {
-                                  _elegidos.add(key);
-                                } else {
-                                  _elegidos.remove(key);
-                                }
-                              });
-                            },
-                            showCheckmark: false,
-                            avatar: Icon(
-                              Icons.local_shipping_outlined,
-                              size: 16,
-                              color: _elegidos.contains(name.toLowerCase())
-                                  ? Colors.white
-                                  : AppColors.brandBlue,
-                            ),
-                            selectedColor: AppColors.brand,
-                            labelStyle: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: _elegidos.contains(name.toLowerCase())
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
-                            ),
-                            side: BorderSide(
-                              color: _elegidos.contains(name.toLowerCase())
-                                  ? AppColors.brand
-                                  : AppColors.borderSubtle,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       value: _gratis,
                       onChanged: (value) => setState(() => _gratis = value),
                       title: const Text(
                         'Envío gratis a partir de un monto',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                        style:
+                            TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                       ),
                       subtitle: Text(
                         'Opcional. Se informa al confirmar el pedido.',

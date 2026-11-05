@@ -26,9 +26,6 @@ import 'package:motolink_pro_app/features/payments/aliado_order_pago_section.dar
 import 'package:motolink_pro_app/features/orders/shared/order_payment_pricing.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
-import 'package:motolink_pro_app/features/logistics/aliado_pedido_carrier_selection_section.dart';
-import 'package:motolink_pro_app/features/logistics/aliado_flete_separado_section.dart';
-import 'package:motolink_pro_app/features/logistics/importer_confirm_pickup_section.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/payments/aliado_multi_importer_payment.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
@@ -697,24 +694,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
               ),
               SizedBox(height: sectionGap),
             ],
-            AliadoPedidoCarrierSelectionSection(
-              request: r,
-              onChanged: _refreshExpandedCard,
-            ),
-            if ((r.status == TransactionRequestStatus.pedidoListo ||
-                    r.hasPickupConfirmed) &&
-                r.carrierDecisionResolved) ...[
-              SizedBox(height: sectionGap),
-              PickupLocationDisplaySection(request: r),
-            ],
-            if (r.aliadoMuestraSeccionFleteSeparado) ...[
-              SizedBox(height: sectionGap),
-              AliadoFleteSeparadoSection(
-                request: r,
-                onChanged: _refreshExpandedCard,
-                compact: true,
-              ),
-            ],
+            _AliadoShippingCostSummary(request: r),
             SizedBox(height: sectionGap),
             OrderCardCollapsibleSection(
               title: OrderVocab.seccionPagoFactura,
@@ -845,24 +825,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           ),
           const SizedBox(height: 10),
         ],
-        AliadoPedidoCarrierSelectionSection(
-          request: chunk.first,
-          onChanged: _refreshExpandedCard,
-        ),
-        if ((chunk.first.status == TransactionRequestStatus.pedidoListo ||
-                chunk.first.hasPickupConfirmed) &&
-            chunk.first.carrierDecisionResolved) ...[
-          const SizedBox(height: 10),
-          PickupLocationDisplaySection(request: chunk.first),
-        ],
-        if (chunk.first.aliadoMuestraSeccionFleteSeparado) ...[
-          const SizedBox(height: 10),
-          AliadoFleteSeparadoSection(
-            request: chunk.first,
-            onChanged: _refreshExpandedCard,
-            compact: true,
-          ),
-        ],
+        _AliadoShippingCostSummary(request: chunk.first),
         const SizedBox(height: 10),
         OrderCardCollapsibleSection(
           title: 'Pago e factura',
@@ -1123,17 +1086,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           : null,
       receipt: _buildRecepcionLeading(context, chunk),
       deliveryActions: deliveryActions
-          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              AliadoPedidoCarrierSelectionSection(
-                  request: r, onChanged: _refreshExpandedCard),
-              if ((r.status == TransactionRequestStatus.pedidoListo ||
-                      r.hasPickupConfirmed) &&
-                  r.carrierDecisionResolved)
-                PickupLocationDisplaySection(request: r),
-              if (r.aliadoMuestraSeccionFleteSeparado)
-                AliadoFleteSeparadoSection(
-                    request: r, onChanged: _refreshExpandedCard, compact: true),
-            ])
+          ? _AliadoShippingCostSummary(request: r)
           : null,
       paymentStatus: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),
       paymentOpen:
@@ -1597,6 +1550,77 @@ class _PasarelaPagoMotoLinkCardState extends State<_PasarelaPagoMotoLinkCard> {
             ),
             const SizedBox(height: 20),
             body,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Resumen de flete definido por el proveedor (sin selección de agencias).
+class _AliadoShippingCostSummary extends StatelessWidget {
+  const _AliadoShippingCostSummary({required this.request});
+
+  final TransactionRequestModel request;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = request.shippingConfigured
+        ? request.shippingSummaryLabel
+        : 'El proveedor definirá si el flete va incluido o el monto adicional.';
+    final grandUsd = request.grandTotalUsd;
+    final grandBs = request.grandTotalBs;
+
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.local_shipping_outlined,
+              size: 20,
+              color: AppColors.brandLink,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Envío',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  if (request.hasExtraShippingCost) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Total con flete: ${formatRefAmount(grandUsd)} ${request.amountCurrencyLabel}'
+                      '${grandBs != null ? ' · ${formatBsLabel(grandBs)}' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),

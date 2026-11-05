@@ -44,6 +44,21 @@ void main() {
       expect(c.imageUrlForWidth(1440), row['image_public_url']);
     }
   });
+  test('mobile-only creative still counts as displayable', () {
+    final c = PromoCampaignModel.fromAliadoRpcJson({
+      'id': 'mobile-only',
+      'campaign_type': 'banner',
+      'image_public_url': '',
+      'mobile_image_public_url': 'https://example.test/mobile.jpg',
+      'starts_at': '2026-11-01T00:00:00Z',
+      'ends_at': '2026-11-18T23:59:59Z',
+      'priority': 1,
+    });
+    expect(c.hasDisplayCreative, isTrue);
+    expect(c.imageUrlForWidth(390), 'https://example.test/mobile.jpg');
+    expect(c.imageUrlForWidth(1440), 'https://example.test/mobile.jpg');
+  });
+
   test(
       'editing, inserting and removing mobile artwork persist the correct pair',
       () {

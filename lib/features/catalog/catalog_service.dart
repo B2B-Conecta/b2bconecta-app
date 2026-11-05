@@ -189,7 +189,7 @@ class CatalogService {
         .map((e) => PromoCampaignModel.fromAliadoRpcJson(
               Map<String, dynamic>.from(e as Map),
             ))
-        .where((c) => c.id.isNotEmpty && c.imagePublicUrl.trim().isNotEmpty)
+        .where((c) => c.id.isNotEmpty && c.hasDisplayCreative)
         .toList();
   }
 
@@ -348,7 +348,7 @@ class CatalogService {
         .map((e) => PromoCampaignModel.fromAliadoRpcJson(
               Map<String, dynamic>.from(e as Map),
             ))
-        .where((c) => c.id.isNotEmpty && c.imagePublicUrl.trim().isNotEmpty)
+        .where((c) => c.id.isNotEmpty && c.hasDisplayCreative)
         .toList();
   }
 

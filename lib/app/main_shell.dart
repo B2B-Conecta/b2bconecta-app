@@ -49,7 +49,6 @@ import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_screen.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
 import 'package:motolink_pro_app/features/catalog/home_screen.dart';
-import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
 import 'package:motolink_pro_app/features/reputation/reputation_tab.dart';
 import 'package:motolink_pro_app/features/support/support_tickets_screen.dart';
 import 'package:motolink_pro_app/features/support/support_ticket_detail_screen.dart';
@@ -1147,65 +1146,6 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
-  Widget _buildCarriersEntryCard() {
-    return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => const ImporterCarriersScreen(),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.local_shipping_outlined,
-                color: AppColors.brandBlue,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Transportistas',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Registre empresas de transporte y conductores '
-                      'para que las tiendas minoristas elijan en el checkout.',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.35,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right,
-                color: AppColors.brand,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final showSupportEntry = widget.homeRole == AppHomeRole.aliado ||
@@ -1278,20 +1218,9 @@ class _ProfileTabState extends State<_ProfileTab> {
                             widget.homeRole == AppHomeRole.aliado
                         ? _buildSupportEntryCard()
                         : null,
-                    afterReputation: showSupportEntry &&
-                            widget.homeRole == AppHomeRole.importador
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildCarriersEntryCard(),
-                              const SizedBox(height: 12),
-                              _buildSupportEntryCard(),
-                            ],
-                          )
-                        : showSupportEntry &&
-                                widget.homeRole == AppHomeRole.aliado
-                            ? _buildSupportEntryCard()
-                            : null,
+                    afterReputation: showSupportEntry
+                        ? _buildSupportEntryCard()
+                        : null,
                   ),
                 ],
               ),

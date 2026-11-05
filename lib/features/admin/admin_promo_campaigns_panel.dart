@@ -433,8 +433,18 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     }
     final now = DateTime.now();
     _startsAt = e?.startsAt ?? DateTime(now.year, now.month, now.day);
+    // Fin inclusivo del día (23:59:59 local) para que el RPC por calendario Caracas
+    // y el filtro `ends_at` no caduquen a medianoche del último día.
+    final defaultEnd = DateTime(now.year, now.month, now.day)
+        .add(const Duration(days: 30));
     _endsAt = e?.endsAt ??
-        DateTime(now.year, now.month, now.day).add(const Duration(days: 30));
+        DateTime(defaultEnd.year, defaultEnd.month, defaultEnd.day, 23, 59, 59);
+    if (e?.endsAt != null &&
+        _endsAt.hour == 0 &&
+        _endsAt.minute == 0 &&
+        _endsAt.second == 0) {
+      _endsAt = DateTime(_endsAt.year, _endsAt.month, _endsAt.day, 23, 59, 59);
+    }
     _isActive = e?.isActive ?? true;
     _imagePath = e?.imageStoragePath;
     _imageUrl = e?.imagePublicUrl;

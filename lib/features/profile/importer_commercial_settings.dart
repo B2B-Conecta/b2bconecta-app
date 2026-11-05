@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
-import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
+import 'package:motolink_pro_app/features/logistics/importer_envio_politica_panel.dart';
 import 'package:motolink_pro_app/features/payments/importer_accepted_pago_metodos_section.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'profile_model.dart';
@@ -132,13 +132,6 @@ class _ImporterCommercialSettingsState
         ImporterAcceptedPagoMetodosSection(
             profile: widget.profile, onSaved: widget.onChanged),
         const SizedBox(height: 20),
-        ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.local_shipping_outlined),
-            title: const Text('Transportistas'),
-            subtitle: const Text('Empresas, conductores y cobertura'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push<void>(MaterialPageRoute(
-                builder: (_) => const ImporterCarriersScreen()))),
+        const ImporterEnvioPoliticaPanel(),
       ]);
 }

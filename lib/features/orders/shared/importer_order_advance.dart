@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/features/logistics/carrier_decision.dart';
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'order_flow_copy/order_actions_flow_copy.dart';
 import 'order_flow_copy/order_payment_flow_copy.dart';
-import 'order_pickup_flow_copy.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_transit_eta_dialog.dart';
 
 /// Avanza el estado de una o varias líneas del importador (con ETA si pasa a en tránsito).
@@ -36,45 +34,6 @@ Future<bool> advanceImporterOrderGroup(
         messenger?.showSnackBar(
           const SnackBar(
             content: Text(OrderPaymentFlowCopy.bloqueoSinFacturaImportador),
-          ),
-        );
-        return false;
-      }
-
-      if (r.carrierDecision == CarrierDecision.pending) {
-        messenger?.showSnackBar(
-          const SnackBar(
-            content: Text(OrderPickupFlowCopy.bloqueoEsperaAliadoTransporte),
-          ),
-        );
-        return false;
-      }
-
-      if (!r.hasPickupConfirmed) {
-        messenger?.showSnackBar(
-          const SnackBar(
-            content: Text(OrderPickupFlowCopy.bloqueoFaltaRecoleccion),
-          ),
-        );
-        return false;
-      }
-
-      if (r.carrierDecision == CarrierDecision.selected &&
-          !r.hasImporterCarrierSelected) {
-        messenger?.showSnackBar(
-          const SnackBar(
-            content: Text(OrderPickupFlowCopy.bloqueoFaltaTransportista),
-          ),
-        );
-        return false;
-      }
-
-      if (r.carrierDecision == CarrierDecision.selected &&
-          r.carrierFletePagoSeparado &&
-          !r.hasFleteFactura) {
-        messenger?.showSnackBar(
-          const SnackBar(
-            content: Text(OrderPaymentFlowCopy.bloqueoSinFacturaFlete),
           ),
         );
         return false;

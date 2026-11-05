@@ -16,10 +16,7 @@ import 'importer_expandable_order_card.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'importer_cancelar_pedido_dialog.dart';
 import 'importer_order_invoice_section.dart';
-import 'package:motolink_pro_app/features/logistics/importer_order_flete_invoice_section.dart';
-import 'package:motolink_pro_app/features/logistics/importer_order_flete_comprobante_section.dart';
-import 'package:motolink_pro_app/features/logistics/importer_order_carrier_summary_section.dart';
-import 'package:motolink_pro_app/features/logistics/importer_confirm_pickup_section.dart';
+import 'package:motolink_pro_app/features/logistics/importer_order_shipping_section.dart';
 import 'package:motolink_pro_app/features/payments/importer_order_pago_verification_section.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_sheet.dart';
 import 'importer_notificar_ajuste_cantidad_dialog.dart';
@@ -880,19 +877,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       deliveryActions: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (g.any(
-              (r) => r.status == TransactionRequestStatus.pedidoListo)) ...[
-            ImporterOrderCarrierSummarySection(
-              lines: g,
-            ),
-            if (g.first.importadorMuestraSeccionRecoleccion) ...[
-              const SizedBox(height: 12),
-              ImporterConfirmPickupSection(
-                lines: g,
-                onChanged: _load,
-              ),
-            ],
-          ],
+          ImporterOrderShippingSection(
+            lines: g,
+            onChanged: () => _load(silent: true),
+          ),
         ],
       ),
       expandedFooter: Column(
@@ -909,15 +897,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               request: g.single,
               onChanged: _load,
             ),
-            const SizedBox(height: 12),
-            ImporterOrderFleteInvoiceSection(
-              request: g.single,
-              onChanged: () => _load(silent: true),
-            ),
-            ImporterOrderFleteComprobanteSection(
-              request: g.single,
-              onChanged: () => _load(silent: true),
-            ),
           ] else ...[
             ImporterOrderPagoVerificationSection(
               compactHelp: true,
@@ -931,15 +910,6 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               request: g.first,
               invoiceBundleLines: g,
               onChanged: _load,
-            ),
-            const SizedBox(height: 12),
-            ImporterOrderFleteInvoiceSection(
-              request: g.first,
-              onChanged: () => _load(silent: true),
-            ),
-            ImporterOrderFleteComprobanteSection(
-              request: g.first,
-              onChanged: () => _load(silent: true),
             ),
           ],
         ],

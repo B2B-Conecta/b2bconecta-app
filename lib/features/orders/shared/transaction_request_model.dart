@@ -856,6 +856,7 @@ class TransactionRequestModel {
         sku: productSku,
         cantidad: cantidad,
         precioRef: precioTotal,
+        imageUrl: productCoverImageUrl(productImageUrls),
       ),
     ];
   }

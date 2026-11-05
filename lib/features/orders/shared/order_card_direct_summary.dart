@@ -166,7 +166,7 @@ List<OrderCardProductPeek> orderCardProductPeeks({
           quantity: p.cantidad,
           lineTotalRef: p.precioRef,
           currencyLabel: r.amountCurrencyLabel,
-          imageUrl: desglose.length == 1 ? cover : null,
+          imageUrl: p.imageUrl ?? (desglose.length == 1 ? cover : null),
           lineStatusLabel: lineStatus,
         ),
       );

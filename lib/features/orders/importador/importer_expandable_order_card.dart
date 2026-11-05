@@ -142,7 +142,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
           icon: Icons.shopping_bag_outlined,
           child: TransactionRequestProductosDesgloseSection(
               lines: lines,
-              compact: true,
+              compact: false,
               viewer: PedidoDesgloseViewer.importador,
               hideSectionTitle: true,
               showPrecioHelp: false));

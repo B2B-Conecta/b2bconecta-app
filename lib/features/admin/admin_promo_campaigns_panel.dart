@@ -270,9 +270,25 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                             ),
                           ),
                         ),
-                        title: Text(
-                          c.internalTitle,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                c.internalTitle,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _PromoActiveSeal(active: c.isActive),
+                            if (c.adminScheduleSealLabel != null) ...[
+                              const SizedBox(width: 6),
+                              _PromoScheduleSeal(
+                                label: c.adminScheduleSealLabel!,
+                              ),
+                            ],
+                          ],
                         ),
                         subtitle: Text(
                           '${c.badgeLabel} · $sponsorLabel · $audienceLabel · '
@@ -433,8 +449,18 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     }
     final now = DateTime.now();
     _startsAt = e?.startsAt ?? DateTime(now.year, now.month, now.day);
+    // Fin inclusivo del día (23:59:59 local) para que el RPC por calendario Caracas
+    // y el filtro `ends_at` no caduquen a medianoche del último día.
+    final defaultEnd = DateTime(now.year, now.month, now.day)
+        .add(const Duration(days: 30));
     _endsAt = e?.endsAt ??
-        DateTime(now.year, now.month, now.day).add(const Duration(days: 30));
+        DateTime(defaultEnd.year, defaultEnd.month, defaultEnd.day, 23, 59, 59);
+    if (e?.endsAt != null &&
+        _endsAt.hour == 0 &&
+        _endsAt.minute == 0 &&
+        _endsAt.second == 0) {
+      _endsAt = DateTime(_endsAt.year, _endsAt.month, _endsAt.day, 23, 59, 59);
+    }
     _isActive = e?.isActive ?? true;
     _imagePath = e?.imageStoragePath;
     _imageUrl = e?.imagePublicUrl;
@@ -1210,6 +1236,66 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PromoActiveSeal extends StatelessWidget {
+  const _PromoActiveSeal({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.successGreen : Colors.red.shade700;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          active ? 'Activa' : 'Desactivada',
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PromoScheduleSeal extends StatelessWidget {
+  const _PromoScheduleSeal({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (label) {
+      'En vitrina' => AppColors.brand,
+      'Programada' => Colors.orange.shade800,
+      _ => Colors.blueGrey.shade700,
+    };
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
         ),
       ),
     );

@@ -72,8 +72,10 @@ abstract final class EnvioPolitica {
     if (code == noDefinido) return null;
     final nombre = proveedor.trim().isEmpty ? 'Este proveedor' : proveedor.trim();
     final base = switch (code) {
-      incluido => '$nombre: el flete va incluido en la factura.',
-      _ => '$nombre: el flete es un cobro adicional, aparte de la factura.',
+      incluido =>
+        '$nombre: el flete suele ir incluido. El proveedor lo confirma en el pedido.',
+      _ =>
+        '$nombre: el flete puede ser un cobro adicional. El proveedor indicará el monto en USD/Bs en el pedido.',
     };
     if (minimoGratis == null || minimoGratis <= 0) return base;
     return '$base Envío gratis desde ${formatRefAmount(minimoGratis)} USD.';

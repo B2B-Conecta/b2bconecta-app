@@ -54,6 +54,7 @@ class _AdminAccountManagementPanelState
   String? _busyId;
   _AccountRoleFilter _roleFilter = _AccountRoleFilter.todos;
   _AccountStateFilter _stateFilter = _AccountStateFilter.todos;
+  OwnerAccountSort _sort = OwnerAccountSort.newest;
   final _searchCtrl = TextEditingController();
   final _listScroll = ScrollController();
   int _pageIndex = 0;
@@ -132,7 +133,7 @@ class _AdminAccountManagementPanelState
 
   List<IncompleteSignupRow> get _incompleteFiltered {
     final q = _searchCtrl.text.trim().toLowerCase();
-    return _incomplete.where((row) {
+    final filtered = _incomplete.where((row) {
       switch (_incompleteFilter) {
         case _IncompleteFilter.sinConfirmar:
           if (row.email == null || row.emailConfirmed) return false;
@@ -146,12 +147,18 @@ class _AdminAccountManagementPanelState
       final email = (row.email ?? '').toLowerCase();
       final phone = (row.phone ?? '').toLowerCase();
       return name.contains(q) || email.contains(q) || phone.contains(q);
-    }).toList();
+    });
+    return sortByCreatedAt(
+      filtered,
+      createdAtOf: (row) => row.createdAt,
+      tieBreakKey: (row) => row.userId,
+      newestFirst: _sort != OwnerAccountSort.oldest,
+    );
   }
 
   List<ProfileModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
-    return _rows.where((p) {
+    final filtered = _rows.where((p) {
       final role = p.role?.trim().toLowerCase();
       switch (_roleFilter) {
         case _AccountRoleFilter.aliados:
@@ -187,7 +194,8 @@ class _AdminAccountManagementPanelState
           break;
       }
       return ownerAccountMatchesQuery(p, q);
-    }).toList();
+    });
+    return sortOwnerAccounts(filtered, sort: _sort);
   }
 
   bool _canChangeRole(ProfileModel p) => OwnerAccountRules.canManageTarget(
@@ -552,7 +560,17 @@ class _AdminAccountManagementPanelState
               _pageIndex = 0;
             }),
           ),
-          const SizedBox(height: 12),
+          SegmentedFilterBar(
+            labels: [
+              for (final s in OwnerAccountSort.values) s.labelEs,
+            ],
+            selectedIndex: OwnerAccountSort.values.indexOf(_sort),
+            onSelected: (index) => setState(() {
+              _sort = OwnerAccountSort.values[index];
+              _pageIndex = 0;
+            }),
+          ),
+          const SizedBox(height: 4),
           TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
@@ -665,7 +683,17 @@ class _AdminAccountManagementPanelState
           _pageIndex = 0;
         }),
       ),
-      const SizedBox(height: 12),
+      SegmentedFilterBar(
+        labels: const ['Más recientes', 'Más antiguas'],
+        selectedIndex: _sort == OwnerAccountSort.oldest ? 1 : 0,
+        onSelected: (index) => setState(() {
+          _sort = index == 0
+              ? OwnerAccountSort.newest
+              : OwnerAccountSort.oldest;
+          _pageIndex = 0;
+        }),
+      ),
+      const SizedBox(height: 4),
       TextField(
         controller: _searchCtrl,
         decoration: InputDecoration(
@@ -849,6 +877,8 @@ class _AccountCardState extends State<_AccountCard> {
             child: Text(
               [
                 ProfileRoleLabels.labelEs(profile.role),
+                if (profile.createdAt != null)
+                  'Alta ${formatEsShortDate(profile.createdAt!)}',
                 if (profile.email != null) profile.email,
                 if (profile.phone != null) profile.phone,
                 if (isSelf) 'Su cuenta',

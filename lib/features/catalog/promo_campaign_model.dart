@@ -51,9 +51,15 @@ class PromoCampaignModel {
   final String? mobileImagePublicUrl;
 
   String imageUrlForWidth(double width) {
+    final desktop = imagePublicUrl.trim();
     final mobile = mobileImagePublicUrl?.trim() ?? '';
-    return width < 600 && mobile.isNotEmpty ? mobile : imagePublicUrl;
+    if (width < 600 && mobile.isNotEmpty) return mobile;
+    if (desktop.isNotEmpty) return desktop;
+    return mobile;
   }
+
+  /// Hay creativo usable (desktop o móvil) para mostrar la valla.
+  bool get hasDisplayCreative => imageUrlForWidth(1200).isNotEmpty;
 
   final String? importadorId;
 
@@ -82,6 +88,32 @@ class PromoCampaignModel {
   bool get isPopup => campaignType == typePopup;
   bool get isThirdParty => sponsorType == sponsorTercero;
   bool get isImporterSponsored => sponsorType == sponsorImportador;
+
+  /// Ventana de fechas inclusiva por día local (alineada a Caracas en SQL).
+  String scheduleStatus({DateTime? now}) {
+    final clock = now ?? DateTime.now();
+    final today = DateTime(clock.year, clock.month, clock.day);
+    final startDay = DateTime(startsAt.year, startsAt.month, startsAt.day);
+    final endDay = DateTime(endsAt.year, endsAt.month, endsAt.day);
+    if (today.isBefore(startDay)) return 'programada';
+    if (today.isAfter(endDay)) return 'vencida';
+    return 'vigente';
+  }
+
+  bool get isScheduleLive => scheduleStatus() == 'vigente';
+
+  /// Sello corto para el listado admin: flag `is_active`.
+  String get adminActiveSealLabel => isActive ? 'Activa' : 'Desactivada';
+
+  /// Sello de calendario cuando la campaña está marcada activa.
+  String? get adminScheduleSealLabel {
+    if (!isActive) return null;
+    return switch (scheduleStatus()) {
+      'programada' => 'Programada',
+      'vencida' => 'Vencida',
+      _ => 'En vitrina',
+    };
+  }
 
   List<String> get resolvedProductIds {
     final fromList =

@@ -89,6 +89,32 @@ class PromoCampaignModel {
   bool get isThirdParty => sponsorType == sponsorTercero;
   bool get isImporterSponsored => sponsorType == sponsorImportador;
 
+  /// Ventana de fechas inclusiva por día local (alineada a Caracas en SQL).
+  String scheduleStatus({DateTime? now}) {
+    final clock = now ?? DateTime.now();
+    final today = DateTime(clock.year, clock.month, clock.day);
+    final startDay = DateTime(startsAt.year, startsAt.month, startsAt.day);
+    final endDay = DateTime(endsAt.year, endsAt.month, endsAt.day);
+    if (today.isBefore(startDay)) return 'programada';
+    if (today.isAfter(endDay)) return 'vencida';
+    return 'vigente';
+  }
+
+  bool get isScheduleLive => scheduleStatus() == 'vigente';
+
+  /// Sello corto para el listado admin: flag `is_active`.
+  String get adminActiveSealLabel => isActive ? 'Activa' : 'Desactivada';
+
+  /// Sello de calendario cuando la campaña está marcada activa.
+  String? get adminScheduleSealLabel {
+    if (!isActive) return null;
+    return switch (scheduleStatus()) {
+      'programada' => 'Programada',
+      'vencida' => 'Vencida',
+      _ => 'En vitrina',
+    };
+  }
+
   List<String> get resolvedProductIds {
     final fromList =
         productIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();

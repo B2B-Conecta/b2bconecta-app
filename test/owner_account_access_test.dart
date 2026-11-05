@@ -270,6 +270,47 @@ void main() {
       expect(ownerAccountMatchesQuery(p, 'zzz'), isFalse);
     });
 
+    test('cuentas se ordenan por fecha de alta o nombre', () {
+      final older = ProfileModel(
+        id: '1',
+        role: 'aliado',
+        businessName: 'Beta',
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+      final newer = ProfileModel(
+        id: '2',
+        role: 'importador',
+        businessName: 'Alpha',
+        createdAt: DateTime.utc(2026, 3, 1),
+      );
+      final undated = ProfileModel(
+        id: '3',
+        role: 'aliado',
+        businessName: 'Zeta',
+      );
+      expect(
+        sortOwnerAccounts(
+          [older, undated, newer],
+          sort: OwnerAccountSort.newest,
+        ).map((p) => p.id),
+        ['2', '1', '3'],
+      );
+      expect(
+        sortOwnerAccounts(
+          [newer, older, undated],
+          sort: OwnerAccountSort.oldest,
+        ).map((p) => p.id),
+        ['1', '2', '3'],
+      );
+      expect(
+        sortOwnerAccounts(
+          [newer, undated, older],
+          sort: OwnerAccountSort.name,
+        ).map((p) => p.businessName),
+        ['Alpha', 'Beta', 'Zeta'],
+      );
+    });
+
     test('fromJson lee is_owner, deactivated_at y email', () {
       final p = ProfileModel.fromJson({
         'id': 'u1',

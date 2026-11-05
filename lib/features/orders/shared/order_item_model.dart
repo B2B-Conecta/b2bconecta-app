@@ -1,3 +1,5 @@
+import 'package:motolink_pro_app/features/inventory/product_images.dart';
+
 /// Fila lista para mostrar nombre/SKU/cantidad/precio (desglose en UI).
 class PedidoProductoLineUi {
   const PedidoProductoLineUi({
@@ -5,12 +7,14 @@ class PedidoProductoLineUi {
     this.sku,
     required this.cantidad,
     required this.precioRef,
+    this.imageUrl,
   });
 
   final String nombre;
   final String? sku;
   final int cantidad;
   final double precioRef;
+  final String? imageUrl;
 
   factory PedidoProductoLineUi.fromOrderItem(OrderItemModel o) {
     final n = o.productName?.trim();
@@ -19,6 +23,7 @@ class PedidoProductoLineUi {
       sku: o.productSku,
       cantidad: o.cantidad,
       precioRef: o.precioLineTotal,
+      imageUrl: productCoverImageUrl(o.productImageUrls),
     );
   }
 }
@@ -37,6 +42,7 @@ class OrderItemModel {
     required this.precioBaseAliadoLine,
     this.productName,
     this.productSku,
+    this.productImageUrls = const <String>[],
   });
 
   final String id;
@@ -50,6 +56,7 @@ class OrderItemModel {
   final double precioBaseAliadoLine;
   final String? productName;
   final String? productSku;
+  final List<String> productImageUrls;
 
   /// Montos en REF (USD); BS solo en UI vía [precioLineTotalBs] con tasa snapshot.
   double precioLineTotalBs(double tasaBcv) => precioLineTotal * tasaBcv;
@@ -73,6 +80,10 @@ class OrderItemModel {
       precioBaseAliadoLine: _asDouble(json['precio_base_aliado_line']),
       productName: _nullableText(prod?['name']),
       productSku: (sku != null && sku.isNotEmpty) ? sku : null,
+      productImageUrls: parseProductImageUrlsJson(
+        prod?['image_urls'],
+        legacyImageUrl: prod?['image_url']?.toString(),
+      ),
     );
   }
 

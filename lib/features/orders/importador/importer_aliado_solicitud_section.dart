@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/order_item_model.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_product_thumb.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -28,7 +29,7 @@ List<PedidoProductoLineUi> transactionRequestLineasDesgloseForViewer(
   );
 }
 
-/// Tarjeta de una partida con la moneda acordada en el pedido.
+/// Fila de partida con miniatura, cantidad y total (detalle o lista compacta).
 Widget pedidoProductoLineCard(
   BuildContext context,
   PedidoProductoLineUi p,
@@ -36,53 +37,111 @@ Widget pedidoProductoLineCard(
   String currencyLabel = 'REF',
 }) {
   final density = B2bOrderCardDensityScope.of(context);
-  final web = density.isDesktop && compact;
+  final webCompact = density.isDesktop && compact;
   final sku = p.sku?.trim();
+  final thumb = compact ? (webCompact ? 40.0 : 44.0) : 64.0;
+  final nameSize = compact ? (webCompact ? 12.0 : 13.0) : 14.0;
+  final metaSize = compact ? (webCompact ? 10.5 : 11.5) : 12.5;
+  final amountSize = compact ? (webCompact ? 12.0 : 13.0) : 16.0;
+  final qtyLabel =
+      '${p.cantidad} ${p.cantidad == 1 ? 'unidad' : 'unidades'}';
+  final amountLabel = '${formatRefAmount(p.precioRef)} $currencyLabel';
+
+  final info = Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        p.nombre,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: nameSize,
+          color: AppColors.textPrimary,
+          height: 1.3,
+        ),
+        maxLines: compact ? 2 : 3,
+        overflow: TextOverflow.ellipsis,
+      ),
+      if (sku != null && sku.isNotEmpty) ...[
+        SizedBox(height: compact ? 2 : 4),
+        Text(
+          'SKU: $sku',
+          style: TextStyle(
+            fontSize: metaSize,
+            color: AppColors.textSecondary,
+            height: 1.25,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+      SizedBox(height: compact ? 3 : 6),
+      Text(
+        qtyLabel,
+        style: TextStyle(
+          fontSize: metaSize,
+          color: AppColors.textSecondary,
+          height: 1.25,
+        ),
+      ),
+    ],
+  );
+
+  final amount = Text(
+    amountLabel,
+    textAlign: TextAlign.end,
+    style: TextStyle(
+      fontSize: amountSize,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+      height: 1.2,
+    ),
+  );
+
+  final row = LayoutBuilder(
+    builder: (context, constraints) {
+      final stackAmount = compact ||
+          constraints.maxWidth < 420 ||
+          MediaQuery.textScalerOf(context).scale(14) > 20;
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OrderProductThumb(size: thumb, url: p.imageUrl),
+          SizedBox(width: compact ? 10 : 12),
+          Expanded(
+            child: stackAmount
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      info,
+                      SizedBox(height: compact ? 6 : 8),
+                      amount,
+                    ],
+                  )
+                : info,
+          ),
+          if (!stackAmount) ...[
+            const SizedBox(width: 12),
+            amount,
+          ],
+        ],
+      );
+    },
+  );
+
+  if (!compact) return row;
+
   return Container(
     width: double.infinity,
     padding: EdgeInsets.symmetric(
-      horizontal: web ? 8 : (compact ? 8 : 10),
-      vertical: web ? 5 : (compact ? 6 : 8),
+      horizontal: webCompact ? 8 : 10,
+      vertical: webCompact ? 8 : 10,
     ),
     decoration: BoxDecoration(
       color: AppColors.surfaceTinted,
-      borderRadius: BorderRadius.circular(web ? 6 : 8),
+      borderRadius: BorderRadius.circular(webCompact ? 8 : 10),
       border: Border.all(color: AppColors.borderSubtle),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          p.nombre,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: web ? 11.0 : (compact ? 12.0 : 12.5),
-            color: AppColors.textPrimary,
-          ),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (sku != null && sku.isNotEmpty) ...[
-          const SizedBox(height: 2),
-          Text(
-            'SKU: $sku',
-            style: TextStyle(
-              fontSize: web ? 9.5 : (compact ? 10 : 10.5),
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-        const SizedBox(height: 2),
-        Text(
-          '${p.cantidad} uds · ${formatRefAmount(p.precioRef)} $currencyLabel',
-          style: TextStyle(
-            fontSize: web ? 10.5 : (compact ? 11 : 11.5),
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
-    ),
+    child: row,
   );
 }
 
@@ -205,7 +264,13 @@ class _LineDesgloseBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var j = 0; j < partidas.length; j++) ...[
-          if (j > 0) SizedBox(height: compact ? 4 : 6),
+          if (j > 0)
+            compact
+                ? const SizedBox(height: 8)
+                : Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1, color: AppColors.borderSubtle),
+                  ),
           pedidoProductoLineCard(context, partidas[j], compact,
               currencyLabel: line.amountCurrencyLabel),
         ],

@@ -1,18 +1,17 @@
 import '../shared/order_detail_layout.dart';
 export '../shared/order_detail_layout.dart';
 import 'package:flutter/material.dart';
-import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/payments/motolink_volume_discount.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../shared/order_list_colors.dart';
 import '../shared/order_list_entry.dart';
 import '../shared/order_delivery_stepper.dart';
-import '../shared/order_card_direct_summary.dart';
 import '../shared/aliado_order_grouping.dart';
 import '../shared/courier_timeline_widget.dart';
 import '../shared/moroso_order_visual.dart';
 import '../shared/transaction_request_model.dart';
+import '../importador/importer_aliado_solicitud_section.dart';
 import 'aliado_transit_eta_banner.dart';
 
 /// Operational widgets stay owned by the panel; the detail only arranges them.
@@ -71,6 +70,7 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
         widget.sectionsBuilder(context, chunk, index + 1, providers.length);
     final sameShipping = checkoutGroupMismoEstadoEnvio(chunk);
     final colors = OrderListColors.of(context);
+    final volumeDiscount = computeVolumeDiscountForLines(chunk);
 
     final tracking = OrderDetailSection(
       title: 'Seguimiento',
@@ -123,7 +123,26 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
     final products = OrderDetailSection(
       title: 'Productos',
       icon: Icons.shopping_bag_outlined,
-      child: _OrderProducts(lines: chunk),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TransactionRequestProductosDesgloseSection(
+            lines: chunk,
+            compact: false,
+            viewer: PedidoDesgloseViewer.aliado,
+            hideSectionTitle: true,
+            showPrecioHelp: false,
+            showImporterGroupHeaders: false,
+          ),
+          if (volumeDiscount != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              volumeDiscount.resumenEs,
+              style: TextStyle(fontSize: 12, color: colors.accent),
+            ),
+          ],
+        ],
+      ),
     );
     final delivery = OrderDetailSection(
       title: 'Entrega',
@@ -215,105 +234,6 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
         ]),
       ),
     ]);
-  }
-}
-
-/// Two reading columns on desktop; a single natural order with large text/mobile.
-class _OrderProducts extends StatelessWidget {
-  const _OrderProducts({required this.lines});
-  final List<TransactionRequestModel> lines;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = OrderListColors.of(context);
-    final discount = computeVolumeDiscountForLines(lines);
-    final products = [
-      for (final line in lines)
-        ...orderCardProductPeeks(lines: [line], importerUserId: line.ownerId)
-    ];
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      for (var i = 0; i < products.length; i++) ...[
-        if (i > 0)
-          Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Divider(height: 1, color: colors.border)),
-        _DetailProductRow(product: products[i]),
-      ],
-      if (discount != null) ...[
-        const SizedBox(height: 12),
-        Text(discount.resumenEs,
-            style: TextStyle(fontSize: 12, color: colors.accent)),
-      ],
-    ]);
-  }
-}
-
-class _DetailProductRow extends StatelessWidget {
-  const _DetailProductRow({required this.product});
-  final OrderCardProductPeek product;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = OrderListColors.of(context);
-    final image = product.imageUrl;
-    Widget fallback() => ColoredBox(
-        color: colors.soft,
-        child:
-            Icon(Icons.inventory_2_outlined, size: 27, color: colors.accent));
-    final photo = ExcludeSemantics(
-        child: Container(
-            width: 64,
-            height: 64,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-                color: colors.soft, borderRadius: BorderRadius.circular(10)),
-            child: image == null
-                ? fallback()
-                : Image.network(image,
-                    fit: BoxFit.contain,
-                    cacheWidth: 160,
-                    errorBuilder: (_, __, ___) => fallback())));
-    final info =
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(product.name,
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: colors.ink,
-              height: 1.35)),
-      if (product.sku?.trim().isNotEmpty == true) ...[
-        const SizedBox(height: 4),
-        Text('SKU ${product.sku}',
-            style: TextStyle(fontSize: 12, color: colors.secondary)),
-      ],
-      const SizedBox(height: 6),
-      Text(
-          '${product.quantity} ${product.quantity == 1 ? 'unidad' : 'unidades'}',
-          style: TextStyle(fontSize: 12, color: colors.secondary)),
-    ]);
-    final amount = Text(
-        '${formatRefAmount(product.lineTotalRef)} ${product.currencyLabel}',
-        style: TextStyle(
-            fontSize: 16, fontWeight: FontWeight.w700, color: colors.ink));
-    return LayoutBuilder(builder: (context, constraints) {
-      final compact = constraints.maxWidth < 460 ||
-          MediaQuery.textScalerOf(context).scale(14) > 20;
-      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        photo,
-        const SizedBox(width: 12),
-        Expanded(
-            child: compact
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [info, const SizedBox(height: 8), amount])
-                : info),
-        if (!compact) ...[
-          const SizedBox(width: 16),
-          Expanded(
-              child: Align(alignment: Alignment.centerRight, child: amount))
-        ],
-      ]);
-    });
   }
 }
 

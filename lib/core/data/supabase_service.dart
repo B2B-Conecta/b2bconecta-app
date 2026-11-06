@@ -1505,6 +1505,12 @@ class SupabaseService {
   }) =>
       CatalogService.fetchParts(limit: limit, offset: offset, filters: filters);
 
+  static Future<List<PartModel>> fetchRelatedProducts({
+    required PartModel current,
+    int limit = 6,
+  }) =>
+      CatalogService.fetchRelatedProducts(current: current, limit: limit);
+
   static Future<double> fetchDefaultCommissionRate() =>
       CommissionsService.fetchDefaultCommissionRate();
 

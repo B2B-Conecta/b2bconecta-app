@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_ranking.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/product_variants.dart';
+import 'package:motolink_pro_app/features/catalog/related_products.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/core/utils/haversine.dart';
 
@@ -472,6 +473,97 @@ class CatalogService {
   }) {
     return retryOnJwtIssuedAtFuture(
       () => _fetchParts(limit: limit, offset: offset, filters: filters),
+    );
+  }
+
+  /// Productos relacionados vía RPC jerárquico
+  /// (`get_related_products_fallback`). Si falla, usa el fallback local
+  /// por categoría / proveedor.
+  static Future<List<PartModel>> fetchRelatedProducts({
+    required PartModel current,
+    int limit = 6,
+  }) {
+    final id = current.id.trim();
+    if (id.isEmpty) return Future<List<PartModel>>.value(const []);
+    final cap = limit < 1 ? 1 : (limit > 24 ? 24 : limit);
+    return retryOnJwtIssuedAtFuture(
+      () => _fetchRelatedProducts(current: current, limit: cap),
+    );
+  }
+
+  static Future<List<PartModel>> _fetchRelatedProducts({
+    required PartModel current,
+    required int limit,
+  }) async {
+    try {
+      final res = await SupabaseAccess.client.rpc(
+        'get_related_products_fallback',
+        params: {
+          'p_product_id': current.id.trim(),
+          'p_limit': limit,
+        },
+      );
+      final orderedIds = <String>[];
+      if (res is List) {
+        for (final row in res) {
+          if (row is! Map) continue;
+          final id = row['product_id']?.toString().trim() ?? '';
+          if (id.isEmpty || id == current.id || orderedIds.contains(id)) {
+            continue;
+          }
+          orderedIds.add(id);
+        }
+      }
+      if (orderedIds.isNotEmpty) {
+        final embed = _catalogProfileSelect(CatalogFilters.empty);
+        final response = await SupabaseAccess.client
+            .from('products')
+            .select('*, $embed')
+            .inFilter('id', orderedIds)
+            .eq('is_active', true)
+            .eq('stock_covers_min_order', true);
+        final list = response as List<dynamic>;
+        final parts = collapseProductVariants([
+          for (final row in list)
+            if (row is Map)
+              PartModel.fromJson(Map<String, dynamic>.from(row)),
+        ]).where((part) => part.id.isNotEmpty && part.id != current.id);
+        final ordered = orderPartsByIds(
+          orderedIds: orderedIds,
+          parts: parts.toList(growable: false),
+          limit: limit,
+        );
+        if (ordered.isNotEmpty) {
+          final discounts = await fetchActivePromoProductDiscounts();
+          return applyPromoDiscountsToParts(ordered, discounts);
+        }
+      }
+    } catch (_) {
+      // Fallback local abajo.
+    }
+
+    return _fetchRelatedProductsLocal(current: current, limit: limit);
+  }
+
+  static Future<List<PartModel>> _fetchRelatedProductsLocal({
+    required PartModel current,
+    required int limit,
+  }) async {
+    final category = current.category?.trim();
+    final owner = current.ownerId?.trim();
+    final CatalogFilters filters;
+    if (category != null && category.isNotEmpty) {
+      filters = CatalogFilters(category: category);
+    } else if (owner != null && owner.isNotEmpty) {
+      filters = CatalogFilters(ownerId: owner);
+    } else {
+      return const [];
+    }
+    final rows = await _fetchParts(limit: 24, filters: filters);
+    return pickRelatedProducts(
+      current: current,
+      candidates: rows,
+      limit: limit,
     );
   }
 

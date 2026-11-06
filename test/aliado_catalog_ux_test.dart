@@ -35,6 +35,22 @@ void main() {
       relatedProductsTitle(_part(id: 'x', ownerId: 'moto')),
       'Más de este proveedor',
     );
+    expect(
+      kRelatedProductsSectionTitle,
+      'Productos relacionados que podrían interesarte',
+    );
+  });
+
+  test('orderPartsByIds preserves RPC ranking and skips missing rows', () {
+    final ordered = orderPartsByIds(
+      orderedIds: const ['b', 'missing', 'a', 'b'],
+      parts: [
+        _part(id: 'a', ownerId: 'moto'),
+        _part(id: 'b', ownerId: 'moto'),
+      ],
+      limit: 2,
+    );
+    expect(ordered.map((p) => p.id).toList(), ['b', 'a']);
   });
 
   test('similar category spellings share one filter label', () {

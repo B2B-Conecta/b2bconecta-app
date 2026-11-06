@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'bcv_rate_badge.dart';
 import 'header_icon_button.dart';
 import 'messages_icon_button.dart';
 import 'motolink_pro_logo.dart';
@@ -29,6 +30,7 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
     this.logoHeight = MotolinkAppBarLogoSizes.importador,
     this.unreadNotifications = 0,
     this.unreadMessages = 0,
+    this.showBcvRate = true,
   });
 
   /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra B2B Conecta a la derecha.
@@ -39,6 +41,9 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   final List<Widget>? extraActions;
   final int unreadNotifications;
   final int unreadMessages;
+
+  /// Pill de tasa BCV en vivo (aliado / importador / admin).
+  final bool showBcvRate;
 
   /// Alto del logo B2B Conecta a la derecha y referencia del logo de usuario.
   final double logoHeight;
@@ -188,6 +193,11 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
         ],
       ),
       actions: [
+        if (widget.showBcvRate)
+          const Padding(
+            padding: EdgeInsets.only(right: 2),
+            child: Center(child: BcvRateBadge()),
+          ),
         ...?widget.extraActions,
         if (widget.onMessagesTap != null)
           MessagesIconButton(

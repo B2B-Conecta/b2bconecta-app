@@ -126,7 +126,6 @@ class _MainShellState extends State<MainShell> {
     if (widget.homeRole == AppHomeRole.administrador) {
       MainShellTabController.registerAdminProfileTabIndex(7);
     }
-    unawaited(_ensureDailyTasaBcvNotification());
     unawaited(SupabaseService.touchMyPresence());
     _presenceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       unawaited(SupabaseService.touchMyPresence());
@@ -146,12 +145,6 @@ class _MainShellState extends State<MainShell> {
   Future<void> _loadAliadoFavorites() async {
     try {
       await AliadoFavoritesService.instance.refresh();
-    } catch (_) {}
-  }
-
-  Future<void> _ensureDailyTasaBcvNotification() async {
-    try {
-      await SupabaseService.runDailyTasaBcvNotifyIfDue();
     } catch (_) {}
   }
 

@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'header_icon_button.dart';
 
 /// Etiqueta relativa de última actualización de la tasa BCV.
 String formatBcvRateUpdatedLabel(DateTime updatedAt, {DateTime? now}) {
@@ -28,12 +29,9 @@ String _formatTime12h(DateTime d) {
   return '$h12:$min $period';
 }
 
-/// Pill compacto de tasa BCV en la barra superior (web y móvil).
+/// Icono de tasa BCV en la barra superior; al tocarlo muestra el detalle.
 class BcvRateBadge extends StatefulWidget {
-  const BcvRateBadge({super.key, this.compactPreferred = false});
-
-  /// Fuerza el texto corto (útil en tests o barras muy densas).
-  final bool compactPreferred;
+  const BcvRateBadge({super.key});
 
   @override
   State<BcvRateBadge> createState() => _BcvRateBadgeState();
@@ -137,52 +135,15 @@ class _BcvRateBadgeState extends State<BcvRateBadge>
   Widget build(BuildContext context) {
     final tasa = _tasa;
     if (_loading && (tasa == null || tasa <= 0)) {
-      return const SizedBox(width: 28, height: 28);
+      return SizedBox.fromSize(size: HeaderIconButton.slot);
     }
     if (tasa == null || tasa <= 0) return const SizedBox.shrink();
 
-    final narrow = widget.compactPreferred ||
-        MediaQuery.sizeOf(context).width < 390;
-    final label = narrow
-        ? 'BCV ${formatBsLabel(tasa)}'
-        : '🇻🇪 BCV: ${formatBsLabel(tasa)}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Tooltip(
-        message: 'Ver detalle de la tasa BCV',
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _openDetails,
-            borderRadius: BorderRadius.circular(20),
-            child: Ink(
-              decoration: BoxDecoration(
-                color: AppColors.brand.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: narrow ? 8 : 10,
-                  vertical: 5,
-                ),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: narrow ? 10.5 : 11.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    final tip = 'BCV ${formatBsLabel(tasa)} · Ver detalle';
+    return HeaderIconButton(
+      tooltip: tip,
+      onPressed: _openDetails,
+      icon: Icons.currency_exchange,
     );
   }
 }

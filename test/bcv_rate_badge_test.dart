@@ -22,7 +22,7 @@ void main() {
   testWidgets('badge se oculta sin tasa cargada', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(body: BcvRateBadge(compactPreferred: true)),
+        home: Scaffold(body: BcvRateBadge()),
       ),
     );
     await tester.pump();

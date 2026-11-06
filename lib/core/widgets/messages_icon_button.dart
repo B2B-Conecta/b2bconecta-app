@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'header_icon_button.dart';
 
-/// Acceso a la vista de chats. El encabezado muestra el nombre, no un icono de burbuja.
+/// Acceso a la bandeja de chats (icono, mismo patrón que notificaciones).
 class MessagesIconButton extends StatelessWidget {
   const MessagesIconButton({
     super.key,
@@ -16,48 +17,12 @@ class MessagesIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unread = unreadCount < 0 ? 0 : unreadCount;
-    return Tooltip(
-      message: unread > 0 ? 'Chats, $unread sin leer' : 'Chats',
-      child: TextButton(
+    return HeaderIconButton(
+      tooltip: unread > 0 ? 'Chats, $unread sin leer' : 'Chats',
       onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.brand,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: const Size(0, 40),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Chats',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-              color: AppColors.brand,
-            ),
-          ),
-          if (unread > 0) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.brand,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                unread > 9 ? '9+' : '$unread',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-      ),
+      count: unread,
+      badgeColor: AppColors.brand,
+      icon: unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
     );
   }
 }

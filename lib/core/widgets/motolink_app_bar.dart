@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -26,6 +27,7 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
     this.currentUserProfile,
     this.onNotificationTap,
     this.onMessagesTap,
+    this.onProfileTap,
     this.extraActions,
     this.logoHeight = MotolinkAppBarLogoSizes.importador,
     this.unreadNotifications = 0,
@@ -38,11 +40,14 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
 
   final VoidCallback? onNotificationTap;
   final VoidCallback? onMessagesTap;
+
+  /// Tap en la foto de perfil (por defecto abre la pestaña Perfil del shell).
+  final VoidCallback? onProfileTap;
   final List<Widget>? extraActions;
   final int unreadNotifications;
   final int unreadMessages;
 
-  /// Pill de tasa BCV en vivo (aliado / importador / admin).
+  /// Icono de tasa BCV en vivo (aliado / importador / admin).
   final bool showBcvRate;
 
   /// Alto del logo B2B Conecta a la derecha y referencia del logo de usuario.
@@ -113,18 +118,29 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
             Expanded(
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: _signedLogoUrl != null
-                        ? Image.network(
-                            _signedLogoUrl!,
-                            width: lh,
-                            height: lh,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                BusinessLogoPlaceholder(size: lh),
-                          )
-                        : BusinessLogoPlaceholder(size: lh),
+                  Tooltip(
+                    message: 'Ir a perfil',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: widget.onProfileTap ??
+                            MainShellTabController.navigateToProfileTab,
+                        borderRadius: BorderRadius.circular(10),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: _signedLogoUrl != null
+                              ? Image.network(
+                                  _signedLogoUrl!,
+                                  width: lh,
+                                  height: lh,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      BusinessLogoPlaceholder(size: lh),
+                                )
+                              : BusinessLogoPlaceholder(size: lh),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(

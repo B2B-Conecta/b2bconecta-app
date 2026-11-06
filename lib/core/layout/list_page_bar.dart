@@ -7,6 +7,23 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 /// Opciones de filas por vista. El máximo es 20.
 const listPageSizeOptions = <int>[10, 20];
 
+/// Total del paginador: el conteo real [matching] si ya llegó; si no, lo cargado.
+int listPagerTotal({required int loaded, int? matching}) {
+  if (matching == null || matching < loaded) return loaded;
+  return matching;
+}
+
+/// Hay filas más allá del lote en memoria.
+bool listPagerHasMore({
+  required int loaded,
+  required int batchLength,
+  required int fetchSize,
+  int? matching,
+}) {
+  if (matching != null) return loaded < matching;
+  return fetchSize > 0 && batchLength >= fetchSize;
+}
+
 int clampListPageIndex({
   required int pageIndex,
   required int total,
@@ -265,6 +282,7 @@ class PagedItems<T> extends StatefulWidget {
     this.separator = 0,
     this.embedded = false,
     this.hasMore = false,
+    this.totalCount,
     this.onNeedMore,
     this.onRefresh,
     this.pageSizeOptions = listPageSizeOptions,
@@ -286,6 +304,9 @@ class PagedItems<T> extends StatefulWidget {
   /// Dentro de otro scroll. No crea un [ListView] propio.
   final bool embedded;
   final bool hasMore;
+
+  /// Conteo total almacenado/filtrado. Si es null, se usa [items.length].
+  final int? totalCount;
   final Future<void> Function()? onNeedMore;
   final Future<void> Function()? onRefresh;
 
@@ -321,14 +342,35 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
   }
 
   Future<void> _setPage(int index) async {
-    final needed = (index + 1) * _pageSize;
-    if (widget.onNeedMore != null &&
+    final targetTotal = listPagerTotal(
+      loaded: widget.items.length,
+      matching: widget.totalCount,
+    );
+    final next = clampListPageIndex(
+      pageIndex: index,
+      total: targetTotal,
+      pageSize: _pageSize,
+    );
+    final needed = (next + 1) * _pageSize;
+    while (widget.onNeedMore != null &&
         widget.hasMore &&
         widget.items.length < needed) {
+      final before = widget.items.length;
       await widget.onNeedMore!();
+      if (!mounted) return;
+      if (widget.items.length <= before) break;
     }
     if (!mounted) return;
-    setState(() => _pageIndex = index);
+    setState(() {
+      _pageIndex = clampListPageIndex(
+        pageIndex: next,
+        total: listPagerTotal(
+          loaded: widget.items.length,
+          matching: widget.totalCount,
+        ),
+        pageSize: _pageSize,
+      );
+    });
   }
 
   @override
@@ -339,7 +381,10 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       pageSize: _pageSize,
     );
     final bar = ListPageBar(
-      total: widget.items.length,
+      total: listPagerTotal(
+        loaded: widget.items.length,
+        matching: widget.totalCount,
+      ),
       hasMore: widget.hasMore,
       pageIndex: _pageIndex,
       pageSize: _pageSize,

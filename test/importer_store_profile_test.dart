@@ -63,6 +63,7 @@ ImporterStoreCatalogSource _source({
     required int offset,
     required CatalogFilters filters,
   })? fetchParts,
+  Future<int> Function({required CatalogFilters filters})? fetchCount,
   Future<PartModel?> Function({
     required String importerId,
     required String productId,
@@ -79,6 +80,7 @@ ImporterStoreCatalogSource _source({
           required CatalogFilters filters,
         }) async =>
             const [],
+    fetchCount: fetchCount,
     fetchVisibleProduct: fetchVisibleProduct,
   );
 }
@@ -376,6 +378,44 @@ void main() {
     expect(offsets, [0, 10]);
     expect(limits, [10, 10]);
   });
+
+  testWidgets(
+    'el paginador muestra el total almacenado, no solo el lote cargado',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpStore(
+        tester,
+        source: _source(
+          fetchCount: ({required CatalogFilters filters}) async {
+            expect(filters.ownerId, _importerA);
+            return 87;
+          },
+          fetchParts: ({
+            required int limit,
+            required int offset,
+            required CatalogFilters filters,
+          }) async {
+            if (offset > 0) return const [];
+            return List<PartModel>.generate(
+              limit,
+              (i) => _part(
+                id: 'a-$i',
+                ownerId: _importerA,
+                nombre: 'Repuesto $i',
+                category: 'Motor',
+              ),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('1–10 de 87'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'un producto de otro mayorista no se abre desde la vitrina',

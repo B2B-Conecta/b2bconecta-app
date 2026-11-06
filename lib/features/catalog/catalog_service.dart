@@ -89,6 +89,23 @@ class CatalogService {
     });
   }
 
+  /// Conteo exacto de productos publicados de un mayorista (panel admin).
+  static Future<int> countAdminPublishedCatalog({
+    required String importerId,
+  }) {
+    final id = importerId.trim();
+    if (id.isEmpty) return Future<int>.value(0);
+    return retryOnJwtIssuedAtFuture(() async {
+      final res = await SupabaseAccess.client
+          .from('products')
+          .select('id')
+          .eq('owner_id', id)
+          .eq('is_active', true)
+          .count(CountOption.exact);
+      return (res as PostgrestResponse<dynamic>).count;
+    });
+  }
+
   /// Dueños con al menos un producto publicado (`is_active`).
   static Future<Set<String>> fetchPublishedCatalogOwnerIds() {
     return retryOnJwtIssuedAtFuture(() async {

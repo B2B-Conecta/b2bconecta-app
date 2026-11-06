@@ -270,6 +270,11 @@ class SupabaseService {
         offset: offset,
       );
 
+  static Future<int> countAdminPublishedCatalog({
+    required String importerId,
+  }) =>
+      CatalogService.countAdminPublishedCatalog(importerId: importerId);
+
   static Future<int> fetchProductsCount({CatalogFilters? filters}) =>
       CatalogService.fetchProductsCount(filters: filters);
 

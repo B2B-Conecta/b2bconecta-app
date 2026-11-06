@@ -1,7 +1,11 @@
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 
-/// Hasta [limit] repuestos de la misma categoría.
+/// Título fijo del carrusel de relacionados (detalle de producto).
+const kRelatedProductsSectionTitle =
+    'Productos relacionados que podrían interesarte';
+
+/// Hasta [limit] repuestos de la misma categoría (fallback local sin RPC).
 /// Primero el mismo importador, después otros mayoristas.
 List<PartModel> pickRelatedProducts({
   required PartModel current,
@@ -23,6 +27,27 @@ List<PartModel> pickRelatedProducts({
     }
   }
   return [...sameOwner, ...others].take(cap).toList(growable: false);
+}
+
+/// Conserva el orden de [orderedIds] al hidratar filas del catálogo.
+List<PartModel> orderPartsByIds({
+  required List<String> orderedIds,
+  required List<PartModel> parts,
+  int? limit,
+}) {
+  if (orderedIds.isEmpty || parts.isEmpty) return const [];
+  final byId = <String, PartModel>{
+    for (final part in parts)
+      if (part.id.isNotEmpty) part.id: part,
+  };
+  final out = <PartModel>[];
+  for (final id in orderedIds) {
+    final part = byId[id];
+    if (part == null) continue;
+    out.add(part);
+    if (limit != null && out.length >= limit) break;
+  }
+  return List<PartModel>.unmodifiable(out);
 }
 
 String relatedProductsTitle(PartModel part) {

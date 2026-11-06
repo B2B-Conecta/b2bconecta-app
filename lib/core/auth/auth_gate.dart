@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/onboarding/public_legal_document_scree
 import 'recover_password_screen.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
@@ -471,6 +472,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshSessionIfLoggedIn());
       unawaited(ProfileService.touchMyLastActive());
+      // Tasa BCV en vivo: reconsultar al volver a la app.
+      if (Supabase.instance.client.auth.currentSession != null) {
+        BcvBasePrice.invalidate();
+        unawaited(BcvBasePrice.refresh(force: true));
+      }
     }
   }
 

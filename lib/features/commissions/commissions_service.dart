@@ -66,7 +66,7 @@ class CommissionsService {
         .rpc('admin_set_tasa_bcv', params: {'p_tasa': tasa});
   }
 
-  /// Si aún no se notificó hoy (Caracas), avisa a todos los usuarios con la tasa guardada.
+  /// Obsoleto: la tasa BCV ya no se notifica (RPC no-op). Conservado por clientes viejos.
   static Future<int> runDailyTasaBcvNotifyIfDue() async {
     try {
       final res = await SupabaseAccess.client.rpc('run_daily_tasa_bcv_notify');

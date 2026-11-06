@@ -142,6 +142,15 @@ class MainShellTabController {
     });
   }
 
+  /// Pestaña Perfil del rol activo (aliado / importador / admin).
+  static void navigateToProfileTab() {
+    if (_b2bProfileTabIndex != null) {
+      _goTo?.call(_resolvedB2BProfileTabIndex);
+      return;
+    }
+    navigateToAdminProfileTab();
+  }
+
   /// Abrir listado importador en filtro «Nuevos» (p. ej. tras tocar notificación).
   static void setImporterPedidosPreferNuevosFilter(bool value) {
     _importerPedidosPreferNuevosFilter = value;

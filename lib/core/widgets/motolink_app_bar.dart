@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'bcv_rate_badge.dart';
 import 'header_icon_button.dart';
 import 'messages_icon_button.dart';
 import 'motolink_pro_logo.dart';
@@ -25,10 +27,12 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
     this.currentUserProfile,
     this.onNotificationTap,
     this.onMessagesTap,
+    this.onProfileTap,
     this.extraActions,
     this.logoHeight = MotolinkAppBarLogoSizes.importador,
     this.unreadNotifications = 0,
     this.unreadMessages = 0,
+    this.showBcvRate = true,
   });
 
   /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra B2B Conecta a la derecha.
@@ -36,9 +40,15 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
 
   final VoidCallback? onNotificationTap;
   final VoidCallback? onMessagesTap;
+
+  /// Tap en la foto de perfil (por defecto abre la pestaña Perfil del shell).
+  final VoidCallback? onProfileTap;
   final List<Widget>? extraActions;
   final int unreadNotifications;
   final int unreadMessages;
+
+  /// Icono de tasa BCV en vivo (aliado / importador / admin).
+  final bool showBcvRate;
 
   /// Alto del logo B2B Conecta a la derecha y referencia del logo de usuario.
   final double logoHeight;
@@ -108,18 +118,29 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
             Expanded(
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: _signedLogoUrl != null
-                        ? Image.network(
-                            _signedLogoUrl!,
-                            width: lh,
-                            height: lh,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                BusinessLogoPlaceholder(size: lh),
-                          )
-                        : BusinessLogoPlaceholder(size: lh),
+                  Tooltip(
+                    message: 'Ir a perfil',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: widget.onProfileTap ??
+                            MainShellTabController.navigateToProfileTab,
+                        borderRadius: BorderRadius.circular(10),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: _signedLogoUrl != null
+                              ? Image.network(
+                                  _signedLogoUrl!,
+                                  width: lh,
+                                  height: lh,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      BusinessLogoPlaceholder(size: lh),
+                                )
+                              : BusinessLogoPlaceholder(size: lh),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -188,6 +209,11 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
         ],
       ),
       actions: [
+        if (widget.showBcvRate)
+          const Padding(
+            padding: EdgeInsets.only(right: 2),
+            child: Center(child: BcvRateBadge()),
+          ),
         ...?widget.extraActions,
         if (widget.onMessagesTap != null)
           MessagesIconButton(

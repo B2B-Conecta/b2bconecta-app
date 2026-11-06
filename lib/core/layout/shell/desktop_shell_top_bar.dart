@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
@@ -15,6 +16,7 @@ class DesktopShellTopBar extends StatelessWidget {
     this.unreadMessages = 0,
     this.trailingActions = const [],
     this.leading,
+    this.showBcvRate = true,
   });
 
   final int unreadNotifications;
@@ -25,6 +27,9 @@ class DesktopShellTopBar extends StatelessWidget {
 
   /// P. ej. botón para volver a mostrar el menú lateral.
   final Widget? leading;
+
+  /// Pill de tasa BCV en vivo.
+  final bool showBcvRate;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +56,10 @@ class DesktopShellTopBar extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               const Spacer(),
+              if (showBcvRate) ...[
+                const BcvRateBadge(),
+                const SizedBox(width: 8),
+              ],
               ...trailingActions,
               if (onMessagesTap != null)
                 MessagesIconButton(

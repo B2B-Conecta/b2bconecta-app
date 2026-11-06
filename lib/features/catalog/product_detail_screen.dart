@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'catalog_filters.dart';
 import 'catalog_service.dart';
 import 'favorite_heart_button.dart';
 import 'part_model.dart';
 import 'product_detail_extras.dart';
-import 'related_products.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -88,22 +86,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _loadRelated() async {
-    final category = part.category?.trim();
-    final owner = part.ownerId?.trim();
-    final CatalogFilters filters;
-    if (category != null && category.isNotEmpty) {
-      filters = CatalogFilters(category: category);
-    } else if (owner != null && owner.isNotEmpty) {
-      filters = CatalogFilters(ownerId: owner);
-    } else {
-      return;
-    }
+    if (part.id.trim().isEmpty) return;
     try {
-      final rows = await CatalogService.fetchParts(limit: 24, filters: filters);
+      final rows = await CatalogService.fetchRelatedProducts(
+        current: part,
+        limit: 6,
+      );
       if (!mounted) return;
-      setState(() {
-        _related = pickRelatedProducts(current: part, candidates: rows);
-      });
+      setState(() => _related = rows);
     } catch (_) {}
   }
 

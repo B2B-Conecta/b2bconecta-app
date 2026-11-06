@@ -1,8 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/features/admin/promo_banner_crop_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/promo_banner_layout.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -104,8 +106,12 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
           campaignType: c.campaignType,
           imageStoragePath: c.imageStoragePath,
           imagePublicUrl: c.imagePublicUrl,
+          imageWidth: c.imageWidth,
+          imageHeight: c.imageHeight,
           mobileImageStoragePath: c.mobileImageStoragePath,
           mobileImagePublicUrl: c.mobileImagePublicUrl,
+          mobileImageWidth: c.mobileImageWidth,
+          mobileImageHeight: c.mobileImageHeight,
           importadorId: c.importadorId,
           productId: c.productId,
           productIds: c.productIds,
@@ -372,8 +378,12 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   late bool _isActive;
   String? _imagePath;
   String? _imageUrl;
+  int? _imageWidth;
+  int? _imageHeight;
   String? _mobileImagePath;
   String? _mobileImageUrl;
+  int? _mobileImageWidth;
+  int? _mobileImageHeight;
   String? _uploadError;
   bool _uploading = false;
   bool _saving = false;
@@ -464,8 +474,12 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     _isActive = e?.isActive ?? true;
     _imagePath = e?.imageStoragePath;
     _imageUrl = e?.imagePublicUrl;
+    _imageWidth = e?.imageWidth;
+    _imageHeight = e?.imageHeight;
     _mobileImagePath = e?.mobileImageStoragePath;
     _mobileImageUrl = e?.mobileImagePublicUrl;
+    _mobileImageWidth = e?.mobileImageWidth;
+    _mobileImageHeight = e?.mobileImageHeight;
     if (_actionType == PromoCampaignModel.actionOpenProduct &&
         _importadorId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -552,14 +566,22 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       return;
     }
 
+    if (!mounted) return;
+    final cropped = await showPromoBannerCropSheet(
+      context: context,
+      imageBytes: checked.bytes,
+      mobile: mobile,
+    );
+    if (cropped == null || !mounted) return;
+
     setState(() {
       _uploading = true;
       _uploadError = null;
     });
     try {
       final uploaded = await SupabaseService.uploadPromoCampaignImage(
-        bytes: checked.bytes,
-        fileExtension: checked.extension,
+        bytes: cropped.bytes,
+        fileExtension: cropped.extension,
         campaignId: widget.existing?.id,
       );
       if (!mounted) return;
@@ -567,9 +589,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
         if (mobile) {
           _mobileImagePath = uploaded.path;
           _mobileImageUrl = uploaded.publicUrl;
+          _mobileImageWidth = cropped.width;
+          _mobileImageHeight = cropped.height;
         } else {
           _imagePath = uploaded.path;
           _imageUrl = uploaded.publicUrl;
+          _imageWidth = cropped.width;
+          _imageHeight = cropped.height;
         }
         _uploadError = null;
       });
@@ -641,8 +667,12 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
       campaignType: _type,
       imageStoragePath: _imagePath ?? '',
       imagePublicUrl: _imageUrl ?? '',
+      imageWidth: _imageWidth,
+      imageHeight: _imageHeight,
       mobileImageStoragePath: _mobileImagePath,
       mobileImagePublicUrl: _mobileImageUrl,
+      mobileImageWidth: _mobileImageWidth,
+      mobileImageHeight: _mobileImageHeight,
       importadorId: _needsImporter ? _importadorId : null,
       productId: openProduct && _selectedProductIds.isNotEmpty
           ? _selectedProductIds.first
@@ -1139,21 +1169,32 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
               title: const Text('Activa'),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Escritorio: 2100 × 300 px (7:1). Móvil: 1500 × 500 px (3:1). '
-              'Use textos grandes y deje margen alrededor de los logos. Sin imagen móvil se usa la de escritorio.',
-              style: TextStyle(fontSize: 12, height: 1.4),
+            Text(
+              '${PromoBannerSpec.guidanceLabel(mobile: false)}. '
+              '${PromoBannerSpec.guidanceLabel(mobile: true)}. '
+              'Al subir se abre un recorte obligatorio con esa proporción. '
+              'Sin imagen móvil se usa la de escritorio.',
+              style: const TextStyle(fontSize: 12, height: 1.4),
             ),
             if (_imageUrl != null) ...[
               const SizedBox(height: 8),
-              const Text('Escritorio · imagen completa'),
+              Text(
+                _imageWidth != null && _imageHeight != null
+                    ? 'Escritorio · ${_imageWidth}×$_imageHeight px'
+                    : 'Escritorio · creativo',
+              ),
               Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 180),
-                  child: Image.network(_imageUrl!,
-                      fit: BoxFit.contain,
+                child: AspectRatio(
+                  aspectRatio: PromoBannerSpec.desktopAspect,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      _imageUrl!,
+                      fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
-                          const Text('No se pudo cargar la vista previa.')),
+                          const Center(child: Text('No se pudo cargar la vista previa.')),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1166,24 +1207,37 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.upload),
+                  : const Icon(Icons.crop),
               label: Text(_imageUrl == null
-                  ? 'Subir imagen de escritorio'
-                  : 'Cambiar imagen de escritorio'),
+                  ? 'Subir y recortar escritorio'
+                  : 'Cambiar y recortar escritorio'),
             ),
             const SizedBox(height: 16),
-            const Text('Móvil · imagen opcional'),
+            Text(
+              _mobileImageWidth != null && _mobileImageHeight != null
+                  ? 'Móvil · ${_mobileImageWidth}×$_mobileImageHeight px (opcional)'
+                  : 'Móvil · imagen opcional',
+            ),
             if (_mobileImageUrl != null) ...[
               const SizedBox(height: 8),
               Center(
-                  child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: 360, maxHeight: 160),
-                child: Image.network(_mobileImageUrl!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) =>
-                        const Text('No se pudo cargar la vista previa móvil.')),
-              )),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: AspectRatio(
+                    aspectRatio: PromoBannerSpec.mobileAspect,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        _mobileImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Text('No se pudo cargar la vista previa móvil.'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
             Wrap(spacing: 8, children: [
               OutlinedButton.icon(
@@ -1192,8 +1246,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                     : () => _pickImage(mobile: true),
                 icon: const Icon(Icons.phone_android),
                 label: Text(_mobileImageUrl == null
-                    ? 'Subir imagen móvil'
-                    : 'Cambiar imagen móvil'),
+                    ? 'Subir y recortar móvil'
+                    : 'Cambiar y recortar móvil'),
               ),
               if (_mobileImageUrl != null)
                 TextButton(
@@ -1202,6 +1256,8 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                       : () => setState(() {
                             _mobileImagePath = null;
                             _mobileImageUrl = null;
+                            _mobileImageWidth = null;
+                            _mobileImageHeight = null;
                           }),
                   child: const Text('Usar imagen de escritorio'),
                 ),

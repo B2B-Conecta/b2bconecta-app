@@ -222,13 +222,15 @@ class PromoCreativeImage extends StatelessWidget {
   const PromoCreativeImage({
     super.key,
     required this.url,
-    this.fit = BoxFit.contain,
+    this.fit = BoxFit.cover,
     this.mobileUrl,
+    this.onLoadFailed,
   });
 
   final String url;
   final BoxFit fit;
   final String? mobileUrl;
+  final ValueChanged<String>? onLoadFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -239,10 +241,13 @@ class PromoCreativeImage extends StatelessWidget {
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
         final cacheWidth = (logicalWidth * dpr).clamp(480.0, 1440.0).round();
+        final resolved =
+            constraints.maxWidth < PromoBannerSpec.breakpoint &&
+                    mobileUrl?.trim().isNotEmpty == true
+                ? mobileUrl!
+                : url;
         return Image.network(
-          constraints.maxWidth < 600 && mobileUrl?.trim().isNotEmpty == true
-              ? mobileUrl!
-              : url,
+          resolved,
           width: double.infinity,
           height: double.infinity,
           fit: fit,
@@ -252,19 +257,47 @@ class PromoCreativeImage extends StatelessWidget {
           gaplessPlayback: true,
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
+            return _PromoBannerPlaceholder(progress: progress);
+          },
+          errorBuilder: (_, __, ___) {
+            final notify = onLoadFailed;
+            if (notify != null) {
+              WidgetsBinding.instance
+                  .addPostFrameCallback((_) => notify(resolved));
+            }
             return const Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              ),
+              child: Icon(Icons.broken_image_outlined, size: 40),
             );
           },
-          errorBuilder: (_, __, ___) => const Center(
-            child: Icon(Icons.broken_image_outlined, size: 40),
-          ),
         );
       },
+    );
+  }
+}
+
+class _PromoBannerPlaceholder extends StatelessWidget {
+  const _PromoBannerPlaceholder({this.progress});
+
+  final ImageChunkEvent? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = progress?.expectedTotalBytes;
+    final loaded = progress?.cumulativeBytesLoaded ?? 0;
+    final value = total != null && total > 0 ? loaded / total : null;
+    return ColoredBox(
+      color: AppColors.brandBlueContainer.withOpacity(.55),
+      child: Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            value: value,
+            color: AppColors.brand,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -296,35 +329,7 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
   Timer? _autoplay;
   bool _interacting = false;
   int _page = 0;
-  final Map<String, double> _ratios = {};
   final Set<String> _failedImages = {};
-  String _creativeUrl = '';
-  ImageStream? _creativeStream;
-  ImageStreamListener? _creativeListener;
-
-  void _resolveCreative(String url) {
-    if (!mounted || _creativeUrl == url) return;
-    _creativeUrl = url;
-    if (_creativeListener != null) {
-      _creativeStream?.removeListener(_creativeListener!);
-    }
-    final stream =
-        NetworkImage(url).resolve(createLocalImageConfiguration(context));
-    final listener = ImageStreamListener((info, _) {
-      final ratio = info.image.width / info.image.height;
-      info.dispose();
-      if (mounted && _ratios[url] != ratio) {
-        setState(() => _ratios[url] = ratio);
-      }
-    }, onError: (Object error, StackTrace? stack) {
-      if (mounted && !_failedImages.contains(url)) {
-        setState(() => _failedImages.add(url));
-      }
-    });
-    _creativeStream = stream;
-    _creativeListener = listener;
-    stream.addListener(listener);
-  }
 
   @override
   void initState() {
@@ -345,9 +350,6 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
   @override
   void dispose() {
     _autoplay?.cancel();
-    if (_creativeListener != null) {
-      _creativeStream?.removeListener(_creativeListener!);
-    }
     _pageController.dispose();
     super.dispose();
   }
@@ -400,60 +402,65 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                 : preferred;
           }
 
-          final url = selectedImage(current);
-          if (_creativeUrl != url) {
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _resolveCreative(url));
-          }
-          final imageSize =
-              promoBannerImageSize(constraints.maxWidth, _ratios[url] ?? 3);
+          final frame = promoBannerFrameSize(constraints.maxWidth);
           final hasViewAll = items.length > 1 && widget.onViewAll != null;
-          final compactAccess = imageSize.width < 600;
+          final compactAccess = frame.width < PromoBannerSpec.breakpoint;
           final indicatorInset =
               hasViewAll ? (compactAccess ? 62.0 : 132.0) : 12.0;
           return Align(
             alignment: Alignment.center,
             child: SizedBox(
-              width: imageSize.width,
-              height: imageSize.height,
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                clipBehavior: Clip.antiAlias,
-                child: MouseRegion(
-                  onEnter: (_) => _interacting = true,
-                  onExit: (_) => _interacting = false,
-                  child: Listener(
-                    onPointerDown: (_) => _interacting = true,
-                    onPointerUp: (_) => _interacting = false,
-                    onPointerCancel: (_) => _interacting = false,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        PageView.builder(
-                          controller: _pageController,
-                          itemCount: items.length,
-                          allowImplicitScrolling: true,
-                          physics: items.length <= 1
-                              ? const NeverScrollableScrollPhysics()
-                              : const PageScrollPhysics(),
-                          onPageChanged: (i) => setState(() => _page = i),
-                          itemBuilder: (context, index) {
-                            final c = items[index];
-                            return Semantics(
-                              label: '${promoBannerCaption(c)}. '
-                                  '${promoActivePeriodLabel(c.startsAt, c.endsAt)}',
-                              button: c.isTappable,
-                              child: InkWell(
-                                onTap: c.isTappable ? () => _onTap(c) : null,
-                                child: ExcludeSemantics(
-                                  child:
-                                      PromoCreativeImage(url: selectedImage(c)),
+              width: frame.width,
+              child: AspectRatio(
+                aspectRatio:
+                    PromoBannerSpec.aspectForWidth(constraints.maxWidth),
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: MouseRegion(
+                    onEnter: (_) => _interacting = true,
+                    onExit: (_) => _interacting = false,
+                    child: Listener(
+                      onPointerDown: (_) => _interacting = true,
+                      onPointerUp: (_) => _interacting = false,
+                      onPointerCancel: (_) => _interacting = false,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          PageView.builder(
+                            controller: _pageController,
+                            itemCount: items.length,
+                            allowImplicitScrolling: true,
+                            physics: items.length <= 1
+                                ? const NeverScrollableScrollPhysics()
+                                : const PageScrollPhysics(),
+                            onPageChanged: (i) => setState(() => _page = i),
+                            itemBuilder: (context, index) {
+                              final c = items[index];
+                              return Semantics(
+                                label: '${promoBannerCaption(c)}. '
+                                    '${promoActivePeriodLabel(c.startsAt, c.endsAt)}',
+                                button: c.isTappable,
+                                child: InkWell(
+                                  onTap: c.isTappable ? () => _onTap(c) : null,
+                                  child: ExcludeSemantics(
+                                    child: PromoCreativeImage(
+                                      url: selectedImage(c),
+                                      fit: BoxFit.cover,
+                                      onLoadFailed: (failedUrl) {
+                                        if (_failedImages.contains(failedUrl)) {
+                                          return;
+                                        }
+                                        setState(
+                                            () => _failedImages.add(failedUrl));
+                                      },
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
+                              );
+                            },
+                          ),
                         if (current.isThirdParty)
                           Positioned(
                             top: 8,
@@ -599,7 +606,8 @@ class _AliadoPromoBannerCarouselState extends State<AliadoPromoBannerCarousel> {
                               ),
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -637,15 +645,17 @@ Future<void> showAliadoPromoPopupDialog({
               ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(16)),
-                child: SizedBox(
-                  height: (MediaQuery.sizeOf(ctx).height * 0.42)
-                      .clamp(180.0, 320.0),
-                  width: double.infinity,
+                child: AspectRatio(
+                  aspectRatio: PromoBannerSpec.aspectForWidth(
+                    MediaQuery.sizeOf(ctx).width,
+                  ),
                   child: ColoredBox(
                     color: AppColors.fieldFill,
                     child: PromoCreativeImage(
-                        url: campaign.imagePublicUrl,
-                        mobileUrl: campaign.mobileImagePublicUrl),
+                      url: campaign.imagePublicUrl,
+                      mobileUrl: campaign.mobileImagePublicUrl,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),

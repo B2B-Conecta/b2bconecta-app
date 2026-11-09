@@ -1,4 +1,5 @@
 import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 
@@ -29,8 +30,14 @@ void navigateFromNotificationPayload({
   if (t0 == 'kyc') {
     switch (homeRole) {
       case AppHomeRole.administrador:
-        MainShellTabController.setPendingKycProfileId(relatedId);
-        MainShellTabController.navigateToAdminKycForNotification();
+        final userId = (relatedId ?? '').trim();
+        MainShellTabController.setPendingKycProfileId(
+          userId.isEmpty ? null : userId,
+        );
+        MainShellTabController.navigateToAdminUsers(
+          section: AdminUsersHubSection.verificacion,
+          userId: userId.isEmpty ? null : userId,
+        );
         return;
       case AppHomeRole.aliado:
       case AppHomeRole.importador:
@@ -47,8 +54,26 @@ void navigateFromNotificationPayload({
     return;
   }
   if (t0 == 'actividad') {
-    if ((relatedId ?? '').trim() == 'registro') {
+    final related = (relatedId ?? '').trim();
+    if (related == 'registro') {
+      if (homeRole == AppHomeRole.administrador) {
+        MainShellTabController.navigateToAdminUsers(
+          section: AdminUsersHubSection.cuentas,
+        );
+        return;
+      }
       MainShellTabController.navigateToProfileKycDocumentation();
+      return;
+    }
+    // Nuevo registro / ficha de usuario: related_id = userId (UUID).
+    if (homeRole == AppHomeRole.administrador &&
+        related.isNotEmpty &&
+        related != 'registro' &&
+        related.contains('-')) {
+      MainShellTabController.navigateToAdminUsers(
+        section: AdminUsersHubSection.cuentas,
+        userId: related,
+      );
       return;
     }
     MainShellTabController.navigateToHomeTab();

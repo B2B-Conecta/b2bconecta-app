@@ -21,7 +21,7 @@ class OwnerAccountDossier extends StatelessWidget {
   final ProfileModel profile;
   final String? title;
 
-  /// El correo de Auth solo lo ve el owner.
+  /// Mostrar correo de acceso (Auth / ficha). En Verificación y Cuentas admin: true.
   final bool showAuthEmail;
 
   final bool isSelf;

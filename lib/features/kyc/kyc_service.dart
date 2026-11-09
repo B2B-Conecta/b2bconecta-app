@@ -20,8 +20,8 @@ class KycService {
           'full_name, code, phone, email'
           ')',
         )
-        .inFilter('role', ['aliado', 'importador']).order('business_name',
-            ascending: true);
+        .inFilter('role', ['aliado', 'importador'])
+        .order('created_at', ascending: false);
 
     final list = response as List<dynamic>;
     return list

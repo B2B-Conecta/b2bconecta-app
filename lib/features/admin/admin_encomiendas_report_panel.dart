@@ -9,7 +9,6 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_stat
 import 'admin_promo_campaigns_panel.dart';
 import 'package:motolink_pro_app/features/referrals/admin_referrals_panel.dart';
 import 'admin_returns_report_panel.dart';
-import 'admin_user_monitoring_panel.dart';
 import 'encomiendas_report_excel_service.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -17,7 +16,6 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/filter_chip_strip.dart';
 import 'package:motolink_pro_app/core/layout/filter_menu_button.dart';
-import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'admin_product_sales_ranking.dart';
@@ -78,13 +76,7 @@ class _AdminEncomiendasReportPanelState
     _hasta = DateTime(now.year, now.month, now.day);
     _desde = _hasta.subtract(const Duration(days: 90));
     _searchCtrl.addListener(_applyLocalFilters);
-    MainShellTabController.adminPresenceRequest.addListener(_openPresence);
     _bootstrap();
-  }
-
-  void _openPresence() {
-    if (!mounted) return;
-    setState(() => _sectionIndex = 2);
   }
 
   Future<void> _bootstrap() async {
@@ -102,7 +94,6 @@ class _AdminEncomiendasReportPanelState
 
   @override
   void dispose() {
-    MainShellTabController.adminPresenceRequest.removeListener(_openPresence);
     _searchCtrl.removeListener(_applyLocalFilters);
     _searchCtrl.dispose();
     super.dispose();
@@ -1031,7 +1022,6 @@ class _AdminEncomiendasReportPanelState
       labels: const [
         'Pedidos',
         'Promos',
-        'Usuarios',
         'Referidos',
         'Devoluciones',
       ],
@@ -1063,30 +1053,12 @@ class _AdminEncomiendasReportPanelState
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: _sectionSwitcher(),
           ),
-          Expanded(
-            child: AdminUserMonitoringPanel(
-              presenceRequest:
-                  MainShellTabController.adminPresenceRequest.value,
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_sectionIndex == 3) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _sectionSwitcher(),
-          ),
           const Expanded(child: AdminReferralsPanel()),
         ],
       );
     }
 
-    if (_sectionIndex == 4) {
+    if (_sectionIndex == 3) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

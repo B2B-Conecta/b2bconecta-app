@@ -4,6 +4,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_create_rules.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_delete_dialog.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_docs_section.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
@@ -17,6 +18,7 @@ class OwnerAccountDossierForm extends StatefulWidget {
     super.key,
     this.existing,
     this.allowAdminRole = false,
+    this.canDeleteAccount = false,
   });
 
   final ProfileModel? existing;
@@ -24,16 +26,21 @@ class OwnerAccountDossierForm extends StatefulWidget {
   /// Solo el propietario puede dar de alta otra cuenta de administración.
   final bool allowAdminRole;
 
+  /// Baja lógica y borrado que libera el correo (mismo alcance que Cuentas).
+  final bool canDeleteAccount;
+
   static Future<bool?> open(
     BuildContext context, {
     ProfileModel? existing,
     bool allowAdminRole = false,
+    bool canDeleteAccount = false,
   }) {
     return Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => OwnerAccountDossierForm(
           existing: existing,
           allowAdminRole: allowAdminRole,
+          canDeleteAccount: canDeleteAccount,
         ),
       ),
     );
@@ -72,10 +79,9 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
 
   bool get _showLegal => _role == 'importador';
 
+  /// Solo en alta. La revisión (aprobar / rechazar / adjuntar) vive en Verificación.
   bool get _showDocs =>
-      _role == 'aliado' &&
-      _profileId != null &&
-      (widget.existing != null || _activate);
+      _role == 'aliado' && _profileId != null && widget.existing == null;
 
   bool get _canActivateNow {
     if (_profileId == null || _isCreate) return false;
@@ -299,8 +305,8 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
                 _isCreate
                     ? 'Crea el usuario de Auth y carga el expediente. '
                         'Si activa la cuenta, puede entrar de inmediato.'
-                    : 'Actualiza los datos fiscales. En tiendas también puede '
-                        'cargar documentos.',
+                    : 'Actualiza los datos fiscales. Los documentos se revisan '
+                        'en Usuarios → Verificación.',
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 14),
@@ -478,8 +484,59 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
                 const SizedBox(height: 20),
                 OwnerAccountDocsSection(
                   profileId: _profileId!,
-                  markApproved: _activate ||
-                      widget.existing?.hasActiveAccountAccess == true,
+                  markApproved: _activate,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tras el alta, la revisión de documentos se hace en '
+                  'Usuarios → Verificación.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+              if (widget.canDeleteAccount && widget.existing != null) ...[
+                const SizedBox(height: 28),
+                Text(
+                  'Cuenta',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Dar de baja conserva historial y correo. '
+                  'Borrar elimina la cuenta y libera el correo.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (!widget.existing!.isDeactivated) ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      foregroundColor: Colors.red.shade800,
+                    ),
+                    onPressed: _busy ? null : _softDelete,
+                    icon: const Icon(Icons.person_off_outlined, size: 18),
+                    label: const Text(OwnerAccountRules.softDeleteActionLabel),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    foregroundColor: Colors.red.shade800,
+                  ),
+                  onPressed: _busy ? null : _hardDelete,
+                  icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                  label: const Text(OwnerAccountRules.hardDeleteActionLabel),
                 ),
               ],
             ],
@@ -488,5 +545,75 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
       ),
     ),
     );
+  }
+
+  Future<void> _softDelete() async {
+    final p = widget.existing;
+    if (p == null) return;
+    final note = await showOwnerAccountDeleteDialog(
+      context: context,
+      profile: p,
+      kind: OwnerAccountDeleteKind.soft,
+    );
+    if (note == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await SupabaseService.ownerDeactivateProfile(
+        profileId: p.id,
+        note: note,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cuenta dada de baja. Historial y correo se conservan.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo dar de baja: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _hardDelete() async {
+    final p = widget.existing;
+    if (p == null) return;
+    final confirm = await showOwnerAccountDeleteDialog(
+      context: context,
+      profile: p,
+      kind: OwnerAccountDeleteKind.hard,
+    );
+    if (confirm == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await SupabaseService.ownerHardDeleteProfile(
+        profileId: p.id,
+        confirm: confirm,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cuenta borrada. El correo quedó libre para reutilizar.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo borrar: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

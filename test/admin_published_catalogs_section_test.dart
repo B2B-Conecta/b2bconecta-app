@@ -33,6 +33,7 @@ Future<void> _pump(
     required int limit,
     required int offset,
   }) loadProducts,
+  Future<int> Function({required String importerId})? countProducts,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -40,6 +41,7 @@ Future<void> _pump(
         body: AdminPublishedCatalogsSection(
           loadImporters: () async => [_importer()],
           loadProducts: loadProducts,
+          countProducts: countProducts,
         ),
       ),
     ),
@@ -125,4 +127,35 @@ void main() {
     );
     expect(calls, 2);
   });
+
+  testWidgets(
+    'el paginador muestra el total publicado, no solo el lote cargado',
+    (tester) async {
+      await _pump(
+        tester,
+        countProducts: ({required String importerId}) async => 87,
+        loadProducts: ({
+          required String importerId,
+          required int limit,
+          required int offset,
+        }) async {
+          if (offset > 0) return const [];
+          return List<PartModel>.generate(
+            10,
+            (i) => PartModel(
+              id: 'p$i',
+              ownerId: _importerA,
+              nombre: 'Repuesto $i',
+              precio: 1,
+              stock: 2,
+              isActive: true,
+            ),
+          );
+        },
+      );
+      await tester.tap(find.text('Mayorista Andino'));
+      await tester.pumpAndSettle();
+      expect(find.text('1–10 de 87'), findsOneWidget);
+    },
+  );
 }

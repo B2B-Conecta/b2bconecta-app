@@ -7,8 +7,12 @@ class PromoCampaignModel {
     required this.campaignType,
     required this.imageStoragePath,
     required this.imagePublicUrl,
+    this.imageWidth,
+    this.imageHeight,
     this.mobileImageStoragePath,
     this.mobileImagePublicUrl,
+    this.mobileImageWidth,
+    this.mobileImageHeight,
     this.importadorId,
     this.productId,
     this.productIds = const [],
@@ -47,8 +51,12 @@ class PromoCampaignModel {
   final String campaignType;
   final String imageStoragePath;
   final String imagePublicUrl;
+  final int? imageWidth;
+  final int? imageHeight;
   final String? mobileImageStoragePath;
   final String? mobileImagePublicUrl;
+  final int? mobileImageWidth;
+  final int? mobileImageHeight;
 
   String imageUrlForWidth(double width) {
     final desktop = imagePublicUrl.trim();
@@ -268,8 +276,12 @@ class PromoCampaignModel {
       campaignType: json['campaign_type']?.toString() ?? typeBanner,
       imageStoragePath: json['image_storage_path']?.toString() ?? '',
       imagePublicUrl: json['image_public_url']?.toString() ?? '',
+      imageWidth: (json['image_width'] as num?)?.toInt(),
+      imageHeight: (json['image_height'] as num?)?.toInt(),
       mobileImagePublicUrl: json['mobile_image_public_url']?.toString(),
       mobileImageStoragePath: json['mobile_image_storage_path']?.toString(),
+      mobileImageWidth: (json['mobile_image_width'] as num?)?.toInt(),
+      mobileImageHeight: (json['mobile_image_height'] as num?)?.toInt(),
       importadorId: json['importador_id']?.toString(),
       productId: ids.isEmpty ? single : ids.first,
       productIds: ids,
@@ -312,6 +324,8 @@ class PromoCampaignModel {
       'campaign_type': campaignType,
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
+      'image_width': imageWidth,
+      'image_height': imageHeight,
       'mobile_image_public_url': mobileImagePublicUrl?.trim().isNotEmpty == true
           ? mobileImagePublicUrl!.trim()
           : null,
@@ -319,6 +333,10 @@ class PromoCampaignModel {
           mobileImageStoragePath?.trim().isNotEmpty == true
               ? mobileImageStoragePath!.trim()
               : null,
+      'mobile_image_width':
+          mobileImagePublicUrl?.trim().isNotEmpty == true ? mobileImageWidth : null,
+      'mobile_image_height':
+          mobileImagePublicUrl?.trim().isNotEmpty == true ? mobileImageHeight : null,
       'importador_id': importadorId,
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,
@@ -350,6 +368,8 @@ class PromoCampaignModel {
       'campaign_type': campaignType,
       'image_storage_path': imageStoragePath,
       'image_public_url': imagePublicUrl,
+      'image_width': imageWidth,
+      'image_height': imageHeight,
       'mobile_image_public_url': mobileImagePublicUrl?.trim().isNotEmpty == true
           ? mobileImagePublicUrl!.trim()
           : null,
@@ -357,6 +377,10 @@ class PromoCampaignModel {
           mobileImageStoragePath?.trim().isNotEmpty == true
               ? mobileImageStoragePath!.trim()
               : null,
+      'mobile_image_width':
+          mobileImagePublicUrl?.trim().isNotEmpty == true ? mobileImageWidth : null,
+      'mobile_image_height':
+          mobileImagePublicUrl?.trim().isNotEmpty == true ? mobileImageHeight : null,
       'importador_id': importadorId,
       'product_id': ids.isEmpty ? null : ids.first,
       'product_ids': ids,

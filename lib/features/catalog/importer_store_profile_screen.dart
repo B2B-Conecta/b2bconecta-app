@@ -32,6 +32,7 @@ class ImporterStoreCatalogSource {
     required this.fetchProfile,
     required this.fetchCategories,
     required this.fetchParts,
+    this.fetchCount,
     this.fetchVisibleProduct,
   });
 
@@ -42,6 +43,9 @@ class ImporterStoreCatalogSource {
     required int offset,
     required CatalogFilters filters,
   }) fetchParts;
+
+  /// Conteo exacto con los mismos filtros que [fetchParts].
+  final Future<int> Function({required CatalogFilters filters})? fetchCount;
   final Future<PartModel?> Function({
     required String importerId,
     required String productId,
@@ -60,6 +64,8 @@ class ImporterStoreCatalogSource {
           offset: offset,
           filters: filters,
         ),
+        fetchCount: ({required CatalogFilters filters}) =>
+            SupabaseService.fetchProductsCount(filters: filters),
         fetchVisibleProduct: ({
           required String importerId,
           required String productId,
@@ -127,10 +133,14 @@ class _ImporterStoreProfileScreenState
   String? _error;
   bool _loadingMore = false;
   bool _hasMore = true;
+  int? _matchingTotal;
   String? _selectedCategory;
   int _viewPage = 0;
   int _viewPageSize = listPageSizeOptions.first;
   int _loadGen = 0;
+
+  int get _pagerTotal =>
+      listPagerTotal(loaded: _parts.length, matching: _matchingTotal);
 
   CatalogFilters get _filters => CatalogFilters.importerStore(
         importerId: widget.importerId,
@@ -181,6 +191,7 @@ class _ImporterStoreProfileScreenState
         _categories = cats;
         _loadingProfile = false;
         _parts.clear();
+        _matchingTotal = null;
         _hasMore = true;
         _viewPage = 0;
       });
@@ -201,9 +212,16 @@ class _ImporterStoreProfileScreenState
     try {
       if (reset) {
         _parts.clear();
+        _matchingTotal = null;
         _hasMore = true;
         _viewPage = 0;
       }
+      final countFn = _source.fetchCount;
+      final countFuture = reset && countFn != null
+          ? countFn(filters: _filters)
+              .then<int?>((value) => value)
+              .catchError((_) => null)
+          : null;
       final page = await _source.fetchParts(
         limit: _viewPageSize,
         offset: _parts.length,
@@ -215,9 +233,21 @@ class _ImporterStoreProfileScreenState
         parts: page,
         category: _selectedCategory,
       );
+      int? matching = _matchingTotal;
+      if (countFuture != null) {
+        matching = await countFuture;
+        if (!mounted || gen != _loadGen) return;
+      }
+      final loaded = _parts.length + kept.length;
       setState(() {
+        if (reset) _matchingTotal = matching;
         _parts.addAll(kept);
-        _hasMore = page.length >= _viewPageSize;
+        _hasMore = listPagerHasMore(
+          loaded: loaded,
+          batchLength: page.length,
+          fetchSize: _viewPageSize,
+          matching: reset ? matching : _matchingTotal,
+        );
         _loadingMore = false;
       });
     } catch (e) {
@@ -237,7 +267,13 @@ class _ImporterStoreProfileScreenState
       if (!mounted || _parts.length == before) break;
     }
     if (!mounted) return;
-    setState(() => _viewPage = index);
+    setState(() {
+      _viewPage = clampListPageIndex(
+        pageIndex: index,
+        total: _pagerTotal,
+        pageSize: _viewPageSize,
+      );
+    });
   }
 
   void _selectCategory(String? category) {
@@ -496,7 +532,7 @@ class _ImporterStoreProfileScreenState
             padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 24),
             sliver: SliverToBoxAdapter(
               child: ListPageBar(
-                total: _parts.length,
+                total: _pagerTotal,
                 hasMore: _hasMore,
                 pageIndex: _viewPage,
                 pageSize: _viewPageSize,

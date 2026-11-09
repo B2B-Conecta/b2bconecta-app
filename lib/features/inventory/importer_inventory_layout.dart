@@ -1,4 +1,5 @@
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 
 /// Layout responsive del inventario importador (móvil / escritorio).
 abstract final class ImporterInventoryLayout {
@@ -21,10 +22,8 @@ abstract final class ImporterInventoryLayout {
 
 /// Total que muestra el paginador. [matching] es el conteo con los filtros
 /// activos; si todavía no llegó, se usa lo ya cargado.
-int inventoryPagerTotal({required int loaded, int? matching}) {
-  if (matching == null || matching < loaded) return loaded;
-  return matching;
-}
+int inventoryPagerTotal({required int loaded, int? matching}) =>
+    listPagerTotal(loaded: loaded, matching: matching);
 
 /// Hay filas más allá del lote en memoria.
 bool inventoryHasMore({
@@ -32,10 +31,13 @@ bool inventoryHasMore({
   required int batchLength,
   required int fetchSize,
   int? matching,
-}) {
-  if (matching != null) return loaded < matching;
-  return fetchSize > 0 && batchLength >= fetchSize;
-}
+}) =>
+    listPagerHasMore(
+      loaded: loaded,
+      batchLength: batchLength,
+      fetchSize: fetchSize,
+      matching: matching,
+    );
 
 /// Subtítulo del inventario. Sin filtros coincide con el paginador.
 /// Con filtros explica el recorte: «12 de 45 productos».

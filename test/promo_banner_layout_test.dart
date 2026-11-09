@@ -36,19 +36,38 @@ void main() {
     expect(promoBannerCaption(campaign('Marca externa', advertising: true)),
         'Publicidad · Marca externa');
   });
-  test('artwork retains its proportions on phones and wide windows', () {
-    for (final width in [320.0, 390.0, 800.0, 1500.0]) {
-      for (final ratio in [2.0, 3.0, 5.0]) {
-        final size = promoBannerImageSize(width, ratio);
-        expect(size.width, lessThanOrEqualTo(width));
-        expect(size.height, lessThanOrEqualTo(width < 600 ? 180 : 220));
-        expect(size.width / size.height, closeTo(ratio, .001));
-      }
-    }
+
+  test('frame uses fixed 3:1 on phones and 7:1 on wide windows', () {
+    final phone = promoBannerFrameSize(390);
+    expect(phone.width / phone.height, closeTo(PromoBannerSpec.mobileAspect, .001));
+    expect(phone.height, lessThanOrEqualTo(180));
+
+    final desktop = promoBannerFrameSize(1400);
     expect(
-        promoBannerImageSize(390, double.nan).width /
-            promoBannerImageSize(390, double.nan).height,
-        3);
+      desktop.width / desktop.height,
+      closeTo(PromoBannerSpec.desktopAspect, .001),
+    );
+    expect(desktop.height, lessThanOrEqualTo(220));
+    expect(desktop.width, lessThanOrEqualTo(1400));
+  });
+
+  test('resolution guard rejects undersized crops', () {
+    expect(
+      promoBannerResolutionError(width: 800, height: 114, mobile: false),
+      contains('1200'),
+    );
+    expect(
+      promoBannerResolutionError(width: 2100, height: 300, mobile: false),
+      isNull,
+    );
+    expect(
+      promoBannerResolutionError(width: 900, height: 300, mobile: true),
+      contains('1200'),
+    );
+    expect(
+      promoBannerResolutionError(width: 1200, height: 400, mobile: true),
+      isNull,
+    );
   });
 
   for (final width in [360.0, 1400.0]) {
@@ -87,6 +106,9 @@ void main() {
       expect(find.text('Ver promoción'), findsNothing);
       expect(
           tester.getSize(find.byType(PageView)).height, lessThanOrEqualTo(220));
+      final expectedRatio = PromoBannerSpec.aspectForWidth(width);
+      final pageSize = tester.getSize(find.byType(PageView));
+      expect(pageSize.width / pageSize.height, closeTo(expectedRatio, .05));
       await tester.tap(find.byType(PageView));
       expect(opened, same(campaign));
       expect(tester.takeException(), isNull);

@@ -15,6 +15,7 @@ class AdminPublishedCatalogsSection extends StatefulWidget {
     super.key,
     this.loadImporters,
     this.loadProducts,
+    this.countProducts,
     this.loadCatalog,
     this.setProductActive,
     this.focusImporter,
@@ -27,6 +28,7 @@ class AdminPublishedCatalogsSection extends StatefulWidget {
     required int limit,
     required int offset,
   })? loadProducts;
+  final Future<int> Function({required String importerId})? countProducts;
   final Future<List<PartModel>> Function({required String importerId})?
       loadCatalog;
   final Future<int> Function({
@@ -56,6 +58,7 @@ class _AdminPublishedCatalogsSectionState
   bool _loadingProducts = false;
   bool _loadingMore = false;
   bool _hasMore = false;
+  int? _matchingTotal;
   String? _productsError;
   bool _showHidden = false;
   String? _busyProductId;
@@ -106,6 +109,18 @@ class _AdminPublishedCatalogsSectionState
     );
   }
 
+  Future<int?> _fetchPublishedCount(String importerId) async {
+    final custom = widget.countProducts;
+    try {
+      if (custom != null) return await custom(importerId: importerId);
+      return await SupabaseService.countAdminPublishedCatalog(
+        importerId: importerId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadImporters() async {
     setState(() {
       _loadingImporters = true;
@@ -131,6 +146,7 @@ class _AdminPublishedCatalogsSectionState
     setState(() {
       _selected = option;
       _products.clear();
+      _matchingTotal = null;
       _hasMore = true;
       _productsError = null;
       _showHidden = false;
@@ -219,6 +235,7 @@ class _AdminPublishedCatalogsSectionState
         _loadingProducts = true;
         _productsError = null;
         _products.clear();
+        _matchingTotal = null;
         _hasMore = true;
       });
     } else {
@@ -227,21 +244,39 @@ class _AdminPublishedCatalogsSectionState
     }
     try {
       final List<PartModel> batch;
+      int? matching = _matchingTotal;
       if (_showHidden) {
         final rows = await _fetchCatalog(selected.id);
         batch = rows.where((part) => !part.isActive).toList();
+        matching = batch.length;
       } else {
+        final countFuture =
+            reset ? _fetchPublishedCount(selected.id) : null;
         batch = await _fetchProducts(
           importerId: selected.id,
           limit: AdminPublishedCatalogsSection.pageSize,
           offset: reset ? 0 : _products.length,
         );
+        if (countFuture != null) matching = await countFuture;
       }
       if (!mounted) return;
+      final loaded = (reset ? 0 : _products.length) + batch.length;
       setState(() {
-        _products.addAll(batch);
+        if (reset) {
+          _products
+            ..clear()
+            ..addAll(batch);
+          _matchingTotal = matching;
+        } else {
+          _products.addAll(batch);
+        }
         _hasMore = !_showHidden &&
-            batch.length >= AdminPublishedCatalogsSection.pageSize;
+            listPagerHasMore(
+              loaded: loaded,
+              batchLength: batch.length,
+              fetchSize: AdminPublishedCatalogsSection.pageSize,
+              matching: matching,
+            );
         _loadingProducts = false;
         _loadingMore = false;
       });
@@ -372,6 +407,7 @@ class _AdminPublishedCatalogsSectionState
                   setState(() {
                     _selected = null;
                     _products.clear();
+                    _matchingTotal = null;
                     _productsError = null;
                     _showHidden = false;
                   });
@@ -427,6 +463,7 @@ class _AdminPublishedCatalogsSectionState
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       separator: 8,
       hasMore: _hasMore,
+      totalCount: _matchingTotal,
       onNeedMore: _loadingMore ? null : () => _loadProducts(reset: false),
       itemBuilder: (part) => _PublishedProductTile(
         part: part,

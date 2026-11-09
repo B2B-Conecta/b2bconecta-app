@@ -42,7 +42,11 @@ supabase migration list
 
 Datos:
 
-- Opción rápida QA: `seed.sql` también en DEV.
+- Opción rápida QA: `seed.sql` también en DEV (incluye enrichment de catálogo).
+- Fotos del seed (generadas): `supabase/seed_assets/product-images/` →  
+  `bash scripts/upload_seed_product_images.sh staging`  
+  luego `supabase db query --linked -f supabase/scripts/seed_enrich_catalog.sql`  
+  (o re-ejecutar `seed.sql` completo tras el upload).
 - Opción real: dump/restore desde staging MotoLink (`lwrqjpqyitnveizshawc`).
 
 ```bash

@@ -6,12 +6,24 @@ import 'package:motolink_pro_app/features/inventory/importer_inventory_layout.da
 
 void main() {
   test('el paginador usa el total filtrado, no el lote de 40', () {
+    expect(listPagerTotal(loaded: 40, matching: 87), 87);
+    expect(listPagerTotal(loaded: 40, matching: null), 40);
+    expect(listPagerTotal(loaded: 40, matching: 12), 40);
     expect(inventoryPagerTotal(loaded: 40, matching: 87), 87);
     expect(inventoryPagerTotal(loaded: 40, matching: null), 40);
     expect(inventoryPagerTotal(loaded: 40, matching: 12), 40);
   });
 
   test('hay más páginas hasta cubrir el conteo, y se detiene al final', () {
+    expect(
+      listPagerHasMore(
+        loaded: 40,
+        batchLength: 40,
+        fetchSize: 40,
+        matching: 87,
+      ),
+      isTrue,
+    );
     expect(
       inventoryHasMore(loaded: 40, batchLength: 40, fetchSize: 40, matching: 87),
       isTrue,

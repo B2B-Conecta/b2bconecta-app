@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'importer_shell_tabs.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
 
 /// Permite cambiar la pestaña del [MainShell] desde hijos o rutas apiladas
 /// (p. ej. importador → tab Pedidos tras marcar en preparación).
@@ -46,9 +47,22 @@ class MainShellTabController {
   static bool _importerCommissionPreferPendiente = false;
   static String? _pendingKycProfileId;
   static VoidCallback? _adminKycNotificationDeepLink;
+  static String? _pendingAccountProfileId;
+  static VoidCallback? _adminAccountNotificationDeepLink;
+  static AdminUsersHubSection? _pendingAdminUsersSection;
+  static VoidCallback? _adminUsersHubDeepLink;
   static String? _pendingSupportTicketId;
   static VoidCallback? _adminSupportNotificationDeepLink;
   static VoidCallback? _b2bSupportNotificationDeepLink;
+
+  /// Admin: pestaña Usuarios (hub Verificación · Cuentas · Actividad).
+  static const int adminUsersTabIndex = 4;
+
+  /// Admin: pestaña Soporte (tras fusionar Cuentas en Usuarios).
+  static const int adminSupportTabIndex = 5;
+
+  /// Admin: pestaña Perfil.
+  static const int adminProfileTabIndexDefault = 6;
 
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
@@ -82,10 +96,14 @@ class MainShellTabController {
     _importerCommissionPreferPendiente = false;
     _pendingKycProfileId = null;
     _adminKycNotificationDeepLink = null;
+    _pendingAccountProfileId = null;
+    _adminAccountNotificationDeepLink = null;
+    _pendingAdminUsersSection = null;
+    _adminUsersHubDeepLink = null;
     _pendingSupportTicketId = null;
     _adminSupportNotificationDeepLink = null;
     _b2bSupportNotificationDeepLink = null;
-    _adminProfileTabIndex = 7;
+    _adminProfileTabIndex = adminProfileTabIndexDefault;
   }
 
   /// [ImporterInventoryDashboard] registra [reload] para refrescar stock tras entrega.
@@ -330,17 +348,46 @@ class MainShellTabController {
     });
   }
 
-  static int _adminProfileTabIndex = 7;
+  static int _adminProfileTabIndex = adminProfileTabIndexDefault;
 
-  /// Admin: pestaña Verificación KYC (índice 4).
+  /// Admin: hub Usuarios → Verificación (deep link `userId` / KYC).
   static void navigateToAdminKycForNotification() {
-    _goTo?.call(4);
+    navigateToAdminUsers(
+      section: AdminUsersHubSection.verificacion,
+      userId: peekPendingKycProfileId(),
+    );
+  }
+
+  /// Admin: hub Usuarios (sección + ficha `userId` opcional).
+  static void navigateToAdminUsers({
+    AdminUsersHubSection section = AdminUsersHubSection.verificacion,
+    String? userId,
+  }) {
+    _pendingAdminUsersSection = section;
+    final id = userId?.trim();
+    if (id != null && id.isNotEmpty) {
+      switch (section) {
+        case AdminUsersHubSection.verificacion:
+          setPendingKycProfileId(id);
+        case AdminUsersHubSection.cuentas:
+          setPendingAccountProfileId(id);
+        case AdminUsersHubSection.actividad:
+          break;
+      }
+    }
+    _goTo?.call(adminUsersTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      _adminKycNotificationDeepLink?.call();
+      _adminUsersHubDeepLink?.call();
+      if (section == AdminUsersHubSection.verificacion) {
+        _adminKycNotificationDeepLink?.call();
+      }
+      if (section == AdminUsersHubSection.cuentas) {
+        _adminAccountNotificationDeepLink?.call();
+      }
     });
   }
 
-  /// Admin: pestaña Perfil (índice 7; Cuentas ocupa el 6).
+  /// Admin: pestaña Perfil.
   static void registerAdminProfileTabIndex(int index) {
     _adminProfileTabIndex = index;
   }
@@ -349,13 +396,17 @@ class MainShellTabController {
     _goTo?.call(_adminProfileTabIndex);
   }
 
-  /// Cada incremento pide abrir Reportes → Usuarios → Presencia.
+  /// Cada incremento pide abrir Usuarios → Actividad → Presencia.
   static final ValueNotifier<int> adminPresenceRequest = ValueNotifier<int>(0);
 
-  /// Admin: pestaña Reportes (índice 1) con la presencia desplegada.
+  /// Admin: hub Usuarios → Actividad con la presencia desplegada.
   static void navigateToAdminPresence() {
-    _goTo?.call(1);
-    adminPresenceRequest.value++;
+    _pendingAdminUsersSection = AdminUsersHubSection.actividad;
+    _goTo?.call(adminUsersTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminUsersHubDeepLink?.call();
+      adminPresenceRequest.value++;
+    });
   }
 
   /// Admin: pestaña Comisiones (índice 3).
@@ -461,9 +512,44 @@ class MainShellTabController {
     return v;
   }
 
-  /// Admin: pestaña Soporte (índice 5).
+  static void registerAdminAccountNotificationDeepLink(
+      VoidCallback? onNavigate) {
+    _adminAccountNotificationDeepLink = onNavigate;
+  }
+
+  static void setPendingAccountProfileId(String? profileId) {
+    final s = profileId?.trim();
+    _pendingAccountProfileId = (s == null || s.isEmpty) ? null : s;
+  }
+
+  static String? peekPendingAccountProfileId() {
+    final s = _pendingAccountProfileId?.trim();
+    if (s == null || s.isEmpty) return null;
+    return s;
+  }
+
+  static String? consumePendingAccountProfileId() {
+    final v = _pendingAccountProfileId;
+    _pendingAccountProfileId = null;
+    return v;
+  }
+
+  static void registerAdminUsersHubDeepLink(VoidCallback? onNavigate) {
+    _adminUsersHubDeepLink = onNavigate;
+  }
+
+  static AdminUsersHubSection? consumePendingAdminUsersSection() {
+    final v = _pendingAdminUsersSection;
+    _pendingAdminUsersSection = null;
+    return v;
+  }
+
+  static AdminUsersHubSection? peekPendingAdminUsersSection() =>
+      _pendingAdminUsersSection;
+
+  /// Admin: pestaña Soporte.
   static void navigateToAdminSupportForNotification() {
-    _goTo?.call(5);
+    _goTo?.call(adminSupportTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminSupportNotificationDeepLink?.call();
     });

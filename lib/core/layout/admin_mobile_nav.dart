@@ -114,7 +114,7 @@ class AdminMobileNav extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Verificación, soporte, cuentas y perfil',
+                  'Usuarios, soporte y perfil',
                   style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,

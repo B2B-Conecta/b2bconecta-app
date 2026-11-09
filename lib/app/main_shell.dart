@@ -24,8 +24,7 @@ import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
 import 'package:motolink_pro_app/features/admin/admin_encomiendas_report_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_daily_presence_card.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
-import 'package:motolink_pro_app/features/kyc/admin_kyc_review_panel.dart';
-import 'package:motolink_pro_app/features/admin/admin_account_management_panel.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_hub_panel.dart';
 import 'package:motolink_pro_app/features/reputation/admin_order_ratings_panel.dart';
 import 'package:motolink_pro_app/features/orders/admin/admin_orders_panel.dart';
 import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.dart';
@@ -124,7 +123,9 @@ class _MainShellState extends State<MainShell> {
       );
     }
     if (widget.homeRole == AppHomeRole.administrador) {
-      MainShellTabController.registerAdminProfileTabIndex(7);
+      MainShellTabController.registerAdminProfileTabIndex(
+        MainShellTabController.adminProfileTabIndexDefault,
+      );
     }
     unawaited(SupabaseService.touchMyPresence());
     _presenceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -242,7 +243,9 @@ class _MainShellState extends State<MainShell> {
     if (!mounted || p == null) return;
     setState(() => _profile = p);
     if (widget.homeRole == AppHomeRole.administrador) {
-      MainShellTabController.registerAdminProfileTabIndex(7);
+      MainShellTabController.registerAdminProfileTabIndex(
+        MainShellTabController.adminProfileTabIndexDefault,
+      );
     }
   }
 
@@ -284,11 +287,11 @@ class _MainShellState extends State<MainShell> {
       subtitle: 'Devengo · cortes · facturación',
     ),
     AdminShellDestination(
-      icon: Icons.verified_user_outlined,
-      selectedIcon: Icons.verified_user,
-      label: 'Verificación',
-      title: 'Verificación',
-      subtitle: 'Tiendas minoristas · mayoristas',
+      icon: Icons.manage_accounts_outlined,
+      selectedIcon: Icons.manage_accounts,
+      label: 'Usuarios',
+      title: 'Usuarios',
+      subtitle: 'Verificación · cuentas · actividad',
     ),
     AdminShellDestination(
       icon: Icons.support_agent_outlined,
@@ -298,14 +301,6 @@ class _MainShellState extends State<MainShell> {
       subtitle: 'Reclamos · respuesta',
     ),
   ];
-
-  static const _adminCuentasDestination = AdminShellDestination(
-    icon: Icons.manage_accounts_outlined,
-    selectedIcon: Icons.manage_accounts,
-    label: 'Cuentas',
-    title: 'Cuentas',
-    subtitle: 'Roles · acceso',
-  );
 
   static const _adminProfileDestination = AdminShellDestination(
     icon: Icons.person_outline,
@@ -318,7 +313,6 @@ class _MainShellState extends State<MainShell> {
   List<AdminShellDestination> get _adminDestinations {
     return [
       ..._adminPanelDestinations,
-      _adminCuentasDestination,
       _adminProfileDestination,
     ];
   }
@@ -412,12 +406,8 @@ class _MainShellState extends State<MainShell> {
       const AdminEncomiendasReportPanel(),
       const AdminOrderRatingsPanel(),
       AdminCommissionSettlementsPanel(viewerRole: _profile.role),
-      AdminKycReviewPanel(
-        viewerRole: _profile.role,
-        viewerIsOwner: _profile.isOwner,
-      ),
+      AdminUsersHubPanel(viewer: _profile),
       const AdminSupportTicketsPanel(),
-      AdminAccountManagementPanel(viewer: _profile),
     ];
   }
 
@@ -442,7 +432,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Pestañas admin: Pedidos … Soporte, Cuentas y Perfil.
+  /// Pestañas admin: Pedidos … Usuarios, Soporte y Perfil.
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,

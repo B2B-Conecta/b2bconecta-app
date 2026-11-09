@@ -64,6 +64,7 @@ class ListPageBar extends StatelessWidget {
     this.hasMore = false,
     this.pageSizeOptions = listPageSizeOptions,
     this.alwaysShow = false,
+    this.topPadding = 12,
     this.bottomPadding = 10,
   });
 
@@ -81,6 +82,9 @@ class ListPageBar extends StatelessWidget {
 
   /// Muestra la barra aunque la lista quepa en una página.
   final bool alwaysShow;
+
+  /// Separación respecto a filtros / barra de búsqueda encima.
+  final double topPadding;
   final double bottomPadding;
 
   @override
@@ -115,7 +119,7 @@ class ListPageBar extends StatelessWidget {
     );
 
     return Padding(
-      padding: EdgeInsets.only(bottom: bottomPadding),
+      padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
       child: LayoutBuilder(builder: (context, constraints) {
         return Wrap(
             alignment: WrapAlignment.spaceBetween,

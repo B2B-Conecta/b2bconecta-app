@@ -14,14 +14,15 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
+import 'package:motolink_pro_app/features/admin/admin_standard_filter_bar.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_filter_bar.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_filter_models.dart';
 
 enum _AccountListMode { cuentas, incompletos }
-
-enum _AccountRoleFilter { todos, aliados, importadores, administracion }
-
-enum _AccountStateFilter { todos, activas, borrador, revision, bloqueadas, eliminadas }
 
 enum _IncompleteFilter { todos, sinConfirmar, confirmados }
 
@@ -31,9 +32,13 @@ class AdminAccountManagementPanel extends StatefulWidget {
   const AdminAccountManagementPanel({
     super.key,
     required this.viewer,
+    this.embeddedInHub = false,
   });
 
   final ProfileModel viewer;
+
+  /// Embebido en [AdminUsersHubPanel].
+  final bool embeddedInHub;
 
   @override
   State<AdminAccountManagementPanel> createState() =>
@@ -52,8 +57,9 @@ class _AdminAccountManagementPanelState
   _AccountListMode _mode = _AccountListMode.cuentas;
   _IncompleteFilter _incompleteFilter = _IncompleteFilter.todos;
   String? _busyId;
-  _AccountRoleFilter _roleFilter = _AccountRoleFilter.todos;
-  _AccountStateFilter _stateFilter = _AccountStateFilter.todos;
+  String? _previewProfileId;
+  AdminUserEstadoFilter _estado = AdminUserEstadoFilter.todos;
+  AdminUserRolFilter _rol = AdminUserRolFilter.todos;
   OwnerAccountSort _sort = OwnerAccountSort.newest;
   final _searchCtrl = TextEditingController();
   final _listScroll = ScrollController();
@@ -63,15 +69,46 @@ class _AdminAccountManagementPanelState
   @override
   void initState() {
     super.initState();
+    MainShellTabController.registerAdminAccountNotificationDeepLink(
+      _consumeAccountDeepLink,
+    );
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
     _load();
   }
 
   @override
   void dispose() {
+    MainShellTabController.registerAdminAccountNotificationDeepLink(null);
     _searchCtrl.dispose();
     _listScroll.dispose();
     super.dispose();
+  }
+
+  ProfileModel? _findProfile(String id) {
+    for (final p in _rows) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  void _consumeAccountDeepLink() {
+    final pending = MainShellTabController.consumePendingAccountProfileId();
+    if (pending == null || !mounted) return;
+    setState(() {
+      _mode = _AccountListMode.cuentas;
+      _previewProfileId = pending;
+      _estado = AdminUserEstadoFilter.todos;
+      _rol = AdminUserRolFilter.todos;
+      _searchCtrl.clear();
+    });
+    if (!isAdminDesktopLayout(context)) {
+      final p = _findProfile(pending);
+      if (p != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _openAccountPreview(p);
+        });
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -86,6 +123,7 @@ class _AdminAccountManagementPanelState
         _rows = rows;
         _loading = false;
       });
+      _consumeAccountDeepLink();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -160,50 +198,130 @@ class _AdminAccountManagementPanelState
     final q = _searchCtrl.text.trim().toLowerCase();
     final filtered = _rows.where((p) {
       final role = p.role?.trim().toLowerCase();
-      switch (_roleFilter) {
-        case _AccountRoleFilter.aliados:
+      switch (_rol) {
+        case AdminUserRolFilter.minorista:
           if (role != 'aliado') return false;
-        case _AccountRoleFilter.importadores:
+        case AdminUserRolFilter.mayorista:
           if (role != 'importador') return false;
-        case _AccountRoleFilter.administracion:
+        case AdminUserRolFilter.administracion:
           if (role != 'administrador') return false;
-        case _AccountRoleFilter.todos:
+        case AdminUserRolFilter.todos:
           break;
       }
       final access = p.accountAccessStatus?.trim();
-      switch (_stateFilter) {
-        case _AccountStateFilter.activas:
+      switch (_estado) {
+        case AdminUserEstadoFilter.pendiente:
+          if (p.isDeactivated ||
+              (access != AccountAccessStatus.draft &&
+                  access != AccountAccessStatus.pendingReview)) {
+            return false;
+          }
+        case AdminUserEstadoFilter.verificado:
+          if (p.isDeactivated ||
+              access != AccountAccessStatus.active ||
+              (role == 'aliado' && p.kycStatus?.trim() != 'aprobado')) {
+            return false;
+          }
+        case AdminUserEstadoFilter.activo:
           if (p.isDeactivated || access != AccountAccessStatus.active) {
             return false;
           }
-        case _AccountStateFilter.borrador:
-          if (p.isDeactivated || access != AccountAccessStatus.draft) {
+        case AdminUserEstadoFilter.bloqueado:
+          if (!p.isDeactivated && access != AccountAccessStatus.rejected) {
             return false;
           }
-        case _AccountStateFilter.revision:
-          if (p.isDeactivated || access != AccountAccessStatus.pendingReview) {
-            return false;
-          }
-        case _AccountStateFilter.bloqueadas:
-          if (p.isDeactivated || access != AccountAccessStatus.rejected) {
-            return false;
-          }
-        case _AccountStateFilter.eliminadas:
-          if (!p.isDeactivated) return false;
-        case _AccountStateFilter.todos:
+        case AdminUserEstadoFilter.todos:
           break;
       }
+      if (p.id == _previewProfileId) return true;
       return ownerAccountMatchesQuery(p, q);
     });
     return sortOwnerAccounts(filtered, sort: _sort);
   }
 
-  bool _canChangeRole(ProfileModel p) => OwnerAccountRules.canManageTarget(
-        viewerIsOwner: widget.viewer.isOwner,
-        viewerId: widget.viewer.id,
-        targetId: p.id,
-        targetIsOwner: p.isOwner,
-      );
+  Future<void> _openAccountPreview(ProfileModel p) async {
+    setState(() => _previewProfileId = p.id);
+    if (isAdminDesktopLayout(context)) return;
+    await showAdaptiveAdminSheet<void>(
+      context: context,
+      draggable: true,
+      initialChildSize: 0.86,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      builder: (ctx, scroll) {
+        return ListView(
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            Text(
+              p.businessName?.trim().isNotEmpty == true
+                  ? p.businessName!.trim()
+                  : (p.email ?? 'Sin nombre'),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            OwnerAccountDossier(
+              profile: p,
+              isSelf: p.id == widget.viewer.id,
+            ),
+            const SizedBox(height: 12),
+            if (_canChangeRole(p)) ...[
+              FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: _busyId == p.id ? null : () => _changeRole(p),
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('Corregir rol (minorista / mayorista)'),
+              ),
+              const SizedBox(height: 8),
+            ],
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                final changed = await OwnerAccountDossierForm.open(
+                  context,
+                  existing: p,
+                  allowAdminRole: widget.viewer.isOwner,
+                  canDeleteAccount: _canOperate(p),
+                );
+                if (changed == true && mounted) await _load();
+              },
+              child: const Text('Abrir expediente'),
+            ),
+            ..._previewDangerActions(p),
+          ],
+        );
+      },
+    );
+  }
+
+  bool _canChangeRole(ProfileModel p) {
+    if (OwnerAccountRules.canChangeB2bRole(
+      viewerIsOwner: widget.viewer.isOwner,
+      viewerRole: widget.viewer.role,
+      viewerId: widget.viewer.id,
+      targetId: p.id,
+      targetIsOwner: p.isOwner,
+      targetRole: p.role,
+    )) {
+      return true;
+    }
+    // Owner: también puede asignar rol administrador.
+    return OwnerAccountRules.canManageTarget(
+      viewerIsOwner: widget.viewer.isOwner,
+      viewerId: widget.viewer.id,
+      targetId: p.id,
+      targetIsOwner: p.isOwner,
+    );
+  }
 
   bool _canOperate(ProfileModel p) => OwnerAccountRules.canDeleteTarget(
         viewerIsOwner: widget.viewer.isOwner,
@@ -267,28 +385,62 @@ class _AdminAccountManagementPanelState
   }
 
   Future<void> _changeRole(ProfileModel p) async {
-    final picked = await showModalBottomSheet<String>(
+    final roles = <String>[
+      'aliado',
+      'importador',
+      if (widget.viewer.isOwner) 'administrador',
+    ];
+    final current = p.role?.trim().toLowerCase();
+    final picked = await showDialog<String>(
       context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Cambiar rol',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Corregir rol de la cuenta'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Si se registró como mayorista por error (o al revés), '
+                'elija el rol correcto.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
-            for (final role in ['aliado', 'importador', 'administrador'])
-              ListTile(
-                title: Text(ProfileRoleLabels.labelEs(role)),
-                selected: p.role?.trim().toLowerCase() == role,
-                onTap: () => Navigator.of(ctx).pop(role),
-              ),
-          ],
+              const SizedBox(height: 12),
+              for (final role in roles)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(ProfileRoleLabels.labelEs(role)),
+                  subtitle: role == 'administrador'
+                      ? null
+                      : Text(
+                          role == 'aliado'
+                              ? 'Tienda minorista'
+                              : 'Importador / mayorista',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                  selected: current == role,
+                  trailing: current == role
+                      ? Icon(Icons.check, color: AppColors.brand)
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(role),
+                ),
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+        ],
       ),
     );
     if (picked == null || picked == p.role?.trim().toLowerCase()) return;
@@ -438,7 +590,7 @@ class _AdminAccountManagementPanelState
     if (!mounted || !done) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cuenta deshabilitada (baja lógica).'),
+        content: Text('Cuenta dada de baja. Historial y correo se conservan.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -458,12 +610,60 @@ class _AdminAccountManagementPanelState
       );
     });
     if (!mounted || !done) return;
+    if (_previewProfileId == p.id) {
+      setState(() => _previewProfileId = null);
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cuenta borrada. El correo quedó libre.'),
+        content: Text('Cuenta borrada. El correo quedó libre para reutilizar.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  List<Widget> _previewDangerActions(ProfileModel p) {
+    if (!_canOperate(p)) return const [];
+    final style = OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(44),
+      foregroundColor: Colors.red.shade800,
+    );
+    return [
+      const SizedBox(height: 16),
+      Text(
+        'Cuenta',
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      const SizedBox(height: 8),
+      if (!p.isDeactivated)
+        OutlinedButton.icon(
+          style: style,
+          onPressed: () => _deactivate(p),
+          icon: const Icon(Icons.person_off_outlined, size: 18),
+          label: const Text(OwnerAccountRules.softDeleteActionLabel),
+        ),
+      if (!p.isDeactivated) const SizedBox(height: 8),
+      OutlinedButton.icon(
+        style: style,
+        onPressed: () => _hardDelete(p),
+        icon: const Icon(Icons.delete_forever_outlined, size: 18),
+        label: const Text(OwnerAccountRules.hardDeleteActionLabel),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        p.isDeactivated
+            ? 'Borrar libera el correo para un registro nuevo.'
+            : 'Dar de baja conserva historial. Borrar libera el correo.',
+        style: TextStyle(
+          fontSize: 11.5,
+          height: 1.35,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    ];
   }
 
   @override
@@ -496,167 +696,279 @@ class _AdminAccountManagementPanelState
       pageIndex: _pageIndex,
       pageSize: _pageSize,
     );
-    return RefreshIndicator(
+    final desktop = isAdminDesktopLayout(context);
+    final preview =
+        _previewProfileId == null ? null : _findProfile(_previewProfileId!);
+
+    final listBody = RefreshIndicator(
       onRefresh: _mode == _AccountListMode.incompletos ? _loadIncomplete : _load,
       color: AppColors.brand,
       child: ListView(
         controller: _listScroll,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          SegmentedFilterBar(
-            labels: const ['Cuentas', 'Registro incompleto'],
-            selectedIndex: _mode == _AccountListMode.cuentas ? 0 : 1,
-            onSelected: (index) => _selectMode(
-              index == 0
-                  ? _AccountListMode.cuentas
-                  : _AccountListMode.incompletos,
-            ),
-          ),
-          const SizedBox(height: 12),
           if (_mode == _AccountListMode.incompletos)
             ..._incompleteSection()
           else ...[
-          Text(
-            'Ficha completa (correo, teléfono y datos fiscales). '
-            'Puede crear cuentas y cargarles el expediente. '
-            'Eliminar desactiva la cuenta y conserva el historial. '
-            'Borrar definitivo quita la cuenta y libera el correo. '
-            'Si tiene pedidos, se avisa antes y puede revisarlos.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-            ),
-            onPressed: () async {
-              final changed = await OwnerAccountDossierForm.open(
-                context,
-                allowAdminRole: widget.viewer.isOwner,
-              );
-              if (changed == true && mounted) await _load();
-            },
-            icon: const Icon(Icons.person_add_outlined, size: 18),
-            label: const Text('Nueva cuenta'),
-          ),
-          const SizedBox(height: 12),
-          SegmentedFilterBar(
-            labels: [
-              for (final f in _AccountRoleFilter.values) _roleFilterLabel(f),
-            ],
-            selectedIndex: _AccountRoleFilter.values.indexOf(_roleFilter),
-            onSelected: (index) => setState(() {
-              _roleFilter = _AccountRoleFilter.values[index];
-              _pageIndex = 0;
-            }),
-          ),
-          SegmentedFilterBar(
-            labels: [
-              for (final f in _AccountStateFilter.values) _stateFilterLabel(f),
-            ],
-            selectedIndex: _AccountStateFilter.values.indexOf(_stateFilter),
-            onSelected: (index) => setState(() {
-              _stateFilter = _AccountStateFilter.values[index];
-              _pageIndex = 0;
-            }),
-          ),
-          SegmentedFilterBar(
-            labels: [
-              for (final s in OwnerAccountSort.values) s.labelEs,
-            ],
-            selectedIndex: OwnerAccountSort.values.indexOf(_sort),
-            onSelected: (index) => setState(() {
-              _sort = OwnerAccountSort.values[index];
-              _pageIndex = 0;
-            }),
-          ),
-          const SizedBox(height: 4),
-          TextField(
-            controller: _searchCtrl,
-            decoration: InputDecoration(
-              hintText: 'Buscar por nombre, RIF, correo o teléfono…',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+            AdminUsersFilterBar(
+              padding: EdgeInsets.zero,
+              searchController: _searchCtrl,
+              searchHint: 'Buscar por nombre, RIF, correo o teléfono…',
+              estado: _estado,
+              rol: _rol,
+              sort: _sort,
+              includeAdminRol: true,
+              onSearchChanged: (_) => setState(() => _pageIndex = 0),
+              onEstado: (v) => setState(() {
+                _estado = v;
+                _pageIndex = 0;
+              }),
+              onRol: (v) => setState(() {
+                _rol = v;
+                _pageIndex = 0;
+              }),
+              onSort: (v) => setState(() {
+                _sort = v;
+                _pageIndex = 0;
+              }),
+              extraMenus: [
+                AdminFilterDropdown(
+                  icon: Icons.folder_outlined,
+                  placeholder: 'Vista',
+                  valueLabel: 'Cuentas',
+                  active: false,
+                  options: [
+                    AdminFilterOption(
+                      label: 'Cuentas',
+                      selected: true,
+                      onSelect: () {},
+                    ),
+                    AdminFilterOption(
+                      label: 'Registro incompleto',
+                      selected: false,
+                      onSelect: () => _selectMode(_AccountListMode.incompletos),
+                    ),
+                  ],
+                ),
+              ],
+              trailing: IconButton(
+                tooltip: 'Nueva cuenta',
+                onPressed: () async {
+                  final changed = await OwnerAccountDossierForm.open(
+                    context,
+                    allowAdminRole: widget.viewer.isOwner,
+                  );
+                  if (changed == true && mounted) await _load();
+                },
+                icon: const Icon(Icons.person_add_outlined),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.brand,
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.brand,
+                    ),
                   ),
                 ),
               ),
-            ),
-          if (filtered.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Text(
-                  _rows.isEmpty
-                      ? 'No hay cuentas.'
-                      : 'Ninguna cuenta coincide con el filtro.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            if (filtered.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    _rows.isEmpty
+                        ? 'No hay cuentas.'
+                        : 'Ninguna cuenta coincide con el filtro.',
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
                 ),
+              )
+            else ...[
+              ListPageBar(
+                total: filtered.length,
+                pageIndex: _pageIndex,
+                pageSize: _pageSize,
+                onPageIndex: (index) {
+                  setState(() => _pageIndex = index);
+                  if (_listScroll.hasClients) _listScroll.jumpTo(0);
+                },
+                onPageSize: (size) {
+                  setState(() {
+                    _pageSize = size;
+                    _pageIndex = 0;
+                  });
+                  if (_listScroll.hasClients) _listScroll.jumpTo(0);
+                },
               ),
-            )
-          else ...[
-            ListPageBar(
-              total: filtered.length,
-              pageIndex: _pageIndex,
-              pageSize: _pageSize,
-              onPageIndex: (index) {
-                setState(() => _pageIndex = index);
-                if (_listScroll.hasClients) _listScroll.jumpTo(0);
-              },
-              onPageSize: (size) {
-                setState(() {
-                  _pageSize = size;
-                  _pageIndex = 0;
-                });
-                if (_listScroll.hasClients) _listScroll.jumpTo(0);
-              },
-            ),
-            ...page.map(
-              (p) => Padding(
-                key: ValueKey<String>('cuenta-${p.id}'),
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _AccountCard(
-                  profile: p,
+              if (desktop) ...[
+                const SizedBox(height: 8),
+                _AccountsDesktopTable(
+                  rows: page,
                   viewerId: widget.viewer.id,
-                  canOperate: _canOperate(p),
-                  canChangeRole: _canChangeRole(p),
-                  showCatalog: widget.viewer.isOwner &&
+                  selectedId: _previewProfileId,
+                  onSelect: _openAccountPreview,
+                  canOperate: _canOperate,
+                  canChangeRole: _canChangeRole,
+                  showCatalogFor: (p) =>
+                      widget.viewer.isOwner &&
                       p.role?.trim().toLowerCase() == 'importador',
-                  busy: _busyId == p.id,
-                  onEditDossier: () async {
+                  busyId: _busyId,
+                  onEditDossier: (p) async {
                     final changed = await OwnerAccountDossierForm.open(
                       context,
                       existing: p,
                       allowAdminRole: widget.viewer.isOwner,
+                      canDeleteAccount: _canOperate(p),
                     );
                     if (changed == true && mounted) await _load();
                   },
-                  onChangeRole: () => _changeRole(p),
-                  onBlock: () => _block(p),
-                  onReactivate: () => _reactivate(p),
-                  onDeactivate: () => _deactivate(p),
-                  onHardDelete: () => _hardDelete(p),
+                  onChangeRole: _changeRole,
+                  onBlock: _block,
+                  onReactivate: _reactivate,
+                  onDeactivate: _deactivate,
+                  onHardDelete: _hardDelete,
+                ),
+              ] else
+                ...page.map(
+                  (p) => Padding(
+                    key: ValueKey<String>('cuenta-${p.id}'),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AccountCard(
+                      profile: p,
+                      viewerId: widget.viewer.id,
+                      canOperate: _canOperate(p),
+                      canChangeRole: _canChangeRole(p),
+                      showCatalog: widget.viewer.isOwner &&
+                          p.role?.trim().toLowerCase() == 'importador',
+                      busy: _busyId == p.id,
+                      onTapHeader: () => _openAccountPreview(p),
+                      onEditDossier: () async {
+                        final changed = await OwnerAccountDossierForm.open(
+                          context,
+                          existing: p,
+                          allowAdminRole: widget.viewer.isOwner,
+                          canDeleteAccount: _canOperate(p),
+                        );
+                        if (changed == true && mounted) await _load();
+                      },
+                      onChangeRole: () => _changeRole(p),
+                      onBlock: () => _block(p),
+                      onReactivate: () => _reactivate(p),
+                      onDeactivate: () => _deactivate(p),
+                      onHardDelete: () => _hardDelete(p),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ],
+      ),
+    );
+
+    if (!desktop || _mode == _AccountListMode.incompletos || preview == null) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: desktop
+                ? AppBreakpoints.adminContentMaxWidth
+                : AppBreakpoints.formMaxWidth,
+          ),
+          child: listBody,
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: AppBreakpoints.adminContentMaxWidth,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(flex: 3, child: listBody),
+            const VerticalDivider(width: 1),
+            SizedBox(
+              width: 380,
+              child: Material(
+                color: AppColors.card,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            preview.businessName?.trim().isNotEmpty == true
+                                ? preview.businessName!.trim()
+                                : (preview.email ?? 'Sin nombre'),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Cerrar',
+                          onPressed: () =>
+                              setState(() => _previewProfileId = null),
+                          icon: const Icon(Icons.close, size: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    OwnerAccountDossier(
+                      profile: preview,
+                      isSelf: preview.id == widget.viewer.id,
+                    ),
+                    const SizedBox(height: 12),
+                    if (_canChangeRole(preview)) ...[
+                      FilledButton.tonalIcon(
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        onPressed: _busyId == preview.id
+                            ? null
+                            : () => _changeRole(preview),
+                        icon: const Icon(Icons.swap_horiz, size: 18),
+                        label:
+                            const Text('Corregir rol (minorista / mayorista)'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      onPressed: () async {
+                        final changed = await OwnerAccountDossierForm.open(
+                          context,
+                          existing: preview,
+                          allowAdminRole: widget.viewer.isOwner,
+                          canDeleteAccount: _canOperate(preview),
+                        );
+                        if (changed == true && mounted) await _load();
+                      },
+                      child: const Text('Abrir expediente'),
+                    ),
+                    ..._previewDangerActions(preview),
+                  ],
                 ),
               ),
             ),
           ],
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -668,44 +980,87 @@ class _AdminAccountManagementPanelState
       pageIndex: _pageIndex,
       pageSize: _pageSize,
     );
+    final confirmLabel = switch (_incompleteFilter) {
+      _IncompleteFilter.todos => 'Todos',
+      _IncompleteFilter.sinConfirmar => 'Sin confirmar',
+      _IncompleteFilter.confirmados => 'Confirmados',
+    };
     return [
-      Text(
-        'Personas que crearon la cuenta y no guardaron la ficha del negocio. '
-        'El correo sirve para contactarlas. No tienen avisos dentro de la app.',
-        style: TextStyle(fontSize: 13, height: 1.35, color: AppColors.textSecondary),
-      ),
-      const SizedBox(height: 12),
-      SegmentedFilterBar(
-        labels: const ['Todos', 'Sin confirmar', 'Confirmados'],
-        selectedIndex: _IncompleteFilter.values.indexOf(_incompleteFilter),
-        onSelected: (index) => setState(() {
-          _incompleteFilter = _IncompleteFilter.values[index];
+      AdminStandardFilterBar(
+        padding: EdgeInsets.zero,
+        searchController: _searchCtrl,
+        searchHint: 'Buscar por nombre, correo o teléfono…',
+        onSearchChanged: (_) => setState(() => _pageIndex = 0),
+        clearVisible: _incompleteFilter != _IncompleteFilter.todos ||
+            _sort != OwnerAccountSort.newest,
+        onClear: () => setState(() {
+          _incompleteFilter = _IncompleteFilter.todos;
+          _sort = OwnerAccountSort.newest;
           _pageIndex = 0;
         }),
-      ),
-      SegmentedFilterBar(
-        labels: const ['Más recientes', 'Más antiguas'],
-        selectedIndex: _sort == OwnerAccountSort.oldest ? 1 : 0,
-        onSelected: (index) => setState(() {
-          _sort = index == 0
-              ? OwnerAccountSort.newest
-              : OwnerAccountSort.oldest;
-          _pageIndex = 0;
-        }),
-      ),
-      const SizedBox(height: 4),
-      TextField(
-        controller: _searchCtrl,
-        decoration: InputDecoration(
-          hintText: 'Buscar por nombre, correo o teléfono…',
-          prefixIcon: const Icon(Icons.search, size: 20),
-          isDense: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+        menus: [
+          AdminFilterDropdown(
+            icon: Icons.folder_outlined,
+            placeholder: 'Vista',
+            valueLabel: 'Registro incompleto',
+            active: true,
+            options: [
+              AdminFilterOption(
+                label: 'Cuentas',
+                selected: false,
+                onSelect: () => _selectMode(_AccountListMode.cuentas),
+              ),
+              AdminFilterOption(
+                label: 'Registro incompleto',
+                selected: true,
+                onSelect: () {},
+              ),
+            ],
           ),
-        ),
+          AdminFilterDropdown(
+            icon: Icons.mark_email_read_outlined,
+            placeholder: 'Estado',
+            valueLabel: confirmLabel,
+            active: _incompleteFilter != _IncompleteFilter.todos,
+            options: [
+              for (final f in _IncompleteFilter.values)
+                AdminFilterOption(
+                  label: switch (f) {
+                    _IncompleteFilter.todos => 'Todos',
+                    _IncompleteFilter.sinConfirmar => 'Sin confirmar',
+                    _IncompleteFilter.confirmados => 'Confirmados',
+                  },
+                  selected: _incompleteFilter == f,
+                  onSelect: () => setState(() {
+                    _incompleteFilter = f;
+                    _pageIndex = 0;
+                  }),
+                ),
+            ],
+          ),
+          AdminFilterDropdown(
+            icon: Icons.sort,
+            placeholder: 'Orden',
+            valueLabel: _sort.labelEs,
+            active: _sort != OwnerAccountSort.newest,
+            options: [
+              for (final s in const [
+                OwnerAccountSort.newest,
+                OwnerAccountSort.oldest,
+              ])
+                AdminFilterOption(
+                  label: s.labelEs,
+                  selected: _sort == s,
+                  onSelect: () => setState(() {
+                    _sort = s;
+                    _pageIndex = 0;
+                  }),
+                ),
+            ],
+          ),
+        ],
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 8),
       if (_incompleteLoading)
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
@@ -779,24 +1134,134 @@ class _AdminAccountManagementPanelState
     ];
   }
 
-  static String _roleFilterLabel(_AccountRoleFilter f) {
-    return switch (f) {
-      _AccountRoleFilter.todos => 'Todos',
-      _AccountRoleFilter.aliados => 'Tiendas minoristas',
-      _AccountRoleFilter.importadores => 'Importadores',
-      _AccountRoleFilter.administracion => 'Administración',
-    };
-  }
+}
 
-  static String _stateFilterLabel(_AccountStateFilter f) {
-    return switch (f) {
-      _AccountStateFilter.todos => 'Todos',
-      _AccountStateFilter.activas => 'Activas',
-      _AccountStateFilter.borrador => 'Borrador',
-      _AccountStateFilter.revision => 'Revisión',
-      _AccountStateFilter.bloqueadas => 'Bloqueadas',
-      _AccountStateFilter.eliminadas => 'Eliminadas',
-    };
+class _AccountsDesktopTable extends StatelessWidget {
+  const _AccountsDesktopTable({
+    required this.rows,
+    required this.viewerId,
+    required this.selectedId,
+    required this.onSelect,
+    required this.canOperate,
+    required this.canChangeRole,
+    required this.showCatalogFor,
+    required this.busyId,
+    required this.onEditDossier,
+    required this.onChangeRole,
+    required this.onBlock,
+    required this.onReactivate,
+    required this.onDeactivate,
+    required this.onHardDelete,
+  });
+
+  final List<ProfileModel> rows;
+  final String viewerId;
+  final String? selectedId;
+  final ValueChanged<ProfileModel> onSelect;
+  final bool Function(ProfileModel) canOperate;
+  final bool Function(ProfileModel) canChangeRole;
+  final bool Function(ProfileModel) showCatalogFor;
+  final String? busyId;
+  final ValueChanged<ProfileModel> onEditDossier;
+  final ValueChanged<ProfileModel> onChangeRole;
+  final ValueChanged<ProfileModel> onBlock;
+  final ValueChanged<ProfileModel> onReactivate;
+  final ValueChanged<ProfileModel> onDeactivate;
+  final ValueChanged<ProfileModel> onHardDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            Material(
+              color: selectedId == rows[i].id
+                  ? AppColors.brandBlueContainer
+                  : Colors.transparent,
+              child: InkWell(
+                onTap: () => onSelect(rows[i]),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          rows[i].businessName?.trim().isNotEmpty == true
+                              ? rows[i].businessName!.trim()
+                              : (rows[i].email ?? 'Sin nombre'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          ProfileRoleLabels.labelEs(rows[i].role),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          OwnerAccountRules.statusLabelEs(
+                            role: rows[i].role,
+                            accountAccessStatus: rows[i].accountAccessStatus,
+                            deactivatedAt: rows[i].deactivatedAt,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Expediente',
+                        onPressed: canOperate(rows[i])
+                            ? () => onEditDossier(rows[i])
+                            : null,
+                        icon: const Icon(Icons.folder_open_outlined, size: 20),
+                      ),
+                      if (showCatalogFor(rows[i]))
+                        IconButton(
+                          tooltip: 'Catálogo',
+                          onPressed: () => OwnerImporterCatalogScreen.open(
+                            context,
+                            importerId: rows[i].id,
+                            importerName:
+                                rows[i].businessName?.trim().isNotEmpty == true
+                                    ? rows[i].businessName!.trim()
+                                    : (rows[i].email ?? 'Mayorista'),
+                          ),
+                          icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -814,6 +1279,7 @@ class _AccountCard extends StatefulWidget {
     required this.onReactivate,
     required this.onDeactivate,
     required this.onHardDelete,
+    this.onTapHeader,
   });
 
   final ProfileModel profile;
@@ -828,6 +1294,7 @@ class _AccountCard extends StatefulWidget {
   final VoidCallback onReactivate;
   final VoidCallback onDeactivate;
   final VoidCallback onHardDelete;
+  final VoidCallback? onTapHeader;
 
   @override
   State<_AccountCard> createState() => _AccountCardState();
@@ -843,6 +1310,64 @@ class _AccountCardState extends State<_AccountCard> {
       deactivatedAt: profile.deactivatedAt,
     );
     final isSelf = profile.id == widget.viewerId;
+    final subtitle = [
+      ProfileRoleLabels.labelEs(profile.role),
+      if (profile.createdAt != null)
+        'Alta ${formatEsShortDate(profile.createdAt!)}',
+      if (profile.email != null) profile.email,
+      if (profile.phone != null) profile.phone,
+      if (isSelf) 'Su cuenta',
+    ].join(' · ');
+
+    if (widget.onTapHeader != null) {
+      return Material(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: widget.onTapHeader,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        profile.businessName?.trim().isNotEmpty == true
+                            ? profile.businessName!.trim()
+                            : (profile.email ?? 'Sin nombre'),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusChip(label: status, deactivated: profile.isDeactivated),
+                const Icon(Icons.chevron_right, size: 20),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -875,14 +1400,7 @@ class _AccountCardState extends State<_AccountCard> {
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              [
-                ProfileRoleLabels.labelEs(profile.role),
-                if (profile.createdAt != null)
-                  'Alta ${formatEsShortDate(profile.createdAt!)}',
-                if (profile.email != null) profile.email,
-                if (profile.phone != null) profile.phone,
-                if (isSelf) 'Su cuenta',
-              ].join(' · '),
+              subtitle,
               style: TextStyle(
                 fontSize: 12.5,
                 color: AppColors.textSecondary,
@@ -1030,7 +1548,7 @@ class _AccountActions extends StatelessWidget {
                       ),
                     ),
                     onPressed: onDeactivate,
-                    child: const Text('Eliminar'),
+                    child: const Text(OwnerAccountRules.softDeleteActionLabel),
                   ),
                 ),
               ],
@@ -1055,7 +1573,7 @@ class _AccountActions extends StatelessWidget {
                       ),
                     ),
                     onPressed: onDeactivate,
-                    child: const Text('Eliminar'),
+                    child: const Text(OwnerAccountRules.softDeleteActionLabel),
                   ),
                 ),
               ],
@@ -1070,18 +1588,19 @@ class _AccountActions extends StatelessWidget {
                 ),
               ),
               onPressed: onDeactivate,
-              child: const Text('Eliminar'),
+              child: const Text(OwnerAccountRules.softDeleteActionLabel),
             ),
           ],
           const SizedBox(height: 8),
-          OutlinedButton(
+          OutlinedButton.icon(
             style: _wide.copyWith(
               foregroundColor: WidgetStatePropertyAll(
                 Colors.red.shade800,
               ),
             ),
             onPressed: onHardDelete,
-            child: const Text('Borrar definitivo'),
+            icon: const Icon(Icons.delete_forever_outlined, size: 18),
+            label: const Text(OwnerAccountRules.hardDeleteActionLabel),
           ),
         ],
       ],

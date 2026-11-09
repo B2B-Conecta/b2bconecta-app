@@ -107,7 +107,11 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
   Widget build(BuildContext context) {
     final role = ProfileRoleLabels.labelEs(widget.profile.role);
     return AlertDialog(
-      title: Text(_isHard ? 'Borrar definitivo' : 'Eliminar cuenta'),
+      title: Text(
+        _isHard
+            ? OwnerAccountRules.hardDeleteDialogTitle
+            : OwnerAccountRules.softDeleteDialogTitle,
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -115,10 +119,12 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
           children: [
             Text(
               _isHard
-                  ? 'Se borra la cuenta y se libera el correo. '
-                      'No se puede deshacer.\n\n$_who · $role'
-                  : 'La cuenta deja de entrar. El historial se conserva '
-                      'y el correo no se libera.\n\n$_who · $role',
+                  ? 'Se elimina la cuenta por completo y el correo queda '
+                      'libre para un registro nuevo. No se puede deshacer.\n\n'
+                      '$_who · $role'
+                  : 'La cuenta deja de poder entrar. Se conserva el historial '
+                      'y el correo sigue ocupado (no se puede reutilizar).\n\n'
+                      '$_who · $role',
             ),
             if (_isHard) ...[
               const SizedBox(height: 14),
@@ -153,8 +159,10 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
           onPressed: _canConfirm ? _submit : null,
           child: Text(
             _isHard
-                ? (_related.count > 0 ? 'Borrar de todas maneras' : 'Borrar')
-                : 'Eliminar',
+                ? (_related.count > 0
+                    ? 'Borrar y liberar de todas maneras'
+                    : OwnerAccountRules.hardDeleteActionLabel)
+                : OwnerAccountRules.softDeleteActionLabel,
           ),
         ),
       ],

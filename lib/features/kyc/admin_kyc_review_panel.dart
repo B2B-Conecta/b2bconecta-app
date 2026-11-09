@@ -6,43 +6,47 @@ import 'aliado_doc_type.dart';
 import 'document_review_status.dart';
 import 'kyc_status.dart';
 import 'profile_document_model.dart';
+import 'profile_kyc_document_tile.dart';
 import 'package:motolink_pro_app/features/admin/admin_action_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
-import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_dossier_form.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_importer_catalog_screen.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
-
-enum _KycQueueFilter {
-  solicitudesIngreso,
-  enRevision,
-  conPendientes,
-  activas,
-  todos,
-}
-
-enum _KycRoleFilter { todos, aliados, mayoristas }
+import 'package:motolink_pro_app/features/admin/admin_users_filter_bar.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_filter_models.dart';
+import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
 
 /// Admin: cola de verificación (aliados KYC + mayoristas / importadores).
 class AdminKycReviewPanel extends StatefulWidget {
   const AdminKycReviewPanel({
     super.key,
     required this.viewerRole,
+    this.viewerId = '',
     this.viewerIsOwner = false,
+    this.embeddedInHub = false,
   });
 
   /// Rol de la sesión: decide si se muestran aprobar/rechazar.
   final String? viewerRole;
 
-  /// El owner ve y busca el correo de Auth en cada expediente.
+  /// Id del admin en sesión (cambio de rol / alcance).
+  final String viewerId;
+
+  /// El owner gestiona rol y correos de Auth.
   final bool viewerIsOwner;
+
+  /// Embebido en [AdminUsersHubPanel]: omite padding duplicado del hub.
+  final bool embeddedInHub;
 
   @override
   State<AdminKycReviewPanel> createState() => _AdminKycReviewPanelState();
@@ -56,8 +60,9 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   String? _expandedProfileId;
   String? _busyProfileId;
   String? _busyDocKey;
-  _KycQueueFilter _filter = _KycQueueFilter.solicitudesIngreso;
-  _KycRoleFilter _roleFilter = _KycRoleFilter.todos;
+  AdminUserEstadoFilter _estado = AdminUserEstadoFilter.todos;
+  AdminUserRolFilter _rol = AdminUserRolFilter.todos;
+  OwnerAccountSort _sort = OwnerAccountSort.newest;
   final _searchCtrl = TextEditingController();
   final _listScroll = ScrollController();
   int _pageIndex = 0;
@@ -105,13 +110,11 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     });
     try {
       var rows = await SupabaseService.fetchB2BProfilesForAdminKycReview();
-      if (widget.viewerIsOwner) {
-        try {
-          final emails = await SupabaseService.ownerAuthEmailsByProfileId();
-          rows = rows.map((p) => p.withAuthEmail(emails[p.id])).toList();
-        } catch (_) {
-          // KYC sigue útil sin correo si el RPC owner falla.
-        }
+      try {
+        final emails = await SupabaseService.ownerAuthEmailsByProfileId();
+        rows = rows.map((p) => p.withAuthEmail(emails[p.id])).toList();
+      } catch (_) {
+        // La cola sigue útil sin correo si el RPC no está disponible.
       }
       if (!mounted) return;
       final expanded = _expandedProfileId;
@@ -176,42 +179,51 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
 
   bool _isAliado(ProfileModel p) => p.role?.trim().toLowerCase() == 'aliado';
 
+  bool _matchesEstado(ProfileModel p) {
+    final access = p.accountAccessStatus?.trim();
+    final ks = p.kycStatus?.trim();
+    switch (_estado) {
+      case AdminUserEstadoFilter.todos:
+        return true;
+      case AdminUserEstadoFilter.pendiente:
+        return access == AccountAccessStatus.pendingReview ||
+            access == AccountAccessStatus.draft ||
+            ks == KycStatus.enRevision ||
+            ks == KycStatus.pendiente ||
+            _profileNeedsAttention(p);
+      case AdminUserEstadoFilter.verificado:
+        return !p.isDeactivated &&
+            (ks == KycStatus.aprobado ||
+                (_isImportador(p) && access == AccountAccessStatus.active));
+      case AdminUserEstadoFilter.activo:
+        return access == AccountAccessStatus.active && !p.isDeactivated;
+      case AdminUserEstadoFilter.bloqueado:
+        return p.isDeactivated ||
+            access == AccountAccessStatus.rejected ||
+            ks == KycStatus.rechazado;
+    }
+  }
+
   List<ProfileModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
-    return _profiles.where((p) {
+    final rows = _profiles.where((p) {
       final role = p.role?.trim().toLowerCase();
       if (role != 'aliado' && role != 'importador') return false;
-      switch (_roleFilter) {
-        case _KycRoleFilter.aliados:
+      switch (_rol) {
+        case AdminUserRolFilter.minorista:
           if (role != 'aliado') return false;
-        case _KycRoleFilter.mayoristas:
+        case AdminUserRolFilter.mayorista:
           if (role != 'importador') return false;
-        case _KycRoleFilter.todos:
+        case AdminUserRolFilter.administracion:
+          return false;
+        case AdminUserRolFilter.todos:
           break;
       }
       if (q.isNotEmpty && !ownerAccountMatchesQuery(p, q)) return false;
-      final access = p.accountAccessStatus?.trim();
-      final inQueue = switch (_filter) {
-        _KycQueueFilter.todos => true,
-        _KycQueueFilter.solicitudesIngreso =>
-          access == AccountAccessStatus.pendingReview ||
-              access == AccountAccessStatus.draft,
-        _KycQueueFilter.enRevision => _isImportador(p)
-            ? access == AccountAccessStatus.pendingReview ||
-                access == AccountAccessStatus.draft
-            : p.kycStatus?.trim() == KycStatus.enRevision ||
-                access == AccountAccessStatus.draft,
-        _KycQueueFilter.conPendientes => access == AccountAccessStatus.draft ||
-            access == AccountAccessStatus.pendingReview ||
-            (_isImportador(p)
-                ? access == AccountAccessStatus.rejected
-                : _profileNeedsAttention(p)),
-        _KycQueueFilter.activas =>
-          access == AccountAccessStatus.active && !p.isDeactivated,
-      };
-      if (inQueue) return true;
+      if (_matchesEstado(p)) return true;
       return p.id == _expandedProfileId;
-    }).toList();
+    });
+    return sortOwnerAccounts(rows, sort: _sort);
   }
 
   Future<void> _openDocument(ProfileDocumentModel doc) async {
@@ -228,6 +240,41 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo abrir: $e')),
       );
+    }
+  }
+
+  Future<void> _uploadDoc({
+    required ProfileModel profile,
+    required String docType,
+    required DocumentPickChannel channel,
+  }) async {
+    final picked = await pickKycDocument(channel: channel);
+    if (picked == null || !mounted) return;
+    final key = '${profile.id}:$docType';
+    setState(() => _busyDocKey = key);
+    try {
+      await SupabaseService.ownerUploadProfileDocument(
+        profileId: profile.id,
+        docType: docType,
+        bytes: picked.bytes,
+        fileName: picked.fileName,
+        markApproved: false,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Documento cargado. Puede aprobarlo o rechazarlo.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _reloadDocs(profile.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo subir: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyDocKey = null);
     }
   }
 
@@ -410,10 +457,192 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     if (picked != null) await _setGlobalKyc(profile, picked);
   }
 
-  void _toggleExpand(ProfileModel p) {
-    final next = _expandedProfileId == p.id ? null : p.id;
-    setState(() => _expandedProfileId = next);
-    if (next != null && _isAliado(p)) _ensureDocsLoaded(next);
+  void _selectProfile(ProfileModel p) {
+    setState(() => _expandedProfileId = p.id);
+    if (_isAliado(p)) _ensureDocsLoaded(p.id);
+  }
+
+  Map<String, ProfileDocumentModel> _currentDocsByType(ProfileModel p) {
+    final docs = _docsByProfile[p.id] ?? [];
+    final currentByType = <String, ProfileDocumentModel>{};
+    for (final d in docs) {
+      if (!d.isCurrent) continue;
+      final prev = currentByType[d.docType];
+      if (prev == null ||
+          (d.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)).isAfter(
+            prev.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+          )) {
+        currentByType[d.docType] = d;
+      }
+    }
+    return currentByType;
+  }
+
+  Future<void> _openMobileDetail(ProfileModel p) async {
+    _selectProfile(p);
+    if (!mounted) return;
+    await showAdaptiveAdminSheet<void>(
+      context: context,
+      draggable: true,
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.96,
+      builder: (ctx, scroll) {
+        return ListView(
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            Text(
+              p.businessName?.trim().isNotEmpty == true
+                  ? p.businessName!.trim()
+                  : 'Sin nombre',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildDetailBody(
+              p,
+              afterTerms: _profileOptionActions(
+                p,
+                buttonHeight: 48,
+                onEditFiscal: () async {
+                  Navigator.of(ctx).pop();
+                  await _openDossier(p);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  bool _canChangeRole(ProfileModel p) => OwnerAccountRules.canChangeB2bRole(
+        viewerIsOwner: widget.viewerIsOwner,
+        viewerRole: widget.viewerRole,
+        viewerId: widget.viewerId,
+        targetId: p.id,
+        targetIsOwner: p.isOwner,
+        targetRole: p.role,
+      );
+
+  Future<void> _openDossier(ProfileModel p) async {
+    final changed = await OwnerAccountDossierForm.open(
+      context,
+      existing: p,
+      allowAdminRole: widget.viewerIsOwner,
+      canDeleteAccount: _canSetAccess,
+    );
+    if (changed == true && mounted) await _load();
+  }
+
+  Future<void> _changeRole(ProfileModel p) async {
+    // Solo B2B aquí: corregir registro equivocado. Admin→admin es otra acción.
+    const roles = <String>['aliado', 'importador'];
+    final current = p.role?.trim().toLowerCase();
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Corregir rol de la cuenta'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Si se registró como mayorista por error (o al revés), '
+                'elija el rol correcto. No borra el expediente ni el correo.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final role in roles)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(ProfileRoleLabels.labelEs(role)),
+                  subtitle: Text(
+                    role == 'aliado'
+                        ? 'Tienda minorista'
+                        : 'Importador / mayorista',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  selected: current == role,
+                  trailing: current == role
+                      ? Icon(Icons.check, color: AppColors.brand)
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(role),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || picked == p.role?.trim().toLowerCase()) return;
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar cambio de rol'),
+        content: Text(
+          '¿Asignar «${ProfileRoleLabels.labelEs(picked)}» a '
+          '${p.businessName ?? p.email ?? 'esta cuenta'}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Cambiar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busyProfileId = p.id);
+    try {
+      await SupabaseService.ownerSetProfileRole(
+        profileId: p.id,
+        role: picked,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Rol actualizado a ${ProfileRoleLabels.labelEs(picked)}.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _load();
+      if (mounted) setState(() => _expandedProfileId = p.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo cambiar el rol: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyProfileId = null);
+    }
   }
 
   Widget _referralAttributionBox(ProfileModel p) {
@@ -484,6 +713,35 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     );
   }
 
+  List<Widget> _profileOptionActions(
+    ProfileModel p, {
+    required double buttonHeight,
+    required VoidCallback onEditFiscal,
+  }) {
+    return [
+      const SizedBox(height: 12),
+      if (_canChangeRole(p)) ...[
+        FilledButton.tonalIcon(
+          style: FilledButton.styleFrom(
+            minimumSize: Size.fromHeight(buttonHeight),
+          ),
+          onPressed: _busyProfileId == p.id ? null : () => _changeRole(p),
+          icon: const Icon(Icons.swap_horiz, size: 18),
+          label: const Text('Corregir rol (minorista / mayorista)'),
+        ),
+        const SizedBox(height: 8),
+      ],
+      OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          minimumSize: Size.fromHeight(buttonHeight),
+        ),
+        onPressed: onEditFiscal,
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        label: const Text('Editar datos fiscales'),
+      ),
+    ];
+  }
+
   Widget _importadorProfileSummary(ProfileModel p) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -492,9 +750,270 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
         OwnerAccountDossier(
           profile: p,
           title: 'Perfil del mayorista',
-          showAuthEmail: widget.viewerIsOwner,
+          showAuthEmail: true,
         ),
       ],
+    );
+  }
+
+  Widget _buildDetailBody(
+    ProfileModel p, {
+    List<Widget> afterTerms = const [],
+  }) {
+    final role = p.role?.trim() ?? '';
+    final currentByType = _currentDocsByType(p);
+    if (_isImportador(p)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _importadorProfileSummary(p),
+          ...afterTerms,
+          if (widget.viewerIsOwner) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              onPressed: () => OwnerImporterCatalogScreen.open(
+                context,
+                importerId: p.id,
+                importerName: p.businessName?.trim().isNotEmpty == true
+                    ? p.businessName!.trim()
+                    : (p.email ?? 'Mayorista'),
+              ),
+              icon: const Icon(Icons.inventory_2_outlined, size: 18),
+              label: const Text('Ver catálogo'),
+            ),
+          ],
+          if (_canSetAccess) ...[
+            const SizedBox(height: 8),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+              onPressed: p.hasActiveAccountAccess || _busyProfileId == p.id
+                  ? null
+                  : () => _setImportadorAccess(p, KycStatus.aprobado),
+              child: Text(
+                p.hasActiveAccountAccess
+                    ? 'Acceso habilitado'
+                    : 'Aprobar mayorista',
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                foregroundColor: Colors.red.shade800,
+              ),
+              onPressed: _busyProfileId == p.id
+                  ? null
+                  : () => _setImportadorAccess(p, KycStatus.rechazado),
+              child: const Text('Rechazar'),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _referralAttributionBox(p),
+        OwnerAccountDossier(
+          profile: p,
+          title: 'Datos de la tienda',
+          showAuthEmail: true,
+        ),
+        ...afterTerms,
+        if (_canReviewKyc) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            onPressed:
+                _busyProfileId == p.id ? null : () => _pickGlobalStatus(p),
+            child: const Text('Cambiar KYC global'),
+          ),
+        ],
+        if (_canSetAccess) ...[
+          const SizedBox(height: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            onPressed: p.hasActiveAccountAccess || _busyProfileId == p.id
+                ? null
+                : () => _setGlobalKyc(p, KycStatus.aprobado),
+            child: Text(
+              p.hasActiveAccountAccess
+                  ? 'Acceso habilitado'
+                  : 'Habilitar acceso',
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          'Documentos',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Aquí puede ver, adjuntar, aprobar o rechazar cada documento.',
+          style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        ...AliadoDocType.forAdminReview(
+          role: role,
+          uploadedTypes: currentByType.keys,
+        ).map((type) {
+          final doc = currentByType[type];
+          final has = doc != null;
+          final st = doc?.reviewStatus?.trim();
+          final busy = _busyDocKey == '${p.id}:$type';
+          final canApprove =
+              _canReviewKyc && has && st != DocumentReviewStatus.aprobado;
+          final canReject =
+              _canReviewKyc && has && st != DocumentReviewStatus.rechazado;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ProfileKycDocumentTile(
+                  title: AliadoDocType.labelEs(type),
+                  hasFile: has,
+                  statusLabel: has
+                      ? DocumentReviewStatus.labelEs(
+                          st ?? DocumentReviewStatus.pendiente,
+                        )
+                      : 'Sin archivo',
+                  effectiveStatus: st,
+                  busy: busy,
+                  compactActions: true,
+                  showPickActions: true,
+                  reviewNote: doc?.reviewNote,
+                  onView: has ? () => _openDocument(doc) : null,
+                  onPickCamera: () => _uploadDoc(
+                    profile: p,
+                    docType: type,
+                    channel: DocumentPickChannel.camera,
+                  ),
+                  onPickGallery: () => _uploadDoc(
+                    profile: p,
+                    docType: type,
+                    channel: DocumentPickChannel.gallery,
+                  ),
+                  onPickFile: () => _uploadDoc(
+                    profile: p,
+                    docType: type,
+                    channel: DocumentPickChannel.file,
+                  ),
+                ),
+                if (canApprove || canReject) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (canApprove)
+                        Expanded(
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                            ),
+                            onPressed: busy
+                                ? null
+                                : () => _reviewDoc(
+                                      profile: p,
+                                      docType: type,
+                                      status: DocumentReviewStatus.aprobado,
+                                    ),
+                            child: const Text('Aprobar'),
+                          ),
+                        ),
+                      if (canApprove && canReject) const SizedBox(width: 8),
+                      if (canReject)
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              foregroundColor: Colors.red.shade800,
+                            ),
+                            onPressed: busy
+                                ? null
+                                : () => _reviewDoc(
+                                      profile: p,
+                                      docType: type,
+                                      status: DocumentReviewStatus.rechazado,
+                                    ),
+                            child: const Text('Rechazar'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildListPane({
+    required List<ProfileModel> page,
+    required List<ProfileModel> filtered,
+    required bool desktop,
+  }) {
+    if (_loading) {
+      return const AdminListSkeleton(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: AppColors.brand,
+      child: filtered.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(height: 80),
+                Center(
+                  child: Text(
+                    'No hay perfiles en esta cola.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            )
+          : ListView(
+              controller: _listScroll,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              children: [
+                if (desktop)
+                  _KycDesktopTable(
+                    rows: page,
+                    selectedId: _expandedProfileId,
+                    onSelect: _selectProfile,
+                    onOpenDossier: _openDossier,
+                  )
+                else
+                  for (final p in page)
+                    Padding(
+                      key: ValueKey<String>('kyc-${p.id}'),
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _KycListCard(
+                        profile: p,
+                        onTap: () => _openMobileDetail(p),
+                      ),
+                    ),
+              ],
+            ),
     );
   }
 
@@ -522,625 +1041,136 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
       pageSize: _pageSize,
     );
 
+    final desktop = isAdminDesktopLayout(context);
+    final maxWidth = desktop
+        ? AppBreakpoints.adminContentMaxWidth
+        : AppBreakpoints.formMaxWidth;
+    final preview = _expandedProfileId == null
+        ? null
+        : () {
+      for (final p in _profiles) {
+        if (p.id == _expandedProfileId) return p;
+      }
+      return null;
+    }();
+
+    final listColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AdminUsersFilterBar(
+          searchController: _searchCtrl,
+          searchHint: 'Buscar por empresa, RIF, correo o teléfono…',
+          estado: _estado,
+          rol: _rol,
+          sort: _sort,
+          onSearchChanged: (_) => setState(() => _pageIndex = 0),
+          onEstado: (v) => setState(() {
+            _estado = v;
+            _expandedProfileId = null;
+            _pageIndex = 0;
+          }),
+          onRol: (v) => setState(() {
+            _rol = v;
+            _expandedProfileId = null;
+            _pageIndex = 0;
+          }),
+          onSort: (v) => setState(() {
+            _sort = v;
+            _pageIndex = 0;
+          }),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ListPageBar(
+            total: filtered.length,
+            pageIndex: _pageIndex,
+            pageSize: _pageSize,
+            onPageIndex: (index) {
+              setState(() => _pageIndex = index);
+              if (_listScroll.hasClients) _listScroll.jumpTo(0);
+            },
+            onPageSize: (size) {
+              setState(() {
+                _pageSize = size;
+                _pageIndex = 0;
+              });
+              if (_listScroll.hasClients) _listScroll.jumpTo(0);
+            },
+          ),
+        ),
+        Expanded(
+          child: _buildListPane(
+            page: page,
+            filtered: filtered,
+            desktop: desktop,
+          ),
+        ),
+      ],
+    );
+
+    if (!desktop || preview == null) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: listColumn,
+        ),
+      );
+    }
+
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
-          maxWidth: AppBreakpoints.formMaxWidth,
+          maxWidth: AppBreakpoints.adminContentMaxWidth,
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() => _pageIndex = 0),
-                decoration: InputDecoration(
-                  hintText: widget.viewerIsOwner
-                      ? 'Buscar por empresa, RIF, correo o teléfono…'
-                      : 'Buscar por empresa, RIF o teléfono…',
-                  prefixIcon: const Icon(Icons.search),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+            Expanded(flex: 3, child: listColumn),
+            const VerticalDivider(width: 1),
+            SizedBox(
+              width: 420,
+              child: Material(
+                color: AppColors.card,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            preview.businessName?.trim().isNotEmpty == true
+                                ? preview.businessName!.trim()
+                                : 'Sin nombre',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Cerrar',
+                          onPressed: () =>
+                              setState(() => _expandedProfileId = null),
+                          icon: const Icon(Icons.close, size: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDetailBody(
+                      preview,
+                      afterTerms: _profileOptionActions(
+                        preview,
+                        buttonHeight: 44,
+                        onEditFiscal: () => _openDossier(preview),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SegmentedFilterBar(
-                labels: [
-                  for (final f in _KycRoleFilter.values) _roleFilterLabel(f),
-                ],
-                selectedIndex: _KycRoleFilter.values.indexOf(_roleFilter),
-                onSelected: (index) => setState(() {
-                  _roleFilter = _KycRoleFilter.values[index];
-                  _expandedProfileId = null;
-                  _pageIndex = 0;
-                }),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SegmentedFilterBar(
-                labels: [
-                  for (final f in _KycQueueFilter.values) _queueFilterLabel(f),
-                ],
-                selectedIndex: _KycQueueFilter.values.indexOf(_filter),
-                onSelected: (index) => setState(() {
-                  _filter = _KycQueueFilter.values[index];
-                  _expandedProfileId = null;
-                  _pageIndex = 0;
-                }),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListPageBar(
-                total: filtered.length,
-                pageIndex: _pageIndex,
-                pageSize: _pageSize,
-                onPageIndex: (index) {
-                  setState(() => _pageIndex = index);
-                  if (_listScroll.hasClients) _listScroll.jumpTo(0);
-                },
-                onPageSize: (size) {
-                  setState(() {
-                    _pageSize = size;
-                    _pageIndex = 0;
-                  });
-                  if (_listScroll.hasClients) _listScroll.jumpTo(0);
-                },
-              ),
-            ),
-            Expanded(
-              child: _loading
-                  ? const AdminListSkeleton(
-                      padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: filtered.isEmpty
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: const [
-                                SizedBox(height: 80),
-                                Center(
-                                  child: Text(
-                                    'No hay perfiles en esta cola.',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : ListView.builder(
-                              controller: _listScroll,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                              itemCount: page.length,
-                              itemBuilder: (context, i) {
-                                final p = page[i];
-                                final expanded = _expandedProfileId == p.id;
-                                final role = p.role?.trim() ?? '';
-                                final docs = _docsByProfile[p.id] ?? [];
-                                final currentByType =
-                                    <String, ProfileDocumentModel>{};
-                                for (final d in docs) {
-                                  if (!d.isCurrent) continue;
-                                  final prev = currentByType[d.docType];
-                                  if (prev == null ||
-                                      (d.createdAt ??
-                                              DateTime
-                                                  .fromMillisecondsSinceEpoch(
-                                                      0))
-                                          .isAfter(
-                                        prev.createdAt ??
-                                            DateTime.fromMillisecondsSinceEpoch(
-                                                0),
-                                      )) {
-                                    currentByType[d.docType] = d;
-                                  }
-                                }
-                                return Card(
-                                  key: ValueKey<String>('kyc-${p.id}'),
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: Column(
-                                    children: [
-                                      InkWell(
-                                        onTap: () => _toggleExpand(p),
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            14,
-                                            12,
-                                            8,
-                                            12,
-                                          ),
-                                          child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      p.businessName
-                                                                  ?.trim()
-                                                                  .isNotEmpty ==
-                                                              true
-                                                          ? p.businessName!
-                                                              .trim()
-                                                          : 'Sin nombre',
-                                                      maxLines: 2,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 15,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: AppColors
-                                                            .textPrimary,
-                                                      ),
-                                                    ),
-                                                    if (!expanded) ...[
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        [
-                                                          ProfileRoleLabels
-                                                              .labelEs(role),
-                                                          if (p.email != null)
-                                                            p.email,
-                                                          if (p.rif != null &&
-                                                              p.rif!
-                                                                  .trim()
-                                                                  .isNotEmpty)
-                                                            p.rif,
-                                                          if (p.phone != null &&
-                                                              p.phone!
-                                                                  .trim()
-                                                                  .isNotEmpty)
-                                                            p.phone,
-                                                          if (p
-                                                              .hasReferralAttribution)
-                                                            'Referido',
-                                                        ].join(' · '),
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize: 12.5,
-                                                          color: AppColors
-                                                              .textSecondary,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              if (p.hasReferralAttribution)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                    right: 6,
-                                                    top: 2,
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.handshake_outlined,
-                                                    size: 18,
-                                                    color: AppColors.brand,
-                                                  ),
-                                                ),
-                                              _KycStatusChip(
-                                                status: p.accountAccessStatus,
-                                              ),
-                                              Icon(
-                                                expanded
-                                                    ? Icons.expand_less
-                                                    : Icons.expand_more,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      if (expanded) ...[
-                                        const Divider(height: 1),
-                                        Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            12,
-                                            8,
-                                            12,
-                                            12,
-                                          ),
-                                          child: _isImportador(p)
-                                              ? Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment
-                                                          .stretch,
-                                                  children: [
-                                                    _importadorProfileSummary(
-                                                        p),
-                                                    if (widget
-                                                        .viewerIsOwner) ...[
-                                                      const SizedBox(
-                                                          height: 12),
-                                                      OutlinedButton.icon(
-                                                        style: OutlinedButton
-                                                            .styleFrom(
-                                                          minimumSize:
-                                                              const Size
-                                                                  .fromHeight(
-                                                            44,
-                                                          ),
-                                                        ),
-                                                        onPressed: () =>
-                                                            OwnerImporterCatalogScreen
-                                                                .open(
-                                                          context,
-                                                          importerId: p.id,
-                                                          importerName: p
-                                                                      .businessName
-                                                                      ?.trim()
-                                                                      .isNotEmpty ==
-                                                                  true
-                                                              ? p.businessName!
-                                                                  .trim()
-                                                              : (p.email ??
-                                                                  'Mayorista'),
-                                                        ),
-                                                        icon: const Icon(
-                                                          Icons
-                                                              .inventory_2_outlined,
-                                                          size: 18,
-                                                        ),
-                                                        label: const Text(
-                                                          'Ver catálogo',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                    if (_canSetAccess) ...[
-                                                      const SizedBox(
-                                                          height: 12),
-                                                      FilledButton(
-                                                        style: FilledButton
-                                                            .styleFrom(
-                                                          minimumSize:
-                                                              const Size
-                                                                  .fromHeight(
-                                                            44,
-                                                          ),
-                                                        ),
-                                                        onPressed: p.hasActiveAccountAccess ||
-                                                                _busyProfileId ==
-                                                                    p.id
-                                                            ? null
-                                                            : () =>
-                                                                _setImportadorAccess(
-                                                                  p,
-                                                                  KycStatus
-                                                                      .aprobado,
-                                                                ),
-                                                        child: Text(
-                                                          p.hasActiveAccountAccess
-                                                              ? 'Acceso habilitado'
-                                                              : 'Aprobar mayorista',
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      OutlinedButton(
-                                                        style: OutlinedButton
-                                                            .styleFrom(
-                                                          minimumSize:
-                                                              const Size
-                                                                  .fromHeight(
-                                                            44,
-                                                          ),
-                                                          foregroundColor:
-                                                              Colors
-                                                                  .red.shade800,
-                                                        ),
-                                                        onPressed: _busyProfileId ==
-                                                                p.id
-                                                            ? null
-                                                            : () =>
-                                                                _setImportadorAccess(
-                                                                  p,
-                                                                  KycStatus
-                                                                      .rechazado,
-                                                                ),
-                                                        child: const Text(
-                                                            'Rechazar'),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                )
-                                              : Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment
-                                                          .stretch,
-                                                  children: [
-                                                    _referralAttributionBox(p),
-                                                    OwnerAccountDossier(
-                                                      profile: p,
-                                                      title:
-                                                          'Datos de la tienda',
-                                                      showAuthEmail:
-                                                          widget.viewerIsOwner,
-                                                    ),
-                                                    if (_canReviewKyc) ...[
-                                                      const SizedBox(
-                                                          height: 12),
-                                                      OutlinedButton(
-                                                        style: OutlinedButton
-                                                            .styleFrom(
-                                                          minimumSize:
-                                                              const Size
-                                                                  .fromHeight(
-                                                            44,
-                                                          ),
-                                                        ),
-                                                        onPressed: _busyProfileId ==
-                                                                p.id
-                                                            ? null
-                                                            : () =>
-                                                                _pickGlobalStatus(
-                                                                  p,
-                                                                ),
-                                                        child: const Text(
-                                                          'Cambiar KYC global',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                    if (_canSetAccess) ...[
-                                                      const SizedBox(height: 8),
-                                                      FilledButton(
-                                                        style: FilledButton
-                                                            .styleFrom(
-                                                          minimumSize:
-                                                              const Size
-                                                                  .fromHeight(
-                                                            44,
-                                                          ),
-                                                        ),
-                                                        onPressed:
-                                                            p.hasActiveAccountAccess ||
-                                                                    _busyProfileId ==
-                                                                        p.id
-                                                                ? null
-                                                                : () =>
-                                                                    _setGlobalKyc(
-                                                                      p,
-                                                                      KycStatus
-                                                                          .aprobado,
-                                                                    ),
-                                                        child: Text(
-                                                          p.hasActiveAccountAccess
-                                                              ? 'Acceso habilitado'
-                                                              : 'Habilitar acceso',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                    const SizedBox(height: 12),
-                                                    ...AliadoDocType
-                                                        .forAdminReview(
-                                                      role: role,
-                                                      uploadedTypes:
-                                                          currentByType.keys,
-                                                    ).map((type) {
-                                                      final doc =
-                                                          currentByType[type];
-                                                      final has = doc != null;
-                                                      final st = doc
-                                                          ?.reviewStatus
-                                                          ?.trim();
-                                                      final busy =
-                                                          _busyDocKey ==
-                                                              '${p.id}:$type';
-                                                      return Padding(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .only(
-                                                          bottom: 8,
-                                                        ),
-                                                        child: DecoratedBox(
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            border: Border.all(
-                                                              color: AppColors
-                                                                  .borderSubtle,
-                                                            ),
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        8),
-                                                          ),
-                                                          child: Padding(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(10),
-                                                            child: Column(
-                                                              crossAxisAlignment:
-                                                                  CrossAxisAlignment
-                                                                      .stretch,
-                                                              children: [
-                                                                Text(
-                                                                  AliadoDocType
-                                                                      .labelEs(
-                                                                    type,
-                                                                  ),
-                                                                  style:
-                                                                      const TextStyle(
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w700,
-                                                                  ),
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 4,
-                                                                ),
-                                                                Text(
-                                                                  has
-                                                                      ? DocumentReviewStatus
-                                                                          .labelEs(
-                                                                          st ??
-                                                                              DocumentReviewStatus.pendiente,
-                                                                        )
-                                                                      : 'Sin archivo',
-                                                                  style:
-                                                                      TextStyle(
-                                                                    fontSize:
-                                                                        12,
-                                                                    color: Colors
-                                                                        .grey
-                                                                        .shade700,
-                                                                  ),
-                                                                ),
-                                                                if ((doc?.reviewNote ??
-                                                                        '')
-                                                                    .trim()
-                                                                    .isNotEmpty) ...[
-                                                                  const SizedBox(
-                                                                    height: 6,
-                                                                  ),
-                                                                  Text(
-                                                                    doc!.reviewNote!
-                                                                        .trim(),
-                                                                    style:
-                                                                        TextStyle(
-                                                                      fontSize:
-                                                                          12,
-                                                                      height:
-                                                                          1.35,
-                                                                      color: Colors
-                                                                          .red
-                                                                          .shade800,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                                if (has) ...[
-                                                                  const SizedBox(
-                                                                    height: 8,
-                                                                  ),
-                                                                  OutlinedButton(
-                                                                    style: OutlinedButton
-                                                                        .styleFrom(
-                                                                      minimumSize:
-                                                                          const Size
-                                                                              .fromHeight(
-                                                                        40,
-                                                                      ),
-                                                                    ),
-                                                                    onPressed: busy
-                                                                        ? null
-                                                                        : () => _openDocument(
-                                                                              doc,
-                                                                            ),
-                                                                    child:
-                                                                        const Text(
-                                                                      'Ver archivo',
-                                                                    ),
-                                                                  ),
-                                                                  if (_canReviewKyc &&
-                                                                      (st != DocumentReviewStatus.aprobado ||
-                                                                          st !=
-                                                                              DocumentReviewStatus.rechazado)) ...[
-                                                                    const SizedBox(
-                                                                      height: 8,
-                                                                    ),
-                                                                    Row(
-                                                                      children: [
-                                                                        if (st !=
-                                                                            DocumentReviewStatus.aprobado)
-                                                                          Expanded(
-                                                                            child:
-                                                                                FilledButton(
-                                                                              style: FilledButton.styleFrom(
-                                                                                minimumSize: const Size.fromHeight(
-                                                                                  40,
-                                                                                ),
-                                                                              ),
-                                                                              onPressed: busy
-                                                                                  ? null
-                                                                                  : () => _reviewDoc(
-                                                                                        profile: p,
-                                                                                        docType: type,
-                                                                                        status: DocumentReviewStatus.aprobado,
-                                                                                      ),
-                                                                              child: const Text(
-                                                                                'Aprobar',
-                                                                              ),
-                                                                            ),
-                                                                          ),
-                                                                        if (st != DocumentReviewStatus.aprobado &&
-                                                                            st !=
-                                                                                DocumentReviewStatus.rechazado)
-                                                                          const SizedBox(
-                                                                            width:
-                                                                                8,
-                                                                          ),
-                                                                        if (st !=
-                                                                            DocumentReviewStatus.rechazado)
-                                                                          Expanded(
-                                                                            child:
-                                                                                OutlinedButton(
-                                                                              style: OutlinedButton.styleFrom(
-                                                                                minimumSize: const Size.fromHeight(
-                                                                                  40,
-                                                                                ),
-                                                                                foregroundColor: Colors.red.shade800,
-                                                                              ),
-                                                                              onPressed: busy
-                                                                                  ? null
-                                                                                  : () => _reviewDoc(
-                                                                                        profile: p,
-                                                                                        docType: type,
-                                                                                        status: DocumentReviewStatus.rechazado,
-                                                                                      ),
-                                                                              child: const Text(
-                                                                                'Rechazar',
-                                                                              ),
-                                                                            ),
-                                                                          ),
-                                                                      ],
-                                                                    ),
-                                                                  ],
-                                                                  if (busy)
-                                                                    const Padding(
-                                                                      padding:
-                                                                          EdgeInsets
-                                                                              .only(
-                                                                        top: 8,
-                                                                      ),
-                                                                      child:
-                                                                          LinearProgressIndicator(
-                                                                        minHeight:
-                                                                            2,
-                                                                        color: AppColors
-                                                                            .brand,
-                                                                      ),
-                                                                    ),
-                                                                ],
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }),
-                                                  ],
-                                                ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
             ),
           ],
         ),
@@ -1148,22 +1178,185 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     );
   }
 
-  static String _roleFilterLabel(_KycRoleFilter f) {
-    return switch (f) {
-      _KycRoleFilter.todos => 'Todos',
-      _KycRoleFilter.aliados => 'Tiendas minoristas',
-      _KycRoleFilter.mayoristas => 'Mayoristas',
-    };
-  }
 
-  static String _queueFilterLabel(_KycQueueFilter f) {
-    return switch (f) {
-      _KycQueueFilter.solicitudesIngreso => 'Solicitudes',
-      _KycQueueFilter.enRevision => 'En revisión',
-      _KycQueueFilter.conPendientes => 'Con pendientes',
-      _KycQueueFilter.activas => 'Activas',
-      _KycQueueFilter.todos => 'Todos los estados',
-    };
+}
+
+class _KycDesktopTable extends StatelessWidget {
+  const _KycDesktopTable({
+    required this.rows,
+    required this.selectedId,
+    required this.onSelect,
+    required this.onOpenDossier,
+  });
+
+  final List<ProfileModel> rows;
+  final String? selectedId;
+  final ValueChanged<ProfileModel> onSelect;
+  final ValueChanged<ProfileModel> onOpenDossier;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            Material(
+              color: selectedId == rows[i].id
+                  ? AppColors.brandBlueContainer
+                  : Colors.transparent,
+              child: InkWell(
+                onTap: () => onSelect(rows[i]),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              rows[i].businessName?.trim().isNotEmpty == true
+                                  ? rows[i].businessName!.trim()
+                                  : 'Sin nombre',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if (rows[i].email?.trim().isNotEmpty == true)
+                              Text(
+                                rows[i].email!.trim(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          ProfileRoleLabels.labelEs(rows[i].role),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          OwnerAccountRules.statusLabelEs(
+                            role: rows[i].role,
+                            accountAccessStatus: rows[i].accountAccessStatus,
+                            deactivatedAt: rows[i].deactivatedAt,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Editar datos',
+                        onPressed: () => onOpenDossier(rows[i]),
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _KycListCard extends StatelessWidget {
+  const _KycListCard({
+    required this.profile,
+    required this.onTap,
+  });
+
+  final ProfileModel profile;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.businessName?.trim().isNotEmpty == true
+                          ? profile.businessName!.trim()
+                          : 'Sin nombre',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        ProfileRoleLabels.labelEs(profile.role),
+                        if (profile.email?.trim().isNotEmpty == true)
+                          profile.email!.trim(),
+                        if (profile.rif?.trim().isNotEmpty == true)
+                          profile.rif!.trim(),
+                      ].join(' · '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _KycStatusChip(status: profile.accountAccessStatus),
+              const Icon(Icons.chevron_right, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

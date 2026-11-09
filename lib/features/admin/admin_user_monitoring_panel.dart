@@ -10,12 +10,14 @@ import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/features/admin/admin_standard_filter_bar.dart';
 
 enum _ActivityPeriod { day, week }
 
 enum _ActivityRoleFilter { all, aliado, importador }
+
+enum _CatalogListFilter { todos, publicados, sinCatalogo }
 
 /// Admin: monitoreo de ingresos y pedidos por aliado/importador.
 class AdminUserMonitoringPanel extends StatefulWidget {
@@ -52,20 +54,23 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   final _listScroll = ScrollController();
   int _pageIndex = 0;
   int _pageSize = listPageSizeOptions.first;
-  int _publishedPageIndex = 0;
-  int _publishedPageSize = listPageSizeOptions.first;
-  int _missingPageIndex = 0;
-  int _missingPageSize = listPageSizeOptions.first;
   AdminCatalogCoverage? _coverage;
   bool _coverageLoading = true;
   bool _showingCatalogs = false;
   bool _presenceOpen = false;
   ImporterOption? _focusedCatalog;
+  _CatalogListFilter _catalogFilter = _CatalogListFilter.todos;
+  final _catalogSearchCtrl = TextEditingController();
+  int _catalogPageIndex = 0;
+  int _catalogPageSize = listPageSizeOptions.first;
 
   @override
   void initState() {
     super.initState();
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
+    _catalogSearchCtrl.addListener(() {
+      setState(() => _catalogPageIndex = 0);
+    });
     if (widget.presenceRequest > 0) {
       _presenceOpen = true;
       _period = _ActivityPeriod.day;
@@ -94,6 +99,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _catalogSearchCtrl.dispose();
     _listScroll.dispose();
     super.dispose();
   }
@@ -234,7 +240,104 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
         controller: _listScroll,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          _toolbar(),
+          AdminStandardFilterBar(
+            padding: EdgeInsets.zero,
+            searchController: _searchCtrl,
+            searchHint: 'Buscar por nombre, RIF o ubicación…',
+            onSearchChanged: (_) => setState(() => _pageIndex = 0),
+            clearVisible: _period != _ActivityPeriod.week ||
+                _roleFilter != _ActivityRoleFilter.all,
+            onClear: () {
+              setState(() {
+                _period = _ActivityPeriod.week;
+                _roleFilter = _ActivityRoleFilter.all;
+                _pageIndex = 0;
+              });
+              _load();
+            },
+            trailing: IconButton(
+              tooltip: 'Actualizar',
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh, size: 22),
+            ),
+            menus: [
+              AdminFilterDropdown(
+                icon: Icons.calendar_today_outlined,
+                placeholder: 'Periodo',
+                valueLabel: _period == _ActivityPeriod.day ? 'Hoy' : 'Semana',
+                active: _period != _ActivityPeriod.week,
+                options: [
+                  AdminFilterOption(
+                    label: 'Hoy',
+                    selected: _period == _ActivityPeriod.day,
+                    onSelect: () {
+                      setState(() {
+                        _period = _ActivityPeriod.day;
+                        _pageIndex = 0;
+                      });
+                      _load();
+                    },
+                  ),
+                  AdminFilterOption(
+                    label: 'Semana',
+                    selected: _period == _ActivityPeriod.week,
+                    onSelect: () {
+                      setState(() {
+                        _period = _ActivityPeriod.week;
+                        _pageIndex = 0;
+                      });
+                      _load();
+                    },
+                  ),
+                ],
+              ),
+              AdminFilterDropdown(
+                icon: Icons.badge_outlined,
+                placeholder: 'Rol',
+                valueLabel: switch (_roleFilter) {
+                  _ActivityRoleFilter.all => 'Todos',
+                  _ActivityRoleFilter.aliado => 'Minorista',
+                  _ActivityRoleFilter.importador => 'Mayorista',
+                },
+                active: _roleFilter != _ActivityRoleFilter.all,
+                options: [
+                  AdminFilterOption(
+                    label: 'Todos',
+                    selected: _roleFilter == _ActivityRoleFilter.all,
+                    onSelect: () {
+                      setState(() {
+                        _roleFilter = _ActivityRoleFilter.all;
+                        _pageIndex = 0;
+                      });
+                      _load();
+                    },
+                  ),
+                  AdminFilterOption(
+                    label: 'Minorista',
+                    selected: _roleFilter == _ActivityRoleFilter.aliado,
+                    onSelect: () {
+                      setState(() {
+                        _roleFilter = _ActivityRoleFilter.aliado;
+                        _pageIndex = 0;
+                      });
+                      _load();
+                    },
+                  ),
+                  AdminFilterOption(
+                    label: 'Mayorista',
+                    selected: _roleFilter == _ActivityRoleFilter.importador,
+                    onSelect: () {
+                      setState(() {
+                        _roleFilter = _ActivityRoleFilter.importador;
+                        _pageIndex = 0;
+                      });
+                      _load();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           _summaryRow(
             users: filtered.length,
@@ -242,16 +345,6 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
             orders: totalOrders,
             delivered: totalDelivered,
             volumeUsd: totalVolume,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _searchCtrl,
-            decoration: InputDecoration(
-              hintText: 'Buscar por nombre, RIF o ubicación…',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            ),
           ),
           const SizedBox(height: 12),
           if (_loading)
@@ -310,54 +403,6 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     );
   }
 
-  Widget _toolbar() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Monitoreo de usuarios',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ),
-            IconButton(
-              tooltip: 'Actualizar',
-              onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh, size: 22),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SegmentedFilterBar(
-          labels: const ['Hoy', 'Semana'],
-          selectedIndex: _ActivityPeriod.values.indexOf(_period),
-          onSelected: (index) {
-            setState(() {
-              _period = _ActivityPeriod.values[index];
-              _pageIndex = 0;
-            });
-            _load();
-          },
-        ),
-        SegmentedFilterBar(
-          labels: const ['Todos', 'Tiendas minoristas', 'Importadores'],
-          selectedIndex: _ActivityRoleFilter.values.indexOf(_roleFilter),
-          onSelected: (index) {
-            setState(() {
-              _roleFilter = _ActivityRoleFilter.values[index];
-              _pageIndex = 0;
-            });
-            _load();
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _summaryRow({
     required int users,
     required int logins,
@@ -404,8 +449,9 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
             ? _loadCoverage
             : () => setState(() {
                   _showingCatalogs = true;
-                  _publishedPageIndex = 0;
-                  _missingPageIndex = 0;
+                  _catalogFilter = _CatalogListFilter.todos;
+                  _catalogSearchCtrl.clear();
+                  _catalogPageIndex = 0;
                 }),
       ),
     ];
@@ -461,8 +507,50 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     );
   }
 
+  List<({ImporterOption importer, bool published})> get _catalogRows {
+    final coverage = _coverage ?? AdminCatalogCoverage.empty;
+    final q = _catalogSearchCtrl.text.trim().toLowerCase();
+    bool matches(ImporterOption i) {
+      if (q.isEmpty) return true;
+      final name = i.businessName.toLowerCase();
+      final estado = (i.estado ?? '').toLowerCase();
+      final ciudad = (i.ciudad ?? '').toLowerCase();
+      return name.contains(q) || estado.contains(q) || ciudad.contains(q);
+    }
+
+    final rows = <({ImporterOption importer, bool published})>[];
+    if (_catalogFilter != _CatalogListFilter.sinCatalogo) {
+      for (final i in coverage.published) {
+        if (matches(i)) rows.add((importer: i, published: true));
+      }
+    }
+    if (_catalogFilter != _CatalogListFilter.publicados) {
+      for (final i in coverage.withoutCatalog) {
+        if (matches(i)) rows.add((importer: i, published: false));
+      }
+    }
+    rows.sort(
+      (a, b) => a.importer.businessName
+          .toLowerCase()
+          .compareTo(b.importer.businessName.toLowerCase()),
+    );
+    return rows;
+  }
+
   Widget _catalogLists() {
     final coverage = _coverage ?? AdminCatalogCoverage.empty;
+    final rows = _catalogRows;
+    final page = sliceListPage(
+      items: rows,
+      pageIndex: _catalogPageIndex,
+      pageSize: _catalogPageSize,
+    );
+    final statusLabel = switch (_catalogFilter) {
+      _CatalogListFilter.todos => 'Todos',
+      _CatalogListFilter.publicados => 'Publicados',
+      _CatalogListFilter.sinCatalogo => 'Sin catálogo',
+    };
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -490,76 +578,82 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              Text(
-                'Catálogos publicados · ${coverage.published.length}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              if (coverage.published.isEmpty)
-                Text(
-                  'Ningún importador tiene productos publicados.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                )
-              else ...[
-                ListPageBar(
-                  total: coverage.published.length,
-                  pageIndex: _publishedPageIndex,
-                  pageSize: _publishedPageSize,
-                  onPageIndex: (index) =>
-                      setState(() => _publishedPageIndex = index),
-                  onPageSize: (size) => setState(() {
-                    _publishedPageSize = size;
-                    _publishedPageIndex = 0;
-                  }),
-                ),
-                ...sliceListPage(
-                  items: coverage.published,
-                  pageIndex: _publishedPageIndex,
-                  pageSize: _publishedPageSize,
-                ).map(
-                  (importer) => _ImporterCatalogTile(
-                    importer: importer,
-                    subtitle: 'Catálogo publicado',
-                    onTap: () => setState(() => _focusedCatalog = importer),
+              AdminStandardFilterBar(
+                padding: EdgeInsets.zero,
+                searchController: _catalogSearchCtrl,
+                searchHint: 'Buscar proveedor por nombre o ubicación…',
+                onSearchChanged: (_) => setState(() => _catalogPageIndex = 0),
+                clearVisible: _catalogFilter != _CatalogListFilter.todos,
+                onClear: () => setState(() {
+                  _catalogFilter = _CatalogListFilter.todos;
+                  _catalogSearchCtrl.clear();
+                  _catalogPageIndex = 0;
+                }),
+                menus: [
+                  AdminFilterDropdown(
+                    icon: Icons.inventory_2_outlined,
+                    placeholder: 'Estado',
+                    valueLabel: statusLabel,
+                    active: _catalogFilter != _CatalogListFilter.todos,
+                    options: [
+                      for (final f in _CatalogListFilter.values)
+                        AdminFilterOption(
+                          label: switch (f) {
+                            _CatalogListFilter.todos => 'Todos',
+                            _CatalogListFilter.publicados =>
+                              'Publicados · ${coverage.published.length}',
+                            _CatalogListFilter.sinCatalogo =>
+                              'Sin catálogo · ${coverage.withoutCatalog.length}',
+                          },
+                          selected: _catalogFilter == f,
+                          onSelect: () => setState(() {
+                            _catalogFilter = f;
+                            _catalogPageIndex = 0;
+                          }),
+                        ),
+                    ],
                   ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              Text(
-                'Sin catálogo publicado · ${coverage.withoutCatalog.length}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Importadores registrados que aún no publican productos.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ],
               ),
               const SizedBox(height: 8),
-              if (coverage.withoutCatalog.isEmpty)
-                Text(
-                  'Todos los importadores registrados tienen catálogo publicado.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              if (rows.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text(
+                      coverage.published.isEmpty &&
+                              coverage.withoutCatalog.isEmpty
+                          ? 'No hay importadores registrados.'
+                          : 'Ningún proveedor coincide con la búsqueda.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 )
               else ...[
                 ListPageBar(
-                  total: coverage.withoutCatalog.length,
-                  pageIndex: _missingPageIndex,
-                  pageSize: _missingPageSize,
+                  total: rows.length,
+                  pageIndex: _catalogPageIndex,
+                  pageSize: _catalogPageSize,
                   onPageIndex: (index) =>
-                      setState(() => _missingPageIndex = index),
+                      setState(() => _catalogPageIndex = index),
                   onPageSize: (size) => setState(() {
-                    _missingPageSize = size;
-                    _missingPageIndex = 0;
+                    _catalogPageSize = size;
+                    _catalogPageIndex = 0;
                   }),
                 ),
-                ...sliceListPage(
-                  items: coverage.withoutCatalog,
-                  pageIndex: _missingPageIndex,
-                  pageSize: _missingPageSize,
-                ).map(
-                  (importer) => _ImporterCatalogTile(
-                    importer: importer,
-                    subtitle: 'Sin catálogo publicado',
+                ...page.map(
+                  (row) => _ImporterCatalogTile(
+                    importer: row.importer,
+                    subtitle: row.published
+                        ? 'Catálogo publicado'
+                        : 'Sin catálogo publicado',
+                    onTap: row.published
+                        ? () => setState(() => _focusedCatalog = row.importer)
+                        : null,
                   ),
                 ),
               ],

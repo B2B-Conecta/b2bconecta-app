@@ -58,6 +58,7 @@ class _AdminEncomiendasReportPanelState
   /// `null` = todos; 10/20/50 = solo pedidos de los productos más vendidos.
   int? _topSoldLimit;
   int _sectionIndex = 0;
+  final Set<int> _visitedSections = {0};
   bool _exporting = false;
 
   static const _topSoldOptions = <int>[10, 20, 50];
@@ -456,113 +457,117 @@ class _AdminEncomiendasReportPanelState
   }
 
   Widget _buildCompactFiltersCard() {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderSubtle),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    final canExport = _filtered.isNotEmpty && !_exporting && !_loading;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchCtrl,
-                    decoration: InputDecoration(
-                      hintText: MediaQuery.sizeOf(context).width < 600
-                          ? 'Producto, SKU, tienda minorista…'
-                          : 'Buscar producto, SKU, tienda minorista…',
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      filled: true,
-                      fillColor: AppColors.fieldFill,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.borderSubtle),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.borderSubtle),
-                      ),
-                      isDense: true,
-                      suffixIcon: _searchCtrl.text.trim().isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                _applyLocalFilters();
-                              },
-                            ),
-                    ),
-                    onChanged: (_) => _applyLocalFilters(),
+            Expanded(
+              child: TextField(
+                controller: _searchCtrl,
+                decoration: InputDecoration(
+                  hintText: MediaQuery.sizeOf(context).width < 600
+                      ? 'Producto, SKU, tienda minorista…'
+                      : 'Buscar producto, SKU, tienda minorista…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: AppColors.fieldFill,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.borderSubtle),
                   ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.borderSubtle),
+                  ),
+                  isDense: true,
+                  suffixIcon: _searchCtrl.text.trim().isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            _applyLocalFilters();
+                          },
+                        ),
                 ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _loading ? null : _load,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.refresh, size: 20),
-                  tooltip: 'Actualizar desde servidor',
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (isAdminDesktopLayout(context))
-              _desktopFilterToolbar()
-            else
-              FilterChipStrip(
-                children: [
-                  for (final (i, days) in const [30, 90, 365].indexed)
-                    StripChip(
-                      label: '$days días',
-                      selected: _presetDayIndex == i,
-                      onTap: _loading
-                          ? null
-                          : () {
-                              _presetDays(days);
-                              _load();
-                            },
-                    ),
-                  StripChip(
-                    label:
-                        '${_formatDateShort(_desde)} – ${_formatDateShort(_hasta)}',
-                    icon: Icons.calendar_today_outlined,
-                    selected: _presetDayIndex < 0,
-                    onTap: _loading ? null : _pickRange,
-                  ),
-                  const StripDivider(),
-                  StripChip(
-                    label: _activeFilterCount == 0
-                        ? 'Filtros'
-                        : 'Filtros ($_activeFilterCount)',
-                    icon: Icons.tune,
-                    selected: _activeFilterCount > 0,
-                    onTap: _showAdvancedFiltersSheet,
-                  ),
-                  ..._activeFilterChips(),
-                  if (_activeFilterCount > 0)
-                    TextButton(
-                      onPressed: _clearAllFilters,
-                      child: const Text('Limpiar'),
-                    ),
-                ],
+                onChanged: (_) => _applyLocalFilters(),
               ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: canExport ? _exportExcel : null,
+              icon: _exporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_outlined, size: 20),
+              tooltip: _filtered.isEmpty
+                  ? 'Sin datos para Excel'
+                  : 'Descargar Excel (${_filtered.length})',
+            ),
+            const SizedBox(width: 4),
+            IconButton.filled(
+              onPressed: _loading ? null : _load,
+              icon: _loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
+              tooltip: 'Actualizar desde servidor',
+            ),
           ],
         ),
-      ),
+        const SizedBox(height: 10),
+        if (isAdminDesktopLayout(context))
+          _desktopFilterToolbar()
+        else
+          FilterChipStrip(
+            children: [
+              for (final (i, days) in const [30, 90, 365].indexed)
+                StripChip(
+                  label: '$days días',
+                  selected: _presetDayIndex == i,
+                  onTap: _loading
+                      ? null
+                      : () {
+                          _presetDays(days);
+                          _load();
+                        },
+                ),
+              StripChip(
+                label:
+                    '${_formatDateShort(_desde)} – ${_formatDateShort(_hasta)}',
+                icon: Icons.calendar_today_outlined,
+                selected: _presetDayIndex < 0,
+                onTap: _loading ? null : _pickRange,
+              ),
+              const StripDivider(),
+              StripChip(
+                label: _activeFilterCount == 0
+                    ? 'Filtros'
+                    : 'Filtros ($_activeFilterCount)',
+                icon: Icons.tune,
+                selected: _activeFilterCount > 0,
+                onTap: _showAdvancedFiltersSheet,
+              ),
+              ..._activeFilterChips(),
+              if (_activeFilterCount > 0)
+                TextButton(
+                  onPressed: _clearAllFilters,
+                  child: const Text('Limpiar'),
+                ),
+            ],
+          ),
+      ],
     );
   }
 
@@ -1017,285 +1022,247 @@ class _AdminEncomiendasReportPanelState
     );
   }
 
+  static const _sectionLabels = <String>[
+    'Encomiendas',
+    'Promos',
+    'Referidos',
+    'Devoluciones',
+  ];
+
+  String get _sectionHint => switch (_sectionIndex) {
+        0 => 'Métricas, Excel y detalle de pedidos en el período.',
+        1 => 'Campañas y banners promocionales del marketplace.',
+        2 => 'Atribución y actividad de referidos.',
+        _ => 'Postventa: frecuencia y saldo por importador.',
+      };
+
+  void _selectSection(int index) {
+    setState(() {
+      _sectionIndex = index;
+      _visitedSections.add(index);
+    });
+  }
+
   Widget _sectionSwitcher() {
     return SegmentedFilterBar(
-      labels: const [
-        'Pedidos',
-        'Promos',
-        'Referidos',
-        'Devoluciones',
-      ],
+      labels: _sectionLabels,
       selectedIndex: _sectionIndex,
-      onSelected: (index) => setState(() => _sectionIndex = index),
+      onSelected: _selectSection,
+    );
+  }
+
+  Widget _sectionHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sectionSwitcher(),
+          Text(
+            _sectionHint,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEncomiendasBody() {
+    if (_error != null && _raw.isEmpty && !_loading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_error!, textAlign: TextAlign.center),
+              TextButton(onPressed: _load, child: const Text('Reintentar')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: Builder(
+        builder: (context) {
+          final mobile = MediaQuery.sizeOf(context).width < 600;
+          return ListView(
+            padding: EdgeInsets.fromLTRB(16, mobile ? 8 : 0, 16, 24),
+            children: [
+              _buildCompactFiltersCard(),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.insights_outlined,
+                    size: 18,
+                    color: AppColors.brandAccent,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    mobile ? 'Resumen' : 'Resumen gerencial',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: mobile ? 14 : 15,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _summary(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.trending_up,
+                    size: 18,
+                    color: AppColors.brandAccent,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      mobile ? 'Top ventas' : 'Productos más vendidos',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: mobile ? 14 : 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (_topSoldLimit != null)
+                    Text(
+                      'Top $_topSoldLimit',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _topSoldProductsSection(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.list_alt_outlined,
+                    size: 18,
+                    color: AppColors.brandAccent,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Detalle',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: mobile ? 14 : 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${_filtered.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_filtered.isEmpty && _loading)
+                const SizedBox(
+                  height: 320,
+                  child: AdminListSkeleton(
+                    itemCount: 4,
+                    padding: EdgeInsets.zero,
+                  ),
+                )
+              else if (_filtered.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'Sin resultados',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                )
+              else
+                PagedItems<TransactionRequestModel>(
+                  items: _filtered,
+                  itemKey: (r) => r.id,
+                  embedded: true,
+                  separator: 8,
+                  itemBuilder: _detailTile,
+                ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Icon(
+                    Icons.storefront_outlined,
+                    size: 18,
+                    color: AppColors.brandAccent,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Sellos de catálogo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: mobile ? 14 : 15,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Verificado / Destacado de mayoristas (no afecta el Excel).',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const AdminCatalogFeaturedSection(),
+            ],
+          );
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_sectionIndex == 1) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _sectionSwitcher(),
-          ),
-          const Expanded(child: AdminPromoCampaignsPanel()),
-        ],
-      );
-    }
-
-    if (_sectionIndex == 2) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _sectionSwitcher(),
-          ),
-          const Expanded(child: AdminReferralsPanel()),
-        ],
-      );
-    }
-
-    if (_sectionIndex == 3) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _sectionSwitcher(),
-          ),
-          const Expanded(child: AdminReturnsReportPanel()),
-        ],
-      );
-    }
-
-    if (_error != null && _raw.isEmpty && !_loading) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _sectionSwitcher(),
-          ),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(_error!, textAlign: TextAlign.center),
-                    TextButton(
-                        onPressed: _load, child: const Text('Reintentar')),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: _sectionSwitcher(),
-        ),
+        _sectionHeader(),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: Builder(
-              builder: (context) {
-                final mobile = MediaQuery.sizeOf(context).width < 600;
-                return ListView(
-                  padding: EdgeInsets.fromLTRB(16, mobile ? 8 : 0, 16, 24),
-                  children: [
-                    _buildCompactFiltersCard(),
-                    const SizedBox(height: 10),
-                    const AdminCatalogFeaturedSection(),
-                    const SizedBox(height: 10),
-                    Material(
-                      color: AppColors.surfaceTinted,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.table_chart_outlined,
-                                  size: 20,
-                                  color: AppColors.brandAccent,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _filtered.isEmpty
-                                        ? 'Sin datos'
-                                        : '${_filtered.length} para Excel',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13.5,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                if (!mobile)
-                                  Text(
-                                    'Encomiendas + ranking',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            FilledButton.tonalIcon(
-                              onPressed:
-                                  (_filtered.isEmpty || _exporting || _loading)
-                                      ? null
-                                      : _exportExcel,
-                              icon: _exporting
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.download_outlined),
-                              label: Text(
-                                _exporting
-                                    ? 'Generando…'
-                                    : (mobile
-                                        ? 'Descargar Excel'
-                                        : 'Descargar Excel (.xlsx)'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.insights_outlined,
-                          size: 18,
-                          color: AppColors.brandAccent,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          mobile ? 'Resumen' : 'Resumen gerencial',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: mobile ? 14 : 15,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _summary(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.trending_up,
-                          size: 18,
-                          color: AppColors.brandAccent,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            mobile ? 'Top ventas' : 'Productos más vendidos',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: mobile ? 14 : 15,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        if (_topSoldLimit != null)
-                          Text(
-                            'Top $_topSoldLimit',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _topSoldProductsSection(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.list_alt_outlined,
-                          size: 18,
-                          color: AppColors.brandAccent,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Detalle',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: mobile ? 14 : 15,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${_filtered.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (_filtered.isEmpty && _loading)
-                      const SizedBox(
-                        height: 320,
-                        child: AdminListSkeleton(
-                          itemCount: 4,
-                          padding: EdgeInsets.zero,
-                        ),
-                      )
-                    else if (_filtered.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Center(
-                          child: Text(
-                            'Sin resultados',
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ),
-                      )
-                    else
-                      PagedItems<TransactionRequestModel>(
-                        items: _filtered,
-                        itemKey: (r) => r.id,
-                        embedded: true,
-                        separator: 8,
-                        itemBuilder: _detailTile,
-                      ),
-                  ],
-                );
-              },
-            ),
+          child: IndexedStack(
+            index: _sectionIndex,
+            children: [
+              for (var i = 0; i < _sectionLabels.length; i++)
+                if (_visitedSections.contains(i))
+                  switch (i) {
+                    0 => _buildEncomiendasBody(),
+                    1 => const AdminPromoCampaignsPanel(),
+                    2 => const AdminReferralsPanel(),
+                    _ => const AdminReturnsReportPanel(),
+                  }
+                else
+                  const SizedBox.shrink(),
+            ],
           ),
         ),
       ],

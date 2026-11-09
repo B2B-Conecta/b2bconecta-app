@@ -268,23 +268,10 @@ class _AdminAccountManagementPanelState
               profile: p,
               isSelf: p.id == widget.viewer.id,
             ),
-            const SizedBox(height: 12),
-            if (_canChangeRole(p)) ...[
-              FilledButton.tonalIcon(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-                onPressed: _busyId == p.id ? null : () => _changeRole(p),
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: const Text('Corregir rol (minorista / mayorista)'),
-              ),
-              const SizedBox(height: 8),
-            ],
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
-              onPressed: () async {
+            ..._profileOptionActions(
+              p,
+              buttonHeight: 48,
+              onEditExpediente: () async {
                 Navigator.of(ctx).pop();
                 final changed = await OwnerAccountDossierForm.open(
                   context,
@@ -294,7 +281,6 @@ class _AdminAccountManagementPanelState
                 );
                 if (changed == true && mounted) await _load();
               },
-              child: const Text('Abrir expediente'),
             ),
             ..._previewDangerActions(p),
           ],
@@ -621,6 +607,44 @@ class _AdminAccountManagementPanelState
     );
   }
 
+  List<Widget> _profileOptionActions(
+    ProfileModel p, {
+    required double buttonHeight,
+    required VoidCallback onEditExpediente,
+  }) {
+    return [
+      const SizedBox(height: 12),
+      Text(
+        'Acciones',
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      const SizedBox(height: 8),
+      if (_canChangeRole(p)) ...[
+        FilledButton.tonalIcon(
+          style: FilledButton.styleFrom(
+            minimumSize: Size.fromHeight(buttonHeight),
+          ),
+          onPressed: _busyId == p.id ? null : () => _changeRole(p),
+          icon: const Icon(Icons.swap_horiz, size: 18),
+          label: const Text('Corregir rol (minorista / mayorista)'),
+        ),
+        const SizedBox(height: 8),
+      ],
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          minimumSize: Size.fromHeight(buttonHeight),
+        ),
+        onPressed: onEditExpediente,
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        label: const Text('Editar expediente'),
+      ),
+    ];
+  }
+
   List<Widget> _previewDangerActions(ProfileModel p) {
     if (!_canOperate(p)) return const [];
     final style = OutlinedButton.styleFrom(
@@ -932,26 +956,10 @@ class _AdminAccountManagementPanelState
                       profile: preview,
                       isSelf: preview.id == widget.viewer.id,
                     ),
-                    const SizedBox(height: 12),
-                    if (_canChangeRole(preview)) ...[
-                      FilledButton.tonalIcon(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                        ),
-                        onPressed: _busyId == preview.id
-                            ? null
-                            : () => _changeRole(preview),
-                        icon: const Icon(Icons.swap_horiz, size: 18),
-                        label:
-                            const Text('Corregir rol (minorista / mayorista)'),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                      onPressed: () async {
+                    ..._profileOptionActions(
+                      preview,
+                      buttonHeight: 44,
+                      onEditExpediente: () async {
                         final changed = await OwnerAccountDossierForm.open(
                           context,
                           existing: preview,
@@ -960,7 +968,6 @@ class _AdminAccountManagementPanelState
                         );
                         if (changed == true && mounted) await _load();
                       },
-                      child: const Text('Abrir expediente'),
                     ),
                     ..._previewDangerActions(preview),
                   ],

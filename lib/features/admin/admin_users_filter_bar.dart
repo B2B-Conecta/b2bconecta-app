@@ -106,8 +106,12 @@ class AdminUsersFilterBar extends StatelessWidget {
       searchHint: searchHint,
       onSearchChanged: onSearchChanged,
       menus: menus,
-      clearVisible: _filtersActive,
+      clearVisible: _filtersActive || searchController.text.trim().isNotEmpty,
       onClear: () {
+        if (searchController.text.isNotEmpty) {
+          searchController.clear();
+          onSearchChanged?.call('');
+        }
         onEstado(AdminUserEstadoFilter.todos);
         onRol(AdminUserRolFilter.todos);
         onSort?.call(OwnerAccountSort.newest);

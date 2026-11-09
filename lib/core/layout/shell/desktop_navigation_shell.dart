@@ -53,7 +53,7 @@ class DesktopNavigationShell extends StatefulWidget {
 }
 
 class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
-  bool _railVisible = true;
+  bool _railExpanded = true;
   bool _prefReady = false;
   bool _signingOut = false;
 
@@ -83,14 +83,14 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
     await DesktopNavRailPreference.ensureLoaded();
     if (!mounted) return;
     setState(() {
-      _railVisible = DesktopNavRailPreference.visible;
+      _railExpanded = DesktopNavRailPreference.expanded;
       _prefReady = true;
     });
   }
 
-  Future<void> _setRailVisible(bool visible) async {
-    setState(() => _railVisible = visible);
-    await DesktopNavRailPreference.setVisible(visible);
+  Future<void> _setRailExpanded(bool expanded) async {
+    setState(() => _railExpanded = expanded);
+    await DesktopNavRailPreference.setExpanded(expanded);
   }
 
   @override
@@ -98,12 +98,13 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
     // Engancha al Theme: al cambiar claro/oscuro el rail y el scaffold se redibujan.
     final brightness = Theme.of(context).brightness;
     AppColors.brightness = brightness;
-    final width = MediaQuery.sizeOf(context).width;
-    final extended = width >= AppBreakpoints.desktopRailExtended;
+    // Preferencia del usuario: expandido (etiquetas) o colapsado (solo iconos).
+    final extended = _prefReady
+        ? _railExpanded
+        : MediaQuery.sizeOf(context).width >= AppBreakpoints.desktopRailExtended;
     final safeIndex = widget.selectedIndex.clamp(0, widget.pages.length - 1);
     final dest =
         widget.destinations[safeIndex.clamp(0, widget.destinations.length - 1)];
-    final showRail = !_prefReady || _railVisible;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -114,21 +115,19 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeInOut,
             alignment: Alignment.centerLeft,
-            child: showRail
-                ? _DesktopSideRail(
-                    extended: extended,
-                    selectedIndex: safeIndex,
-                    destinations: widget.destinations,
-                    badgeLabel: widget.railBadgeLabel,
-                    profile: widget.profile,
-                    onDestinationSelected: widget.onDestinationSelected,
-                    onOpenSettings: widget.onOpenSettings,
-                    onSignOut: widget.onSignOut == null ? null : _signOut,
-                    signingOut: _signingOut,
-                    statusBuilder: widget.railStatusBuilder,
-                    onHideRail: () => _setRailVisible(false),
-                  )
-                : const SizedBox(width: 0),
+            child: _DesktopSideRail(
+              extended: extended,
+              selectedIndex: safeIndex,
+              destinations: widget.destinations,
+              badgeLabel: widget.railBadgeLabel,
+              profile: widget.profile,
+              onDestinationSelected: widget.onDestinationSelected,
+              onOpenSettings: widget.onOpenSettings,
+              onSignOut: widget.onSignOut == null ? null : _signOut,
+              signingOut: _signingOut,
+              statusBuilder: widget.railStatusBuilder,
+              onToggleExpanded: () => _setRailExpanded(!extended),
+            ),
           ),
           Expanded(
             child: ScrollCompactLayout(
@@ -143,19 +142,6 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                           onMessagesTap: widget.onMessagesTap,
                           unreadMessages: widget.unreadMessages,
                           trailingActions: widget.trailingActions,
-                          leading: showRail
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Mostrar menú',
-                                  onPressed: () => _setRailVisible(true),
-                                  style: IconButton.styleFrom(
-                                    minimumSize: const Size(44, 44),
-                                  ),
-                                  icon: Icon(
-                                    Icons.menu,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
                         ),
                         _DesktopPageHeading(
                             destination: dest,
@@ -241,7 +227,7 @@ class _DesktopSideRail extends StatelessWidget {
     required this.profile,
     required this.onDestinationSelected,
     required this.onOpenSettings,
-    required this.onHideRail,
+    this.onToggleExpanded,
     this.onSignOut,
     this.signingOut = false,
     this.statusBuilder,
@@ -254,7 +240,7 @@ class _DesktopSideRail extends StatelessWidget {
   final ProfileModel profile;
   final ValueChanged<int> onDestinationSelected;
   final VoidCallback onOpenSettings;
-  final VoidCallback onHideRail;
+  final VoidCallback? onToggleExpanded;
   final VoidCallback? onSignOut;
   final bool signingOut;
   final Widget Function(bool extended)? statusBuilder;
@@ -264,7 +250,7 @@ class _DesktopSideRail extends StatelessWidget {
     return Material(
       color: AppColors.surfaceTinted,
       child: Container(
-        width: extended ? 232 : 96,
+        width: extended ? 232 : 72,
         decoration: BoxDecoration(
           border: Border(right: BorderSide(color: AppColors.borderSubtle)),
         ),
@@ -273,7 +259,11 @@ class _DesktopSideRail extends StatelessWidget {
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(
-                  extended ? 12 : 8, 12, extended ? 8 : 8, 8),
+                extended ? 12 : 6,
+                12,
+                extended ? 8 : 6,
+                8,
+              ),
               child: extended
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,45 +289,50 @@ class _DesktopSideRail extends StatelessWidget {
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Ocultar menú',
-                          onPressed: onHideRail,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(40, 40),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        if (onToggleExpanded != null)
+                          IconButton(
+                            tooltip: 'Contraer menú',
+                            onPressed: onToggleExpanded,
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(40, 40),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: Icon(
+                              Icons.menu_open,
+                              color: AppColors.textSecondary,
+                              size: 22,
+                            ),
                           ),
-                          icon: Icon(
-                            Icons.menu_open,
-                            color: AppColors.textSecondary,
-                            size: 22,
-                          ),
-                        ),
                       ],
                     )
                   : Column(
                       children: [
-                        const B2bConectaMark(size: 36),
-                        const SizedBox(height: 4),
-                        IconButton(
-                          tooltip: 'Ocultar menú',
-                          onPressed: onHideRail,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(40, 40),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        const B2bConectaMark(size: 32),
+                        if (onToggleExpanded != null) ...[
+                          const SizedBox(height: 2),
+                          IconButton(
+                            tooltip: 'Expandir menú',
+                            onPressed: onToggleExpanded,
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(40, 40),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: Icon(
+                              Icons.menu,
+                              color: AppColors.textSecondary,
+                              size: 22,
+                            ),
                           ),
-                          icon: Icon(
-                            Icons.menu_open,
-                            color: AppColors.textSecondary,
-                            size: 22,
-                          ),
-                        ),
+                        ],
                       ],
                     ),
             ),
             Expanded(
               child: ListView.builder(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: extended ? 10 : 8,
+                  vertical: 4,
+                ),
                 itemCount: destinations.length,
                 itemBuilder: (context, i) {
                   final d = destinations[i];
@@ -464,30 +459,50 @@ class _DesktopSideRailAccountFooter extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Tooltip(
-          message: '$displayName · $role · Cuenta y seguridad',
-          child: IconButton(
-            onPressed: onOpenSettings,
-            style: IconButton.styleFrom(
-              backgroundColor: AppColors.card,
-              side: BorderSide(color: AppColors.borderSubtle),
-              minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(
+            message: '$displayName · $role',
+            child: Material(
+              color: AppColors.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.borderSubtle),
+              ),
+              child: InkWell(
+                onTap: onOpenSettings,
+                borderRadius: BorderRadius.circular(12),
+                child: const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(Icons.settings_outlined, size: 22),
+                ),
+              ),
             ),
-            icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
           ),
-        ),
-        if (onSignOut != null) ...[
-          const SizedBox(height: 4),
-          IconButton(
-            tooltip: signingOut ? 'Cerrando sesión…' : 'Cerrar sesión',
-            onPressed: signingOut ? null : onSignOut,
-            style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
-            icon: Icon(Icons.logout, color: AppColors.textSecondary),
-          ),
+          if (onSignOut != null) ...[
+            const SizedBox(height: 6),
+            Tooltip(
+              message: signingOut ? 'Cerrando sesión…' : 'Cerrar sesión',
+              child: InkWell(
+                onTap: signingOut ? null : onSignOut,
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    Icons.logout,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }
@@ -531,13 +546,14 @@ class _RailNavTile extends StatelessWidget {
           ),
           child: Tooltip(
             message: label,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: extended ? 14 : 4,
-                vertical: extended ? 12 : 8,
-              ),
-              child: extended
-                  ? Row(
+            waitDuration: const Duration(milliseconds: 350),
+            child: extended
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
                       children: [
                         Icon(icon, size: 22, color: iconColor),
                         const SizedBox(width: 12),
@@ -555,27 +571,14 @@ class _RailNavTile extends StatelessWidget {
                           ),
                         ),
                       ],
-                    )
-                  : Column(
-                      children: [
-                        Icon(icon, size: 22, color: iconColor),
-                        const SizedBox(height: 4),
-                        Text(
-                          label,
-                          maxLines: 2,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            height: 1.15,
-                            fontWeight:
-                                selected ? FontWeight.w800 : FontWeight.w600,
-                            color: fg,
-                          ),
-                        ),
-                      ],
                     ),
-            ),
+                  )
+                : SizedBox(
+                    height: 48,
+                    child: Center(
+                      child: Icon(icon, size: 22, color: iconColor),
+                    ),
+                  ),
           ),
         ),
       ),

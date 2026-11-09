@@ -270,7 +270,7 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.analytics,
       label: 'Reportes',
       title: 'Reportes',
-      subtitle: 'Encomiendas · Promos · Devoluciones',
+      subtitle: 'Encomiendas · promos · referidos · devoluciones',
     ),
     AdminShellDestination(
       icon: Icons.star_rate_outlined,
@@ -291,7 +291,7 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icons.manage_accounts,
       label: 'Usuarios',
       title: 'Usuarios',
-      subtitle: 'Verificación · cuentas · actividad',
+      subtitle: 'KYC · cuentas · presencia',
     ),
     AdminShellDestination(
       icon: Icons.support_agent_outlined,

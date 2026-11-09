@@ -1207,6 +1207,18 @@ class SupabaseService {
   static Future<List<IncompleteSignupRow>> listIncompleteSignups() =>
       AdminService.listIncompleteSignups();
 
+  static Future<void> banIncompleteSignup({
+    required String userId,
+    required String note,
+  }) =>
+      AdminService.banIncompleteSignup(userId: userId, note: note);
+
+  static Future<void> purgeIncompleteSignup({
+    required String userId,
+    required String confirm,
+  }) =>
+      AdminService.purgeIncompleteSignup(userId: userId, confirm: confirm);
+
   static Future<Map<String, String>> ownerAuthEmailsByProfileId() =>
       AdminService.ownerAuthEmailsByProfileId();
 

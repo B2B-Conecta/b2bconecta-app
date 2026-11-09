@@ -720,6 +720,15 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
   }) {
     return [
       const SizedBox(height: 12),
+      Text(
+        'Acciones',
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      const SizedBox(height: 8),
       if (_canChangeRole(p)) ...[
         FilledButton.tonalIcon(
           style: FilledButton.styleFrom(
@@ -737,7 +746,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
         ),
         onPressed: onEditFiscal,
         icon: const Icon(Icons.edit_outlined, size: 18),
-        label: const Text('Editar datos fiscales'),
+        label: const Text('Editar expediente'),
       ),
     ];
   }

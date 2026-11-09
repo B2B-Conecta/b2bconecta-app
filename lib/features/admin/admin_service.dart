@@ -121,6 +121,34 @@ class AdminService {
         .toList();
   }
 
+  /// Admin: bloquea Auth sin perfil (correo sigue ocupado).
+  static Future<void> banIncompleteSignup({
+    required String userId,
+    required String note,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'admin_ban_incomplete_signup',
+      params: <String, dynamic>{
+        'p_user_id': userId,
+        'p_note': note.trim(),
+      },
+    );
+  }
+
+  /// Admin: borra Auth sin perfil y libera el correo.
+  static Future<void> purgeIncompleteSignup({
+    required String userId,
+    required String confirm,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'admin_purge_incomplete_signup',
+      params: <String, dynamic>{
+        'p_user_id': userId,
+        'p_confirm': confirm.trim(),
+      },
+    );
+  }
+
   /// Administrador: ficha completa (perfiles + correo de Auth).
   static Future<List<ProfileModel>> ownerListProfilesWithDossier() async {
     final listed = await ownerListProfiles();

@@ -54,6 +54,7 @@ class _AdminAccountManagementPanelState
   bool _incompleteLoaded = false;
   String? _error;
   String? _incompleteError;
+  String? _busyIncompleteId;
   _AccountListMode _mode = _AccountListMode.cuentas;
   _IncompleteFilter _incompleteFilter = _IncompleteFilter.todos;
   String? _busyId;
@@ -1134,11 +1135,187 @@ class _AdminAccountManagementPanelState
           (row) => Padding(
             key: ValueKey<String>('incompleto-${row.userId}'),
             padding: const EdgeInsets.only(bottom: 10),
-            child: _IncompleteSignupCard(row: row),
+            child: _IncompleteSignupCard(
+              row: row,
+              busy: _busyIncompleteId == row.userId,
+              onBan: () => _banIncomplete(row),
+              onPurge: () => _purgeIncomplete(row),
+            ),
           ),
         ),
       ],
     ];
+  }
+
+  Future<String?> _promptIncompleteNote() async {
+    final ctrl = TextEditingController();
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(OwnerAccountRules.softDeleteDialogTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'El registro incompleto no podrá iniciar sesión. '
+              'El correo sigue ocupado hasta que lo borre.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLines: 3,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Motivo (mín. 3 caracteres)…',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final note = ctrl.text.trim();
+              if (note.length < 3) return;
+              Navigator.of(ctx).pop(note);
+            },
+            child: const Text(OwnerAccountRules.softDeleteActionLabel),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    return res;
+  }
+
+  Future<String?> _promptIncompletePurge(IncompleteSignupRow row) async {
+    final ctrl = TextEditingController();
+    final email = row.email?.trim();
+    final hasEmail = email != null && email.isNotEmpty;
+    final expected = hasEmail ? email.toLowerCase() : row.userId.toLowerCase();
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final canConfirm = ctrl.text.trim().toLowerCase() == expected;
+          return AlertDialog(
+            title: const Text(OwnerAccountRules.hardDeleteDialogTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  hasEmail
+                      ? 'Se eliminará el usuario de Auth y el correo quedará libre '
+                          'para un registro nuevo.\n\nEscriba $email para confirmar.'
+                      : 'Se eliminará el usuario de Auth.\n\n'
+                          'Escriba el id del usuario para confirmar.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: hasEmail ? 'Correo…' : 'Id de usuario…',
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setLocal(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: canConfirm
+                    ? () => Navigator.of(ctx).pop(ctrl.text.trim())
+                    : null,
+                child: const Text(OwnerAccountRules.hardDeleteActionLabel),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    ctrl.dispose();
+    return res;
+  }
+
+  Future<void> _banIncomplete(IncompleteSignupRow row) async {
+    final note = await _promptIncompleteNote();
+    if (note == null || !mounted) return;
+    setState(() => _busyIncompleteId = row.userId);
+    try {
+      await SupabaseService.banIncompleteSignup(
+        userId: row.userId,
+        note: note,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registro incompleto desactivado. El correo sigue ocupado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _loadIncomplete();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo desactivar: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyIncompleteId = null);
+    }
+  }
+
+  Future<void> _purgeIncomplete(IncompleteSignupRow row) async {
+    final confirm = await _promptIncompletePurge(row);
+    if (confirm == null || !mounted) return;
+    setState(() => _busyIncompleteId = row.userId);
+    try {
+      await SupabaseService.purgeIncompleteSignup(
+        userId: row.userId,
+        confirm: confirm,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registro borrado. El correo quedó libre.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _loadIncomplete();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo borrar: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyIncompleteId = null);
+    }
   }
 
 }
@@ -1616,9 +1793,17 @@ class _AccountActions extends StatelessWidget {
 }
 
 class _IncompleteSignupCard extends StatefulWidget {
-  const _IncompleteSignupCard({required this.row});
+  const _IncompleteSignupCard({
+    required this.row,
+    required this.busy,
+    required this.onBan,
+    required this.onPurge,
+  });
 
   final IncompleteSignupRow row;
+  final bool busy;
+  final VoidCallback onBan;
+  final VoidCallback onPurge;
 
   @override
   State<_IncompleteSignupCard> createState() => _IncompleteSignupCardState();
@@ -1641,16 +1826,22 @@ class _IncompleteSignupCardState extends State<_IncompleteSignupCard> {
   @override
   Widget build(BuildContext context) {
     final row = widget.row;
-    final status = row.email == null
-        ? 'Sin correo'
-        : row.emailConfirmed
-            ? 'Sin perfil'
-            : 'Correo sin confirmar';
+    final status = row.isBanned
+        ? 'Desactivado'
+        : row.email == null
+            ? 'Sin correo'
+            : row.emailConfirmed
+                ? 'Sin perfil'
+                : 'Correo sin confirmar';
     final subtitle = [
       if (row.displayName != null && row.email != null) row.email,
       if (row.phone != null) row.phone,
       if (row.createdAt != null) 'Registro ${formatEsShortDateTime(row.createdAt)}',
     ].join(' · ');
+    final dangerStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(44),
+      foregroundColor: Colors.red.shade800,
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1675,7 +1866,7 @@ class _IncompleteSignupCardState extends State<_IncompleteSignupCard> {
                   ),
                 ),
               ),
-              _StatusChip(label: status, deactivated: false),
+              _StatusChip(label: status, deactivated: row.isBanned),
             ],
           ),
           subtitle: subtitle.isEmpty
@@ -1714,12 +1905,47 @@ class _IncompleteSignupCardState extends State<_IncompleteSignupCard> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
-                  onPressed: _copyEmail,
+                  onPressed: widget.busy ? null : _copyEmail,
                   icon: const Icon(Icons.copy_outlined, size: 18),
                   label: const Text('Copiar correo'),
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            Text(
+              'Acciones',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (!row.isBanned)
+              OutlinedButton.icon(
+                style: dangerStyle,
+                onPressed: widget.busy ? null : widget.onBan,
+                icon: const Icon(Icons.person_off_outlined, size: 18),
+                label: const Text(OwnerAccountRules.softDeleteActionLabel),
+              ),
+            if (!row.isBanned) const SizedBox(height: 8),
+            OutlinedButton.icon(
+              style: dangerStyle,
+              onPressed: widget.busy ? null : widget.onPurge,
+              icon: const Icon(Icons.delete_forever_outlined, size: 18),
+              label: const Text(OwnerAccountRules.hardDeleteActionLabel),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              row.isBanned
+                  ? 'Borrar libera el correo para un registro nuevo.'
+                  : 'Dar de baja bloquea el acceso. Borrar libera el correo.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       ),

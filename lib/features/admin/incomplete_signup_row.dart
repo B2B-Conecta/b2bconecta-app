@@ -8,6 +8,7 @@ class IncompleteSignupRow {
     this.createdAt,
     this.lastSignInAt,
     this.emailConfirmedAt,
+    this.bannedUntil,
   });
 
   final String userId;
@@ -17,8 +18,15 @@ class IncompleteSignupRow {
   final DateTime? createdAt;
   final DateTime? lastSignInAt;
   final DateTime? emailConfirmedAt;
+  final DateTime? bannedUntil;
 
   bool get emailConfirmed => emailConfirmedAt != null;
+
+  bool get isBanned {
+    final until = bannedUntil;
+    if (until == null) return false;
+    return until.isAfter(DateTime.now().toUtc());
+  }
 
   String get title {
     final name = displayName?.trim();
@@ -50,6 +58,7 @@ class IncompleteSignupRow {
       createdAt: date(json['created_at']),
       lastSignInAt: date(json['last_sign_in_at']),
       emailConfirmedAt: date(json['email_confirmed_at']),
+      bannedUntil: date(json['banned_until']),
     );
   }
 }

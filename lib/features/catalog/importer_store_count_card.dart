@@ -72,16 +72,18 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(color: AppColors.borderSubtle),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              width: 48,
+              height: 48,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const _StoreCountIcon(size: 22),
-                  const SizedBox(height: 4),
+                  const _StoreCountIcon(size: 18),
+                  const SizedBox(height: 2),
                   Text(
                     '$count',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),

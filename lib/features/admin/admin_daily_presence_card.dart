@@ -69,6 +69,7 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
         '${online ?? '—'} en línea · Ver presencia';
 
     if (!widget.extended) {
+      final onlineLabel = online?.toString() ?? '—';
       return Padding(
         padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         child: Tooltip(
@@ -82,20 +83,37 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
             child: InkWell(
               onTap: widget.onOpenDetails,
               borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SizedBox(
+                width: 48,
+                height: 52,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      today,
+                      onlineLabel,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 11,
+                        height: 1,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    _OnlineDot(active: (online ?? 0) > 0),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          Icons.storefront_outlined,
+                          size: 22,
+                          color: AppColors.textSecondary,
+                        ),
+                        Positioned(
+                          right: -3,
+                          top: -2,
+                          child: _OnlineDot(active: (online ?? 0) > 0),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

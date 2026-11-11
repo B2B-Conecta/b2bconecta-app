@@ -7,6 +7,7 @@ import '../../app/main_shell_tab.dart';
 import '../../app/theme/app_theme.dart';
 import '../../core/widgets/ios_chrome.dart';
 import '../../core/data/supabase_service.dart';
+import '../../core/widgets/bandeja_sheet.dart';
 import '../../core/widgets/bcv_rate_badge.dart';
 import '../cart/cart_screen.dart';
 import '../cart/cart_service.dart';

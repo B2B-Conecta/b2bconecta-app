@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_thread.dart';
@@ -32,7 +33,7 @@ class OrderChatsEntryButton extends StatelessWidget {
         context: context,
         homeRole: homeRole,
       ),
-      icon: const Icon(Icons.forum_outlined, size: 18),
+      icon: const LucideIcon(LucideGlyph.messageCircle, size: 18),
       label: const Text('Chats'),
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.brand,
@@ -469,8 +470,7 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
             Expanded(
               child: _selectedId == null
                   ? _notice('Selecciona una conversación',
-                      'Elige un chat para leer o responder.',
-                      icon: Icons.forum_outlined)
+                      'Elige un chat para leer o responder.')
                   : _conversation(_selectedId!, _kind, embedded: true),
             ),
           ],
@@ -626,7 +626,8 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
           child: _signedOut
               ? _notice('Sesión vencida',
                   'Vuelve a iniciar sesión para ver tus mensajes.',
-                  icon: Icons.lock_outline)
+                  glyph: Icon(Icons.lock_outline,
+                      size: 28, color: AppColors.textSecondary))
               : _loading && !hasData
                   ? const Center(child: Text('Cargando conversaciones…'))
                   : failed && !hasData
@@ -802,14 +803,16 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
   }
 
   Widget _notice(String title, String description,
-          {Widget? action, IconData icon = Icons.chat_bubble_outline}) =>
+          {Widget? action, Widget? glyph}) =>
       Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 28, color: AppColors.textSecondary),
+              glyph ??
+                  LucideIcon(LucideGlyph.messageCircle,
+                      size: 28, color: AppColors.textSecondary),
               const SizedBox(height: 8),
               Text(title,
                   textAlign: TextAlign.center,

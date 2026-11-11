@@ -302,7 +302,10 @@ class _HomeSupplierConversationState extends State<_HomeSupplierConversation> {
                     ? Column(mainAxisSize: MainAxisSize.min, children: [
                         const Text('No pudimos abrir la consulta.'),
                         TextButton(
-                            onPressed: () => setState(() => _thread = _open()),
+                            onPressed: () {
+                              final next = _open();
+                              setState(() => _thread = next);
+                            },
                             child: const Text('Reintentar')),
                       ])
                     : const CircularProgressIndicator()),
@@ -323,7 +326,10 @@ class _HomeRecentSection extends StatefulWidget {
 class _HomeRecentSectionState extends State<_HomeRecentSection> {
   late Future<List<PartModel>> _items;
 
-  void _reload() => setState(() => _items = _load());
+  void _reload() {
+    final next = _load();
+    setState(() => _items = next);
+  }
 
   Future<List<PartModel>> _load() => CatalogService.fetchHomeProducts(
       RecentProductViews.forViewer(widget.viewerId));
@@ -741,43 +747,13 @@ extension on _AliadoHomeDashboardState {
         ),
       );
 
-  Future<void> _openHomeInbox() async {
-    final action = await showModalBottomSheet<VoidCallback>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheet) => SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('Bandeja', style: Theme.of(sheet).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              if (widget.onMessagesTap != null)
-                _inboxDestination(sheet, 'Mensajes', LucideGlyph.messageCircle,
-                    widget.unreadMessages, widget.onMessagesTap!),
-              if (widget.onNotificationTap != null)
-                _inboxDestination(sheet, 'Notificaciones', LucideGlyph.bell,
-                    widget.unreadNotifications, widget.onNotificationTap!),
-            ]),
-          ),
-        ),
-      ),
-    );
-    if (mounted) action?.call();
-  }
-
-  Widget _inboxDestination(BuildContext sheet, String label, LucideGlyph icon,
-      int unread, VoidCallback action) {
-    return ListTile(
-      onTap: () => Navigator.pop(sheet, action),
-      leading: LucideIcon(icon),
-      title: Text(label),
-      subtitle: unread > 0 ? Text('$unread sin leer') : null,
-      trailing: const _HomeAngle(size: 16),
-    );
-  }
+  Future<void> _openHomeInbox() => showBandejaSheet(
+        context: context,
+        onMessagesTap: widget.onMessagesTap,
+        onNotificationTap: widget.onNotificationTap,
+        unreadMessages: widget.unreadMessages,
+        unreadNotifications: widget.unreadNotifications,
+      );
 
   Widget _mobileIdentity(bool compact) => Row(
         children: [
@@ -1110,7 +1086,7 @@ extension on _AliadoHomeDashboardState {
           ]),
         ]))),
         _block(_homeStrip(
-            icon: LucideGlyph.messagesSquare,
+            icon: LucideGlyph.messageCircle,
             title: '¿No encuentras un repuesto?',
             subtitle: 'Consulta con un proveedor',
             action: 'Consultar',
@@ -1322,7 +1298,7 @@ extension on _AliadoHomeDashboardState {
               title: Text(supplier.businessName),
               subtitle: Text(supplier.ubicacionLine),
               trailing: consult
-                  ? const LucideIcon(LucideGlyph.messagesSquare)
+                  ? const LucideIcon(LucideGlyph.messageCircle)
                   : const _HomeAngle(),
               onTap: () => Navigator.pop(context, supplier),
             );
@@ -1419,9 +1395,10 @@ extension on _AliadoHomeDashboardState {
                     children: [
                   _partCaption(part),
                   const SizedBox(height: 3),
-                  Text(part.minOrderQtyLabelEs,
-                      style: TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary)),
+                  if (part.hasSupplierMinOrderQty)
+                    Text(part.minOrderQtyLabelEs,
+                        style: TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary)),
                   if (largeText) _price(part),
                 ])),
             if (!largeText) ...[
@@ -1470,6 +1447,7 @@ extension on _AliadoHomeDashboardState {
                     const SizedBox(height: 8),
                     _price(part),
                     const SizedBox(height: 3),
+                    if (part.hasSupplierMinOrderQty)
                     Text(part.minOrderQtyLabelEs,
                         style: TextStyle(
                             fontSize: 11, color: AppColors.textSecondary)),
@@ -1521,9 +1499,10 @@ extension on _AliadoHomeDashboardState {
                       _partCaption(part),
                       const SizedBox(height: 4),
                       _price(part),
-                      Text(part.minOrderQtyLabelEs,
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary)),
+                      if (part.hasSupplierMinOrderQty)
+                    Text(part.minOrderQtyLabelEs,
+                        style: TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary)),
                     ]),
               )),
             ])),

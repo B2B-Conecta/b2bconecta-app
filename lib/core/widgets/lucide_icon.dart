@@ -7,10 +7,12 @@ enum LucideGlyph {
   package('package'),
   circleCheck('circle-check'),
   shoppingCart('shopping-cart'),
+  shoppingBag('shopping-bag'),
   chevronRight('chevron-right'),
   plus('plus'),
   close('x'),
   image('image'),
+  imageOff('image-off'),
   search('search'),
   handbag('handbag'),
   inbox('inbox'),
@@ -18,7 +20,9 @@ enum LucideGlyph {
   bell('bell'),
   slidersHorizontal('sliders-horizontal'),
   van('van'),
+  truck('truck'),
   arrowRight('arrow-right'),
+  arrowLeft('arrow-left'),
   messagesSquare('messages-square'),
   refreshCw('refresh-cw'),
   grid('grid-2x2'),
@@ -32,7 +36,13 @@ enum LucideGlyph {
   disc('disc'),
   settings('settings'),
   zap('zap'),
-  wrench('wrench');
+  wrench('wrench'),
+  trash2('trash-2'),
+  check('check'),
+  maximize2('maximize-2'),
+  star('star'),
+  tag('tag'),
+  minus('minus');
 
   const LucideGlyph(this.assetName);
 

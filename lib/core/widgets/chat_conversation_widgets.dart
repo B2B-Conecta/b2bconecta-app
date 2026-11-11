@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 class ChatComposer extends StatelessWidget {
   const ChatComposer({
@@ -98,13 +99,13 @@ class ChatConversationNotice extends StatelessWidget {
     super.key,
     required this.title,
     this.description,
-    this.icon = Icons.chat_bubble_outline_rounded,
+    this.icon,
     this.onRetry,
   });
 
   final String title;
   final String? description;
-  final IconData icon;
+  final IconData? icon;
   final VoidCallback? onRetry;
 
   @override
@@ -115,7 +116,10 @@ class ChatConversationNotice extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 26, color: AppColors.textSecondary),
+            icon == null
+                ? LucideIcon(LucideGlyph.messageCircle,
+                    size: 26, color: AppColors.textSecondary)
+                : Icon(icon, size: 26, color: AppColors.textSecondary),
             const SizedBox(height: 10),
             Text(title,
                 textAlign: TextAlign.center,

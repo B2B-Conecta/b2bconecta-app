@@ -77,7 +77,11 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       text: p != null ? '${p.stock}' : '',
     );
     _minOrderQtyController = TextEditingController(
-      text: '${p?.minOrderQtyEffective ?? ProductMinOrderQty.platformFloor}',
+      text: p == null
+          ? ''
+          : p.hasSupplierMinOrderQty
+              ? '${p.minOrderQtyEffective}'
+              : '',
     );
     final path = canonicalCatalogCategory(p?.category) ??
         classifyCatalogProduct(p?.category, p?.nombre ?? '');
@@ -182,17 +186,21 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       );
       return;
     }
-    final minOrderQty = int.tryParse(_minOrderQtyController.text.trim());
-    if (minOrderQty == null || minOrderQty < ProductMinOrderQty.absoluteFloor) {
+    final minRaw = _minOrderQtyController.text.trim();
+    final minParsed =
+        minRaw.isEmpty ? null : int.tryParse(minRaw);
+    if (minRaw.isNotEmpty &&
+        (minParsed == null || minParsed < ProductMinOrderQty.absoluteFloor)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'La cantidad mínima de pedido es obligatoria y no puede ser menor a ${ProductMinOrderQty.absoluteFloor}.',
+            'La cantidad mínima de pedido no puede ser menor a ${ProductMinOrderQty.absoluteFloor}.',
           ),
         ),
       );
       return;
     }
+    final minOrderQty = ProductMinOrderQty.resolve(minParsed);
     // Solo-divisas: un solo precio USD; se limpia cualquier oferta previa.
     double? salePrice;
     if (!_pagoSoloDivisas) {
@@ -542,8 +550,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           salePriceUsd: _pagoSoloDivisas
               ? null
               : parsePreviewMoney(_salePriceController.text),
-          quantity: int.tryParse(_minOrderQtyController.text.trim()) ??
-              ProductMinOrderQty.platformFloor,
+          quantity: ProductMinOrderQty.resolve(
+              int.tryParse(_minOrderQtyController.text.trim())),
           pagoSoloDivisas: _pagoSoloDivisas,
         ),
         const SizedBox(height: 12),
@@ -558,18 +566,20 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           controller: _minOrderQtyController,
           decoration: _dec(
             'Pedido mínimo / MOQ',
-            hint: 'Su mínimo (vacío → 5)',
+            hint: 'Opcional (vacío = 1 unidad)',
           ).copyWith(
             helperText:
-                'Si define un mínimo, esa cantidad manda (mínimo ${ProductMinOrderQty.absoluteFloor}). '
-                'Si no lo define, la plataforma usa ${ProductMinOrderQty.platformDefault}.',
+                'Solo si quiere exigir un mínimo mayor a 1. '
+                'Vacío = el aliado puede pedir desde ${ProductMinOrderQty.platformDefault} unidad.',
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           validator: (v) {
-            final n = int.tryParse(v?.trim() ?? '');
+            final raw = v?.trim() ?? '';
+            if (raw.isEmpty) return null;
+            final n = int.tryParse(raw);
             if (n == null || n < ProductMinOrderQty.absoluteFloor) {
-              return 'Obligatorio · mínimo ${ProductMinOrderQty.absoluteFloor}';
+              return 'Mínimo ${ProductMinOrderQty.absoluteFloor}';
             }
             return null;
           },

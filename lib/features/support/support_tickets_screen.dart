@@ -6,6 +6,7 @@ import 'support_ticket_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'support_ticket_detail_screen.dart';
 
 /// Listado y creación de reclamos (aliado / importador).
@@ -132,7 +133,6 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                     )
                   else if (_rows.isEmpty)
                     _messagePanel(
-                      icon: Icons.forum_outlined,
                       title: 'Aún no tienes reclamos',
                       description:
                           'Cuando abras un reclamo, podrás seguirlo desde aquí.',
@@ -255,10 +255,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
       );
 
   Widget _messagePanel({
-    required IconData icon,
     required String title,
     required String description,
     Widget? action,
+    IconData? icon,
   }) =>
       Material(
         color: AppColors.card,
@@ -270,7 +270,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Icon(icon, color: _accent, size: 28),
+              icon == null
+                  ? LucideIcon(LucideGlyph.messageCircle,
+                      color: _accent, size: 28)
+                  : Icon(icon, color: _accent, size: 28),
               const SizedBox(height: 8),
               Text(title,
                   textAlign: TextAlign.center,
@@ -330,12 +333,11 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                    ticket.isClosed
-                        ? Icons.check_circle_outline
-                        : Icons.forum_outlined,
-                    color: ticket.isClosed ? AppColors.textSecondary : _accent,
-                    size: 22),
+                ticket.isClosed
+                    ? Icon(Icons.check_circle_outline,
+                        color: AppColors.textSecondary, size: 22)
+                    : LucideIcon(LucideGlyph.messageCircle,
+                        color: _accent, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

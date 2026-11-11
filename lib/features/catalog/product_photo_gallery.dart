@@ -21,13 +21,16 @@ class ProductPhotoGallery extends StatefulWidget {
   final ImageProvider<Object> Function(String)? imageProvider;
 
   @override
-  State<ProductPhotoGallery> createState() => _ProductPhotoGalleryState();
+  State<ProductPhotoGallery> createState() => ProductPhotoGalleryState();
 }
 
-class _ProductPhotoGalleryState extends State<ProductPhotoGallery> {
+class ProductPhotoGalleryState extends State<ProductPhotoGallery> {
   final _pages = PageController();
   late List<String> _urls;
   int _index = 0;
+
+  /// Opens the fullscreen viewer on the current photo (AppBar amplify).
+  Future<void> openFullscreen() => _open(_index);
 
   @override
   void initState() {

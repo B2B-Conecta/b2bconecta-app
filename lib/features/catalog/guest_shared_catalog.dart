@@ -525,7 +525,9 @@ class _GuestStoreProductCard extends StatelessWidget {
                 if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo))
                   const SizedBox(height: 6),
                 Text(
-                  '${part.stockForSale} en stock · ${part.minOrderQtyLabelEs}',
+                  part.hasSupplierMinOrderQty
+                      ? '${part.stockForSale} en stock · ${part.minOrderQtyLabelEs}'
+                      : '${part.stockForSale} en stock',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

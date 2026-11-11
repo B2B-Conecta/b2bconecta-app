@@ -216,28 +216,21 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sugeridos'), findsOneWidget);
+    expect(find.text('Completa tu compra'), findsOneWidget);
+    expect(find.text('También te puede interesar.'), findsOneWidget);
     expect(find.text('Válvula metálica'), findsOneWidget);
     expect(find.text('Mayorista líder'), findsOneWidget);
-    expect(find.text('Añadir al pedido'), findsOneWidget);
-    expect(find.text('Pedido aparte'), findsOneWidget);
-    expect(find.text('Detalle'), findsOneWidget);
-    await tester.ensureVisible(find.text('Detalle'));
-    await tester.tap(find.text('Detalle'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Flete adicional'), findsOneWidget);
-    await tester.tapAt(const Offset(8, 8));
-    await tester.pumpAndSettle();
+    expect(find.text('Agregar'), findsWidgets);
     expect(find.text('Bs 500,00'), findsWidgets);
-    expect(find.text('Continuar con la entrega'), findsOneWidget);
+    expect(find.textContaining('Continuar con la entrega'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Añadir al pedido'));
-    await tester.tap(find.text('Añadir al pedido'));
+    await tester.ensureVisible(find.text('Agregar').last);
+    await tester.tap(find.text('Agregar').last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.text('Añadido'), findsOneWidget);
-    expect(find.text('Continuar con la entrega'), findsOneWidget);
+    expect(find.textContaining('Continuar con la entrega'), findsOneWidget);
     expect(cart.lines.map((line) => line.part.id), contains('valve'));
     expect(find.text('Bs 700,00'), findsWidgets);
 
@@ -247,7 +240,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('en escritorio las sugerencias usan carrusel con fichas grandes',
+  testWidgets('en escritorio las sugerencias usan strip compacto horizontal',
       (tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
@@ -294,7 +287,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Siguiente'), findsOneWidget);
+    expect(find.text('Completa tu compra'), findsOneWidget);
+    expect(find.byTooltip('Siguiente'), findsNothing);
     expect(find.text('Aceite 20W50 0'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
   });

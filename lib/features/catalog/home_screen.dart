@@ -4,6 +4,7 @@ import 'aliado_catalog_categories.dart';
 import 'catalog_taxonomy.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'aliado_catalog_quick_filters.dart';
+import 'aliado_catalog_toolbar.dart';
 import 'aliado_product_card.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'catalog_filters.dart';
@@ -21,13 +22,16 @@ import 'package:motolink_pro_app/features/admin/admin_catalog_coverage.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/sync_app_colors_to_theme.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'aliado_catalog_layout.dart';
 import 'aliado_catalog_filters_sheet.dart';
 import 'aliado_promo_campaign_widgets.dart';
 import 'importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
+import 'aliado_catalog_branded_header.dart';
 import 'product_detail_screen.dart';
 import 'sliver_catalog_card_rows.dart';
 import 'catalog_browse_layout.dart';
@@ -291,6 +295,24 @@ class _HomeScreenState extends State<HomeScreen>
           _catalogSortMode = CatalogSortMode.reputation;
       }
     });
+    _applyFiltersFromUi();
+  }
+
+  Future<void> _openSortSheet() async {
+    final next = await showAliadoCatalogSortSheet(
+      context: context,
+      selected: _catalogSortMode,
+    );
+    if (!mounted || next == null || next == _catalogSortMode) return;
+    setState(() => _catalogSortMode = next);
+    if (next == CatalogSortMode.nearest) {
+      final ok = await _ensureGpsForNearestSort();
+      if (!mounted) return;
+      if (!ok) {
+        setState(() => _catalogSortMode = CatalogSortMode.defaultMode);
+        return;
+      }
+    }
     _applyFiltersFromUi();
   }
 
@@ -786,6 +808,8 @@ class _HomeScreenState extends State<HomeScreen>
         ? null
         : MotolinkAppBar(
             currentUserProfile: widget.profile,
+            branded: widget.homeRole == AppHomeRole.aliado,
+            showBcvRate: widget.homeRole != AppHomeRole.aliado,
             logoHeight: widget.homeRole == AppHomeRole.aliado
                 ? MotolinkAppBarLogoSizes.aliado
                 : MotolinkAppBarLogoSizes.importador,
@@ -800,17 +824,21 @@ class _HomeScreenState extends State<HomeScreen>
                       builder: (context, _) {
                         final n = CartService.instance.itemCount;
                         return HeaderIconButton(
-                          tooltip: 'Carrito',
+                          tooltip: 'Bolsa',
                           count: n,
-                          icon: n > 0
-                              ? Icons.shopping_cart
-                              : Icons.shopping_cart_outlined,
+                          iconColor: AppColors.white,
+                          icon: Icons.shopping_bag_outlined,
+                          iconWidget: const LucideIcon(
+                            LucideGlyph.shoppingBag,
+                            size: 22,
+                            color: AppColors.white,
+                          ),
                           onPressed: () {
                             Navigator.of(context).push<bool>(
                               MaterialPageRoute(
                                 builder: (_) => CartScreen(
                                   profile: widget.profile,
-                                  liveTasaBcv: null,
+                                  liveTasaBcv: BcvBasePrice.cachedRate,
                                 ),
                               ),
                             );
@@ -874,10 +902,12 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
+    final useBrandedHeader = widget.homeRole == AppHomeRole.aliado &&
+        !widget.embedInDesktopShell;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: appBar,
+      appBar: useBrandedHeader ? null : appBar,
       body: FutureBuilder<List<Object>>(
         future: Future.wait<Object>([_importersFuture, _promoFuture]),
         builder: (context, bootstrapSnapshot) {
@@ -910,91 +940,86 @@ class _HomeScreenState extends State<HomeScreen>
                   textScale: MediaQuery.textScalerOf(context).scale(14) / 14);
               final hPad = AliadoCatalogLayout.horizontalPadding(catalogWidth);
               _catalogCrossAxisCount = crossAxisCount;
+              final openFilters = bootstrapSnapshot.hasError
+                  ? null
+                  : () => _openCatalogFiltersSheet(importers);
 
-              return CatalogBrowseLayout(
-                heading: widget.homeRole == AppHomeRole.aliado
-                    ? Padding(
-                        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
-                        child: Text(
-                          'Catálogo de repuestos',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      )
-                    : null,
-                search: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
-                  child: isDesktopCatalog
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: TextField(
+              final browse = CatalogBrowseLayout(
+                heading: useBrandedHeader
+                    ? null
+                    : (widget.homeRole == AppHomeRole.aliado
+                        ? Padding(
+                            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+                            child: Text(
+                              'Catálogo de repuestos',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          )
+                        : null),
+                search: useBrandedHeader
+                    ? null
+                    : Padding(
+                        padding: EdgeInsets.fromLTRB(
+                            hPad, isDesktopCatalog ? 4 : 12, hPad, 8),
+                        child: isDesktopCatalog
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      textInputAction: TextInputAction.search,
+                                      onSubmitted: (_) => _applyFiltersFromUi(),
+                                      decoration: _searchDecoration(
+                                        onOpenFilters: openFilters,
+                                        filterBadge: filterBadge,
+                                        showFilterButton: false,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: openFilters,
+                                    icon: Badge(
+                                      isLabelVisible: filterBadge > 0,
+                                      label: Text('$filterBadge'),
+                                      child: const Icon(Icons.tune, size: 20),
+                                    ),
+                                    label: const Text('Filtros'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.brandAccent,
+                                      backgroundColor: AppColors.fieldFill,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                      side: BorderSide(
+                                          color: AppColors.borderSubtle),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : TextField(
                                 controller: _searchController,
                                 textInputAction: TextInputAction.search,
                                 onSubmitted: (_) => _applyFiltersFromUi(),
                                 decoration: _searchDecoration(
-                                  onOpenFilters: bootstrapSnapshot.hasError
-                                      ? null
-                                      : () =>
-                                          _openCatalogFiltersSheet(importers),
+                                  onOpenFilters: openFilters,
                                   filterBadge: filterBadge,
-                                  showFilterButton: false,
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            OutlinedButton.icon(
-                              onPressed: bootstrapSnapshot.hasError
-                                  ? null
-                                  : () => _openCatalogFiltersSheet(importers),
-                              icon: Badge(
-                                isLabelVisible: filterBadge > 0,
-                                label: Text('$filterBadge'),
-                                child: const Icon(Icons.tune, size: 20),
-                              ),
-                              label: const Text('Filtros'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.brandAccent,
-                                backgroundColor: AppColors.fieldFill,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                                side: BorderSide(color: AppColors.borderSubtle),
-                              ),
-                            ),
-                          ],
-                        )
-                      : TextField(
-                          controller: _searchController,
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: (_) => _applyFiltersFromUi(),
-                          decoration: _searchDecoration(
-                            onOpenFilters: bootstrapSnapshot.hasError
-                                ? null
-                                : () => _openCatalogFiltersSheet(importers),
-                            filterBadge: filterBadge,
-                          ),
-                        ),
-                ),
+                      ),
                 quickFilters: widget.homeRole == AppHomeRole.aliado
-                    ? Padding(
-                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AliadoCatalogQuickFilters(
-                              selected: _selectedQuickFilter,
-                              onSelected: _selectQuickFilter,
-                            ),
-                            if (_activeFilters.brandField case final brand?)
-                              InputChip(
-                                label: Text(brand.value,
+                    ? Builder(builder: (context) {
+                        final brandField = _activeFilters.brandField;
+                        final brandChip = brandField == null
+                            ? null
+                            : InputChip(
+                                label: Text(brandField.value,
                                     overflow: TextOverflow.ellipsis),
                                 onDeleted: () {
                                   _activeFilters = CatalogFilters.empty;
@@ -1002,10 +1027,33 @@ class _HomeScreenState extends State<HomeScreen>
                                 },
                                 deleteButtonTooltipMessage:
                                     'Quitar filtro de marca',
-                              ),
-                          ],
-                        ),
-                      )
+                              );
+                        return Padding(
+                          padding: EdgeInsets.fromLTRB(
+                              hPad, useBrandedHeader ? 14 : 0, hPad, 8),
+                          child: useBrandedHeader
+                              ? AliadoCatalogToolbar(
+                                  selectedFilter: _selectedQuickFilter,
+                                  onFilterSelected: _selectQuickFilter,
+                                  resultCount:
+                                      _catalogTotal ?? _loadedParts.length,
+                                  sortMode: _catalogSortMode,
+                                  onSortTap: _openSortSheet,
+                                  brandChip: brandChip,
+                                )
+                              : Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    AliadoCatalogQuickFilters(
+                                      selected: _selectedQuickFilter,
+                                      onSelected: _selectQuickFilter,
+                                    ),
+                                    if (brandChip != null) brandChip,
+                                  ],
+                                ),
+                        );
+                      })
                     : null,
                 notice: _catalogSortMode == CatalogSortMode.featured &&
                         widget.homeRole == AppHomeRole.aliado
@@ -1095,6 +1143,7 @@ class _HomeScreenState extends State<HomeScreen>
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     );
+                    final showInlineResultsMeta = !useBrandedHeader;
 
                     if (parts.isEmpty) {
                       return ListView(
@@ -1107,10 +1156,11 @@ class _HomeScreenState extends State<HomeScreen>
                               onPromoCampaignSelected: _onPromoCampaignSelected,
                               compact: isDesktopCatalog,
                             ),
-                          Padding(
-                            padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
-                            child: Text(resultsLabel, style: resultsStyle),
-                          ),
+                          if (showInlineResultsMeta)
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
+                              child: Text(resultsLabel, style: resultsStyle),
+                            ),
                           const SizedBox(height: 120),
                           Center(
                             child: Text(
@@ -1152,20 +1202,21 @@ class _HomeScreenState extends State<HomeScreen>
                               compact: isDesktopCatalog,
                             ),
                           ),
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(
-                              hPad,
-                              4,
-                              hPad,
-                              0,
-                            ),
-                            child: Text(
-                              resultsLabel,
-                              style: resultsStyle,
+                        if (showInlineResultsMeta)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                hPad,
+                                4,
+                                hPad,
+                                0,
+                              ),
+                              child: Text(
+                                resultsLabel,
+                                style: resultsStyle,
+                              ),
                             ),
                           ),
-                        ),
                         SliverPadding(
                           padding: EdgeInsets.fromLTRB(
                             hPad,
@@ -1249,6 +1300,26 @@ class _HomeScreenState extends State<HomeScreen>
                               builder: (_) =>
                                   CartScreen(profile: widget.profile)),
                         )),
+              );
+
+              if (!useBrandedHeader) return browse;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AliadoCatalogBrandedHeader(
+                    profile: widget.profile,
+                    searchController: _searchController,
+                    onSearchSubmitted: _applyFiltersFromUi,
+                    onOpenFilters: openFilters,
+                    onMessagesTap: widget.onMessagesTap,
+                    onNotificationTap: widget.onNotificationTap,
+                    unreadMessages: widget.unreadMessages,
+                    unreadNotifications: widget.unreadNotifications,
+                    filterBadge: filterBadge,
+                  ),
+                  Expanded(child: browse),
+                ],
               );
             },
           );

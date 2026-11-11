@@ -20,7 +20,8 @@ void main() {
               precio: 52,
               salePriceUsd: 48,
               stock: 10,
-              stockReserved: 2)),
+              stockReserved: 2,
+              minOrderQty: 5)),
     ))));
     await tester.pump();
     expect(find.text('48.00 USD'), findsOneWidget);
@@ -44,7 +45,8 @@ void main() {
               nombre: 'Disco',
               precio: 52,
               stock: 10,
-              stockReserved: 7)),
+              stockReserved: 7,
+              minOrderQty: 5)),
     ))));
     await tester.pump();
     expect(find.text('3 disponibles'), findsOneWidget);
@@ -75,11 +77,11 @@ void main() {
               ownerRatingAvg: 4.5,
               ownerRatingCount: 12)),
     ))));
-    expect(find.text('Vendido por Repuestos del Centro'), findsOneWidget);
+    expect(find.text('Repuestos del Centro'), findsOneWidget);
     expect(find.text('Lara · Barquisimeto'), findsOneWidget);
     expect(find.text('4.5'), findsOneWidget);
     expect(find.text(' (12)'), findsOneWidget);
-    await tester.tap(find.text('Vendido por Repuestos del Centro'));
+    await tester.tap(find.text('Repuestos del Centro'));
     expect(opened, isTrue);
     expect(tester.takeException(), isNull);
   });
@@ -99,7 +101,7 @@ void main() {
               ownerBusinessName: 'Proveedor')),
     ))));
     expect(find.byIcon(Icons.star_rounded), findsNothing);
-    expect(find.text('Vendido por Proveedor'), findsOneWidget);
+    expect(find.text('Proveedor'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

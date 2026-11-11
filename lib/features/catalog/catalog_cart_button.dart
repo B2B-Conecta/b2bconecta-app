@@ -48,19 +48,24 @@ class CatalogCartButton extends StatelessWidget {
     return ListenableBuilder(
         listenable: service,
         builder: (context, _) {
+          const ctaBlue = Color(0xFF004BDD);
+          final ctaShape = RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999));
+          final ctaStyle = FilledButton.styleFrom(
+              minimumSize: const Size(0, 42),
+              backgroundColor: ctaBlue,
+              foregroundColor: AppColors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              shape: ctaShape,
+              textStyle: const TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w800));
           if (part.variantChoices.isNotEmpty) {
             return FilledButton.icon(
                 onPressed: () => _openVariantPicker(context, service),
-                style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 44),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    textStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
-                icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
-                label: const Text('Agregar al carrito'));
+                style: ctaStyle,
+                icon: const Icon(Icons.shopping_cart_outlined, size: 17),
+                label: const Text('Agregar'));
           }
           final line = CartProductActions.lineFor(part, service);
           final blocked = CartProductActions.blockReason(
@@ -132,27 +137,20 @@ class CatalogCartButton extends StatelessWidget {
                               ? 'Pedidos suspendidos'
                               : blocked != null
                                   ? 'No disponible'
-                                  : 'Agregar al carrito';
+                                  : 'Agregar';
           final button = Tooltip(
               message: blocked ??
                   'Agregar el mínimo de ${part.minOrderQtyEffective} unidades',
               child: FilledButton(
                 onPressed: blocked == null ? () => _activate(service) : null,
-                style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 44),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    textStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
+                style: ctaStyle,
                 child: Semantics(
                     label: blocked == null
                         ? '$label: ${part.nombre}, ${part.minOrderQtyEffective} unidades'
                         : '$label: ${part.nombre}',
                     child: ExcludeSemantics(
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.add_shopping_cart_outlined, size: 18),
+                      const Icon(Icons.shopping_cart_outlined, size: 17),
                       const SizedBox(width: 6),
                       Flexible(child: Text(label, textAlign: TextAlign.center)),
                     ]))),

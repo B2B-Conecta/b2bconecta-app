@@ -113,6 +113,9 @@ begin
 end;
 $$;
 
+-- RETURNS TABLE cambió (añade banned_until): REPLACE no basta (42P13).
+drop function if exists public.list_admin_incomplete_signups ();
+
 create or replace function public.list_admin_incomplete_signups ()
 returns table (
   user_id uuid,

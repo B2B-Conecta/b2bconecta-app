@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 /// Atajos de la vitrina aliado. Una sola opción activa a la vez.
 enum AliadoCatalogQuickFilter {
@@ -24,21 +25,21 @@ extension AliadoCatalogQuickFilterLabel on AliadoCatalogQuickFilter {
     }
   }
 
-  IconData? get icon {
+  LucideGlyph? get glyph {
     switch (this) {
       case AliadoCatalogQuickFilter.all:
         return null;
       case AliadoCatalogQuickFilter.usdPromo:
-        return Icons.sell_outlined;
+        return LucideGlyph.tag;
       case AliadoCatalogQuickFilter.shippingIncluded:
-        return Icons.local_shipping_outlined;
+        return LucideGlyph.truck;
       case AliadoCatalogQuickFilter.topReputation:
-        return Icons.star_rounded;
+        return LucideGlyph.star;
     }
   }
 }
 
-/// Chips horizontales bajo el buscador. Sin barra de scroll visible.
+/// Chips horizontales bajo el título. Sin barra de scroll visible.
 class AliadoCatalogQuickFilters extends StatelessWidget {
   const AliadoCatalogQuickFilters({
     super.key,
@@ -49,10 +50,13 @@ class AliadoCatalogQuickFilters extends StatelessWidget {
   final AliadoCatalogQuickFilter selected;
   final ValueChanged<AliadoCatalogQuickFilter> onSelected;
 
+  static const _activeBlue = Color(0xFF004BDD);
+  static const _idleFill = Color(0xFFF0F2F5);
+  static const _idleText = Color(0xFF000010);
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final border = dark ? AppColors.borderSubtle : const Color(0xFFE2E8F0);
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
       child: SingleChildScrollView(
@@ -67,7 +71,9 @@ class AliadoCatalogQuickFilters extends StatelessWidget {
               _QuickFilterChip(
                 filter: filter,
                 selected: filter == selected,
-                borderColor: border,
+                activeColor: dark ? AppColors.brandAccent : _activeBlue,
+                idleFill: dark ? AppColors.surfaceTinted : _idleFill,
+                idleText: dark ? AppColors.textPrimary : _idleText,
                 onTap: () => onSelected(filter),
               ),
             ],
@@ -82,45 +88,43 @@ class _QuickFilterChip extends StatelessWidget {
   const _QuickFilterChip({
     required this.filter,
     required this.selected,
-    required this.borderColor,
+    required this.activeColor,
+    required this.idleFill,
+    required this.idleText,
     required this.onTap,
   });
 
   final AliadoCatalogQuickFilter filter;
   final bool selected;
-  final Color borderColor;
+  final Color activeColor;
+  final Color idleFill;
+  final Color idleText;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? AppColors.white : AppColors.textPrimary;
-    final icon = filter.icon;
+    final fg = selected ? AppColors.white : idleText;
+    final glyph = filter.glyph;
     return Material(
-      color: selected ? AppColors.brand : AppColors.card,
+      color: selected ? activeColor : idleFill,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected ? AppColors.brand : borderColor,
-            ),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[
-                Icon(icon, size: 14, color: fg),
+              if (glyph != null) ...[
+                LucideIcon(glyph, size: 14, color: fg),
                 const SizedBox(width: 5),
               ],
               Text(
                 filter.labelEs,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: fg,
                   height: 1.1,

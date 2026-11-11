@@ -6,6 +6,7 @@ import 'support_ticket_detail_screen.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
@@ -364,8 +365,8 @@ class _DetailPlaceholder extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.forum_outlined,
+          LucideIcon(
+            LucideGlyph.messageCircle,
             size: 40,
             color: AppColors.textSecondary,
           ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -390,33 +391,76 @@ class _CartScreenState extends State<CartScreen> {
     final campaign = _cart.promoCampaignIdForImportador(line.part.ownerId);
     _cart.removeProduct(line.part.id);
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final narrow = MediaQuery.sizeOf(context).width < 980;
+    // Con checkout sticky: subir el banner. Bolsa vacía: pegarlo abajo.
+    final bottomGap = _cart.isEmpty
+        ? 12.0
+        : (narrow ? 88.0 : 24.0);
+    void undo() {
+      messenger.hideCurrentSnackBar();
+      if (!mounted ||
+          _submitting ||
+          accountRevision != _cart.accountRevision) {
+        return;
+      }
+      if (_cart.lines.any((item) => item.part.id == line.part.id)) return;
+      _cart.addOrIncrement(line.part,
+          precioUnitarioAliadoRef: line.precioUnitarioAliadoRef,
+          delta: line.quantity);
+      if (campaign != null && line.part.ownerId != null) {
+        _cart.setPromoAttribution(
+            importadorId: line.part.ownerId!, campaignId: campaign);
+      }
+    }
+
     messenger.showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: const Color(0xFF0A317B),
+      elevation: 0,
+      margin: EdgeInsets.fromLTRB(16, 0, 16, bottomGap + bottomInset),
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      duration: const Duration(seconds: 5),
       content: Row(
         children: [
-          LucideIcon(
-            LucideGlyph.handbag,
-            size: 20,
-            color: Theme.of(context).snackBarTheme.contentTextStyle?.color,
+          const LucideIcon(LucideGlyph.handbag,
+              size: 18, color: AppColors.white),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Producto eliminado',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          Flexible(child: Text('${line.part.nombre} eliminado del carrito.')),
+          Material(
+            color: const Color(0xFF004BDD),
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              onTap: undo,
+              borderRadius: BorderRadius.circular(999),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Text(
+                  'Deshacer',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
-      action: SnackBarAction(
-          label: 'Deshacer',
-          onPressed: () {
-            if (!mounted ||
-                _submitting ||
-                accountRevision != _cart.accountRevision) return;
-            if (_cart.lines.any((item) => item.part.id == line.part.id)) return;
-            _cart.addOrIncrement(line.part,
-                precioUnitarioAliadoRef: line.precioUnitarioAliadoRef,
-                delta: line.quantity);
-            if (campaign != null && line.part.ownerId != null) {
-              _cart.setPromoAttribution(
-                  importadorId: line.part.ownerId!, campaignId: campaign);
-            }
-          }),
     ));
   }
 
@@ -447,30 +491,36 @@ class _CartScreenState extends State<CartScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           child: Row(children: [
-            const Icon(Icons.storefront_outlined,
+            const LucideIcon(LucideGlyph.store,
                 size: 20, color: AppColors.brandBlue),
             const SizedBox(width: 10),
             Expanded(
                 child: Text(_cart.importadorDisplayName(entry.key),
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
                         fontSize: 14,
-                        color: AppColors.textPrimary))),
+                        color: Color(0xFF004BDD)))),
             if (entry.value.any((l) => l.part.ownerPagoSoloDivisas)) ...[
               const SizedBox(width: 8),
-              _CartOfferChip(
-                  label: 'Solo divisas',
-                  bg: AppColors.infoSurface,
-                  fg: AppColors.brandLink,
-                  border: AppColors.borderSubtle),
+              Flexible(
+                child: _CartOfferChip(
+                    label: 'Solo divisas',
+                    bg: AppColors.infoSurface,
+                    fg: AppColors.brandLink,
+                    border: AppColors.borderSubtle),
+              ),
             ],
             if (_importerGroupHasPromo(entry.value)) ...[
               const SizedBox(width: 8),
-              _CartOfferChip(
-                  label: 'Promoción',
-                  bg: AppColors.brandBlueContainer,
-                  fg: AppColors.brandLink,
-                  border: AppColors.divider),
+              Flexible(
+                child: _CartOfferChip(
+                    label: 'Promoción',
+                    bg: AppColors.brandBlueContainer,
+                    fg: AppColors.brandLink,
+                    border: AppColors.divider),
+              ),
             ],
           ]),
         ),
@@ -526,17 +576,21 @@ class _CartScreenState extends State<CartScreen> {
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Divider(height: 1, color: AppColors.divider)),
-          _CartLineCard(
-            key: ValueKey(entry.value[i].part.id),
-            line: entry.value[i],
-            modo: _pagoMoneda,
-            tasa: tasa,
-            onRemove: _submitting || !_cart.canEdit
-                ? null
-                : () => _removeLine(entry.value[i]),
-            onQuantityChanged: _submitting || !_cart.canEdit
-                ? null
-                : (qty) => _cart.setQuantity(entry.value[i].part.id, qty),
+          _CartLineDismissible(
+            lineId: entry.value[i].part.id,
+            enabled: !_submitting && _cart.canEdit,
+            onDismissed: () => _removeLine(entry.value[i]),
+            child: _CartLineCard(
+              line: entry.value[i],
+              modo: _pagoMoneda,
+              tasa: tasa,
+              onRemove: _submitting || !_cart.canEdit
+                  ? null
+                  : () => _removeLine(entry.value[i]),
+              onQuantityChanged: _submitting || !_cart.canEdit
+                  ? null
+                  : (qty) => _cart.setQuantity(entry.value[i].part.id, qty),
+            ),
           ),
         ],
       ],
@@ -567,12 +621,7 @@ class _CartScreenState extends State<CartScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceTinted,
-      appBar: AppBar(
-        title: const Text(
-          'Carrito',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
+      appBar: _BolsaAppBar(profile: widget.profile),
       body: _cart.restoring || (_cart.isEmpty && !_cart.canEdit)
           ? Center(
               child: Padding(
@@ -580,13 +629,13 @@ class _CartScreenState extends State<CartScreen> {
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     if (_cart.restoring) const CircularProgressIndicator(),
                     const SizedBox(height: 16),
-                    Text(_cart.storageMessage ?? 'Recuperando tu carrito…',
+                    Text(_cart.storageMessage ?? 'Recuperando tu bolsa…',
                         textAlign: TextAlign.center),
                     if (!_cart.restoring)
                       _cart.invalidDraft
                           ? TextButton(
                               onPressed: _cart.discardInvalidDraft,
-                              child: const Text('Iniciar carrito nuevo'))
+                              child: const Text('Iniciar bolsa nueva'))
                           : TextButton(
                               onPressed: _cart.retryRestore,
                               child: const Text('Reintentar')),
@@ -605,7 +654,7 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Su carrito está vacío',
+                          'Tu bolsa está vacía',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
@@ -640,157 +689,268 @@ class _CartScreenState extends State<CartScreen> {
                   final wide = constraints.maxWidth >= 980 &&
                       MediaQuery.textScalerOf(context).scale(14) <= 18;
                   final groups = _cart.supplierGroups.entries.toList();
-                  final heading = LayoutBuilder(builder: (context, box) {
-                    final title = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Revisa tu compra',
-                            style: TextStyle(
-                                fontSize: 24,
-                                height: 1.2,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary)),
-                        const SizedBox(height: 6),
-                        Text(
-                            '${_cart.lines.length} ${_cart.lines.length == 1 ? 'repuesto' : 'repuestos'} · ${_cart.itemCount} unidades · ${groups.length} ${groups.length == 1 ? 'proveedor' : 'proveedores'}',
-                            style: TextStyle(
-                                fontSize: 13, color: AppColors.textSecondary)),
-                      ],
-                    );
-                    final back = TextButton.icon(
-                      onPressed: _submitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                      label: const Text('Seguir comprando'),
-                      style:
-                          TextButton.styleFrom(minimumSize: const Size(0, 44)),
-                    );
-                    return box.maxWidth < 580
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [title, const SizedBox(height: 4), back])
-                        : Row(children: [Expanded(child: title), back]);
-                  });
+                  final statsLabel =
+                      '${_cart.lines.length} ${_cart.lines.length == 1 ? 'repuesto' : 'repuestos'} • ${_cart.itemCount} unidades • ${groups.length} ${groups.length == 1 ? 'proveedor' : 'proveedores'}';
+                  final heading = Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(statsLabel,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0A317B))),
+                      TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: const Color(0xFF004BDD),
+                          textStyle: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('Seguir comprando'),
+                              SizedBox(width: 4),
+                              LucideIcon(LucideGlyph.arrowRight,
+                                  size: 16, color: Color(0xFF004BDD)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                  final currencyBlock = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _CartCurrencySelector(
+                        selected: _pagoMoneda.index,
+                        onSelected: _submitting
+                            ? null
+                            : (index) {
+                                setState(() =>
+                                    _pagoMoneda = _PagoMoneda.values[index]);
+                              },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        pagaBolivares
+                            ? 'Pago en Bs al BCV'
+                            : 'Pago en divisas',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  );
                   final warning = _cart.restoreMessage ?? _cart.storageMessage;
+                  final listRefGross = _cart.totalRef();
+                  final usdSavings = !pagaBolivares
+                      ? (listRefGross - displayGross)
+                      : 0.0;
+                  final net = displayNet < 0 ? 0.0 : displayNet;
+                  final summaryRows = <Widget>[
+                    _CartSummaryRow(
+                        label: !pagaBolivares && usdSavings > 0.009
+                            ? 'Precio sin descuento'
+                            : 'Productos (${_cart.itemCount} uds)',
+                        value: !pagaBolivares && usdSavings > 0.009
+                            ? '${formatRefAmount(listRefGross)} USD'
+                            : (pagaBolivares
+                                ? '${formatRefAmount(displayGross)} REF'
+                                : '${formatRefAmount(displayGross)} USD')),
+                    if (appliedCredit > 0) ...[
+                      const SizedBox(height: 10),
+                      _CartSummaryRow(
+                          label: 'Saldo a favor',
+                          value: pagaBolivares
+                              ? '−${formatRefAmount(appliedCredit)} REF'
+                              : '−${formatRefAmount(appliedCredit)} USD'),
+                    ],
+                    if (!pagaBolivares && usdSavings > 0.009) ...[
+                      const SizedBox(height: 10),
+                      _CartSummaryRow(
+                          label: 'Ahorro en divisas',
+                          value: '−${formatRefAmount(usdSavings)} USD',
+                          valueColor: AppColors.successGreen),
+                    ],
+                    const SizedBox(height: 12),
+                    Divider(height: 1, color: AppColors.divider),
+                    const SizedBox(height: 12),
+                    _CartSummaryRow(
+                        label: 'Subtotal',
+                        value: pagaBolivares
+                            ? '${formatRefAmount(net)} REF'
+                            : '${formatRefAmount(net)} USD',
+                        // REF/Bs: el destaque es el equivalente en Bs.
+                        // USD: el destaque es el subtotal neto.
+                        prominent: !pagaBolivares),
+                    if (pagaBolivares && totalBs != null) ...[
+                      const SizedBox(height: 12),
+                      _CartSummaryRow(
+                          label: 'Equivalente en Bs',
+                          value: formatBsLabel(totalBs),
+                          prominent: true),
+                      const SizedBox(height: 8),
+                      _CartBcvRate(
+                          tasa: tasa!, effectiveDate: _tasaEffectiveDate),
+                    ],
+                    if (pagaBolivares && totalBs == null) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                          'No hay tasa BCV vigente para cobrar en bolívares.',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.brandBlue)),
+                    ],
+                    if (currencyBlocked) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                          'Un proveedor solo acepta divisas. Elige USD para continuar.'),
+                    ],
+                    if (!_cart.meetsAllImporterMinOrders) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                          'Completa el mínimo de cada proveedor para continuar.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: AppColors.textPrimary)),
+                    ],
+                  ];
                   final summary = _CartPanel(
                     padding: const EdgeInsets.all(18),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('Resumen del pedido',
+                          Text('Resumen de tu compra',
                               style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.textPrimary)),
                           const SizedBox(height: 16),
-                          _CartCurrencySelector(
-                            selected: _pagoMoneda.index,
-                            onSelected: _submitting
-                                ? null
-                                : (index) {
-                                    setState(() => _pagoMoneda =
-                                        _PagoMoneda.values[index]);
-                                  },
-                          ),
-                          const SizedBox(height: 16),
-                          if (pagaBolivares || appliedCredit > 0)
-                            _CartSummaryRow(
-                                label: pagaBolivares && appliedCredit <= 0
-                                    ? 'Referencia'
-                                    : 'Productos (${_cart.itemCount} uds)',
-                                value: pagaBolivares
-                                    ? '${formatRefAmount(displayGross)} REF'
-                                    : _cartMoney(
-                                        displayGross, _pagoMoneda, tasa)),
-                          if (appliedCredit > 0) ...[
-                            const SizedBox(height: 10),
-                            _CartSummaryRow(
-                                label: 'Saldo a favor',
-                                value: pagaBolivares
-                                    ? '−${formatRefAmount(appliedCredit)} REF'
-                                    : '−${_cartMoney(appliedCredit, _pagoMoneda, tasa)}'),
-                            if (pagaBolivares) ...[
-                              const SizedBox(height: 10),
-                              _CartSummaryRow(
-                                  label: 'Referencia',
-                                  value:
-                                      '${formatRefAmount(displayNet < 0 ? 0 : displayNet)} REF'),
-                            ],
-                          ],
-                          if (pagaBolivares || appliedCredit > 0) ...[
+                          ...summaryRows,
+                          if (wide) ...[
                             const SizedBox(height: 12),
-                            Divider(height: 1, color: AppColors.divider),
+                            Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const LucideIcon(LucideGlyph.truck,
+                                      size: 18, color: Color(0xFF004BDD)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                      child: Text(
+                                          'El envío se revisa en el siguiente paso.',
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              height: 1.4,
+                                              color: AppColors.textSecondary))),
+                                ]),
+                            const SizedBox(height: 16),
+                            FilledButton(
+                              onPressed: canConfirm ? _checkout : null,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF004BDD),
+                                disabledBackgroundColor:
+                                    const Color(0xFF004BDD).withOpacity(0.35),
+                                minimumSize: const Size(double.infinity, 50),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
+                                textStyle: const TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.w700),
+                              ),
+                              child: _submitting
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white))
+                                  : const Text('Continuar con la entrega →',
+                                      textAlign: TextAlign.center),
+                            ),
                           ],
-                          const SizedBox(height: 12),
-                          _CartSummaryRow(
-                              label: 'Subtotal',
-                              value: _cartMoney(displayNet < 0 ? 0 : displayNet,
-                                  _pagoMoneda, tasa),
-                              prominent: true),
-                          if (pagaBolivares && totalBs != null) ...[
-                            const SizedBox(height: 8),
-                            _CartBcvRate(
-                                tasa: tasa!, effectiveDate: _tasaEffectiveDate),
-                          ],
-                          const SizedBox(height: 12),
-                          Row(
+                        ]),
+                  );
+                  final checkoutBar = Material(
+                    color: AppColors.card,
+                    elevation: 10,
+                    shadowColor: AppColors.black.withOpacity(0.12),
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.local_shipping_outlined,
-                                    size: 18, color: AppColors.textSecondary),
+                                const LucideIcon(LucideGlyph.truck,
+                                    size: 18, color: Color(0xFF004BDD)),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                    child: Text(
-                                        'Revisa la entrega en el siguiente paso.',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            height: 1.4,
-                                            color: AppColors.textSecondary))),
-                              ]),
-                          if (pagaBolivares && totalBs == null) ...[
-                            const SizedBox(height: 12),
-                            const Text(
-                                'No hay tasa BCV vigente para cobrar en bolívares.',
-                                style: TextStyle(
-                                    fontSize: 12, color: AppColors.brandBlue)),
-                          ],
-                          if (currencyBlocked) ...[
-                            const SizedBox(height: 12),
-                            const Text(
-                                'Un proveedor solo acepta divisas. Elige Divisas (USD) para continuar.'),
-                          ],
-                          if (!_cart.meetsAllImporterMinOrders) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                                'Completa el mínimo de cada proveedor para continuar.',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.4,
-                                    color: AppColors.textPrimary)),
-                          ],
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: canConfirm ? _checkout : null,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 48),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              textStyle: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600),
+                                  child: Text(
+                                    'El envío se revisa en el siguiente paso.',
+                                    softWrap: true,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      height: 1.35,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: _submitting
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : const Text('Continuar con la entrega',
-                                    textAlign: TextAlign.center),
-                          ),
-                        ]),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: FilledButton(
+                                onPressed: canConfirm ? _checkout : null,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF004BDD),
+                                  disabledBackgroundColor:
+                                      const Color(0xFF004BDD).withOpacity(0.35),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                child: _submitting
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white))
+                                    : const FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                            'Continuar con la entrega →'),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   );
                   final products = [
                     if (warning != null)
@@ -819,21 +979,19 @@ class _CartScreenState extends State<CartScreen> {
                               ? null
                               : _addSuggestion,
                         );
-                  return Align(
+                  final body = Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: wide ? 1280 : 720),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
-                            wide ? 28 : 16, wide ? 24 : 20, wide ? 28 : 16, 0),
+                            wide ? 28 : 16, wide ? 24 : 16, wide ? 28 : 16, 0),
                         child: wide
                             ? Builder(builder: (context) {
                                 WidgetsBinding.instance
                                     .addPostFrameCallback((_) {
                                   if (mounted) _syncSummaryHeight();
                                 });
-                                // Scroll de toda la página; arriba = alto del
-                                // resumen. Pedidos extras, dentro de ese alto.
                                 return SingleChildScrollView(
                                   padding: EdgeInsets.only(
                                     bottom: 24 +
@@ -844,7 +1002,9 @@ class _CartScreenState extends State<CartScreen> {
                                         CrossAxisAlignment.stretch,
                                     children: [
                                       heading,
-                                      const SizedBox(height: 20),
+                                      const SizedBox(height: 12),
+                                      currencyBlock,
+                                      const SizedBox(height: 16),
                                       Row(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
@@ -877,21 +1037,31 @@ class _CartScreenState extends State<CartScreen> {
                               })
                             : ListView(
                                 padding: EdgeInsets.only(
-                                    bottom: 24 +
+                                    bottom: 16 +
                                         MediaQuery.paddingOf(context).bottom),
                                 children: [
                                     heading,
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 12),
+                                    currencyBlock,
+                                    const SizedBox(height: 14),
                                     ...products,
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 8),
                                     summary,
                                     if (suggestions != null) ...[
-                                      const SizedBox(height: 32),
+                                      const SizedBox(height: 24),
                                       suggestions,
                                     ],
+                                    const SizedBox(height: 12),
                                   ]),
                       ),
                     ),
+                  );
+                  if (wide) return body;
+                  return Column(
+                    children: [
+                      Expanded(child: body),
+                      checkoutBar,
+                    ],
                   );
                 }),
     );
@@ -901,8 +1071,7 @@ class _CartScreenState extends State<CartScreen> {
 /// Compact product row; supplier identity belongs to its containing group.
 class _CartLineCard extends StatelessWidget {
   const _CartLineCard(
-      {super.key,
-      required this.line,
+      {required this.line,
       required this.modo,
       required this.tasa,
       required this.onRemove,
@@ -922,20 +1091,33 @@ class _CartLineCard extends StatelessWidget {
     final displayModo =
         part.ownerPagoSoloDivisas ? _PagoMoneda.usd : modo;
     final unit = _cartUnitDollars(line, displayModo);
-    final showBsBreakdown =
-        displayModo == _PagoMoneda.bolivares && !part.ownerPagoSoloDivisas;
-    final promo = ProductCatalogPricing.campaignDiscountChipEs(
+    final showUsd = displayModo == _PagoMoneda.usd;
+    final usdDiscount = showUsd
+        ? ProductCatalogPricing.directSaleDiscountChipEs(
+            listPriceUsd: line.precioUnitarioAliadoRef,
+            salePriceUsd: unit)
+        : null;
+    final campaignChip = ProductCatalogPricing.campaignDiscountChipEs(
         part.activeCampaignDiscountPercent,
         discountRules: part.discountRules,
         quantity: line.quantity);
+    final unitLabel = showUsd
+        ? '${formatRefAmount(unit)} USD'
+        : '${formatRefAmount(unit)} REF';
+    final lineTotalLabel = showUsd
+        ? '${formatRefAmount(unit * line.quantity)} USD'
+        : '${formatRefAmount(unit * line.quantity)} REF';
+    final stockHint = part.hasSupplierMinOrderQty
+        ? 'Mín. ${part.minOrderQtyEffective} • Disp. ${part.stockForSale}'
+        : 'Disp. ${part.stockForSale}';
     final thumbnail = ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: SizedBox(
-            width: 56,
-            height: 56,
+            width: 64,
+            height: 64,
             child: cover != null && cover.isNotEmpty
                 ? Image.network(cover,
-                    fit: BoxFit.contain,
+                    fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _thumbPlaceholder())
                 : _thumbPlaceholder()));
     final details =
@@ -944,89 +1126,100 @@ class _CartLineCard extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              height: 1.3,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              height: 1.25,
               color: AppColors.textPrimary)),
       if (sku.isNotEmpty) ...[
         const SizedBox(height: 3),
-        Text('SKU $sku',
+        Text(sku,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       ],
-      const SizedBox(height: 4),
-      Text(
-          showBsBreakdown
-              ? '${formatRefAmount(unit)} REF / ud'
-              : '${_cartMoney(unit, displayModo, tasa)} / ud',
-          style: TextStyle(
-              fontSize: 12,
-              height: 1.3,
-              fontWeight: part.ownerPagoSoloDivisas
-                  ? FontWeight.w700
-                  : FontWeight.w500,
-              color: part.ownerPagoSoloDivisas
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary)),
-      if (showBsBreakdown) ...[
-        const SizedBox(height: 2),
-        Text(_cartMoney(unit, displayModo, tasa),
+      const SizedBox(height: 6),
+      Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            unitLabel,
             style: TextStyle(
-                fontSize: 11, height: 1.3, color: AppColors.textSecondary)),
-      ],
-      if (promo != null ||
-          (displayModo == _PagoMoneda.usd && part.tieneOfertaDirecta)) ...[
-        const SizedBox(height: 6),
-        _CartOfferChip(
-            label: promo ?? 'Oferta aplicada',
-            bg: AppColors.brandBlueContainer,
-            fg: AppColors.brandLink,
-            border: AppColors.divider),
-      ],
+              fontSize: 15,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
+              color: usdDiscount != null
+                  ? AppColors.successGreen
+                  : AppColors.textPrimary,
+            ),
+          ),
+          if (usdDiscount != null)
+            _CartOfferChip(
+              label: usdDiscount,
+              bg: const Color(0xFFE5F6EA),
+              fg: const Color(0xFF1B7F3A),
+              border: const Color(0xFFE5F6EA),
+            ),
+          if (campaignChip != null)
+            _CartOfferChip(
+              label: campaignChip,
+              bg: AppColors.brandBlueContainer,
+              fg: AppColors.brandLink,
+              border: AppColors.divider,
+            ),
+        ],
+      ),
     ]);
     final remove = IconButton(
         onPressed: onRemove,
-        tooltip: 'Quitar del carrito',
+        tooltip: 'Eliminar',
         style: IconButton.styleFrom(
             minimumSize: const Size(44, 44),
             padding: EdgeInsets.zero,
             foregroundColor: AppColors.textSecondary),
-        icon: const Icon(Icons.close_rounded, size: 18));
-    final quantity = Column(mainAxisSize: MainAxisSize.min, children: [
-      _CartQuantityControl(line: line, onChanged: onQuantityChanged),
-      const SizedBox(height: 5),
-      Text('Mín. ${part.minOrderQtyEffective} · Disp. ${part.stockForSale}',
-          style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-    ]);
-    final amountValue = _cartMoney(unit * line.quantity, displayModo, tasa);
+        icon: const LucideIcon(LucideGlyph.trash2, size: 18));
+    final stockText = Text(stockHint,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary));
     final amountStyle = TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
         fontFeatures: const [FontFeature.tabularFigures()],
         color: AppColors.textPrimary);
-    final amountWidth = _cartTextWidth(context, amountValue, amountStyle)
-        .clamp(104.0, double.infinity);
-    final amount = Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Importe',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-          const SizedBox(height: 3),
-          if (showBsBreakdown) ...[
-            _CartMoneyText(
-                value: '${formatRefAmount(unit * line.quantity)} REF',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 2),
+    final totalBar = DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceTinted,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Text('Total',
+                style:
+                    TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _CartMoneyText(value: lineTotalLabel, style: amountStyle),
+            ),
           ],
-          _CartMoneyText(value: amountValue, style: amountStyle),
-        ]);
+        ),
+      ),
+    );
+    final quantityRow = Row(
+      children: [
+        _CartQuantityControl(line: line, onChanged: onQuantityChanged),
+        const SizedBox(width: 10),
+        Expanded(child: stockText),
+      ],
+    );
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       child: LayoutBuilder(builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 640 &&
-            amountWidth <= constraints.maxWidth - 520 &&
+        final wide = constraints.maxWidth >= 720 &&
             MediaQuery.textScalerOf(context).scale(14) <= 18;
         if (wide) {
           return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -1034,9 +1227,17 @@ class _CartLineCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(child: details),
             const SizedBox(width: 12),
-            quantity,
-            const SizedBox(width: 16),
-            SizedBox(width: amountWidth, child: amount),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  quantityRow,
+                  const SizedBox(height: 8),
+                  totalBar,
+                ],
+              ),
+            ),
             const SizedBox(width: 4),
             remove,
           ]);
@@ -1050,13 +1251,10 @@ class _CartLineCard extends StatelessWidget {
                 Expanded(child: details),
                 remove,
               ]),
-              const SizedBox(height: 14),
-              Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [quantity, amount]),
+              const SizedBox(height: 12),
+              quantityRow,
+              const SizedBox(height: 10),
+              totalBar,
             ]);
       }),
     );
@@ -1076,26 +1274,31 @@ class _CartQuantityControl extends StatelessWidget {
     final canDec =
         onChanged != null && line.quantity > line.part.minOrderQtyEffective;
     final canInc = onChanged != null && line.quantity < line.part.stockForSale;
-    return DecoratedBox(
-        decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderSubtle),
-            borderRadius: BorderRadius.circular(10)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _QtyButton(
-              icon: Icons.remove_rounded,
-              enabled: canDec,
-              onTap: canDec ? () => onChanged!(line.quantity - 1) : null),
-          CartQuantityField(
-              quantity: line.quantity,
-              minimum: line.part.minOrderQtyEffective,
-              maximum: line.part.stockForSale,
-              onChanged: onChanged,
-              embedded: true),
-          _QtyButton(
-              icon: Icons.add_rounded,
-              enabled: canInc,
-              onTap: canInc ? () => onChanged!(line.quantity + 1) : null),
-        ]));
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+          decoration: BoxDecoration(
+              color: AppColors.white,
+              border: Border.all(color: AppColors.borderSubtle),
+              borderRadius: BorderRadius.circular(12)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            _QtyButton(
+                icon: Icons.remove_rounded,
+                enabled: canDec,
+                onTap: canDec ? () => onChanged!(line.quantity - 1) : null),
+            CartQuantityField(
+                quantity: line.quantity,
+                minimum: line.part.minOrderQtyEffective,
+                maximum: line.part.stockForSale,
+                onChanged: onChanged,
+                embedded: true),
+            _QtyButton(
+                icon: Icons.add_rounded,
+                enabled: canInc,
+                onTap: canInc ? () => onChanged!(line.quantity + 1) : null),
+          ])),
+    );
   }
 }
 
@@ -1115,23 +1318,27 @@ class _CartPanel extends StatelessWidget {
 
 class _CartSummaryRow extends StatelessWidget {
   const _CartSummaryRow(
-      {required this.label, required this.value, this.prominent = false});
+      {required this.label,
+      required this.value,
+      this.prominent = false,
+      this.valueColor});
   final String label;
   final String value;
   final bool prominent;
+  final Color? valueColor;
   @override
   Widget build(BuildContext context) {
     final labelStyle = TextStyle(
-        fontSize: 13,
+        fontSize: 13.5,
         fontWeight: prominent ? FontWeight.w500 : FontWeight.w400,
         color: AppColors.textSecondary);
     final valueStyle = TextStyle(
-        fontSize: prominent ? 24 : 13,
+        fontSize: prominent ? 22 : 14,
         height: prominent ? 1.15 : null,
-        fontWeight: prominent ? FontWeight.w700 : FontWeight.w600,
+        fontWeight: prominent ? FontWeight.w800 : FontWeight.w600,
         letterSpacing: prominent ? -0.5 : null,
         fontFeatures: const [FontFeature.tabularFigures()],
-        color: AppColors.textPrimary);
+        color: valueColor ?? AppColors.textPrimary);
     final labelText = Text(label, style: labelStyle);
     if (value.isEmpty) return labelText;
     final amount = _CartMoneyText(value: value, style: valueStyle);
@@ -1191,14 +1398,15 @@ class _CartBcvRate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(fontSize: 11, color: AppColors.textSecondary);
+    final style = TextStyle(fontSize: 12, color: AppColors.textSecondary);
     final date = effectiveDate;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Wrap(spacing: 4, runSpacing: 2, children: [
-        Text('Tasa BCV: 1 REF =', style: style),
-        Text(formatBsLabel(tasa, fractionDigits: 4),
-            maxLines: 1, softWrap: false, style: style),
-      ]),
+      Text(
+        'Tasa BCV: ${formatBsLabel(tasa, fractionDigits: 3)} por REF',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      ),
       if (date != null) ...[
         const SizedBox(height: 3),
         Text(
@@ -1214,11 +1422,13 @@ class _CartCurrencySelector extends StatelessWidget {
       {required this.selected, required this.onSelected});
   final int selected;
   final ValueChanged<int>? onSelected;
+  static const _active = Color(0xFF004BDD);
   @override
   Widget build(BuildContext context) => DecoratedBox(
         decoration: BoxDecoration(
             color: AppColors.surfaceTinted,
-            borderRadius: BorderRadius.circular(10)),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.borderSubtle)),
         child: Padding(
             padding: const EdgeInsets.all(4),
             child: Row(children: [
@@ -1228,31 +1438,33 @@ class _CartCurrencySelector extends StatelessWidget {
                   selected: i == selected,
                   button: true,
                   child: Material(
-                    color: i == selected
-                        ? AppColors.brandBlue
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
+                    color: i == selected ? _active : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
                     child: InkWell(
                       onTap: onSelected == null ? null : () => onSelected!(i),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(999),
                       child: ConstrainedBox(
                           constraints: const BoxConstraints(minHeight: 44),
                           child: Center(
                               child: Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 4, vertical: 10),
-                                  child: Text(
-                                      const [
-                                        'Bolívares (REF)',
-                                        'Divisas (USD)'
-                                      ][i],
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: i == selected
-                                              ? AppColors.white
-                                              : AppColors.textPrimary))))),
+                                  child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                          const [
+                                            'REF / Bs',
+                                            'USD'
+                                          ][i],
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: i == selected
+                                                  ? AppColors.white
+                                                  : AppColors
+                                                      .textPrimary)))))),
                     ),
                   ),
                 )),
@@ -1386,6 +1598,221 @@ class _CreditToggle extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Cabecera azul del mock: back + avatar + «Tu bolsa» / B2B CONECTA.
+class _BolsaAppBar extends StatefulWidget implements PreferredSizeWidget {
+  const _BolsaAppBar({required this.profile});
+
+  final ProfileModel profile;
+
+  /// Más alto que [kToolbarHeight] para dejar aire bajo el status bar.
+  static const double toolbarHeight = 68;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(toolbarHeight);
+
+  @override
+  State<_BolsaAppBar> createState() => _BolsaAppBarState();
+}
+
+class _BolsaAppBarState extends State<_BolsaAppBar> {
+  String? _signedLogoUrl;
+  Object? _logoRequestKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveLogo(widget.profile.logoStoragePath?.trim());
+  }
+
+  @override
+  void didUpdateWidget(covariant _BolsaAppBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final path = widget.profile.logoStoragePath?.trim();
+    if (path != oldWidget.profile.logoStoragePath?.trim()) {
+      _resolveLogo(path);
+    }
+  }
+
+  void _resolveLogo(String? path) {
+    final key = path ?? Object();
+    _logoRequestKey = key;
+    if (path == null || path.isEmpty) {
+      setState(() => _signedLogoUrl = null);
+      return;
+    }
+    SupabaseService.createSignedUrlForProfileLogo(path).then((url) {
+      if (!mounted || _logoRequestKey != key) return;
+      setState(() => _signedLogoUrl = url);
+    }).catchError((_) {
+      if (!mounted || _logoRequestKey != key) return;
+      setState(() => _signedLogoUrl = null);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const headerBlue = Color(0xFF004BDD);
+    Widget logoFace({required Widget child}) => Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.white,
+            border: Border.all(color: AppColors.white.withOpacity(0.9), width: 1.5),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        );
+    final logo = logoFace(
+      child: _signedLogoUrl != null
+          ? Image.network(
+              _signedLogoUrl!,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Center(
+                child: LucideIcon(
+                  LucideGlyph.store,
+                  size: 18,
+                  color: headerBlue,
+                ),
+              ),
+            )
+          : const Center(
+              child: LucideIcon(
+                LucideGlyph.store,
+                size: 18,
+                color: headerBlue,
+              ),
+            ),
+    );
+    return AppBar(
+      toolbarHeight: _BolsaAppBar.toolbarHeight,
+      backgroundColor: headerBlue,
+      foregroundColor: AppColors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: false,
+      systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+      ),
+      leading: IconButton(
+        tooltip: 'Volver',
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: const LucideIcon(LucideGlyph.arrowLeft, color: AppColors.white),
+      ),
+      titleSpacing: 0,
+      title: Row(
+        children: [
+          logo,
+          const SizedBox(width: 10),
+          const Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tu bolsa',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                      height: 1.1,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'B2B',
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w800,
+                            fontStyle: FontStyle.italic,
+                            fontSize: 11,
+                            height: 1.1,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' CONECTA',
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
+                            height: 1.1,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Swipe-to-delete on narrow viewports; trash button remains for all sizes.
+class _CartLineDismissible extends StatelessWidget {
+  const _CartLineDismissible({
+    required this.lineId,
+    required this.enabled,
+    required this.onDismissed,
+    required this.child,
+  });
+
+  final String lineId;
+  final bool enabled;
+  final VoidCallback onDismissed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final swipe = enabled && MediaQuery.sizeOf(context).width < 768;
+    if (!swipe) return KeyedSubtree(key: ValueKey(lineId), child: child);
+    return Dismissible(
+      key: ValueKey('dismiss-$lineId'),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDismissed(),
+      background: Container(
+        alignment: Alignment.centerRight,
+        decoration: const BoxDecoration(
+          color: Color(0xFFE11D48),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            LucideIcon(LucideGlyph.trash2, color: AppColors.white, size: 20),
+            SizedBox(height: 6),
+            Text(
+              'Eliminar',
+              style: TextStyle(
+                color: AppColors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+      child: ColoredBox(color: AppColors.card, child: child),
     );
   }
 }

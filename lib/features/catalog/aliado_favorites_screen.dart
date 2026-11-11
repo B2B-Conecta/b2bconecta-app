@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_branded_header.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
@@ -55,62 +55,69 @@ class _AliadoFavoritesScreenState extends State<AliadoFavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final useBranded = !widget.embedInDesktopShell;
+    final content = ListenableBuilder(
+      listenable: AliadoFavoritesService.instance,
+      builder: (context, _) {
+        final service = AliadoFavoritesService.instance;
+        if (!service.loaded && _error == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!service.loaded && _error != null) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'No se pudieron cargar los favoritos.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: _load,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        final parts = service.parts;
+        if (parts.isEmpty) {
+          return const _FavoritesEmpty();
+        }
+        return PagedItems(
+          items: parts,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          separator: 10,
+          itemBuilder: (part) => _FavoriteRow(part: part),
+        );
+      },
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: widget.embedInDesktopShell
-          ? null
-          : MotolinkAppBar(
-              currentUserProfile: widget.profile,
-              logoHeight: MotolinkAppBarLogoSizes.aliado,
-              onNotificationTap: widget.onNotificationTap,
-              unreadNotifications: widget.unreadNotifications,
-              onMessagesTap: widget.onMessagesTap,
-              unreadMessages: widget.unreadMessages,
-            ),
-      body: ListenableBuilder(
-        listenable: AliadoFavoritesService.instance,
-        builder: (context, _) {
-          final service = AliadoFavoritesService.instance;
-          if (!service.loaded && _error == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!service.loaded && _error != null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'No se pudieron cargar los favoritos.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _load,
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
+      body: useBranded
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AliadoBrandedHeader(
+                  profile: widget.profile,
+                  onMessagesTap: widget.onMessagesTap,
+                  onNotificationTap: widget.onNotificationTap,
+                  unreadMessages: widget.unreadMessages,
+                  unreadNotifications: widget.unreadNotifications,
                 ),
-              ),
-            );
-          }
-          final parts = service.parts;
-          if (parts.isEmpty) {
-            return const _FavoritesEmpty();
-          }
-          return PagedItems(
-            items: parts,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            separator: 10,
-            itemBuilder: (part) => _FavoriteRow(part: part),
-          );
-        },
-      ),
+                Expanded(child: content),
+              ],
+            )
+          : content,
     );
   }
 }
@@ -168,7 +175,10 @@ class _FavoriteRow extends StatelessWidget {
     if (part.stockForSale < part.minOrderQtyEffective) {
       return 'Stock insuficiente para el mínimo';
     }
-    return '${part.stockForSale} en stock · ${part.minOrderQtyLabelEs}';
+    final stock = '${part.stockForSale} en stock';
+    return part.hasSupplierMinOrderQty
+        ? '$stock · ${part.minOrderQtyLabelEs}'
+        : stock;
   }
 
   @override

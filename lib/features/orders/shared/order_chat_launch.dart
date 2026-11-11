@@ -4,6 +4,7 @@ import 'order_list_colors.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_access.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_thread.dart';
@@ -96,7 +97,7 @@ Future<void> showOrderChatSheet({
               ),
               Row(
                 children: [
-                  const Icon(Icons.chat_bubble_outline,
+                  const LucideIcon(LucideGlyph.messageCircle,
                       color: AppColors.brand, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
@@ -219,9 +220,11 @@ class OrderChatIconButton extends StatelessWidget {
           final colors = OrderListColors.of(context);
           return OutlinedButton.icon(
             onPressed: onOpen,
-            icon: Icon(
-                unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
-                size: 18),
+            icon: LucideIcon(
+              LucideGlyph.messageCircle,
+              size: 18,
+              color: colors.accent,
+            ),
             label: Text(unread > 0 ? 'Mensajes ($unread)' : 'Mensajes'),
             style: OutlinedButton.styleFrom(
                 foregroundColor: colors.accent,
@@ -249,8 +252,8 @@ class OrderChatIconButton extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
-            child: Icon(
-              unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
+            child: LucideIcon(
+              LucideGlyph.messageCircle,
               color: unread > 0 ? AppColors.brand : AppColors.textSecondary,
             ),
           ),
@@ -283,10 +286,7 @@ class OrderOpenChatButton extends StatelessWidget {
           width: double.infinity,
           child: FilledButton.icon(
             onPressed: onPressed,
-            icon: Icon(
-              unread > 0 ? Icons.chat_bubble : Icons.chat_bubble_outline,
-              size: 18,
-            ),
+            icon: const LucideIcon(LucideGlyph.messageCircle, size: 18),
             label: Text(
               unread > 0 ? 'Ver chat ($unread sin leer)' : 'Ver chat',
             ),

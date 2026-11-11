@@ -5,9 +5,12 @@ import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 /// Burbuja circular: menú con iconos **claro** / **oscuro**.
 class ThemeModeBubble extends StatelessWidget {
-  const ThemeModeBubble({super.key, this.compact = false});
+  const ThemeModeBubble({super.key, this.compact = false, this.iconColor});
 
   final bool compact;
+
+  /// En cabeceras branded (azul), forzar icono claro.
+  final Color? iconColor;
 
   static const _modes = <ThemeMode>[ThemeMode.light, ThemeMode.dark];
 
@@ -87,20 +90,30 @@ class ThemeModeBubble extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.fieldFill,
-              border: Border.all(color: AppColors.borderSubtle, width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: iconColor != null
+                  ? AppColors.white.withOpacity(0.14)
+                  : AppColors.fieldFill,
+              border: Border.all(
+                color: iconColor != null
+                    ? AppColors.white.withOpacity(0.28)
+                    : AppColors.borderSubtle,
+                width: 1.2,
+              ),
+              boxShadow: iconColor != null
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: AppColors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
             child: Icon(
               controller.currentIcon,
               size: compact ? 18 : 20,
-              color: controller.isDark ? scheme.primary : AppColors.brandBlue,
+              color: iconColor ??
+                  (controller.isDark ? scheme.primary : AppColors.brandBlue),
             ),
           ),
         );

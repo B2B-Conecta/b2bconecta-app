@@ -24,9 +24,9 @@ class AliadoHomeHeader extends StatelessWidget {
     return SliverPersistentHeader(
       pinned: true,
       delegate: _HeaderDelegate(
-        topInset: MediaQuery.paddingOf(context).top,
-        toolbarHeight: 64 + extra * 2,
-        searchHeight: 66 + extra,
+        topInset: MediaQuery.viewPaddingOf(context).top + 6,
+        toolbarHeight: 68 + extra * 2,
+        searchHeight: 70 + extra,
         search: search,
         toolbar: (progress) {
           final compact = progress > .3;
@@ -39,7 +39,7 @@ class AliadoHomeHeader extends StatelessWidget {
             ...actions,
           ]);
           return Padding(
-            padding: const EdgeInsets.fromLTRB(14, 4, 10, 4),
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
             child: Row(children: [
               Expanded(child: identity(compact)),
               buttons,

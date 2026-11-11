@@ -1,0 +1,46 @@
+---
+description: Estándares visuales del catálogo aliado y la bolsa (carrito)
+globs: lib/features/catalog/**/*.dart,lib/features/cart/**/*.dart
+alwaysApply: false
+---
+
+# UI Catálogo y Bolsa (B2B Conecta)
+
+Alinea pantallas aliado al maquetado: cabecera azul branded, Lucide, precios duales, gestos táctiles.
+
+## Catálogo
+
+- AppBar aliado: `MotolinkAppBar(branded: true)` — avatar, bolsa con badge (`LucideIcons.shoppingBag`), campana Lucide.
+- Fichas: foto con **AspectRatio fijo** del layout; imagen de producto sin crop agresivo en vitrina (contain/frame); corazón favorito sobre la foto.
+- CTA azul **Agregar**; stock con check Lucide + “Mín. X uds”; proveedor + estrella.
+- Barra flotante del carrito cuando hay ítems (`CatalogCartBar`).
+- Chips rápidos: Lucide (`tag`, `truck`, `star`).
+
+## Precios (doble moneda obligatoria)
+
+- Línea principal: **USD** promo (verde + chip `−%`) o **REF** sin promo.
+- Siempre línea **Bs** (tasa BCV); si la tasa carga, placeholder `Bs …`.
+- Reutiliza `CatalogProductPriceDisplay` / `CatalogCartPrice` — no inventes un tercer formato.
+
+```dart
+// ✅ CatalogProductPriceDisplay(listPriceUsd: …, salePriceUsd: …, bcvRate: …)
+// ❌ Solo “12.00 REF” sin Bs en ficha de catálogo
+```
+
+## Detalle
+
+- Título “Detalle del repuesto”; dual price box USD | REF/Bs.
+- Footer sticky: estado + stepper qty (mín) + **Agregar**.
+
+## Bolsa (carrito)
+
+- Cabecera azul redondeada: “Tu bolsa” / “B2B CONECTA” + avatar.
+- Toggle **REF / Bs** | **USD**; líneas agrupadas por proveedor.
+- **Swipe-to-delete** (`Dismissible`) con “Eliminar” + snackbar **Producto eliminado** / **Deshacer**.
+- Resumen: Productos / Subtotal / Equivalente Bs (o ahorro USD); CTA “Continuar con la entrega →”.
+- “Completa tu compra”: fichas **compactas** horizontales con Agregar (no carrusel alto).
+
+## Fotos
+
+- Galería/detalle: `AspectRatio` estable; thumbs alineados.
+- En listados compactos, preferir frame + `BoxFit.contain`; si el diseño pide fill edge-to-edge, `BoxFit.cover` **solo** con `AspectRatio` fijo y `ClipRRect`.

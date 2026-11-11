@@ -38,6 +38,7 @@ import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
 import 'main_shell_tab.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_branded_header.dart';
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/core/layout/shell/shell_destination.dart';
@@ -978,25 +979,40 @@ class _OrdersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final useBranded =
+        homeRole == AppHomeRole.aliado && !embedInDesktopShell;
+    final panel = switch (homeRole) {
+      AppHomeRole.importador => const ImporterActiveOrdersPanel(),
+      AppHomeRole.administrador => const SizedBox.shrink(),
+      AppHomeRole.aliado => const AliadoPedidosPanel(),
+    };
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: embedInDesktopShell
+      appBar: useBranded || embedInDesktopShell
           ? null
           : MotolinkAppBar(
               currentUserProfile: profile,
-              logoHeight: homeRole == AppHomeRole.aliado
-                  ? MotolinkAppBarLogoSizes.aliado
-                  : MotolinkAppBarLogoSizes.importador,
+              logoHeight: MotolinkAppBarLogoSizes.importador,
               onNotificationTap: onNotificationTap,
               unreadNotifications: unreadNotifications,
               onMessagesTap: onMessagesTap,
               unreadMessages: unreadMessages,
             ),
-      body: switch (homeRole) {
-        AppHomeRole.importador => const ImporterActiveOrdersPanel(),
-        AppHomeRole.administrador => const SizedBox.shrink(),
-        AppHomeRole.aliado => const AliadoPedidosPanel(),
-      },
+      body: useBranded
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AliadoBrandedHeader(
+                  profile: profile,
+                  onMessagesTap: onMessagesTap,
+                  onNotificationTap: onNotificationTap,
+                  unreadMessages: unreadMessages,
+                  unreadNotifications: unreadNotifications,
+                ),
+                Expanded(child: panel),
+              ],
+            )
+          : panel,
     );
   }
 }
@@ -1152,15 +1168,62 @@ class _ProfileTabState extends State<_ProfileTab> {
     final showSupportEntry = widget.homeRole == AppHomeRole.aliado ||
         widget.homeRole == AppHomeRole.importador;
 
+    final useBranded =
+        widget.homeRole == AppHomeRole.aliado && !widget.embedInDesktopShell;
+    final profileBody = SafeArea(
+      top: !useBranded && !widget.embedInDesktopShell,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          widget.embedInDesktopShell ? 0 : 20,
+          widget.embedInDesktopShell ? 0 : 8,
+          widget.embedInDesktopShell ? 0 : 20,
+          24,
+        ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: widget.embedInDesktopShell ? 1120 : double.infinity,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ProfileB2BForm(
+                  summaryFirst: true,
+                  accountActionsInShell: widget.embedInDesktopShell,
+                  overviewSupport: showSupportEntry
+                      ? _buildSupportEntryCard(
+                          inProfileGroup: widget.embedInDesktopShell)
+                      : null,
+                  key: ValueKey<Object>(
+                    '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
+                  ),
+                  initial: widget.profile,
+                  onRelatedDataChanged: widget.onProfileSaved,
+                  onSaved: () {
+                    widget.onProfileSaved();
+                  },
+                  beforeSignOut: showSupportEntry &&
+                          widget.homeRole == AppHomeRole.aliado
+                      ? _buildSupportEntryCard()
+                      : null,
+                  afterReputation:
+                      showSupportEntry ? _buildSupportEntryCard() : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: widget.embedInDesktopShell
+      appBar: useBranded || widget.embedInDesktopShell
           ? null
           : MotolinkAppBar(
               currentUserProfile: widget.profile,
-              logoHeight: widget.homeRole == AppHomeRole.aliado
-                  ? MotolinkAppBarLogoSizes.aliado
-                  : MotolinkAppBarLogoSizes.importador,
+              logoHeight: MotolinkAppBarLogoSizes.importador,
               onNotificationTap: widget.onNotificationTap,
               unreadNotifications: widget.unreadNotifications,
               onMessagesTap: widget.onMessagesTap,
@@ -1182,52 +1245,21 @@ class _ProfileTabState extends State<_ProfileTab> {
                           ),
                         ],
             ),
-      body: SafeArea(
-        top: !widget.embedInDesktopShell,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            widget.embedInDesktopShell ? 0 : 20,
-            widget.embedInDesktopShell ? 0 : 8,
-            widget.embedInDesktopShell ? 0 : 20,
-            24,
-          ),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: widget.embedInDesktopShell ? 1120 : double.infinity,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ProfileB2BForm(
-                    summaryFirst: true,
-                    accountActionsInShell: widget.embedInDesktopShell,
-                    overviewSupport: showSupportEntry
-                        ? _buildSupportEntryCard(
-                            inProfileGroup: widget.embedInDesktopShell)
-                        : null,
-                    key: ValueKey<Object>(
-                      '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
-                    ),
-                    initial: widget.profile,
-                    onRelatedDataChanged: widget.onProfileSaved,
-                    onSaved: () {
-                      widget.onProfileSaved();
-                    },
-                    beforeSignOut: showSupportEntry &&
-                            widget.homeRole == AppHomeRole.aliado
-                        ? _buildSupportEntryCard()
-                        : null,
-                    afterReputation:
-                        showSupportEntry ? _buildSupportEntryCard() : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      body: useBranded
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AliadoBrandedHeader(
+                  profile: widget.profile,
+                  onMessagesTap: widget.onMessagesTap,
+                  onNotificationTap: widget.onNotificationTap,
+                  unreadMessages: widget.unreadMessages,
+                  unreadNotifications: widget.unreadNotifications,
+                ),
+                Expanded(child: profileBody),
+              ],
+            )
+          : profileBody,
     );
   }
 }

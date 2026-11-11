@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
@@ -399,7 +400,7 @@ class _ImporterStoreProfileScreenState
               key: const Key('store-supplier-chat'),
               tooltip: 'Mensaje al proveedor',
               onPressed: _openSupplierChat,
-              icon: const Icon(Icons.chat_bubble_outline),
+              icon: const LucideIcon(LucideGlyph.messageCircle),
             ),
         ],
       ),

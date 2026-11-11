@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 512 512">
+  <title>Escape de motocicleta</title>
+  <g transform="translate(30.72 30.72) scale(.88)" fill="none" stroke="currentColor" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M56 218V153q0-17 14-16l39 7 115 84 64 65 22 55q8 8 22 6l94-8q13-1 11-18l-4-38q0-3 3-4l12-2q5-1 5 4l5 42c2 20-10 35-30 37l-96 8q-22 2-39-15l-40-25-83-32Z"/>
+    <path d="M109 144 56 218m44-61 110 86m78 50-35 42m57 13-17 12M67 138l17 15m-28 23 11 8"/>
+  </g>
+</svg>

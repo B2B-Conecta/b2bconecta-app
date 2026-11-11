@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 512 512">
+  <title>Lubricantes de motocicleta</title>
+  <g transform="translate(30.72 30.72) scale(.88)" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M187 189v-45a35 35 0 0 1 35-35h104l103 49q32 16 32 48v214a36 36 0 0 1-36 36H237"/>
+    <path d="M228 109V80a23 23 0 0 1 23-23h36a23 23 0 0 1 23 23v29
+             M83 175v-23a19 19 0 0 1 19-19h27a19 19 0 0 1 19 19v23"/>
+    <path d="M229 208v-29a28 28 0 0 1 28-28h69l72 36a39 39 0 0 1 21 35v164a27 27 0 0 1-27 27H265"/>
+    <path d="M80 175h76q6 0 12 3l75 36q22 10 22 37v177a28 28 0 0 1-28 28H80a29 29 0 0 1-29-29V204a29 29 0 0 1 29-29Z"/>
+    <rect x="94" y="264" width="125" height="151" rx="8"/>
+    <path d="M156.5 302c-12 16-27 36-27 49a27 27 0 0 0 54 0c0-13-15-33-27-49Z
+             M293 232h62m-62 34h62m-62 34h62m-62 34h62m-62 34h62"/>
+  </g>
+</svg>

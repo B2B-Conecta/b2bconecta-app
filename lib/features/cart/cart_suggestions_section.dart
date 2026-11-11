@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
@@ -473,8 +474,8 @@ class _SuggestionCard extends StatelessWidget {
                       ImporterCatalogLogo(
                         storagePath: part.ownerLogoStoragePath,
                         size: 14,
-                        fallback: Icon(
-                          Icons.storefront_outlined,
+                        fallback: LucideIcon(
+                          LucideGlyph.store,
                           size: 14,
                           color: AppColors.textSecondary,
                         ),

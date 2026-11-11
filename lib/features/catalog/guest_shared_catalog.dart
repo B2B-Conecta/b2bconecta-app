@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
+import 'catalog_taxonomy.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
@@ -137,18 +139,21 @@ class _GuestSupplierStoreScreenState extends State<GuestSupplierStoreScreen> {
             store.estado?.trim(),
             store.ciudad?.trim(),
           ].where((s) => s != null && s.isNotEmpty).join(' · ');
-          final categories = <String>[];
-          for (final part in store.products) {
-            final category = part.category?.trim() ?? '';
-            if (category.isNotEmpty && !categories.contains(category)) {
-              categories.add(category);
-            }
-          }
-          final selected = categories.contains(_category) ? _category : null;
-          final visible = selected == null
+          final categories = catalogCategoryFamilies(
+            store.products.map((part) => part.category ?? ''),
+          );
+          final selectedValues =
+              catalogValuesForSelection(categories, _category).toSet();
+          final selected = selectedValues.isEmpty ? null : _category;
+          final family = selected?.split(' / ').first;
+          final children = categories
+              .where((group) => group.label == family)
+              .expand((group) => group.children);
+          final visible = selectedValues.isEmpty
               ? store.products
               : store.products
-                  .where((part) => (part.category ?? '').trim() == selected)
+                  .where((part) =>
+                      selectedValues.contains((part.category ?? '').trim()))
                   .toList();
           return Scaffold(
             backgroundColor: AppColors.background,
@@ -211,16 +216,36 @@ class _GuestSupplierStoreScreenState extends State<GuestSupplierStoreScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: ChoiceChip(
-                                  label: Text(
-                                      formatCatalogCategoryLabel(category)),
-                                  selected: selected == category,
-                                  onSelected: (_) =>
-                                      setState(() => _category = category),
+                                  label: Text(catalogCategoryDisplayLabel(
+                                      category.label)),
+                                  selected: family == category.label,
+                                  onSelected: (_) => setState(
+                                      () => _category = category.label),
                                 ),
                               ),
                           ],
                         ),
                       ),
+                      if (children.isNotEmpty)
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Todas'),
+                              selected: selected == family,
+                              onSelected: (_) =>
+                                  setState(() => _category = family),
+                            ),
+                            for (final child in children)
+                              ChoiceChip(
+                                label: Text(
+                                    formatCatalogCategoryLabel(child.label)),
+                                selected: selected == child.label,
+                                onSelected: (_) =>
+                                    setState(() => _category = child.label),
+                              ),
+                          ],
+                        ),
                     ],
                     const SizedBox(height: 14),
                     if (visible.isEmpty)
@@ -350,8 +375,9 @@ class _GuestStoreHeader extends StatelessWidget {
                   color: AppColors.surfaceTinted,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.storefront_outlined,
-                    color: AppColors.brand),
+                child: const Center(
+                  child: LucideIcon(LucideGlyph.store, color: AppColors.brand),
+                ),
               ),
             ),
             const SizedBox(width: 12),

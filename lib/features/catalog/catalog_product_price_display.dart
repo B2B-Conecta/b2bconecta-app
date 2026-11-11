@@ -23,6 +23,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.prominent = false,
     this.ownerPagoSoloDivisas = false,
     this.bcvRate,
+    this.usdColor,
   });
   final double listPriceUsd;
   final double? salePriceUsd;
@@ -35,6 +36,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool prominent;
   final bool ownerPagoSoloDivisas;
   final double? bcvRate;
+  final Color? usdColor;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +81,8 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                 runSpacing: 2,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  amount(usd, 'USD', mainSize, AppColors.successGreen),
+                  amount(
+                      usd, 'USD', mainSize, usdColor ?? AppColors.successGreen),
                   if (discountLabel != null)
                     _UsdDiscountChip(label: discountLabel),
                 ]),
@@ -91,7 +94,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
               listCurrency,
               mainSize,
               ownerPagoSoloDivisas
-                  ? AppColors.successGreen
+                  ? usdColor ?? AppColors.successGreen
                   : AppColors.textPrimary,
             ),
           if (!ownerPagoSoloDivisas)

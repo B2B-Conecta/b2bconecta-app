@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:motolink_pro_app/features/kyc/aliado_doc_type.dart';
@@ -301,12 +302,13 @@ class _TransactionRequestCounterpartyProfileSectionState
     return Container(
       width: size,
       height: size,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: AppColors.brandBlueContainer.withOpacity(0.6),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(
-        Icons.storefront_outlined,
+      child: LucideIcon(
+        LucideGlyph.store,
         color: AppColors.brandBlue,
         size: web ? 20 : 24,
       ),

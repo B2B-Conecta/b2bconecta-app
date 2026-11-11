@@ -1,4 +1,5 @@
 import '../catalog/product_variants.dart';
+import '../catalog/catalog_taxonomy.dart';
 import 'catalog_import/catalog_import_field.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
@@ -208,8 +209,7 @@ class CatalogImportValidator {
           rowIndex: row.rowIndex,
           sku: sku,
           code: 'INVALID_VARIANT_ATTRIBUTES',
-          message:
-              'Atributos inválidos. Use Tamaño:M|Color:Rojo o JSON '
+          message: 'Atributos inválidos. Use Tamaño:M|Color:Rojo o JSON '
               '{"Tamaño":"M","Color":"Rojo"}',
         ));
         continue;
@@ -219,8 +219,7 @@ class CatalogImportValidator {
           rowIndex: row.rowIndex,
           sku: sku,
           code: 'REQUIRED_VARIANT_VALUE',
-          message:
-              'La variante necesita un valor o atributos '
+          message: 'La variante necesita un valor o atributos '
               '(ej. Tamaño:M|Color:Rojo)',
         ));
         continue;
@@ -278,6 +277,7 @@ class CatalogImportValidator {
     }
 
     final name = readField(CatalogImportField.name.key)?.trim() ?? '';
+    final rawCategory = _nullable(readField(CatalogImportField.category.key));
     final priceBinding = mapping.columnMap[CatalogImportField.priceUsd.key];
     final priceRaw = readUntransformed(CatalogImportField.priceUsd.key);
     final stockRaw = readUntransformed(CatalogImportField.stock.key);
@@ -376,7 +376,9 @@ class CatalogImportValidator {
       stock: stock,
       minOrderQty: minOrderQty,
       description: _nullable(readField(CatalogImportField.description.key)),
-      category: _nullable(readField(CatalogImportField.category.key)),
+      category: rawCategory == null
+          ? null
+          : classifyCatalogProduct(rawCategory, name) ?? rawCategory,
       compatibility: _nullable(readField(CatalogImportField.compatibility.key)),
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,

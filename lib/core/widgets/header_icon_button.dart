@@ -13,6 +13,8 @@ class HeaderIconButton extends StatelessWidget {
     this.count = 0,
     this.badgeColor,
     this.iconColor,
+    this.iconWidget,
+    this.size = slot,
   });
 
   final IconData icon;
@@ -21,6 +23,8 @@ class HeaderIconButton extends StatelessWidget {
   final int count;
   final Color? badgeColor;
   final Color? iconColor;
+  final Widget? iconWidget;
+  final Size size;
 
   static const slot = Size(40, 40);
 
@@ -50,8 +54,8 @@ class HeaderIconButton extends StatelessWidget {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              minimumSize: slot,
-              fixedSize: slot,
+              minimumSize: size,
+              fixedSize: size,
             ),
             icon: Badge(
               isLabelVisible: unread > 0,
@@ -67,7 +71,7 @@ class HeaderIconButton extends StatelessWidget {
                   height: 1,
                 ),
               ),
-              child: Icon(icon, size: 22, color: color),
+              child: iconWidget ?? Icon(icon, size: 22, color: color),
             ),
           ),
         );

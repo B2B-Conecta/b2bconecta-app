@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'aliado_catalog_categories.dart';
+import 'catalog_taxonomy.dart';
+import 'catalog_category_icon.dart';
 import 'importer_catalog_logo.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'aliado_catalog_reputation_filter_presets.dart';
@@ -19,6 +22,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     required this.importers,
     required this.scrollController,
     this.categories = const [],
+    this.categoryGroups = const [],
     this.onOpenImporterStore,
   });
 
@@ -26,6 +30,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
   final List<ImporterOption> importers;
   final ScrollController? scrollController;
   final List<String> categories;
+  final List<AliadoCatalogCategoryGroup> categoryGroups;
   final ValueChanged<String>? onOpenImporterStore;
 
   static Future<AliadoCatalogFiltersDraft?> show(
@@ -33,6 +38,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     required AliadoCatalogFiltersDraft initial,
     required List<ImporterOption> importers,
     List<String> categories = const [],
+    List<AliadoCatalogCategoryGroup> categoryGroups = const [],
     ValueChanged<String>? onOpenImporterStore,
   }) {
     return showAdaptiveAdminSheet<AliadoCatalogFiltersDraft>(
@@ -48,6 +54,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
         importers: importers,
         scrollController: scrollController,
         categories: categories,
+        categoryGroups: categoryGroups,
         onOpenImporterStore: onOpenImporterStore,
       ),
     );
@@ -203,9 +210,23 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     required String label,
     required bool selected,
     required VoidCallback onTap,
+    CatalogCategoryArt? art,
   }) {
     return FilterChip(
-      label: Text(label),
+      label: art == null
+          ? Text(label)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CatalogCategoryIcon(
+                  art: art,
+                  size: 18,
+                  color: selected ? Colors.white : null,
+                ),
+                const SizedBox(width: 6),
+                Flexible(child: Text(label)),
+              ],
+            ),
       selected: selected,
       onSelected: (_) => onTap(),
       showCheckmark: true,
@@ -413,6 +434,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   hint: 'Rubros de los productos publicados en el catálogo.',
                 ),
                 if (widget.categories.isEmpty &&
+                    widget.categoryGroups.isEmpty &&
                     _category == kAliadoCatalogAllCategoriesLabel)
                   Text(
                     'Todavía no hay categorías publicadas.',
@@ -427,16 +449,47 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                     spacing: 8,
                     runSpacing: 8,
                     children: aliadoCatalogCategoryChoices(
-                      categories: widget.categories,
-                      selected: _category,
+                      categories: [
+                        ...widget.categories,
+                        for (final group in widget.categoryGroups) group.label,
+                      ],
+                      selected: categoryFamily(_category),
                     ).map((label) {
                       return _choiceChip(
-                        label: label,
-                        selected: _category == label,
+                        label: catalogCategoryDisplayLabel(label),
+                        art: CatalogCategoryArt.forLabel(label),
+                        selected: categoryFamily(_category) == label,
                         onTap: () => setState(() => _category = label),
                       );
                     }).toList(),
                   ),
+                for (final group in widget.categoryGroups)
+                  if (group.label == categoryFamily(_category) &&
+                      group.children.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text('Tipo de pieza',
+                        style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _choiceChip(
+                          label:
+                              'Todos en ${catalogCategoryDisplayLabel(group.label)}',
+                          selected: _category == group.label,
+                          onTap: () => setState(() => _category = group.label),
+                        ),
+                        for (final child in group.children)
+                          _choiceChip(
+                            label: categoryLeaf(child.label),
+                            selected: _category == child.label,
+                            onTap: () =>
+                                setState(() => _category = child.label),
+                          ),
+                      ],
+                    ),
+                  ],
                 _sectionHeader(
                   'Orden',
                   icon: Icons.swap_vert_rounded,
@@ -685,7 +738,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                               icon: ImporterCatalogLogo(
                                 storagePath: o.logoStoragePath,
                                 size: 28,
-                                fallback: const Icon(Icons.storefront_outlined),
+                                fallback: const LucideIcon(LucideGlyph.store),
                               ),
                               onPressed: () =>
                                   widget.onOpenImporterStore!(o.id),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'catalog_cart_price.dart';
 import 'importer_catalog_logo.dart';
@@ -74,7 +75,7 @@ class ProductDetailSupplier extends StatelessWidget {
                   child: ImporterCatalogLogo(
                       storagePath: part.ownerLogoStoragePath,
                       size: 32,
-                      fallback: Icon(Icons.storefront_outlined,
+                      fallback: LucideIcon(LucideGlyph.store,
                           size: 22, color: AppColors.textSecondary))),
               const SizedBox(width: 10),
               Expanded(

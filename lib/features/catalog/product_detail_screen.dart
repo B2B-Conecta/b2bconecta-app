@@ -21,6 +21,7 @@ import 'store_supplier_chat.dart';
 import 'product_photo_gallery.dart';
 import 'product_variants.dart';
 import 'product_variant_selector.dart';
+import 'recent_product_views.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -101,7 +102,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (widget.guestPreview) return;
     try {
       final p = await SupabaseService.fetchMyProfile();
-      if (mounted) setState(() => _profile = p);
+      if (!mounted) return;
+      setState(() => _profile = p);
+      if (p?.isAliado == true) RecentProductViews.record(p!.id, widget.part.id);
     } catch (_) {}
   }
 

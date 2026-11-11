@@ -14,6 +14,7 @@ import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
@@ -390,7 +391,17 @@ class _CartScreenState extends State<CartScreen> {
     _cart.removeProduct(line.part.id);
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(
-      content: Text('${line.part.nombre} eliminado del carrito.'),
+      content: Row(
+        children: [
+          LucideIcon(
+            LucideGlyph.handbag,
+            size: 20,
+            color: Theme.of(context).snackBarTheme.contentTextStyle?.color,
+          ),
+          const SizedBox(width: 8),
+          Flexible(child: Text('${line.part.nombre} eliminado del carrito.')),
+        ],
+      ),
       action: SnackBarAction(
           label: 'Deshacer',
           onPressed: () {
@@ -587,8 +598,8 @@ class _CartScreenState extends State<CartScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.shopping_cart_outlined,
+                        LucideIcon(
+                          LucideGlyph.handbag,
                           size: 48,
                           color: AppColors.textSecondary.withOpacity(0.55),
                         ),

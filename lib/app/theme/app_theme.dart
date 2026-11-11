@@ -168,8 +168,11 @@ SnackBarThemeData _snackBarTheme({
     actionTextColor: action,
     disabledActionTextColor: foreground.withOpacity(0.45),
     behavior: SnackBarBehavior.floating,
-    elevation: 4,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    elevation: 3,
+    shape: RoundedRectangleBorder(
+      borderRadius: AppDecorations.radius12,
+      side: BorderSide(color: foreground.withOpacity(0.18)),
+    ),
     insetPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
   );
 }
@@ -196,9 +199,9 @@ ThemeData buildAppTheme() {
       onInverseSurface: AppColors.white,
     ),
     snackBarTheme: _snackBarTheme(
-      background: snackBg,
+      background: primary,
       foreground: AppColors.white,
-      action: accent,
+      action: const Color(0xFFE0EBFF),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.white,
@@ -300,7 +303,7 @@ ThemeData buildAppDarkTheme() {
     snackBarTheme: _snackBarTheme(
       background: snackBg,
       foreground: AppColors.white,
-      action: primary,
+      action: const Color(0xFFBCD3FF),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: surface,

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 1254 1254">
+  <title>Admisión y combustible</title>
+  <g transform="translate(81 73) scale(.875)" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M194 507H409Q429 438 503 438H872a102 102 0 0 1 102 102v176
+             M925 904Q908 918 879 918H503Q407 918 402 821H194"/>
+    <ellipse cx="194" cy="664" rx="60" ry="157"/>
+    <path d="M974 530h105a32 32 0 0 1 32 32v55a32 32 0 0 1-32 32H974"/>
+    <rect x="476" y="374" width="402" height="64" rx="32"/>
+    <path d="M515 374v-70a51 51 0 0 1 51-51h222a51 51 0 0 1 51 51v70
+             M632 253v-77a26 26 0 0 1 26-26h40a26 26 0 0 1 26 26v77
+             M463 918v116a78 78 0 0 0 78 78h277a78 78 0 0 0 78-78V918"/>
+    <path d="M975 754c-20 28-48 60-48 83a48 48 0 0 0 96 0c0-23-28-55-48-83Z" stroke-width="26"/>
+  </g>
+</svg>

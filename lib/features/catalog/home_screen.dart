@@ -479,16 +479,6 @@ class _HomeScreenState extends State<HomeScreen>
     return true;
   }
 
-  Future<void> _openActivePromotionsSheet(
-    List<PromoCampaignModel> campaigns,
-  ) async {
-    await showAliadoActivePromotionsSheet(
-      context: context,
-      campaigns: campaigns,
-      onPromoCampaignSelected: _onPromoCampaignSelected,
-    );
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
@@ -1148,14 +1138,6 @@ class _HomeScreenState extends State<HomeScreen>
                     if (parts.isEmpty) {
                       return ListView(
                         children: [
-                          if (promos.isNotEmpty)
-                            AliadoPromoBannerCarousel(
-                              campaigns: promos,
-                              onViewAll: () =>
-                                  _openActivePromotionsSheet(promos),
-                              onPromoCampaignSelected: _onPromoCampaignSelected,
-                              compact: isDesktopCatalog,
-                            ),
                           if (showInlineResultsMeta)
                             Padding(
                               padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
@@ -1181,8 +1163,7 @@ class _HomeScreenState extends State<HomeScreen>
                       );
                     }
 
-                    // Un solo scroll: la valla va arriba del contenido y
-                    // se desplaza con el catálogo (deja de quedar fija).
+                    // Las vallas publicitarias viven solo en Inicio.
                     if (_hasMoreProducts && !_isLoadingMore) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (!mounted) return;
@@ -1192,16 +1173,6 @@ class _HomeScreenState extends State<HomeScreen>
                     return CustomScrollView(
                       controller: _catalogScrollController,
                       slivers: [
-                        if (promos.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: AliadoPromoBannerCarousel(
-                              campaigns: promos,
-                              onViewAll: () =>
-                                  _openActivePromotionsSheet(promos),
-                              onPromoCampaignSelected: _onPromoCampaignSelected,
-                              compact: isDesktopCatalog,
-                            ),
-                          ),
                         if (showInlineResultsMeta)
                           SliverToBoxAdapter(
                             child: Padding(

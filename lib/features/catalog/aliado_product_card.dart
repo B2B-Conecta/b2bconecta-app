@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
@@ -142,8 +143,8 @@ class AliadoProductCard extends StatelessWidget {
                                     ImporterCatalogLogo(
                                         storagePath: part.ownerLogoStoragePath,
                                         size: 16,
-                                        fallback: Icon(
-                                            Icons.storefront_outlined,
+                                        fallback: LucideIcon(
+                                            LucideGlyph.store,
                                             size: 16,
                                             color: AppColors.textSecondary)),
                                     const SizedBox(width: 6),

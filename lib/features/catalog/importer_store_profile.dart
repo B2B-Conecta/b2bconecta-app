@@ -147,13 +147,17 @@ List<PartModel> constrainCatalogPartsToFilters(
 ) {
   final owners = filters.effectiveOwnerIds.toSet();
   final cat = filters.category?.trim();
+  final categories = filters.categoryAnyOf.toSet();
   return parts.where((p) {
     if (owners.isNotEmpty) {
       final oid = p.ownerId?.trim() ?? '';
       if (!owners.contains(oid)) return false;
     }
     if (filters.onlyActiveProducts && !p.isActive) return false;
-    if (cat != null && cat.isNotEmpty && (p.category ?? '').trim() != cat) {
+    final value = (p.category ?? '').trim();
+    if (categories.isNotEmpty) {
+      if (!categories.contains(value)) return false;
+    } else if (cat != null && cat.isNotEmpty && value != cat) {
       return false;
     }
     if (filters.onlyEnvioIncluido &&

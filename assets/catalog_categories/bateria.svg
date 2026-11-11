@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 1254 1254">
+  <title>Batería de motocicleta</title>
+  <g fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="188" y="359" width="878" height="608" rx="40"/>
+    <path d="M271 359v-59q0-14 14-14h126q14 0 14 14v59
+             M829 359v-59q0-14 14-14h126q14 0 14 14v59"/>
+    <path d="M288 462h94m-47-47v94m537-47h94"/>
+    <path d="M351 625h-5a49 49 0 0 0-49 49v167a48 48 0 0 0 48 48h501
+             M910 626a49 49 0 0 1 47 49v166a49 49 0 0 1-47 48
+             M420 625h194"/>
+    <path d="M380 685v140m54-140v140m54-140v140m54-140v140m54-140v140"/>
+    <path d="M777 482 652 687h85v135l124-207h-84Z"/>
+  </g>
+</svg>

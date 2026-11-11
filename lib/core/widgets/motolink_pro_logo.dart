@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'motolink_pro_logo_bytes.dart';
+import 'lucide_icon.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
@@ -116,8 +117,8 @@ class BusinessLogoPlaceholder extends StatelessWidget {
             borderRadius: BorderRadius.circular(size * 0.16),
             border: Border.all(color: AppColors.borderSubtle),
           ),
-          child: Icon(
-            Icons.storefront_outlined,
+          child: LucideIcon(
+            LucideGlyph.store,
             size: size * 0.48,
             color: iconColor,
           ),

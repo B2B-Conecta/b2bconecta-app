@@ -4,6 +4,18 @@ import 'package:flutter/scheduler.dart';
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'importer_shell_tabs.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
+import '../features/catalog/catalog_filters.dart';
+import '../features/catalog/promo_campaign_model.dart';
+
+class AliadoCatalogRequest {
+  const AliadoCatalogRequest(
+      {this.filters = CatalogFilters.empty,
+      this.campaign,
+      this.openFilters = false});
+  final CatalogFilters filters;
+  final PromoCampaignModel? campaign;
+  final bool openFilters;
+}
 
 /// Permite cambiar la pestaña del [MainShell] desde hijos o rutas apiladas
 /// (p. ej. importador → tab Pedidos tras marcar en preparación).
@@ -13,6 +25,31 @@ class MainShellTabController {
   static void Function(int index)? _goTo;
   static VoidCallback? _refreshImporterInventory;
   static VoidCallback? _refreshImporterHome;
+  static VoidCallback? _openAliadoCatalog;
+  static VoidCallback? _openReputation;
+  static AliadoCatalogRequest? _catalogRequest;
+
+  static void registerAliadoCatalog(VoidCallback? open) =>
+      _openAliadoCatalog = open;
+
+  static AliadoCatalogRequest? consumeAliadoCatalogRequest() {
+    final request = _catalogRequest;
+    _catalogRequest = null;
+    return request;
+  }
+
+  static void navigateToAliadoCatalog({
+    CatalogFilters filters = CatalogFilters.empty,
+    PromoCampaignModel? campaign,
+    bool openFilters = false,
+  }) {
+    _catalogRequest = AliadoCatalogRequest(
+        filters: filters, campaign: campaign, openFilters: openFilters);
+    _goTo?.call(AliadoShellTabs.catalogo);
+    SchedulerBinding.instance
+        .addPostFrameCallback((_) => _openAliadoCatalog?.call());
+  }
+
   static final importerInventoryRequest = ValueNotifier<String?>(null);
 
   static void registerImporterHomeReload(VoidCallback? reload) =>
@@ -71,6 +108,9 @@ class MainShellTabController {
     _goTo = null;
     _refreshImporterInventory = null;
     _refreshImporterHome = null;
+    _openAliadoCatalog = null;
+    _openReputation = null;
+    _catalogRequest = null;
     importerInventoryRequest.value = null;
     _refreshImporterPedidos = null;
     _pendingNotificationRelatedId = null;
@@ -133,11 +173,13 @@ class MainShellTabController {
     required int pedidos,
     required int reputation,
     required int profile,
+    VoidCallback? onReputation,
   }) {
     _homeTabIndex = home;
     _b2bPedidosTabIndex = pedidos;
     _b2bReputationTabIndex = reputation;
     _b2bProfileTabIndex = profile;
+    _openReputation = onReputation;
   }
 
   static void registerB2BProfileTabIndex(int index) =>
@@ -154,7 +196,11 @@ class MainShellTabController {
 
   /// Pestaña Reputación del rol que tiene el shell abierto.
   static void navigateToReputationTab() {
-    _goTo?.call(_b2bReputationTabIndex);
+    if (_openReputation != null) {
+      _openReputation!();
+    } else {
+      _goTo?.call(_b2bReputationTabIndex);
+    }
     SchedulerBinding.instance.addPostFrameCallback((_) {
       requestNotificationsReload();
     });

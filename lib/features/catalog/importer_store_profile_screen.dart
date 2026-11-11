@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_taxonomy.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/favorite_heart_button.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
@@ -142,10 +143,14 @@ class _ImporterStoreProfileScreenState
   int get _pagerTotal =>
       listPagerTotal(loaded: _parts.length, matching: _matchingTotal);
 
-  CatalogFilters get _filters => CatalogFilters.importerStore(
-        importerId: widget.importerId,
-        category: _selectedCategory,
-      );
+  CatalogFilters get _filters {
+    final values = catalogValuesForSelection(
+        catalogCategoryFamilies(_categories), _selectedCategory);
+    return CatalogFilters.importerStore(
+      importerId: widget.importerId,
+      category: values.length == 1 ? values.single : null,
+    ).copyWith(categoryAnyOf: values.length > 1 ? values : const []);
+  }
 
   @override
   void initState() {
@@ -217,22 +222,19 @@ class _ImporterStoreProfileScreenState
         _viewPage = 0;
       }
       final countFn = _source.fetchCount;
+      final filters = _filters;
       final countFuture = reset && countFn != null
-          ? countFn(filters: _filters)
+          ? countFn(filters: filters)
               .then<int?>((value) => value)
               .catchError((_) => null)
           : null;
       final page = await _source.fetchParts(
         limit: _viewPageSize,
         offset: _parts.length,
-        filters: _filters,
+        filters: filters,
       );
       if (!mounted || gen != _loadGen) return;
-      final kept = retainImporterStoreCatalogParts(
-        importerId: widget.importerId,
-        parts: page,
-        category: _selectedCategory,
-      );
+      final kept = constrainCatalogPartsToFilters(page, filters);
       int? matching = _matchingTotal;
       if (countFuture != null) {
         matching = await countFuture;
@@ -596,13 +598,11 @@ class _ImporterStoreProfileScreenState
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (logo.isNotEmpty) ...[
-                  ImporterCatalogLogo(
-                    storagePath: logo,
-                    size: 64,
-                  ),
-                  const SizedBox(width: 12),
-                ],
+                ImporterCatalogLogo(
+                  storagePath: logo,
+                  size: 64,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,6 +732,9 @@ class _ImporterStoreProfileScreenState
   }
 
   Widget _categoryChips() {
+    final families = catalogCategoryFamilies(_categories);
+    final selected = canonicalCatalogCategory(_selectedCategory);
+    final family = selected == null ? null : categoryFamily(selected);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -756,18 +759,36 @@ class _ImporterStoreProfileScreenState
                   onSelected: (_) => _selectCategory(null),
                 ),
               ),
-              for (final c in _categories)
+              for (final group in families)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(c.trim()),
-                    selected: _selectedCategory == c,
-                    onSelected: (_) => _selectCategory(c),
+                    label: Text(catalogCategoryDisplayLabel(group.label)),
+                    selected: family == group.label,
+                    onSelected: (_) => _selectCategory(group.label),
                   ),
                 ),
             ],
           ),
         ),
+        for (final group in families)
+          if (group.label == family && group.children.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Toda la categoría'),
+                  selected: selected == group.label,
+                  onSelected: (_) => _selectCategory(group.label),
+                ),
+                for (final child in group.children)
+                  ChoiceChip(
+                    label: Text(categoryLeaf(child.label)),
+                    selected: selected == child.label,
+                    onSelected: (_) => _selectCategory(child.label),
+                  ),
+              ],
+            ),
       ],
     );
   }

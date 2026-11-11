@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 
-/// Logo del importador en tarjetas de catálogo (solo si tiene foto registrada).
+/// Logo del importador, con un ícono de tienda si no hay foto.
 class ImporterCatalogLogo extends StatefulWidget {
   const ImporterCatalogLogo({
     super.key,
@@ -26,6 +27,7 @@ class ImporterCatalogLogo extends StatefulWidget {
 class _ImporterCatalogLogoState extends State<ImporterCatalogLogo> {
   String? _url;
   bool _failed = false;
+  int _request = 0;
 
   @override
   void initState() {
@@ -42,32 +44,28 @@ class _ImporterCatalogLogoState extends State<ImporterCatalogLogo> {
   }
 
   Future<void> _resolve() async {
+    final request = ++_request;
     final path = widget.storagePath?.trim();
-    if (path == null || path.isEmpty) {
-      if (mounted) setState(() => _url = null);
-      return;
-    }
-
-    final cached = ImporterCatalogLogo._urlCache[path];
-    if (cached != null) {
-      if (mounted) setState(() => _url = cached);
-      return;
-    }
+    _url = path == null ? null : ImporterCatalogLogo._urlCache[path];
+    _failed = false;
+    if (path == null || path.isEmpty || _url != null) return;
 
     try {
       final url = await SupabaseService.createSignedUrlForProfileLogo(path);
       ImporterCatalogLogo._urlCache[path] = url;
-      if (mounted) setState(() => _url = url);
+      if (mounted && request == _request) setState(() => _url = url);
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && request == _request) setState(() => _failed = true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final path = widget.storagePath?.trim();
+    final fallback =
+        widget.fallback ?? BusinessLogoPlaceholder(size: widget.size);
     if (path == null || path.isEmpty || _failed) {
-      return widget.fallback ?? const SizedBox.shrink();
+      return fallback;
     }
 
     final url = _url;
@@ -92,8 +90,7 @@ class _ImporterCatalogLogoState extends State<ImporterCatalogLogo> {
         width: widget.size,
         height: widget.size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
-            widget.fallback ?? const SizedBox.shrink(),
+        errorBuilder: (_, __, ___) => fallback,
       ),
     );
   }

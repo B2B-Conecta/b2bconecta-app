@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 1254 1254">
+  <g fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(627 627) rotate(-45)">
+      <circle cx="-439" cy="0" r="51" stroke-width="28"/>
+      <circle cx="439" cy="0" r="51" stroke-width="28"/>
+      <path d="M-404-37C-378-29-360-34-342-46M-404 37C-378 29-360 34-342 46M341-46C361-34 380-29 404-37M341 46C361 34 380 29 404 37"/>
+      <rect x="-342" y="-86" width="47" height="172" rx="20"/>
+      <rect x="-25" y="-91" width="57" height="182" rx="18"/>
+      <rect x="293" y="-82" width="48" height="164" rx="18"/>
+      <path d="M32-61H293M32 61H293"/>
+      <path d="M-296-39L-268-39M-241-38L-215-38M-190-38L-164-38M-139-38L-113-38M-88-38L-63-38M-38-38L-25-38M-296 39L-268 39M-241 39L-215 39M-190 39L-164 39M-139 39L-113 39M-88 39L-63 39M-38 39L-25 39"/>
+      <rect x="-265" y="-77" width="27" height="154" rx="13.5" transform="rotate(-8 -251.5 0)"/>
+      <rect x="-214" y="-77" width="27" height="154" rx="13.5" transform="rotate(-8 -200.5 0)"/>
+      <rect x="-163" y="-77" width="27" height="154" rx="13.5" transform="rotate(-8 -149.5 0)"/>
+      <rect x="-112" y="-77" width="27" height="154" rx="13.5" transform="rotate(-8 -98.5 0)"/>
+      <rect x="-61" y="-77" width="27" height="154" rx="13.5" transform="rotate(-8 -47.5 0)"/>
+    </g>
+  </g>
+</svg>

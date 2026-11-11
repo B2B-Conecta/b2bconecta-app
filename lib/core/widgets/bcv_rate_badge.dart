@@ -31,7 +31,19 @@ String _formatTime12h(DateTime d) {
 
 /// Icono de tasa BCV en la barra superior; al tocarlo muestra el detalle.
 class BcvRateBadge extends StatefulWidget {
-  const BcvRateBadge({super.key});
+  const BcvRateBadge(
+      {super.key,
+      this.iconColor,
+      this.icon = Icons.currency_exchange,
+      this.iconWidget,
+      this.alwaysVisible = false,
+      this.size = HeaderIconButton.slot});
+
+  final Color? iconColor;
+  final IconData icon;
+  final Widget? iconWidget;
+  final bool alwaysVisible;
+  final Size size;
 
   @override
   State<BcvRateBadge> createState() => _BcvRateBadgeState();
@@ -134,16 +146,23 @@ class _BcvRateBadgeState extends State<BcvRateBadge>
   @override
   Widget build(BuildContext context) {
     final tasa = _tasa;
-    if (_loading && (tasa == null || tasa <= 0)) {
+    if (!widget.alwaysVisible && _loading && (tasa == null || tasa <= 0)) {
       return SizedBox.fromSize(size: HeaderIconButton.slot);
     }
-    if (tasa == null || tasa <= 0) return const SizedBox.shrink();
+    if (!widget.alwaysVisible && (tasa == null || tasa <= 0)) {
+      return const SizedBox.shrink();
+    }
 
-    final tip = 'BCV ${formatBsLabel(tasa)} · Ver detalle';
+    final tip = tasa != null && tasa > 0
+        ? 'BCV ${formatBsLabel(tasa)} · Ver detalle'
+        : 'Consultar tasa BCV';
     return HeaderIconButton(
       tooltip: tip,
       onPressed: _openDetails,
-      icon: Icons.currency_exchange,
+      icon: widget.icon,
+      iconWidget: widget.iconWidget,
+      iconColor: widget.iconColor,
+      size: widget.size,
     );
   }
 }
@@ -178,7 +197,7 @@ class _BcvRateDetails extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '1 USD / REF = ${formatBsLabel(tasa, fractionDigits: 4)}',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
             color: AppColors.brand,

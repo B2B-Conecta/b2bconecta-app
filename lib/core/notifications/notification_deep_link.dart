@@ -115,7 +115,7 @@ void navigateFromNotificationPayload({
     }
   }
   if (t0 == 'catalogo' && homeRole == AppHomeRole.aliado) {
-    MainShellTabController.navigateToHomeTab();
+    MainShellTabController.navigateToAliadoCatalog();
     return;
   }
   if (t0 == 'promocion' || t0 == 'inventario') {

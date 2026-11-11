@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'importer_shell_tabs.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_home_dashboard.dart';
+import 'package:motolink_pro_app/features/dashboard/aliado_home_dashboard.dart';
+import 'package:motolink_pro_app/features/reputation/reputation_overview.dart';
 import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -70,6 +72,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _tabIndex = 0;
   final _visitedImporterTabs = <int>{ImporterShellTabs.inicio};
+  final _visitedAliadoTabs = <int>{AliadoShellTabs.inicio};
   late ProfileModel _profile;
   late final NotificationProvider _notifications;
   bool _showAliadoAccessApprovedBanner = false;
@@ -97,6 +100,8 @@ class _MainShellState extends State<MainShell> {
           _tabIndex = index;
           if (widget.homeRole == AppHomeRole.importador) {
             _visitedImporterTabs.add(index);
+          } else if (widget.homeRole == AppHomeRole.aliado) {
+            _visitedAliadoTabs.add(index);
           }
         });
       }
@@ -106,12 +111,13 @@ class _MainShellState extends State<MainShell> {
       _notifications.reload();
     });
     if (widget.homeRole == AppHomeRole.aliado) {
-      _tabIndex = AliadoShellTabs.catalogo;
+      _tabIndex = AliadoShellTabs.inicio;
       MainShellTabController.registerB2BNavigation(
-        home: AliadoShellTabs.catalogo,
+        home: AliadoShellTabs.inicio,
         pedidos: AliadoShellTabs.pedidos,
-        reputation: AliadoShellTabs.reputacion,
+        reputation: AliadoShellTabs.perfil,
         profile: AliadoShellTabs.perfil,
+        onReputation: _openAliadoReputation,
       );
       unawaited(_loadAliadoFavorites());
     } else if (widget.homeRole == AppHomeRole.importador) {
@@ -319,6 +325,15 @@ class _MainShellState extends State<MainShell> {
 
   static const _aliadoDestinations = <ShellDestination>[
     ShellDestination(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      label: 'Inicio',
+      title: 'Inicio',
+      subtitle: 'Descubre · compra · repón',
+      compactHeaderOnScroll: true,
+      bottomContentPadding: 8,
+    ),
+    ShellDestination(
       icon: Icons.shopping_cart_outlined,
       selectedIcon: Icons.shopping_cart,
       label: 'Pedidos',
@@ -326,13 +341,6 @@ class _MainShellState extends State<MainShell> {
       subtitle: 'En curso · entregas',
       bottomContentPadding: 8,
       compactHeaderOnScroll: true,
-    ),
-    ShellDestination(
-      icon: Icons.star_outline,
-      selectedIcon: Icons.star,
-      label: 'Reputación',
-      title: 'Reputación',
-      subtitle: 'Valoraciones · resumen',
     ),
     ShellDestination(
       icon: Icons.grid_view_outlined,
@@ -588,6 +596,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _tabIndex = i;
       if (role == AppHomeRole.importador) _visitedImporterTabs.add(i);
+      if (role == AppHomeRole.aliado) _visitedAliadoTabs.add(i);
     });
     if (role == AppHomeRole.aliado) {
       if (i == AliadoShellTabs.pedidos) {
@@ -596,7 +605,7 @@ class _MainShellState extends State<MainShell> {
       if (i == AliadoShellTabs.favoritos) {
         unawaited(_loadAliadoFavorites());
       }
-      if (i == AliadoShellTabs.reputacion || i == AliadoShellTabs.perfil) {
+      if (i == AliadoShellTabs.perfil) {
         unawaited(_refreshProfile());
       }
       return;
@@ -631,7 +640,8 @@ class _MainShellState extends State<MainShell> {
                 unreadNotifications: _notifications.unreadCount,
                 onMessagesTap: _openMessagesInbox,
                 unreadMessages: _notifications.unreadChatCount),
-        body: ImporterHomeDashboard(profile: _profile, embedInDesktopShell: desktop),
+        body: ImporterHomeDashboard(
+            profile: _profile, embedInDesktopShell: desktop),
       ),
       if (_visitedImporterTabs.contains(ImporterShellTabs.inventario))
         HomeScreen(
@@ -679,7 +689,16 @@ class _MainShellState extends State<MainShell> {
 
   List<Widget> _aliadoPages({required bool desktop}) {
     final embedded = desktop;
-    return [
+    final pages = <Widget>[
+      AliadoHomeDashboard(
+        profile: _profile,
+        isActiveTab: _tabIndex == AliadoShellTabs.inicio,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        embedInDesktopShell: embedded,
+      ),
       _OrdersTab(
         profile: _profile,
         homeRole: AppHomeRole.aliado,
@@ -689,19 +708,10 @@ class _MainShellState extends State<MainShell> {
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
-      ReputationTab(
-        profile: _profile,
-        homeRole: AppHomeRole.aliado,
-        onNotificationTap: _openNotificationCenter,
-        unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: _openMessagesInbox,
-        unreadMessages: _notifications.unreadChatCount,
-        onProfileRefresh: _refreshProfile,
-        embedInDesktopShell: embedded,
-      ),
       HomeScreen(
         profile: _profile,
         homeRole: AppHomeRole.aliado,
+        isActiveTab: _tabIndex == AliadoShellTabs.catalogo,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
         onMessagesTap: _openMessagesInbox,
@@ -727,6 +737,26 @@ class _MainShellState extends State<MainShell> {
         embedInDesktopShell: embedded,
       ),
     ];
+    return [
+      for (var i = 0; i < pages.length; i++)
+        _visitedAliadoTabs.contains(i) ? pages[i] : const SizedBox.shrink()
+    ];
+  }
+
+  void _openAliadoReputation() {
+    Navigator.of(context).push<void>(MaterialPageRoute(
+        builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Mi reputación')),
+              body: StatefulBuilder(
+                  builder: (context, update) => ReputationOverview(
+                      profile: _profile,
+                      isImporter: false,
+                      showHeading: false,
+                      onProfileRefresh: () async {
+                        await _refreshProfile();
+                        if (context.mounted) update(() {});
+                      })),
+            )));
   }
 
   Widget _buildB2bDesktopShell({
@@ -789,6 +819,8 @@ class _MainShellState extends State<MainShell> {
       builder: (context, _) {
         AppColors.brightness = ThemeController.instance.effectiveBrightness;
         return Scaffold(
+          extendBody:
+              role == AppHomeRole.aliado && _tabIndex == AliadoShellTabs.inicio,
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -855,27 +887,12 @@ class _MainShellState extends State<MainShell> {
         }
         return _buildB2bMobileShell(
           role: AppHomeRole.aliado,
-          navItems: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view),
-              label: 'Catálogo',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_outlined),
-              activeIcon: Icon(Icons.shopping_cart),
-              label: 'Pedidos',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.star_outline),
-              activeIcon: Icon(Icons.star),
-              label: 'Reputación',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
-            ),
+          navItems: [
+            for (final destination in _aliadoDestinations)
+              BottomNavigationBarItem(
+                  icon: Icon(destination.icon),
+                  activeIcon: Icon(destination.selectedIcon),
+                  label: destination.label)
           ],
         );
       },
@@ -891,7 +908,8 @@ class _MainShellState extends State<MainShell> {
             role: AppHomeRole.importador,
             destinations: _importadorDestinations,
             railBadgeLabel: 'Panel importador',
-            railStatusBuilder: (extended) => ImporterStoreCountCard(extended: extended),
+            railStatusBuilder: (extended) =>
+                ImporterStoreCountCard(extended: extended),
           );
         }
         return _buildB2bMobileShell(
@@ -1147,21 +1165,22 @@ class _ProfileTabState extends State<_ProfileTab> {
               unreadNotifications: widget.unreadNotifications,
               onMessagesTap: widget.onMessagesTap,
               unreadMessages: widget.unreadMessages,
-              extraActions: widget.profile.hasActiveAccountAccess && showSupportEntry
-                  ? const []
-                  : [
-                HeaderIconButton(
-                  tooltip: 'Ajustes',
-                  icon: Icons.settings_outlined,
-                  onPressed: () {
-                    Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const AccountSettingsScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
+              extraActions:
+                  widget.profile.hasActiveAccountAccess && showSupportEntry
+                      ? const []
+                      : [
+                          HeaderIconButton(
+                            tooltip: 'Ajustes',
+                            icon: Icons.settings_outlined,
+                            onPressed: () {
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const AccountSettingsScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
             ),
       body: SafeArea(
         top: !widget.embedInDesktopShell,
@@ -1176,9 +1195,7 @@ class _ProfileTabState extends State<_ProfileTab> {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: widget.embedInDesktopShell
-                    ? 1120
-                    : double.infinity,
+                maxWidth: widget.embedInDesktopShell ? 1120 : double.infinity,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1187,7 +1204,8 @@ class _ProfileTabState extends State<_ProfileTab> {
                     summaryFirst: true,
                     accountActionsInShell: widget.embedInDesktopShell,
                     overviewSupport: showSupportEntry
-                        ? _buildSupportEntryCard(inProfileGroup: widget.embedInDesktopShell)
+                        ? _buildSupportEntryCard(
+                            inProfileGroup: widget.embedInDesktopShell)
                         : null,
                     key: ValueKey<Object>(
                       '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
@@ -1201,9 +1219,8 @@ class _ProfileTabState extends State<_ProfileTab> {
                             widget.homeRole == AppHomeRole.aliado
                         ? _buildSupportEntryCard()
                         : null,
-                    afterReputation: showSupportEntry
-                        ? _buildSupportEntryCard()
-                        : null,
+                    afterReputation:
+                        showSupportEntry ? _buildSupportEntryCard() : null,
                   ),
                 ],
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'aliado_catalog_categories.dart';
+import 'catalog_taxonomy.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'aliado_catalog_quick_filters.dart';
 import 'aliado_product_card.dart';
@@ -30,6 +31,7 @@ import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'product_detail_screen.dart';
 import 'sliver_catalog_card_rows.dart';
 import 'catalog_browse_layout.dart';
+import '../../app/main_shell_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -41,6 +43,7 @@ class HomeScreen extends StatefulWidget {
     this.unreadNotifications = 0,
     this.unreadMessages = 0,
     this.embedInDesktopShell = false,
+    this.isActiveTab = true,
   });
 
   final ProfileModel profile;
@@ -52,6 +55,7 @@ class HomeScreen extends StatefulWidget {
 
   /// Sin AppBar propio cuando el shell de escritorio provee chrome.
   final bool embedInDesktopShell;
+  final bool isActiveTab;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -69,11 +73,11 @@ class _HomeScreenState extends State<HomeScreen>
   final List<PartModel> _loadedParts = <PartModel>[];
   bool _hasMoreProducts = true;
   bool _isLoadingMore = false;
+  int _productsGeneration = 0;
   int? _catalogTotal;
   CatalogFilters _activeFilters = CatalogFilters.empty;
   Set<String> _selectedImporterIds = {};
   String _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel;
-  List<String> _catalogCategories = const [];
   List<AliadoCatalogCategoryGroup> _categoryGroups = const [];
 
   late final TextEditingController _searchController;
@@ -119,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen>
       _partsFuture = _fetchProducts(reset: true);
       _refreshCatalogTotal();
       _loadCatalogCategories();
+      MainShellTabController.registerAliadoCatalog(_consumeHomeRequest);
     } else if (widget.homeRole == AppHomeRole.administrador) {
       _importersFuture = Future.value(const []);
       _promoFuture = Future.value(const []);
@@ -132,6 +137,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    if (widget.homeRole == AppHomeRole.aliado) {
+      MainShellTabController.registerAliadoCatalog(null);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _catalogScrollController.removeListener(_onCatalogScroll);
     _searchController.dispose();
@@ -143,14 +151,60 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  Future<void> _refreshCatalogTotal() async {
+  void _consumeHomeRequest() {
+    final request = MainShellTabController.consumeAliadoCatalogRequest();
+    if (!mounted || request == null) return;
+    final f = request.filters;
+    _searchController.text = f.searchQuery ?? '';
+    _minPriceController.text = f.minPrice?.toString() ?? '';
+    _maxPriceController.text = f.maxPrice?.toString() ?? '';
+    _ownerEstadoFilterController.text = f.ownerEstado ?? '';
+    _ownerCiudadFilterController.text = f.ownerCiudad ?? '';
+    setState(() {
+      _selectedImporterIds = f.effectiveOwnerIds.toSet();
+      _selectedCategoryLabel = canonicalCatalogCategory(f.category) ??
+          f.category ??
+          (f.categoryAnyOf.isEmpty
+              ? kAliadoCatalogAllCategoriesLabel
+              : categoryFamily(
+                  canonicalCatalogCategory(f.categoryAnyOf.first) ??
+                      f.categoryAnyOf.first));
+      _catalogSortMode = f.sortMode;
+      _minOwnerRatingAvg = f.minOwnerRatingAvg;
+      _minOwnerRatingCount = f.minOwnerRatingCount;
+      _onlyWithCommercialDiscount =
+          f.onlyWithCommercialDiscount || f.onlyUsdPromotion;
+      _onlyEnvioIncluido = f.onlyEnvioIncluido;
+      _activeFilters = f;
+      _partsFuture = _fetchProducts(reset: true);
+    });
+    _refreshCatalogTotal();
+    if (_catalogScrollController.hasClients) _catalogScrollController.jumpTo(0);
+    if (request.campaign != null) _onPromoCampaignSelected(request.campaign!);
+    if (request.openFilters) _openFiltersFromInicio();
+  }
+
+  Future<void> _openFiltersFromInicio() async {
     try {
-      final n =
-          await SupabaseService.fetchProductsCount(filters: _activeFilters);
-      if (!mounted) return;
-      setState(() => _catalogTotal = n);
+      final importers = await _importersFuture;
+      if (mounted && widget.isActiveTab) {
+        await _openCatalogFiltersSheet(importers);
+      }
     } catch (_) {
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudieron abrir los filtros.')));
+    }
+  }
+
+  Future<void> _refreshCatalogTotal() async {
+    final filters = _activeFilters;
+    try {
+      final n = await SupabaseService.fetchProductsCount(filters: filters);
+      if (!mounted || !identical(filters, _activeFilters)) return;
+      setState(() => _catalogTotal = n);
+    } catch (_) {
+      if (!mounted || !identical(filters, _activeFilters)) return;
       setState(() => _catalogTotal = null);
     }
   }
@@ -188,6 +242,7 @@ class _HomeScreenState extends State<HomeScreen>
       onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
       onlyUsdPromotion: _onlyWithCommercialDiscount,
       onlyEnvioIncluido: _onlyEnvioIncluido,
+      brandField: _activeFilters.brandField,
     );
   }
 
@@ -537,25 +592,20 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       final rows = await SupabaseService.fetchAliadoCatalogCategories();
       if (!mounted) return;
-      final groups = groupAliadoCatalogCategories(rows);
+      final groups = catalogCategoryFamilies(rows);
       setState(() {
         _categoryGroups = groups;
-        _catalogCategories = [for (final group in groups) group.label];
       });
     } catch (_) {}
   }
 
   List<String> _categoryValuesFor(String label) {
-    final wanted = label.trim();
-    if (wanted.isEmpty || wanted == kAliadoCatalogAllCategoriesLabel) {
-      return const [];
+    if (_categoryGroups.isEmpty &&
+        _activeFilters.category == label &&
+        _activeFilters.categoryAnyOf.isNotEmpty) {
+      return _activeFilters.categoryAnyOf;
     }
-    for (final group in _categoryGroups) {
-      if (group.label == wanted || group.values.contains(wanted)) {
-        return group.values;
-      }
-    }
-    return [wanted];
+    return catalogValuesForSelection(_categoryGroups, label);
   }
 
   /// Proveedores con al menos un producto publicado. El resto no aparece
@@ -573,12 +623,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _openCatalogFiltersSheet(List<ImporterOption> importers) async {
     await _loadCatalogCategories();
-    if (!mounted) return;
+    if (!mounted || !widget.isActiveTab) return;
     final result = await AliadoCatalogFiltersSheet.show(
       context,
       initial: _currentFiltersDraft(),
       importers: importers,
-      categories: _catalogCategories,
+      categoryGroups: _categoryGroups,
       onOpenImporterStore: (id) {
         CatalogRouteLock.push(
           context,
@@ -597,6 +647,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<List<PartModel>> _fetchProducts({required bool reset}) async {
     if (reset) {
+      _productsGeneration++;
+      _isLoadingMore = false;
       _loadedParts.clear();
       _hasMoreProducts = true;
       if (_catalogScrollController.hasClients) {
@@ -606,11 +658,17 @@ class _HomeScreenState extends State<HomeScreen>
     if (!_hasMoreProducts) return List<PartModel>.unmodifiable(_loadedParts);
 
     final batch = _catalogPageSize;
+    final generation = _productsGeneration;
     final nextBatch = await SupabaseService.fetchParts(
       limit: batch,
       offset: _loadedParts.length,
       filters: _activeFilters,
     );
+
+    // Una búsqueda nueva invalida las cargas anteriores, incluida la inicial.
+    if (!mounted || generation != _productsGeneration) {
+      return List<PartModel>.unmodifiable(_loadedParts);
+    }
 
     if (nextBatch.length < batch) {
       _hasMoreProducts = false;
@@ -632,10 +690,11 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted || widget.homeRole != AppHomeRole.aliado) return;
     if (_isLoadingMore || !_hasMoreProducts || _loadedParts.isEmpty) return;
     setState(() => _isLoadingMore = true);
+    final generation = _productsGeneration;
     try {
       await _fetchProducts(reset: false);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _productsGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No se pudieron cargar más productos.'),
@@ -643,7 +702,9 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoadingMore = false);
+      if (mounted && generation == _productsGeneration) {
+        setState(() => _isLoadingMore = false);
+      }
     }
   }
 
@@ -924,9 +985,25 @@ class _HomeScreenState extends State<HomeScreen>
                 quickFilters: widget.homeRole == AppHomeRole.aliado
                     ? Padding(
                         padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
-                        child: AliadoCatalogQuickFilters(
-                          selected: _selectedQuickFilter,
-                          onSelected: _selectQuickFilter,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AliadoCatalogQuickFilters(
+                              selected: _selectedQuickFilter,
+                              onSelected: _selectQuickFilter,
+                            ),
+                            if (_activeFilters.brandField case final brand?)
+                              InputChip(
+                                label: Text(brand.value,
+                                    overflow: TextOverflow.ellipsis),
+                                onDeleted: () {
+                                  _activeFilters = CatalogFilters.empty;
+                                  _applyFiltersFromUi();
+                                },
+                                deleteButtonTooltipMessage:
+                                    'Quitar filtro de marca',
+                              ),
+                          ],
                         ),
                       )
                     : null,
@@ -1025,7 +1102,8 @@ class _HomeScreenState extends State<HomeScreen>
                           if (promos.isNotEmpty)
                             AliadoPromoBannerCarousel(
                               campaigns: promos,
-                              onViewAll: () => _openActivePromotionsSheet(promos),
+                              onViewAll: () =>
+                                  _openActivePromotionsSheet(promos),
                               onPromoCampaignSelected: _onPromoCampaignSelected,
                               compact: isDesktopCatalog,
                             ),
@@ -1068,7 +1146,8 @@ class _HomeScreenState extends State<HomeScreen>
                           SliverToBoxAdapter(
                             child: AliadoPromoBannerCarousel(
                               campaigns: promos,
-                              onViewAll: () => _openActivePromotionsSheet(promos),
+                              onViewAll: () =>
+                                  _openActivePromotionsSheet(promos),
                               onPromoCampaignSelected: _onPromoCampaignSelected,
                               compact: isDesktopCatalog,
                             ),

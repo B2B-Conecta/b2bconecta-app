@@ -22,7 +22,9 @@ flutter precache --web
 flutter pub get
 
 echo "==> Building Flutter web (release)"
-flutter build web --release
+# Flutter 3.24 CanvasKit can leave decoded Chromium VideoFrames unclosed.
+# Use CanvasKit's own image codecs until the engine is upgraded and verified.
+flutter build web --release --dart-define=BROWSER_IMAGE_DECODING_ENABLED=false
 
 bash "$ROOT_DIR/scripts/inject_web_push_sw.sh"
 

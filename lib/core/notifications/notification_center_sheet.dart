@@ -387,8 +387,11 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
         bg = AppColors.brand;
         break;
       case 'soporte':
-        glyph = const Icon(Icons.support_agent_outlined,
-            color: Colors.white, size: 18);
+        glyph = const LucideIcon(
+          LucideGlyph.headset,
+          size: 18,
+          color: Colors.white,
+        );
         bg = Colors.blue.shade700;
         break;
       default:

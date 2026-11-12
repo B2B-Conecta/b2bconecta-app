@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'order_list_colors.dart';
 import 'order_message_attachment.dart';
 import 'order_message_media.dart';
 import 'order_message_pick.dart';
@@ -792,12 +793,12 @@ class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
                     FilledButton(
                       onPressed: _saving ? null : _register,
                       child: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: OrderListColors.of(context).onAccent,
                               ),
                             )
                           : Text(OrderPostventaKind.actionLabel(widget.kind)),
@@ -932,8 +933,8 @@ class _OrderReturnRequestScreenState extends State<OrderReturnRequestScreen> {
                     onPressed: _saving ? null : () => _removeEvidence(index),
                     icon: const Icon(Icons.close, size: 16),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.card,
-                      foregroundColor: AppColors.textPrimary,
+                      backgroundColor: OrderListColors.of(context).surface,
+                      foregroundColor: OrderListColors.of(context).ink,
                     ),
                   ),
                 ),
@@ -963,8 +964,9 @@ class _PreferenceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = OrderListColors.of(context);
     return Material(
-      color: selected ? AppColors.brandBlueContainer : AppColors.card,
+      color: selected ? colors.theme.brandContainer : colors.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -1146,6 +1148,7 @@ class _ResolutionNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = OrderListColors.of(context);
     final String text;
     if (resolution == OrderPostventaKind.credito) {
       text =
@@ -1163,9 +1166,9 @@ class _ResolutionNote extends StatelessWidget {
     }
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(color: colors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1175,7 +1178,7 @@ class _ResolutionNote extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 13,
             height: 1.35,
-            color: AppColors.textPrimary,
+            color: colors.ink,
           ),
         ),
       ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 /// Burbuja circular: menú con iconos **claro** / **oscuro**.
@@ -30,7 +30,8 @@ class ThemeModeBubble extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final mode = controller.mode;
-        final scheme = Theme.of(context).colorScheme;
+        final theme = B2BThemeExtension.of(context);
+        final onBrand = Theme.of(context).colorScheme.onPrimary;
         return PopupMenuButton<ThemeMode>(
           tooltip: 'Claro / Oscuro',
           padding: EdgeInsets.zero,
@@ -38,15 +39,16 @@ class ThemeModeBubble extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 52, maxWidth: 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: AppColors.borderSubtle),
+            side: BorderSide(color: theme.border),
           ),
-          color: AppColors.card,
+          color: theme.dialogSurface,
           onOpened: () => FocusManager.instance.primaryFocus?.unfocus(),
           onSelected: (m) {
             FocusManager.instance.primaryFocus?.unfocus();
             controller.setMode(m);
           },
           itemBuilder: (context) {
+            final menuTheme = B2BThemeExtension.of(context);
             return [
               for (final m in _modes)
                 PopupMenuItem<ThemeMode>(
@@ -62,11 +64,11 @@ class ThemeModeBubble extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: mode == m
-                              ? AppColors.brandAccent.withOpacity(0.16)
+                              ? menuTheme.brandContainer
                               : Colors.transparent,
                           border: mode == m
                               ? Border.all(
-                                  color: AppColors.brandAccent,
+                                  color: menuTheme.brand,
                                   width: 1.5,
                                 )
                               : null,
@@ -75,8 +77,8 @@ class ThemeModeBubble extends StatelessWidget {
                           _icon(m),
                           size: 20,
                           color: mode == m
-                              ? AppColors.brandAccent
-                              : AppColors.textPrimary,
+                              ? menuTheme.brand
+                              : menuTheme.textPrimary,
                         ),
                       ),
                     ),
@@ -91,19 +93,19 @@ class ThemeModeBubble extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: iconColor != null
-                  ? AppColors.white.withOpacity(0.14)
-                  : AppColors.fieldFill,
+                  ? onBrand.withOpacity(0.14)
+                  : theme.inputFill,
               border: Border.all(
                 color: iconColor != null
-                    ? AppColors.white.withOpacity(0.28)
-                    : AppColors.borderSubtle,
+                    ? onBrand.withOpacity(0.28)
+                    : theme.border,
                 width: 1.2,
               ),
               boxShadow: iconColor != null
                   ? null
                   : [
                       BoxShadow(
-                        color: AppColors.black.withOpacity(0.08),
+                        color: theme.textPrimary.withOpacity(0.08),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -112,8 +114,7 @@ class ThemeModeBubble extends StatelessWidget {
             child: Icon(
               controller.currentIcon,
               size: compact ? 18 : 20,
-              color: iconColor ??
-                  (controller.isDark ? scheme.primary : AppColors.brandBlue),
+              color: iconColor ?? theme.brand,
             ),
           ),
         );

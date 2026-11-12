@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 /// Icono de cabecera con el mismo tamaño y la misma pastilla de conteo.
@@ -28,13 +28,9 @@ class HeaderIconButton extends StatelessWidget {
 
   static const slot = Size(40, 40);
 
-  /// Color legible en la barra superior según el modo elegido (no [Theme.of],
-  /// que a veces va un frame atrasado respecto a [AppColors] al cambiar tono).
-  static Color defaultIconColor() {
-    final dark = ThemeController.instance.isDark;
-    return dark
-        ? AppColors.white.withOpacity(0.88)
-        : AppColors.black.withOpacity(0.72);
+  /// Color de icono de cabecera según el tema activo.
+  static Color defaultIconColor(BuildContext context) {
+    return B2BThemeExtension.of(context).textPrimary;
   }
 
   @override
@@ -43,7 +39,8 @@ class HeaderIconButton extends StatelessWidget {
     return ListenableBuilder(
       listenable: ThemeController.instance,
       builder: (context, _) {
-        final color = iconColor ?? defaultIconColor();
+        final theme = B2BThemeExtension.of(context);
+        final color = iconColor ?? defaultIconColor(context);
         return IconTheme(
           data: IconThemeData(color: color, size: 22),
           child: IconButton(
@@ -59,13 +56,13 @@ class HeaderIconButton extends StatelessWidget {
             ),
             icon: Badge(
               isLabelVisible: unread > 0,
-              backgroundColor: badgeColor ?? AppColors.brand,
+              backgroundColor: badgeColor ?? theme.brand,
               largeSize: 16,
               padding: const EdgeInsets.symmetric(horizontal: 3),
               label: Text(
                 unread > 9 ? '9+' : '$unread',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.surfaceCard,
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   height: 1,

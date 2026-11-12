@@ -21,10 +21,23 @@ String ratingValueLabelEs(int value) {
   }
 }
 
+/// Escala de tono: 1 rojo → 3 ámbar → 5 verde (legible en claro y oscuro).
 Color ratingValueColor(int value) {
   final t = ((value.clamp(1, 5) - 1) / 4).toDouble();
-  return Color.lerp(const Color(0xFFE53935), const Color(0xFFFF9800), t) ??
-      const Color(0xFFE53935);
+  if (t <= 0.5) {
+    return Color.lerp(
+          const Color(0xFFDC2626),
+          const Color(0xFFCA8A04),
+          t * 2,
+        ) ??
+        const Color(0xFFDC2626);
+  }
+  return Color.lerp(
+        const Color(0xFFCA8A04),
+        const Color(0xFF16A34A),
+        (t - 0.5) * 2,
+      ) ??
+      const Color(0xFF16A34A);
 }
 
 /// Promedio simple redondeado (misma regla que `resolve_rating_submission` en BD).

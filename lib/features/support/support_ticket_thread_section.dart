@@ -168,7 +168,7 @@ class _SupportTicketThreadSectionState
                           title: 'Conversa con B2B Conecta',
                           description:
                               'Aquí puedes consultar y seguir tu reclamo.',
-                          icon: Icons.support_agent_outlined,
+                          icon: Icons.headset_mic_outlined,
                         )
                       : ChatTimeline(
                           itemCount: _items.length,

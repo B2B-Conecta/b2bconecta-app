@@ -185,9 +185,9 @@ class OrdersService {
     flete_pago_aprobado_at,
     created_at,
     updated_at,
-    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status ),
+    aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at ),
     importer_carrier:importer_carriers!transaction_requests_importer_carrier_id_fkey ( company_name, contact_phone, flete_pago_modo, accepted_pago_metodos, pago_metodo_instrucciones ),
-    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, accepted_pago_metodos, pago_metodo_instrucciones, pago_solo_divisas )
+    importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at, accepted_pago_metodos, pago_metodo_instrucciones, pago_solo_divisas )
   ''';
 
   static String get _trSelectForListWithSubs => _trSelectMotoconecta;
@@ -330,6 +330,19 @@ class OrdersService {
         .map((row) => TransactionRequestModel.fromJson(
             Map<String, dynamic>.from(row as Map)))
         .toList();
+  }
+
+  /// Conteo ligero de pedidos operativos activos (badge del rail admin).
+  static Future<int> countActiveTransactionRequestsForAdmin() async {
+    final res = await SupabaseAccess.client
+        .from('transaction_requests')
+        .select('id')
+        .inFilter(
+          'status',
+          TransactionRequestStatus.motoconectaAdminOperationalActive,
+        )
+        .count(CountOption.exact);
+    return (res as PostgrestResponse<dynamic>).count;
   }
 
   /// Pedidos cerrados: entregados o rechazados (admin).

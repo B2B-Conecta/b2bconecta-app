@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Paleta B2B Conecta — colores oficiales de marca:
-/// - Azul oscuro `#0039A0`
-/// - Tono claro `#0C47FA`
-/// - Negro `#000000` / Blanco `#FFFFFF`
+import 'package:motolink_pro_app/app/theme/app_dark_tokens.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+
+/// Paleta B2B Conecta — claro + oscuro (WCAG 2.1 AA).
 ///
-/// Claros/oscuros derivan de esos cuatro. Verde y ámbar se reservan para
-/// estados funcionales y valoraciones, sin sustituir los colores de marca.
+/// **Claro:** azul marca `#0039A0` / acento `#0C47FA` (legado producto).
+/// **Oscuro:** tokens slate + Blue 500 — ver [AppDarkTokens] y
+/// `docs/DARK_MODE_STYLE_GUIDE.md`.
+///
+/// El panel admin (Cuentas, Ajustes) también usa [AdminUsersChrome], que
+/// reacciona a [brightness] / [AppDarkTokens] en modo oscuro.
 class AppColors {
   AppColors._();
 
@@ -25,79 +29,84 @@ class AppColors {
 
   static Color surfaceTintedFor(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    return dark
-        ? Color.lerp(black, brandBlue, 0.20)!
-        : Color.lerp(white, brandBlue, 0.04)!;
+    return dark ? AppDarkTokens.surfaceElevated : Color.lerp(white, brandBlue, 0.04)!;
   }
 
   static Color textSecondaryFor(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    return dark ? white.withOpacity(0.78) : black.withOpacity(0.62);
+    return dark ? AppDarkTokens.textSecondary : black.withOpacity(0.62);
   }
 
   static Color textMutedFor(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    return dark ? white.withOpacity(0.72) : black.withOpacity(0.48);
+    return dark ? AppDarkTokens.textMuted : black.withOpacity(0.48);
   }
 
   static Color photoFrameFor(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    return dark ? Color.lerp(black, brandBlue, 0.14)! : white;
+    return dark ? AppDarkTokens.surfaceSubtle : white;
   }
 
-  /// Azul oscuro de marca (referencia oficial).
+  /// Azul oscuro de marca (referencia oficial — modo claro / logo).
   static const brandBlue = Color(0xFF0039A0);
 
-  /// Tono claro / acento (referencia oficial).
+  /// Tono claro / acento (referencia oficial — modo claro).
   static const brandAccent = Color(0xFF0C47FA);
   static const black = Color(0xFF000000);
   static const white = Color(0xFFFFFFFF);
 
-  /// CTA primario (= azul cobalto del logo).
+  /// CTA / marca en contextos `const` (= azul cobalto del logo).
+  /// En UI reactiva a tema preferir [brandLink] o `Theme.colorScheme.primary`
+  /// (en oscuro: [AppDarkTokens.brand] Blue 500).
   static const brand = brandBlue;
 
   /// Compat: mismo que [brand].
   static const brandOrange = brand;
 
   /// Enlace / icono de marca legible sobre superficies del tema actual.
-  /// En oscuro usa el acento claro; en claro el azul cobalto.
-  static Color get brandLink => _dark ? brandAccent : brandBlue;
+  static Color get brandLink => _dark ? AppDarkTokens.brand : brandBlue;
 
-  /// Superficie suave: blanco + tinte azul marca (claro) / azul sobre negro (oscuro).
-  static Color get brandBlueContainer => _dark
-      ? Color.lerp(black, brandBlue, 0.35)!
-      : Color.lerp(white, brandBlue, 0.08)!;
+  /// Superficie suave de acento.
+  static Color get brandBlueContainer =>
+      _dark ? AppDarkTokens.brandContainer : Color.lerp(white, brandBlue, 0.08)!;
 
   static Color get background =>
-      _dark ? Color.lerp(black, brandBlue, 0.10)! : white;
+      _dark ? AppDarkTokens.background : white;
 
-  static Color get textPrimary => _dark ? white : black;
+  static Color get textPrimary =>
+      _dark ? AppDarkTokens.textPrimary : black;
 
-  /// Secundario con contraste usable (WCAG-ish) en claro y oscuro.
+  /// Secundario con contraste AA en oscuro (≈ 5.9:1).
   static Color get textSecondary =>
-      _dark ? white.withOpacity(0.78) : black.withOpacity(0.62);
+      _dark ? AppDarkTokens.textSecondary : black.withOpacity(0.62);
 
-  /// Terciario / hints (placeholders); aún legible sobre campos.
+  /// Terciario / hints.
   static Color get textMuted =>
-      _dark ? white.withOpacity(0.72) : black.withOpacity(0.48);
+      _dark ? AppDarkTokens.textMuted : black.withOpacity(0.48);
 
-  /// Relleno de inputs: más hundido que [card] para que se distinga en ambos modos.
-  static Color get fieldFill => _dark
-      ? Color.lerp(black, brandBlue, 0.14)!
-      : Color.lerp(white, brandBlue, 0.07)!;
+  /// Relleno de inputs.
+  static Color get fieldFill =>
+      _dark ? AppDarkTokens.fieldFill : Color.lerp(white, brandBlue, 0.07)!;
 
-  static Color get surfaceTinted => _dark
-      ? Color.lerp(black, brandBlue, 0.20)!
-      : Color.lerp(white, brandBlue, 0.04)!;
+  static Color get surfaceTinted =>
+      _dark ? AppDarkTokens.surfaceElevated : Color.lerp(white, brandBlue, 0.04)!;
 
   /// Tarjetas / paneles elevados sobre el fondo.
-  static Color get card => _dark ? Color.lerp(black, brandBlue, 0.30)! : white;
+  static Color get card => _dark ? AppDarkTokens.surface : white;
+
+  /// Superficie elevada (modales / sheets) en dark; en claro = card.
+  static Color get cardElevated =>
+      _dark ? AppDarkTokens.surfaceElevated : white;
+
+  /// Zebra / filas alternas.
+  static Color get zebra =>
+      _dark ? AppDarkTokens.surfaceSubtle : const Color(0xFFF8FAFC);
 
   static Color get borderSubtle =>
-      _dark ? white.withOpacity(0.28) : brandBlue.withOpacity(0.18);
+      _dark ? AppDarkTokens.borderStrong : brandBlue.withOpacity(0.18);
 
   static Color get divider =>
-      _dark ? white.withOpacity(0.16) : brandBlue.withOpacity(0.12);
+      _dark ? AppDarkTokens.border : brandBlue.withOpacity(0.12);
 
   /// Placeholder / hint legible sobre [fieldFill] en claro y oscuro.
   static TextStyle get hintStyle => TextStyle(
@@ -105,28 +114,41 @@ class AppColors {
         fontWeight: FontWeight.w500,
       );
 
-  /// Éxito funcional (no es color de marca; se mantiene para estados OK).
+  /// Éxito funcional (modo claro).
   static const successGreen = Color(0xFF2E7D32);
 
-  /// Atención funcional y estrella de valoración; legibles en ambos temas.
+  /// Éxito adaptado al tema (texto / iconos).
+  static Color get successForeground =>
+      _dark ? AppDarkTokens.successFg : successGreen;
+
+  /// Atención funcional y estrella de valoración.
   static const warningAmber = Color(0xFF946200);
-  static const warningAmberOnDark = Color(0xFFF2C66D);
+  static const warningAmberOnDark = Color(0xFFFBBF24);
+
+  static Color get warningForeground =>
+      _dark ? AppDarkTokens.warningFg : warningAmber;
+
+  static Color get dangerForeground =>
+      _dark ? AppDarkTokens.dangerFg : const Color(0xFFDC2626);
+
+  static Color get dangerSolid =>
+      _dark ? AppDarkTokens.dangerSolid : const Color(0xFFEF4444);
 
   /// Superficies pastel adaptadas (evita blanco/ámbar claro + texto blanco).
-  static Color get warningSurface => _dark
-      ? Color.lerp(black, warningAmberOnDark, 0.18)!
-      : const Color(0xFFFFF8E1);
+  static Color get warningSurface =>
+      _dark ? AppDarkTokens.warningPill : const Color(0xFFFFF8E1);
 
-  static Color get infoSurface => _dark
-      ? Color.lerp(black, brandAccent, 0.18)!
-      : Color.lerp(white, brandBlue, 0.08)!;
+  static Color get infoSurface =>
+      _dark ? AppDarkTokens.brandContainer : Color.lerp(white, brandBlue, 0.08)!;
 
-  static Color get successSurface => _dark
-      ? Color.lerp(black, successGreen, 0.22)!
-      : const Color(0xFFE8F5E9);
+  static Color get successSurface =>
+      _dark ? AppDarkTokens.successPill : const Color(0xFFE8F5E9);
+
+  static Color get dangerSurface =>
+      _dark ? AppDarkTokens.dangerPill : const Color(0xFFFEE2E2);
 
   static Color get tealSurface => _dark
-      ? Color.lerp(black, const Color(0xFF4DB6AC), 0.20)!
+      ? Color.lerp(AppDarkTokens.surface, const Color(0xFF4DB6AC), 0.20)!
       : const Color(0xFFE0F2F1);
 
   /// Si [color] es un pastel claro en modo oscuro, lo sustituye por [fallback].
@@ -184,7 +206,8 @@ ThemeData buildAppTheme() {
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    scaffoldBackgroundColor: AppColors.white,
+    extensions: const <ThemeExtension<dynamic>>[B2BThemeExtension.light],
+    scaffoldBackgroundColor: const Color(0xFFF8FAFC),
     colorScheme: ColorScheme.light(
       primary: primary,
       onPrimary: AppColors.white,
@@ -197,6 +220,8 @@ ThemeData buildAppTheme() {
       outline: primary.withOpacity(0.18),
       inverseSurface: snackBg,
       onInverseSurface: AppColors.white,
+      error: const Color(0xFFDC2626),
+      onError: AppColors.white,
     ),
     snackBarTheme: _snackBarTheme(
       background: primary,
@@ -274,45 +299,52 @@ ThemeData buildAppTheme() {
   );
 }
 
+/// Tema oscuro B2B Conecta — [AppDarkTokens], toggle Sol/Luna ([ThemeController]).
 ThemeData buildAppDarkTheme() {
-  const primary = AppColors.brandAccent;
-  const brand = AppColors.brandBlue;
-  final scaffold = Color.lerp(AppColors.black, brand, 0.10)!;
-  final surface = Color.lerp(AppColors.black, brand, 0.22)!;
-  final field = Color.lerp(AppColors.black, brand, 0.28)!;
-  // Elevado respecto al scaffold: se lee bien sin el flash blanco de inverseSurface.
-  final snackBg = Color.lerp(AppColors.black, brand, 0.48)!;
+  const primary = AppDarkTokens.brand;
+  const scaffold = AppDarkTokens.background;
+  const surface = AppDarkTokens.surface;
+  const elevated = AppDarkTokens.surfaceElevated;
+  const field = AppDarkTokens.fieldFill;
+  const onSurface = AppDarkTokens.textPrimary;
+  const onVariant = AppDarkTokens.textSecondary;
+  const outline = AppDarkTokens.borderStrong;
+
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    extensions: const <ThemeExtension<dynamic>>[B2BThemeExtension.dark],
     scaffoldBackgroundColor: scaffold,
     colorScheme: ColorScheme.dark(
       primary: primary,
-      onPrimary: AppColors.white,
-      secondary: brand,
-      onSecondary: AppColors.white,
-      secondaryContainer: Color.lerp(AppColors.black, brand, 0.40)!,
-      onSecondaryContainer: AppColors.white,
+      onPrimary: onSurface,
+      secondary: AppDarkTokens.brandBase,
+      onSecondary: onSurface,
+      secondaryContainer: AppDarkTokens.brandContainer,
+      onSecondaryContainer: onSurface,
       surface: surface,
-      onSurface: AppColors.white,
-      onSurfaceVariant: AppColors.white.withOpacity(0.78),
-      outline: AppColors.white.withOpacity(0.22),
-      inverseSurface: snackBg,
-      onInverseSurface: AppColors.white,
+      onSurface: onSurface,
+      onSurfaceVariant: onVariant,
+      surfaceContainerHighest: elevated,
+      outline: outline,
+      inverseSurface: elevated,
+      onInverseSurface: onSurface,
+      error: AppDarkTokens.dangerSolid,
+      onError: onSurface,
     ),
     snackBarTheme: _snackBarTheme(
-      background: snackBg,
-      foreground: AppColors.white,
-      action: const Color(0xFFBCD3FF),
+      background: elevated,
+      foreground: onSurface,
+      action: primary,
     ),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: surface,
-      foregroundColor: AppColors.white,
+      foregroundColor: onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
-      surfaceTintColor: primary.withOpacity(0.12),
-      titleTextStyle: const TextStyle(
-        color: AppColors.white,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: TextStyle(
+        color: onSurface,
         fontSize: 18,
         fontWeight: FontWeight.w700,
       ),
@@ -322,27 +354,44 @@ ThemeData buildAppDarkTheme() {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.white.withOpacity(0.18)),
+        side: const BorderSide(color: AppDarkTokens.border),
       ),
     ),
-    dividerTheme: DividerThemeData(
-      color: AppColors.white.withOpacity(0.16),
+    dividerTheme: const DividerThemeData(
+      color: AppDarkTokens.border,
       thickness: 1,
+    ),
+    dialogTheme: DialogTheme(
+      backgroundColor: elevated,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppDarkTokens.borderStrong),
+      ),
+    ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: elevated,
+      surfaceTintColor: Colors.transparent,
+      modalBackgroundColor: elevated,
+    ),
+    drawerTheme: const DrawerThemeData(
+      backgroundColor: AppDarkTokens.sidebar,
+      surfaceTintColor: Colors.transparent,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: field,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      hintStyle: TextStyle(color: AppColors.white.withOpacity(0.72)),
-      labelStyle: TextStyle(color: AppColors.white.withOpacity(0.78)),
-      prefixIconColor: AppColors.white.withOpacity(0.72),
+      hintStyle: const TextStyle(color: AppDarkTokens.textMuted),
+      labelStyle: const TextStyle(color: AppDarkTokens.textSecondary),
+      prefixIconColor: AppDarkTokens.textSecondary,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.white.withOpacity(0.22)),
+        borderSide: const BorderSide(color: outline),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.white.withOpacity(0.22)),
+        borderSide: const BorderSide(color: outline),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -352,7 +401,7 @@ ThemeData buildAppDarkTheme() {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primary,
-        foregroundColor: AppColors.white,
+        foregroundColor: onSurface,
         elevation: 0,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -362,20 +411,20 @@ ThemeData buildAppDarkTheme() {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: primary,
-        foregroundColor: AppColors.white,
+        foregroundColor: onSurface,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(foregroundColor: primary),
     ),
-    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: surface,
       selectedItemColor: primary,
-      unselectedItemColor: AppColors.white.withOpacity(0.65),
+      unselectedItemColor: AppDarkTokens.textMuted,
       type: BottomNavigationBarType.fixed,
       elevation: 8,
     ),
     cardColor: surface,
-    dividerColor: AppColors.white.withOpacity(0.16),
+    dividerColor: AppDarkTokens.border,
   );
 }

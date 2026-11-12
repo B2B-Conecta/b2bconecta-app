@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/admin/admin_service.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_related_orders.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_status_flow_copy.dart';
@@ -107,6 +108,9 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
   Widget build(BuildContext context) {
     final role = ProfileRoleLabels.labelEs(widget.profile.role);
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AdminUsersChrome.sheetRadius),
+      ),
       title: Text(
         _isHard
             ? OwnerAccountRules.hardDeleteDialogTitle
@@ -119,11 +123,12 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
           children: [
             Text(
               _isHard
-                  ? 'Se elimina la cuenta por completo y el correo queda '
+                  ? 'Purga total: se elimina el registro y el correo queda '
                       'libre para un registro nuevo. No se puede deshacer.\n\n'
                       '$_who · $role'
-                  : 'La cuenta deja de poder entrar. Se conserva el historial '
-                      'y el correo sigue ocupado (no se puede reutilizar).\n\n'
+                  : 'Baja suave: pierde acceso y se congela el historial de '
+                      'pedidos; el correo permanece ocupado para auditoría '
+                      'fiscal. El motivo es obligatorio y queda en el registro.\n\n'
                       '$_who · $role',
             ),
             if (_isHard) ...[
@@ -137,11 +142,13 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
               maxLines: _isHard ? 1 : 3,
               keyboardType:
                   _isHard ? TextInputType.emailAddress : TextInputType.text,
-              decoration: InputDecoration(
-                hintText: _isHard
-                    ? 'Escriba el correo para confirmar…'
-                    : 'Motivo (visible en la cuenta)…',
-                border: const OutlineInputBorder(),
+              decoration: AdminUsersChrome.field(
+                label: _isHard
+                    ? 'Escriba el correo para confirmar'
+                    : 'Motivo de la baja',
+                hint: _isHard
+                    ? 'Doble confirmación de seguridad…'
+                    : 'Visible en el expediente…',
               ),
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _submit(),
@@ -155,7 +162,12 @@ class _OwnerAccountDeleteDialogState extends State<_OwnerAccountDeleteDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.red.shade700,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           onPressed: _canConfirm ? _submit : null,
           child: Text(
             _isHard

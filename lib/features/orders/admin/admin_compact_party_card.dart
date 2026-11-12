@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/admin_collapsible_section.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status_highlight_widgets.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_counterparty_profile_section.dart';
 
@@ -18,6 +19,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
     this.fiscalMapsUrl,
     this.logoStoragePath,
     this.kycStatus,
+    this.catalogVerifiedAt,
   });
 
   final String profileId;
@@ -30,6 +32,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
   final String? fiscalMapsUrl;
   final String? logoStoragePath;
   final String? kycStatus;
+  final DateTime? catalogVerifiedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +41,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
         label: 'Tienda minorista',
         name: businessName,
         kycStatus: kycStatus,
+        catalogVerified: catalogVerifiedAt != null,
       ),
       subtitle: _subtitleWidget(),
       child: TransactionRequestCounterpartyProfileSection(
@@ -52,6 +56,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
         fiscalMapsUrl: fiscalMapsUrl,
         logoStoragePath: logoStoragePath,
         kycStatus: kycStatus,
+        catalogVerifiedAt: catalogVerifiedAt,
         loadApprovedDocuments: true,
       ),
     );
@@ -92,6 +97,7 @@ class AdminCompactImportadorCard extends StatelessWidget {
     this.direccion,
     this.fiscalMapsUrl,
     this.logoStoragePath,
+    this.catalogVerifiedAt,
     this.initiallyExpanded = false,
   });
 
@@ -104,6 +110,7 @@ class AdminCompactImportadorCard extends StatelessWidget {
   final String? direccion;
   final String? fiscalMapsUrl;
   final String? logoStoragePath;
+  final DateTime? catalogVerifiedAt;
   final bool initiallyExpanded;
 
   @override
@@ -113,6 +120,7 @@ class AdminCompactImportadorCard extends StatelessWidget {
       title: _CompactPartyHeader(
         label: 'Importador',
         name: businessName,
+        catalogVerified: catalogVerifiedAt != null,
       ),
       subtitle: _subtitleWidget(),
       child: TransactionRequestCounterpartyProfileSection(
@@ -126,6 +134,7 @@ class AdminCompactImportadorCard extends StatelessWidget {
         direccion: direccion,
         fiscalMapsUrl: fiscalMapsUrl,
         logoStoragePath: logoStoragePath,
+        catalogVerifiedAt: catalogVerifiedAt,
         loadApprovedDocuments: false,
       ),
     );
@@ -158,11 +167,13 @@ class _CompactPartyHeader extends StatelessWidget {
     required this.label,
     required this.name,
     this.kycStatus,
+    this.catalogVerified = false,
   });
 
   final String label;
   final String? name;
   final String? kycStatus;
+  final bool catalogVerified;
 
   @override
   Widget build(BuildContext context) {
@@ -185,9 +196,23 @@ class _CompactPartyHeader extends StatelessWidget {
             fontSize: 13,
           ),
         ),
-        if (kycStatus != null && kycStatus!.trim().isNotEmpty) ...[
+        if (catalogVerified ||
+            (kycStatus != null && kycStatus!.trim().isNotEmpty)) ...[
           const SizedBox(height: 4),
-          KycCompactStatusChip(kycStatus: kycStatus),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (catalogVerified)
+                const ImporterCatalogSealChip(
+                  kind: ImporterCatalogSealKind.verified,
+                  compact: true,
+                ),
+              if (kycStatus != null && kycStatus!.trim().isNotEmpty)
+                KycCompactStatusChip(kycStatus: kycStatus),
+            ],
+          ),
         ],
       ],
     );

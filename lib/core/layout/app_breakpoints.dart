@@ -1,9 +1,15 @@
 /// Anchos de referencia para layouts adaptativos (web / tablet / móvil).
 abstract final class AppBreakpoints {
-  /// Admin en escritorio: barra lateral en lugar de bottom nav.
+  /// Cajón deslizable / hamburguesa: por debajo se oculta el rail fijo.
+  static const double mobileMenu = 768;
+
+  /// Área táctil mínima (Material / accesibilidad).
+  static const double minTouchTarget = 48;
+
+  /// Layouts de contenido “escritorio” (hubs, sheets, formularios anchos).
   static const double adminDesktop = 900;
 
-  /// Aliado / importador en escritorio (mismo umbral que admin).
+  /// Aliado / importador: mismo umbral de contenido ancho.
   static const double b2bDesktop = adminDesktop;
 
   /// NavigationRail extendido con etiquetas largas.

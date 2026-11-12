@@ -5,6 +5,7 @@ import 'support_ticket_model.dart';
 import 'support_ticket_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'support_ticket_detail_screen.dart';
@@ -163,13 +164,22 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
     final summary = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.brandBlueContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(Icons.support_agent_outlined, color: _accent),
+        Builder(
+          builder: (context) {
+            final theme = B2BThemeExtension.of(context);
+            return Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.brandContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: LucideIcon(
+                LucideGlyph.headset,
+                size: 22,
+                color: theme.brand,
+              ),
+            );
+          },
         ),
         const SizedBox(width: 12),
         Expanded(

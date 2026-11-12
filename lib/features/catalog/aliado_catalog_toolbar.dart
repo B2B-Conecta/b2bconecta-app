@@ -6,7 +6,7 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'aliado_catalog_quick_filters.dart';
 import 'catalog_sort_mode.dart';
 
-/// Bloque bajo el encabezado branded: título, chips y meta de resultados/orden.
+/// Bloque bajo el encabezado branded: chips y meta de resultados/orden.
 class AliadoCatalogToolbar extends StatelessWidget {
   const AliadoCatalogToolbar({
     super.key,
@@ -25,8 +25,11 @@ class AliadoCatalogToolbar extends StatelessWidget {
   final VoidCallback onSortTap;
   final Widget? brandChip;
 
-  static const _titleColor = Color(0xFF000000);
   static const _metaColor = Color(0xFF000010);
+
+  /// Altura fija del strip fijado bajo el chrome azul (scroll).
+  static double pinnedHeight({required bool hasBrandChip}) =>
+      12 + 40 + (hasBrandChip ? 40.0 : 0) + 12 + 24 + 8;
 
   @override
   Widget build(BuildContext context) {
@@ -35,17 +38,6 @@ class AliadoCatalogToolbar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Catálogo de repuestos',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
-            height: 1.15,
-            color: _titleColor,
-          ),
-        ),
-        const SizedBox(height: 14),
         AliadoCatalogQuickFilters(
           selected: selectedFilter,
           onSelected: onFilterSelected,
@@ -87,6 +79,74 @@ class AliadoCatalogToolbar extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Filtros/orden pegados bajo el header azul; no se ocultan al scrollear.
+class AliadoCatalogPinnedFiltersHeader extends StatelessWidget {
+  const AliadoCatalogPinnedFiltersHeader({
+    super.key,
+    required this.horizontalPadding,
+    required this.child,
+    this.hasBrandChip = false,
+  });
+
+  final double horizontalPadding;
+  final Widget child;
+  final bool hasBrandChip;
+
+  @override
+  Widget build(BuildContext context) {
+    final height =
+        AliadoCatalogToolbar.pinnedHeight(hasBrandChip: hasBrandChip);
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _AliadoCatalogPinnedFiltersDelegate(
+        height: height,
+        horizontalPadding: horizontalPadding,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _AliadoCatalogPinnedFiltersDelegate
+    extends SliverPersistentHeaderDelegate {
+  _AliadoCatalogPinnedFiltersDelegate({
+    required this.height,
+    required this.horizontalPadding,
+    required this.child,
+  });
+
+  final double height;
+  final double horizontalPadding;
+  final Widget child;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(
+      color: AppColors.background,
+      elevation: overlapsContent ? 1.5 : 0,
+      shadowColor: AppColors.black.withOpacity(0.08),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+            horizontalPadding, 12, horizontalPadding, 8),
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _AliadoCatalogPinnedFiltersDelegate old) =>
+      height != old.height ||
+      horizontalPadding != old.horizontalPadding ||
+      child != old.child;
 }
 
 Future<CatalogSortMode?> showAliadoCatalogSortSheet({

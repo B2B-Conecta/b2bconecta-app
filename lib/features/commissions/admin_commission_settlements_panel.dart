@@ -7,22 +7,29 @@ import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 import 'commission_collected_income_card.dart';
 import 'commission_settlement_document_type.dart';
 import 'commission_settlement_model.dart';
+import 'commissions_data_table.dart';
+import 'commissions_kpi_cards.dart';
 import 'importer_commission_volume_context.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'commission_settlement_filter_utils.dart';
 import 'commission_volume_tiers.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'commission_settlement_fiscal.dart';
 import 'admin_tasa_bcv_card.dart';
 import 'commission_volume_tier_banner.dart';
 import 'commission_settlement_lines_section.dart';
-import 'commission_settlement_list_filter_bar.dart';
 import 'commission_settlement_filters_sheet.dart';
+import 'commission_settlement_list_filter_bar.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/admin/admin_action_rules.dart';
+import 'package:motolink_pro_app/features/admin/unified_action_dialog.dart';
+
+/// Alias de módulo para rutas admin (`/admin/commissions`).
+typedef CommissionsModule = AdminCommissionSettlementsPanel;
 
 /// Admin: cortes semanales, facturación y cobro de comisiones B2B Conecta.
 class AdminCommissionSettlementsPanel extends StatefulWidget {
@@ -49,6 +56,8 @@ class _AdminCommissionSettlementsPanelState
   final TextEditingController _searchController = TextEditingController();
   CommissionSettlementFilters _filters = const CommissionSettlementFilters();
   int _incomeCardEpoch = 0;
+  double? _tasaBcv;
+  int _tableResetKey = 0;
 
   List<CommissionSettlementModel> get _filteredRows =>
       filterCommissionSettlements(_rows, _filters);
@@ -56,12 +65,50 @@ class _AdminCommissionSettlementsPanelState
   int get _activeFilterCount {
     final f = _filters;
     var count = 0;
-    if (f.searchQuery.trim().isNotEmpty) count++;
-    if (f.status != null) count++;
     if (f.weekScope != null) count++;
     if (f.documentType != null) count++;
     if (f.importadorId != null) count++;
     return count;
+  }
+
+  void _onQuickSearch(String q) {
+    setState(() {
+      _filters = _filters.copyWithSearch(q);
+      _tableResetKey++;
+    });
+  }
+
+  void _onStatusPill(String? status) {
+    setState(() {
+      _filters = _filters.copyWithStatus(status);
+      _tableResetKey++;
+    });
+  }
+
+  void _toggleSettlementExpand(String id) {
+    setState(() {
+      if (_expandedSettlementIds.contains(id)) {
+        _expandedSettlementIds.remove(id);
+      } else {
+        _expandedSettlementIds.add(id);
+      }
+    });
+  }
+
+  void _onSettlementRowAction(CommissionSettlementModel s, String actionId) {
+    switch (actionId) {
+      case 'toggle':
+        _toggleSettlementExpand(s.id);
+      case 'pdf':
+        _abrirFacturaPdf(s);
+      case 'gen_pdf':
+      case 'regen_pdf':
+        _generarFacturaPdf(s);
+      case 'csv':
+        _exportSettlementCsv(s);
+      case 'anular':
+        _cancelSettlement(s);
+    }
   }
 
   Future<void> _openCommissionSettlementFiltersSheet() async {
@@ -139,6 +186,7 @@ class _AdminCommissionSettlementsPanelState
         _filters = _filters.copyWithSearch(ref);
         _searchController.text = ref;
       }
+      _tableResetKey++;
     });
   }
 
@@ -163,14 +211,17 @@ class _AdminCommissionSettlementsPanelState
           await SupabaseService.fetchImporterCommissionVolumeContexts(
         rows.map((r) => r.importadorId),
       );
+      final tasaRec = await SupabaseService.fetchGlobalTasaBcvRecord();
       if (!mounted) return;
       setState(() {
         _defaultRate = rate;
         _volumeTiers = tiers;
         _rows = rows;
         _volumeByImportador = volumeByImportador;
+        _tasaBcv = tasaRec?.tasa;
         _loading = false;
         _incomeCardEpoch++;
+        _tableResetKey++;
       });
       if (MainShellTabController.peekPendingCommissionSettlementId() != null) {
         SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -285,81 +336,17 @@ class _AdminCommissionSettlementsPanelState
       );
       return;
     }
-    if (importers.isEmpty) return;
-    String? selectedId = importers.first.id;
-    final ctrl = TextEditingController(text: '5.00');
-    if (!mounted) return;
-    final ok = await showDialog<bool>(
+    if (importers.isEmpty || !mounted) return;
+    final result = await UnifiedActionDialog.show<({String id, double? rate})>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlg) => AlertDialog(
-          title: const Text('Tasa por importador'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: selectedId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Importador'),
-                  items: importers
-                      .map(
-                        (o) => DropdownMenuItem(
-                          value: o.id,
-                          child: Text(
-                            o.businessName,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setDlg(() => selectedId = v),
-                ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Porcentaje (%) — vacío = tramos por volumen',
-                  hintText: '5.00',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Guardar'),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _ImportadorRateDialog(importers: importers),
     );
-    if (ok != true || !mounted || selectedId == null) return;
-    final trimmed = ctrl.text.trim();
-    double? rate;
-    if (trimmed.isNotEmpty) {
-      final pct = double.tryParse(trimmed.replaceAll(',', '.'));
-      if (pct == null || pct < 0 || pct > 100) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Porcentaje inválido.')),
-        );
-        return;
-      }
-      rate = pct / 100;
-    }
+    if (result == null || !mounted) return;
     setState(() => _busy = true);
     try {
       await SupabaseService.adminSetImportadorCommissionRate(
-        importadorId: selectedId!,
-        rate: rate,
+        importadorId: result.id,
+        rate: result.rate,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -377,42 +364,13 @@ class _AdminCommissionSettlementsPanelState
 
   Future<void> _editDefaultRate() async {
     if (!_canEditRates) return;
-    final ctrl = TextEditingController(
-      text: (_defaultRate * 100).toStringAsFixed(2),
-    );
-    final ok = await showDialog<bool>(
+    final pct = await UnifiedActionDialog.show<double>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tasa global de comisión'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Porcentaje (%)',
-            hintText: '5.00',
-            suffixText: '%',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Guardar'),
-          ),
-        ],
+      builder: (ctx) => _DefaultRateDialog(
+        initialPct: _defaultRate * 100,
       ),
     );
-    if (ok != true || !mounted) return;
-    final pct = double.tryParse(ctrl.text.replaceAll(',', '.'));
-    if (pct == null || pct < 0 || pct > 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Indique un porcentaje válido (0–100).')),
-      );
-      return;
-    }
+    if (pct == null || !mounted) return;
     setState(() => _busy = true);
     try {
       await SupabaseService.adminSetDefaultCommissionRate(pct / 100);
@@ -930,8 +888,9 @@ class _AdminCommissionSettlementsPanelState
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: theme.brand));
     }
     if (_error != null) {
       return Center(
@@ -940,7 +899,11 @@ class _AdminCommissionSettlementsPanelState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.textSecondary),
+              ),
               const SizedBox(height: 12),
               FilledButton(onPressed: _load, child: const Text('Reintentar')),
             ],
@@ -949,402 +912,342 @@ class _AdminCommissionSettlementsPanelState
       );
     }
 
+    final canEditTasa = AdminActionRules.canEditPlatformConfig(
+      viewerRole: widget.viewerRole,
+    );
+    final rulesCard = _RulesCard(
+      defaultRatePct: _defaultRate * 100,
+      volumeTiersSummary: commissionVolumeTiersSummaryEs(_volumeTiers),
+      canEditRates: _canEditRates,
+      onEditRate: _busy ? null : _editDefaultRate,
+      onEditImportadorRate: _busy ? null : _editImportadorRate,
+      onEditVolumeTiers: _busy ? null : _editVolumeTiers,
+    );
+    final generateCta = _GenerateCutsCta(
+      busy: _busy,
+      onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
+      onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
+    );
+    final settlementsBody = _rows.isEmpty
+        ? Material(
+            color: theme.surfaceCard,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.borderSubtle),
+              ),
+              child: Row(
+                children: [
+                  LucideIcon(
+                    LucideGlyph.clipboardCheck,
+                    size: 18,
+                    color: theme.textMuted,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Sin liquidaciones aún. Use «Generar corte» en la cuenta operativa.',
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : CommissionsDataTable(
+            rows: _filteredRows,
+            searchController: _searchController,
+            statusFilter: (_filters.status == null ||
+                    _filters.status == 'pagado' ||
+                    _filters.status == 'emitido')
+                ? _filters.status
+                : '__advanced__',
+            onStatusFilter: _onStatusPill,
+            onSearchChanged: _onQuickSearch,
+            expandedIds: _expandedSettlementIds,
+            onToggleExpand: _toggleSettlementExpand,
+            detailBuilder: _settlementDetail,
+            onRowAction: _onSettlementRowAction,
+            busy: _busy,
+            tasaBcv: _tasaBcv,
+            onOpenAdvancedFilters: _openCommissionSettlementFiltersSheet,
+            activeFilterCount: _activeFilterCount,
+            resetKey: _tableResetKey,
+            onClearFilters: () {
+              _searchController.clear();
+              setState(() {
+                _filters = const CommissionSettlementFilters();
+                _tableResetKey++;
+              });
+            },
+          );
+
+    final leftColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CommissionsKpiCards(rows: _rows, tasaBcv: _tasaBcv),
+        const SizedBox(height: 12),
+        CommissionCollectedIncomeCard(
+          key: ValueKey('admin-income-$_incomeCardEpoch'),
+          isAdmin: true,
+          tasaBcv: _tasaBcv,
+          onOpenSettlement: _openSettlementFromReport,
+          onFilterImportador: _filterImportadorFromReport,
+          onFilterDocumentType: _filterDocumentTypeFromReport,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Historial de liquidaciones',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: theme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        settlementsBody,
+      ],
+    );
+
+    final rightColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AdminTasaBcvCard(
+          canEdit: canEditTasa,
+          onRateChanged: (rate) {
+            if (!mounted) return;
+            setState(() => _tasaBcv = rate);
+          },
+        ),
+        const SizedBox(height: 12),
+        rulesCard,
+        const SizedBox(height: 12),
+        generateCta,
+      ],
+    );
+
     return Stack(
       children: [
         RefreshIndicator(
           onRefresh: _load,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-            children: [
-              AdminTasaBcvCard(
-                canEdit: AdminActionRules.canEditPlatformConfig(
-                  viewerRole: widget.viewerRole,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _CommissionAmountsStrip(rows: _rows),
-              const SizedBox(height: 12),
-              Text(
-                _filters.hasActiveFilters
-                    ? 'Cortes y liquidaciones (${_filteredRows.length} de ${_rows.length})'
-                    : 'Cortes y liquidaciones (${_rows.length})',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                ),
-              ),
-              if (_rows.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _openCommissionSettlementFiltersSheet,
-                  icon: Badge(
-                    isLabelVisible: _activeFilterCount > 0,
-                    label: Text('$_activeFilterCount'),
-                    backgroundColor: AppColors.brand,
-                    child: const Icon(Icons.tune),
-                  ),
-                  label: const Text('Filtros'),
-                ),
-              ],
-              const SizedBox(height: 8),
-              if (_rows.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    'Sin cobros registrados. Genere un corte en borrador abajo.',
-                    style: TextStyle(color: AppColors.textSecondary, height: 1.35),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              else if (_filteredRows.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Ningún corte coincide con los filtros.',
-                        style: TextStyle(color: AppColors.textSecondary),
-                        textAlign: TextAlign.center,
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _filters = const CommissionSettlementFilters());
-                        },
-                        child: const Text('Limpiar filtros'),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                PagedItems(
-                  items: _filteredRows,
-                  embedded: true,
-                  itemBuilder: _settlementTile,
-                ),
-              const SizedBox(height: 12),
-              CommissionCollectedIncomeCard(
-                key: ValueKey('admin-income-$_incomeCardEpoch'),
-                isAdmin: true,
-                onOpenSettlement: _openSettlementFromReport,
-                onFilterImportador: _filterImportadorFromReport,
-                onFilterDocumentType: _filterDocumentTypeFromReport,
-              ),
-              const SizedBox(height: 12),
-              _ConfigCard(
-                defaultRatePct: _defaultRate * 100,
-                volumeTiersSummary:
-                    commissionVolumeTiersSummaryEs(_volumeTiers),
-                canEditRates: _canEditRates,
-                onEditRate: _busy ? null : _editDefaultRate,
-                onEditImportadorRate: _busy ? null : _editImportadorRate,
-                onEditVolumeTiers: _busy ? null : _editVolumeTiers,
-                onGeneratePreviousWeek: _busy ? null : _generatePreviousWeek,
-                onGenerateCurrentWeek: _busy ? null : _generateCurrentWeek,
-              ),
-            ],
+          color: theme.brand,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 1080;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                children: [
+                  if (wide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 70, child: leftColumn),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 30, child: rightColumn),
+                      ],
+                    )
+                  else ...[
+                    leftColumn,
+                    const SizedBox(height: 14),
+                    rightColumn,
+                  ],
+                ],
+              );
+            },
           ),
         ),
         if (_busy)
-          const Positioned.fill(
+          Positioned.fill(
             child: ColoredBox(
-              color: Color(0x33FFFFFF),
-              child: Center(child: CircularProgressIndicator()),
+              color: theme.textPrimary.withOpacity(0.12),
+              child: Center(
+                child: CircularProgressIndicator(color: theme.brand),
+              ),
             ),
           ),
       ],
     );
   }
 
-  Widget _settlementTile(CommissionSettlementModel s) {
-    final expanded = _expandedSettlementIds.contains(s.id);
-    final ref = s.invoiceReference?.trim() ?? '';
-    final name = s.importadorBusinessName ?? 'Importador';
-    final status = CommissionSettlementModel.statusLabelEs(s.status);
-    final amount = 'USD ${s.totalCobroUsd.toStringAsFixed(2)}';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ExpansionTile(
-        initiallyExpanded: expanded,
-        onExpansionChanged: (v) {
-          setState(() {
-            if (v) {
-              _expandedSettlementIds.add(s.id);
-            } else {
-              _expandedSettlementIds.remove(s.id);
-            }
-          });
-        },
-        title: Text(
-          ref.isNotEmpty ? ref : name,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+  Widget _settlementDetail(CommissionSettlementModel s) {
+    final theme = B2BThemeExtension.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (s.isBorrador && _volumeByImportador[s.importadorId] != null) ...[
+          CommissionVolumeTierBanner(
+            volumeContext: _volumeByImportador[s.importadorId]!,
+            compact: true,
+            title: 'Volumen mes (referencia al emitir)',
+          ),
+          const SizedBox(height: 8),
+        ],
+        Text(
+          s.isDeliveryNote
+              ? 'Base comisión (neta, sin IVA): REF ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
+              : 'Base: REF ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
+                  'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
+                  'REF ${s.ivaComisionUsd.toStringAsFixed(2)}',
+          style: TextStyle(fontSize: 12, color: theme.textSecondary),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        if (!s.isBorrador)
+          Text(
+            s.documentTypeEffective.labelEs,
+            style: TextStyle(fontSize: 12, color: theme.textPrimary),
+          ),
+        if (s.importadorRif != null && s.importadorRif!.isNotEmpty)
+          Text(
+            'RIF: ${s.importadorRif}',
+            style: TextStyle(fontSize: 12, color: theme.textPrimary),
+          ),
+        if (s.issuedAt != null)
+          Text(
+            'Emitido: ${formatEsShortDateTime(s.issuedAt)}',
+            style: TextStyle(fontSize: 12, color: theme.textPrimary),
+          ),
+        if (s.paidAt != null)
+          Text(
+            'Pagado: ${formatEsShortDateTime(s.paidAt)}',
+            style: TextStyle(fontSize: 12, color: theme.textPrimary),
+          ),
+        if (s.isEmitido && s.pagoEstadoLabelEs.isNotEmpty)
+          Text(
+            'Pago: ${s.pagoEstadoLabelEs}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: s.pagoEnRevision ? theme.brand : theme.textPrimary,
+            ),
+          ),
+        if (s.pagoRechazado &&
+            s.pagoRechazoNota != null &&
+            s.pagoRechazoNota!.trim().isNotEmpty)
+          Text(
+            'Rechazo: ${s.pagoRechazoNota}',
+            style: TextStyle(fontSize: 11, color: errorColor),
+          ),
+        const SizedBox(height: 8),
+        CommissionSettlementLinesSection(settlementId: s.id),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Text(
-              ref.isNotEmpty
-                  ? '$name · $status · $amount'
-                  : '$status · $amount',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            Text(
-              '${s.periodLabelEs} · ${s.lineCount} pedido(s) · Consultar detalle',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            if (s.canAnular)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _busy ? null : () => _cancelSettlement(s),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red.shade800,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('Anular corte'),
-                ),
+            if (s.isBorrador) ...[
+              FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () => _issueSettlement(
+                          s,
+                          documentType:
+                              CommissionSettlementDocumentType.fiscalInvoice,
+                        ),
+                child: const Text('Emitir factura'),
               ),
-            if (s.isBorrador && _volumeByImportador[s.importadorId] != null) ...[
-              const SizedBox(height: 6),
-              CommissionVolumeTierBanner(
-                volumeContext: _volumeByImportador[s.importadorId]!,
-                compact: true,
-                title: 'Volumen mes (referencia al emitir)',
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _issueSettlement(
+                          s,
+                          documentType:
+                              CommissionSettlementDocumentType.deliveryNote,
+                        ),
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.textSecondary,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
+                child: Text(
+                  CommissionSettlementDocumentType
+                      .deliveryNote.adminEmitActionLabel,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
+            if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _abrirFacturaPdf(s),
+                icon: LucideIcon(
+                  LucideGlyph.fileText,
+                  size: 16,
+                  color: theme.brand,
+                ),
+                label: const Text('Ver PDF'),
+              ),
+            if ((s.isEmitido || s.isPagado) && !s.tieneFacturaPdf)
+              OutlinedButton(
+                onPressed: _busy ? null : () => _generarFacturaPdf(s),
+                child: const Text('Generar PDF'),
+              ),
+            if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
+              TextButton(
+                onPressed: _busy ? null : () => _generarFacturaPdf(s),
+                child: const Text('Regenerar PDF'),
+              ),
+            if (!s.isBorrador && !s.isAnulado)
+              TextButton.icon(
+                onPressed: _busy ? null : () => _exportSettlementCsv(s),
+                icon: LucideIcon(
+                  LucideGlyph.copy,
+                  size: 16,
+                  color: theme.brand,
+                ),
+                label: const Text('Copiar CSV'),
+              ),
+            if (s.isEmitido && s.pagoEnRevision) ...[
+              if (s.tieneComprobantePago)
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _abrirComprobante(s),
+                  child: const Text('Ver comprobante'),
+                ),
+              FilledButton(
+                onPressed: _busy ? null : () => _approvePago(s),
+                child: const Text('Confirmar pago'),
+              ),
+              TextButton(
+                onPressed: _busy ? null : () => _rejectPago(s),
+                style: TextButton.styleFrom(foregroundColor: errorColor),
+                child: const Text('Rechazar'),
+              ),
+            ],
+            if (s.isEmitido && !s.pagoEnRevision)
+              TextButton(
+                onPressed: _busy ? null : () => _markPaid(s),
+                child: const Text('Pagado sin comprobante'),
+              ),
+            if (s.canAnular)
+              TextButton(
+                onPressed: _busy ? null : () => _cancelSettlement(s),
+                style: TextButton.styleFrom(foregroundColor: errorColor),
+                child: const Text('Anular corte'),
+              ),
           ],
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  s.isDeliveryNote
-                      ? 'Base comisión (neta, sin IVA): USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)}'
-                      : 'Base: USD ${s.baseImponibleComisionUsd.toStringAsFixed(2)} + '
-                          'IVA ${CommissionSettlementFiscal.ivaPct.toStringAsFixed(0)} %: '
-                          'USD ${s.ivaComisionUsd.toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                if (!s.isBorrador)
-                  Text(
-                    s.documentTypeEffective.labelEs,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (s.importadorRif != null && s.importadorRif!.isNotEmpty)
-                  Text('RIF: ${s.importadorRif}', style: const TextStyle(fontSize: 12)),
-                if (s.issuedAt != null)
-                  Text(
-                    'Emitido: ${formatEsShortDateTime(s.issuedAt)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (s.paidAt != null)
-                  Text(
-                    'Pagado: ${formatEsShortDateTime(s.paidAt)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (s.isEmitido && s.pagoEstadoLabelEs.isNotEmpty)
-                  Text(
-                    'Pago: ${s.pagoEstadoLabelEs}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: s.pagoEnRevision
-                          ? AppColors.brandBlue
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                if (s.pagoRechazado && s.pagoRechazoNota != null &&
-                    s.pagoRechazoNota!.trim().isNotEmpty)
-                  Text(
-                    'Rechazo: ${s.pagoRechazoNota}',
-                    style: TextStyle(fontSize: 11, color: Colors.red.shade700),
-                  ),
-                const SizedBox(height: 8),
-                CommissionSettlementLinesSection(settlementId: s.id),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (s.isBorrador) ...[
-                      FilledButton(
-                        onPressed: _busy
-                            ? null
-                            : () => _issueSettlement(
-                                  s,
-                                  documentType: CommissionSettlementDocumentType
-                                      .fiscalInvoice,
-                                ),
-                        child: const Text('Emitir factura'),
-                      ),
-                      TextButton(
-                        onPressed: _busy
-                            ? null
-                            : () => _issueSettlement(
-                                  s,
-                                  documentType: CommissionSettlementDocumentType
-                                      .deliveryNote,
-                                ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                        ),
-                        child: Text(
-                          CommissionSettlementDocumentType
-                              .deliveryNote.adminEmitActionLabel,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                    if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : () => _abrirFacturaPdf(s),
-                        icon: const Icon(Icons.picture_as_pdf, size: 18),
-                        label: const Text('Ver PDF'),
-                      ),
-                    if ((s.isEmitido || s.isPagado) && !s.tieneFacturaPdf)
-                      OutlinedButton(
-                        onPressed: _busy ? null : () => _generarFacturaPdf(s),
-                        child: const Text('Generar PDF'),
-                      ),
-                    if ((s.isEmitido || s.isPagado) && s.tieneFacturaPdf)
-                      TextButton(
-                        onPressed: _busy ? null : () => _generarFacturaPdf(s),
-                        child: const Text('Regenerar PDF'),
-                      ),
-                    if (!s.isBorrador && !s.isAnulado)
-                      TextButton.icon(
-                        onPressed: _busy ? null : () => _exportSettlementCsv(s),
-                        icon: const Icon(Icons.copy, size: 18),
-                        label: const Text('Copiar CSV'),
-                      ),
-                    if (s.isEmitido && s.pagoEnRevision) ...[
-                      if (s.tieneComprobantePago)
-                        OutlinedButton(
-                          onPressed: _busy ? null : () => _abrirComprobante(s),
-                          child: const Text('Ver comprobante'),
-                        ),
-                      FilledButton(
-                        onPressed: _busy ? null : () => _approvePago(s),
-                        child: const Text('Confirmar pago'),
-                      ),
-                      TextButton(
-                        onPressed: _busy ? null : () => _rejectPago(s),
-                        child: const Text('Rechazar'),
-                      ),
-                    ],
-                    if (s.isEmitido && !s.pagoEnRevision)
-                      TextButton(
-                        onPressed: _busy ? null : () => _markPaid(s),
-                        child: const Text('Pagado sin comprobante'),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommissionAmountsStrip extends StatelessWidget {
-  const _CommissionAmountsStrip({required this.rows});
-
-  final List<CommissionSettlementModel> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    var cobrado = 0.0;
-    var pendiente = 0.0;
-    for (final s in rows) {
-      if (s.isPagado) cobrado += s.totalCobroUsd;
-      if (s.isEmitido) pendiente += s.totalCobroUsd;
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: _amount(
-            label: 'Cobrado',
-            value: cobrado,
-            color: AppColors.successGreen,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _amount(
-            label: 'Pendiente',
-            value: pendiente,
-            color: AppColors.brand,
-          ),
         ),
       ],
     );
   }
-
-  Widget _amount({
-    required String label,
-    required double value,
-    required Color color,
-  }) {
-    return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderSubtle),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'USD ${value.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: color,
-                height: 1.1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-class _ConfigCard extends StatelessWidget {
-  const _ConfigCard({
+class _RulesCard extends StatelessWidget {
+  const _RulesCard({
     required this.defaultRatePct,
     required this.volumeTiersSummary,
     required this.canEditRates,
     this.onEditRate,
     this.onEditImportadorRate,
     this.onEditVolumeTiers,
-    this.onGeneratePreviousWeek,
-    this.onGenerateCurrentWeek,
   });
 
   final double defaultRatePct;
@@ -1353,124 +1256,83 @@ class _ConfigCard extends StatelessWidget {
   final VoidCallback? onEditRate;
   final VoidCallback? onEditImportadorRate;
   final VoidCallback? onEditVolumeTiers;
-  final VoidCallback? onGeneratePreviousWeek;
-  final VoidCallback? onGenerateCurrentWeek;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
+    final theme = B2BThemeExtension.of(context);
+    return Material(
+      color: theme.surfaceCard,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.borderSubtle),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Reglas y cortes',
+              'Cuenta operativa',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 15,
-                color: AppColors.textPrimary,
+                color: theme.textPrimary,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
-              'Devengo al marcar Recibido · tasa por volumen o override',
+              'Métodos de cobro y reglas de retención.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.3,
-                color: AppColors.textSecondary,
+                color: theme.textSecondary,
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              'Tasas',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: AppColors.textPrimary,
-              ),
+            _ruleRow(
+              context: context,
+              glyph: LucideGlyph.landmark,
+              title: 'Métodos de cobro',
+              subtitle: 'Zelle / Cuenta bancaria nacional',
             ),
             const SizedBox(height: 6),
-            _configRow(
-              icon: Icons.percent,
-              title: 'Tasa global',
+            _ruleRow(
+              context: context,
+              glyph: LucideGlyph.percent,
+              title: 'Comisión base',
               subtitle: '${defaultRatePct.toStringAsFixed(2)} %',
-              actionLabel: 'Editar',
+              actionLabel: 'Ver / editar',
               onAction: onEditRate,
               showAction: canEditRates,
             ),
             const SizedBox(height: 6),
-            _configRow(
-              icon: Icons.stacked_line_chart,
-              title: 'Tramos volumen',
-              subtitle: volumeTiersSummary,
-              actionLabel: 'Tramos',
-              onAction: onEditVolumeTiers,
-              showAction: canEditRates,
-            ),
-            const SizedBox(height: 6),
-            _configRow(
-              icon: Icons.store_outlined,
+            _ruleRow(
+              context: context,
+              glyph: LucideGlyph.store,
               title: 'Tasa por importador',
               subtitle: 'Override opcional',
               actionLabel: 'Configurar',
               onAction: onEditImportadorRate,
               showAction: canEditRates,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
+            _ruleRow(
+              context: context,
+              glyph: LucideGlyph.barChart3,
+              title: 'Tramos por volumen',
+              subtitle: volumeTiersSummary,
+              actionLabel: 'Tramos',
+              onAction: onEditVolumeTiers,
+              showAction: canEditRates,
+            ),
+            const SizedBox(height: 10),
             Text(
-              'B2B-COM- (IVA) · B2B-NOT- (sin IVA). Históricos ML- se conservan.',
+              'B2B-COM- (IVA) · B2B-NOT- (sin IVA).',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.3,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            Text(
-              'Generar cortes en borrador',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: onGeneratePreviousWeek,
-                    icon: const Icon(Icons.calendar_view_week, size: 18),
-                    label: const Text('Semana anterior'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onGenerateCurrentWeek,
-                    icon: const Icon(Icons.today_outlined, size: 18),
-                    label: const Text('Semana actual'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.brandAccent,
-                      side: BorderSide(color: AppColors.brandAccent),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '«Semana actual» solo para pruebas en desarrollo.',
-                style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                color: theme.textMuted,
               ),
             ),
           ],
@@ -1479,25 +1341,27 @@ class _ConfigCard extends StatelessWidget {
     );
   }
 
-  static Widget _configRow({
-    required IconData icon,
+  static Widget _ruleRow({
+    required BuildContext context,
+    required LucideGlyph glyph,
     required String title,
     required String subtitle,
-    required String actionLabel,
+    String actionLabel = '',
     VoidCallback? onAction,
-    bool showAction = true,
+    bool showAction = false,
   }) {
+    final theme = B2BThemeExtension.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.fieldFill,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderSubtle),
+        color: theme.inputFill,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.borderSubtle),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 20, color: AppColors.brandAccent),
+          LucideIcon(glyph, size: 16, color: theme.brand),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1508,7 +1372,7 @@ class _ConfigCard extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
-                    color: AppColors.textPrimary,
+                    color: theme.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1517,24 +1381,349 @@ class _ConfigCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.3,
-                    color: AppColors.textSecondary,
+                    color: theme.textSecondary,
                   ),
                 ),
               ],
             ),
           ),
           if (showAction)
-            TextButton(
+            OutlinedButton(
               onPressed: onAction,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.brand,
+                side: BorderSide(color: theme.borderStrong),
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: Text(actionLabel),
+              child: Text(
+                actionLabel,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
         ],
       ),
     );
   }
+}
 
+/// Centro de acción primaria: generar cortes en borrador.
+class _GenerateCutsCta extends StatelessWidget {
+  const _GenerateCutsCta({
+    required this.busy,
+    this.onGeneratePreviousWeek,
+    this.onGenerateCurrentWeek,
+  });
+
+  final bool busy;
+  final VoidCallback? onGeneratePreviousWeek;
+  final VoidCallback? onGenerateCurrentWeek;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return Material(
+      color: theme.brandContainer,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.brand.withOpacity(0.28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Generador de cortes',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: theme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Crea borradores quincenales / semanales a partir de comisiones devengadas.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: theme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onGeneratePreviousWeek,
+              icon: busy
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.surfaceCard,
+                      ),
+                    )
+                  : LucideIcon(
+                      LucideGlyph.clipboardCheck,
+                      size: 16,
+                      color: theme.surfaceCard,
+                    ),
+              label: const Text('Generar corte (semana anterior)'),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.brand,
+                foregroundColor: theme.surfaceCard,
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onGenerateCurrentWeek,
+              icon: LucideIcon(
+                LucideGlyph.activity,
+                size: 15,
+                color: theme.brand,
+              ),
+              label: const Text('Semana actual (pruebas)'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.brand,
+                side: BorderSide(color: theme.borderStrong),
+                minimumSize: const Size.fromHeight(38),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DefaultRateDialog extends StatefulWidget {
+  const _DefaultRateDialog({required this.initialPct});
+
+  final double initialPct;
+
+  @override
+  State<_DefaultRateDialog> createState() => _DefaultRateDialogState();
+}
+
+class _DefaultRateDialogState extends State<_DefaultRateDialog> {
+  late final TextEditingController _ctrl;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+      text: widget.initialPct.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final pct = double.tryParse(_ctrl.text.replaceAll(',', '.'));
+    if (pct == null || pct < 0 || pct > 100) {
+      setState(() => _error = 'Indique un porcentaje válido (0–100).');
+      return;
+    }
+    Navigator.of(context).pop(pct);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return UnifiedActionDialog(
+      title: 'Comisión base',
+      subtitle: 'Tasa global de retención aplicada por defecto.',
+      glyph: LucideGlyph.percent,
+      tone: UnifiedActionTone.info,
+      primaryLabel: 'Guardar',
+      onPrimary: _submit,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            style: TextStyle(color: theme.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'Porcentaje (%)',
+              hintText: '2.50',
+              suffixText: '%',
+              filled: true,
+              fillColor: theme.inputFill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.brand, width: 1.4),
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ImportadorRateDialog extends StatefulWidget {
+  const _ImportadorRateDialog({required this.importers});
+
+  final List<ImporterOption> importers;
+
+  @override
+  State<_ImportadorRateDialog> createState() => _ImportadorRateDialogState();
+}
+
+class _ImportadorRateDialogState extends State<_ImportadorRateDialog> {
+  late String _selectedId;
+  final _ctrl = TextEditingController(text: '5.00');
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedId = widget.importers.first.id;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final trimmed = _ctrl.text.trim();
+    double? rate;
+    if (trimmed.isNotEmpty) {
+      final pct = double.tryParse(trimmed.replaceAll(',', '.'));
+      if (pct == null || pct < 0 || pct > 100) {
+        setState(() => _error = 'Porcentaje inválido (0–100 o vacío).');
+        return;
+      }
+      rate = pct / 100;
+    }
+    Navigator.of(context).pop((id: _selectedId, rate: rate));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return UnifiedActionDialog(
+      title: 'Tasa por importador',
+      subtitle: 'Override opcional. Vacío = tramos por volumen.',
+      glyph: LucideGlyph.store,
+      tone: UnifiedActionTone.info,
+      primaryLabel: 'Guardar',
+      onPrimary: _submit,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DropdownButtonFormField<String>(
+            value: _selectedId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Importador',
+              filled: true,
+              fillColor: theme.inputFill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+            ),
+            items: widget.importers
+                .map(
+                  (o) => DropdownMenuItem(
+                    value: o.id,
+                    child: Text(
+                      o.businessName,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _selectedId = v);
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            style: TextStyle(color: theme.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'Porcentaje (%)',
+              hintText: '5.00',
+              suffixText: '%',
+              filled: true,
+              fillColor: theme.inputFill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.brand, width: 1.4),
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

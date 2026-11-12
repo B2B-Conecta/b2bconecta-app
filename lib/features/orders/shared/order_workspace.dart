@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/features/orders/admin/orders_data_table.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_chat_widget.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'aliado_order_grouping.dart';
 import 'transaction_request_model.dart';
@@ -28,7 +31,9 @@ class OrderWorkspace extends StatelessWidget {
       this.loading = false,
       this.viewerRole = AppHomeRole.aliado,
       this.groupKey,
-      this.emptyMessage});
+      this.emptyMessage,
+      this.canCancelGroup,
+      this.onCancelGroup});
   final List<List<TransactionRequestModel>> groups;
   final String? selectedKey;
   final ValueChanged<String> onSelect;
@@ -47,6 +52,10 @@ class OrderWorkspace extends StatelessWidget {
   /// Mensaje cuando la lista está vacía (p. ej. alcance sin resultados).
   final String? emptyMessage;
 
+  /// Admin: habilita «Cancelar / Suspender» en [OrdersDataTable].
+  final bool Function(List<TransactionRequestModel>)? canCancelGroup;
+  final ValueChanged<List<TransactionRequestModel>>? onCancelGroup;
+
   String _keyOf(List<TransactionRequestModel> g) =>
       (groupKey ?? checkoutGroupExpandKey)(g);
 
@@ -62,7 +71,10 @@ class OrderWorkspace extends StatelessWidget {
             builder: (context, compact) => PopScope<Object?>(
                   canPop: !detailOpen,
                   onPopInvokedWithResult: (didPop, result) {
-                    if (!didPop && detailOpen) onClose();
+                    if (!didPop && detailOpen) {
+                      OrderFloatingChat.close();
+                      onClose();
+                    }
                   },
                   child: ColoredBox(
                       color: OrderListColors.of(context).background,
@@ -81,10 +93,22 @@ class OrderWorkspace extends StatelessWidget {
                             children: [
                               if (loading)
                                 const LinearProgressIndicator(minHeight: 2),
-                              if (!detailOpen) ...[
-                                controls,
-                                SizedBox(height: compact ? 4 : 12)
-                              ],
+                              if (!detailOpen)
+                                Flexible(
+                                  flex: 0,
+                                  fit: FlexFit.loose,
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        controls,
+                                        SizedBox(height: compact ? 4 : 12),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               Expanded(
                                   child: Row(
                                       crossAxisAlignment:
@@ -105,6 +129,33 @@ class OrderWorkspace extends StatelessWidget {
                                                     LayoutBuilder(builder:
                                                         (context,
                                                             listConstraints) {
+                                                  final useCorporateAdmin =
+                                                      viewerRole ==
+                                                          AppHomeRole
+                                                              .administrador;
+                                                  if (useCorporateAdmin) {
+                                                    return SingleChildScrollView(
+                                                      child: OrdersDataTable(
+                                                        groups: groups,
+                                                        selectedKey:
+                                                            selectedKey,
+                                                        loading: loading,
+                                                        emptyMessage:
+                                                            emptyMessage,
+                                                        onClearFilters:
+                                                            onClearFilters,
+                                                        onRefresh: onRefresh,
+                                                        resetKey: resetKey,
+                                                        canCancel:
+                                                            canCancelGroup,
+                                                        onCancel:
+                                                            onCancelGroup,
+                                                        onOpen: (g) =>
+                                                            onSelect(
+                                                                _keyOf(g)),
+                                                      ),
+                                                    );
+                                                  }
                                                   final table = listConstraints
                                                               .maxWidth >=
                                                           900 &&
@@ -203,7 +254,11 @@ class OrderWorkspace extends StatelessWidget {
                                                             compact ? 0 : 8),
                                                     child: Row(children: [
                                                       IconButton(
-                                                          onPressed: onClose,
+                                                          onPressed: () {
+                                                            OrderFloatingChat
+                                                                .close();
+                                                            onClose();
+                                                          },
                                                           tooltip:
                                                               'Volver a pedidos',
                                                           icon: const Icon(Icons
@@ -239,8 +294,16 @@ class OrderWorkspace extends StatelessWidget {
                 ));
       });
 
-  Widget _surface(BuildContext context, Widget child) =>
-      ColoredBox(color: OrderListColors.of(context).background, child: child);
+  Widget _surface(BuildContext context, Widget child) {
+    if (viewerRole == AppHomeRole.administrador) {
+      final theme = B2BThemeExtension.of(context);
+      return ColoredBox(color: theme.background, child: child);
+    }
+    return ColoredBox(
+      color: OrderListColors.of(context).background,
+      child: child,
+    );
+  }
 
   Widget _pageFooter(BuildContext context, Widget child) => Container(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -258,21 +321,46 @@ class _OrdersEmpty extends StatelessWidget {
   final VoidCallback onClear;
   final String? message;
   @override
-  Widget build(BuildContext context) => Center(
-      child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.search_off, size: 32, color: AppColors.textSecondary),
-            const SizedBox(height: 12),
-            Text(
-              message ?? 'No encontramos pedidos con estos filtros.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, height: 1.35),
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 32,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      message ?? 'No encontramos pedidos con estos filtros.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: onClear,
+                      child: const Text('Ver todos los pedidos'),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            TextButton(
-                onPressed: onClear, child: const Text('Ver todos los pedidos')),
-          ])));
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Shipping progress only; payment is negotiated independently of delivery.

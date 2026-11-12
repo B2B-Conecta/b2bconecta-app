@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_eligibility.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
@@ -12,10 +12,12 @@ import 'package:motolink_pro_app/features/commissions/order_commission_summary.d
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_delivery_stepper.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_detail_layout.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_list_colors.dart';
 import 'admin_recalc_tasa_bcv_button.dart';
 import 'transaction_request_admin_sections.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+
+/// Alias de producto del detalle de pedido admin (`/admin/orders/detail`).
+typedef OrderDetailModule = AdminExpandableOrderCard;
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -64,19 +66,23 @@ class AdminExpandableOrderCard extends StatelessWidget {
       );
     }
 
+    final theme = B2BThemeExtension.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.hardEdge,
-      color: highlighted ? AppColors.brandBlueContainer : null,
+      color: highlighted ? theme.brandContainer : theme.surfaceCard,
       shape: highlighted
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
-                color: AppColors.brandAccent.withOpacity(0.7),
+                color: theme.brand.withOpacity(0.7),
                 width: 1.5,
               ),
             )
-          : null,
+          : RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.borderSubtle),
+            ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,7 +143,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
     required bool isCheckoutGroup,
     required TransactionRequestModel r,
   }) {
-    final colors = OrderListColors.of(context);
+    final theme = B2BThemeExtension.of(context);
+    // Columna izq (~60%): timeline → pagos/gestión → productos.
     final tracking = OrderDetailSection(
       title: 'Seguimiento',
       icon: Icons.local_shipping_outlined,
@@ -146,32 +153,67 @@ class AdminExpandableOrderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OrderDeliveryStepper(lines: lines),
-          const SizedBox(height: 8),
-          ExpansionTile(
-            key: PageStorageKey('admin-history-${r.id}'),
-            tilePadding: EdgeInsets.zero,
-            title: const Text(
-              'Historial del envío',
-              style: TextStyle(fontSize: 13),
-            ),
-            children: [
-              for (final line in lines)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: CourierTimelineWidget(
-                    request: line,
-                    compact: true,
-                    viewerRole: AppHomeRole.administrador,
-                    showHeading: lines.length > 1,
-                  ),
+          const SizedBox(height: 4),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: theme.borderSubtle),
+            child: ExpansionTile(
+              key: PageStorageKey('admin-history-${r.id}'),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(top: 4, bottom: 2),
+              initiallyExpanded: false,
+              title: Text(
+                'Historial del envío',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textSecondary,
                 ),
-            ],
+              ),
+              children: [
+                for (final line in lines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CourierTimelineWidget(
+                      request: line,
+                      compact: true,
+                      viewerRole: AppHomeRole.administrador,
+                      showHeading: lines.length > 1,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
     );
+    final payments = OrderDetailSection(
+      title: 'Pagos y gestión',
+      icon: Icons.payments_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Estado del pago, comprobantes y acciones administrativas.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: theme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          AdminRecalcTasaBcvButton(
+            lines: lines,
+            onDone: onRequestMutated,
+          ),
+          if (expandedFooter != null) ...[
+            const SizedBox(height: 8),
+            expandedFooter!,
+          ],
+        ],
+      ),
+    );
     final products = OrderDetailSection(
-      title: 'Productos',
+      title: 'Productos / partidas',
       icon: Icons.shopping_bag_outlined,
       child: TransactionRequestProductosDesgloseSection(
         lines: lines,
@@ -181,8 +223,9 @@ class AdminExpandableOrderCard extends StatelessWidget {
         showPrecioHelp: false,
       ),
     );
+    // Columna der (~40%): entrega, partes, comisión, valoraciones.
     final delivery = OrderDetailSection(
-      title: 'Entrega',
+      title: 'Datos de entrega',
       icon: Icons.location_on_outlined,
       flat: true,
       child: TransactionRequestDestinoEntregaSection(
@@ -199,31 +242,10 @@ class AdminExpandableOrderCard extends StatelessWidget {
         embedded: true,
       ),
     );
-    final management = OrderDetailSection(
-      title: 'Gestión administrativa',
-      icon: Icons.admin_panel_settings_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AdminRecalcTasaBcvButton(
-            lines: lines,
-            onDone: onRequestMutated,
-          ),
-          if (isCheckoutGroup) ...[
-            AdminCheckoutGroupMasterHeader(
-              lines: lines,
-              onMutated: onRequestMutated,
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (expandedFooter != null) expandedFooter!,
-        ],
-      ),
-    );
     final commission = orderCardCommissionSubtitle(lines) == null
         ? null
         : OrderDetailSection(
-            title: 'Comisión B2B Conecta',
+            title: 'Comisión B2B',
             icon: Icons.receipt_long_outlined,
             child: OrderCommissionSummary(
               lines: orderLinesEligibleForCommission(lines),
@@ -235,7 +257,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
           l.aliadoExperienceSubmittedAt != null ||
           lineaElegibleValoracionAliado(l)))
         OrderDetailSection(
-          title: 'Valoración de la tienda minorista',
+          title: 'Valoración tienda',
           icon: Icons.star_outline,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -258,7 +280,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
           lineaElegibleValoracionImportador(l) ||
           l.aliadoExperienceSubmittedAt != null))
         OrderDetailSection(
-          title: 'Valoración del mayorista',
+          title: 'Valoración mayorista',
           icon: Icons.rate_review_outlined,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -279,8 +301,8 @@ class AdminExpandableOrderCard extends StatelessWidget {
     ];
 
     final primary = <Widget>[
-      management,
       tracking,
+      payments,
       products,
     ];
     final secondary = <Widget>[
@@ -293,41 +315,32 @@ class AdminExpandableOrderCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
-          margin: EdgeInsets.zero,
-          elevation: 0,
-          color: colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: colors.border),
-          ),
-          child: OrderSummaryHeader(
+        OrderSummaryHeader(
+          lines: lines,
+          viewerRole: AppHomeRole.administrador,
+          expanded: true,
+          onToggle: onToggle,
+          statusLabel: statusLabel,
+          showToggle: false,
+          detailSummary: true,
+          showRoutineGuidance: false,
+          actionsInHeader: true,
+          onCancel: null,
+          cancelBusy: false,
+          chatAction: _chatButton(
+            context,
             lines: lines,
-            viewerRole: AppHomeRole.administrador,
-            expanded: true,
-            onToggle: onToggle,
-            statusLabel: statusLabel,
-            showToggle: false,
-            detailSummary: true,
-            showRoutineGuidance: false,
-            actionsInHeader: true,
-            onCancel: null,
-            cancelBusy: false,
-            chatAction: _chatButton(
-              context,
-              lines: lines,
-              isCheckoutGroup: isCheckoutGroup,
-              showLabel: false,
-            ),
+            isCheckoutGroup: isCheckoutGroup,
+            showLabel: false,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         OrderDetailColumns(
           primary: primary,
           secondary: secondary,
           mobileOrder: [
-            management,
             tracking,
+            payments,
             products,
             delivery,
             parties,

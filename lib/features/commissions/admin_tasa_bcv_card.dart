@@ -4,26 +4,27 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'bcv_reference_rate_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/unified_action_dialog.dart';
 
 /// Admin (Comisiones): tasa BCV vigente, compacta.
 class AdminTasaBcvCard extends StatefulWidget {
-  const AdminTasaBcvCard({super.key, required this.canEdit});
+  const AdminTasaBcvCard({super.key, required this.canEdit, this.onRateChanged});
 
   /// Sincronizar o fijar la tasa global. Sin permiso la tarjeta es de lectura.
   final bool canEdit;
+  final ValueChanged<double?>? onRateChanged;
 
   @override
   State<AdminTasaBcvCard> createState() => _AdminTasaBcvCardState();
 }
 
 class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
-  final _ctrl = TextEditingController();
   bool _loading = true;
   bool _busy = false;
-  bool _editing = false;
   String? _error;
   double? _rate;
   DateTime? _updatedAt;
@@ -33,12 +34,6 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -64,11 +59,9 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
         _rate = rec?.tasa;
         _updatedAt = rec?.updatedAt;
         _effectiveDate = rec?.effectiveDate ?? quote?.effectiveDate;
-        _ctrl.text =
-            rec != null ? formatVesAmount(rec.tasa, fractionDigits: 4) : '';
         _loading = false;
-        _editing = false;
       });
+      widget.onRateChanged?.call(_rate);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -98,9 +91,8 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
         _rate = synced;
         _updatedAt = rec?.updatedAt ?? DateTime.now();
         _effectiveDate = rec?.effectiveDate;
-        _ctrl.text = formatVesAmount(synced, fractionDigits: 4);
-        _editing = false;
       });
+      widget.onRateChanged?.call(_rate);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,24 +103,25 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
     }
   }
 
-  Future<void> _saveManual() async {
-    final parsed = parseVesOrEnDecimal(_ctrl.text);
-    if (parsed == null || parsed <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Indique una tasa válida.')),
-      );
-      return;
-    }
+  Future<void> _openManualDialog() async {
+    final initial = _rate != null
+        ? formatVesAmount(_rate!, fractionDigits: 4)
+        : '';
+    final saved = await UnifiedActionDialog.show<double>(
+      context: context,
+      builder: (ctx) => _ManualTasaBcvDialog(initialText: initial),
+    );
+    if (saved == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await SupabaseService.adminSetTasaBcv(parsed);
+      await SupabaseService.adminSetTasaBcv(saved);
       if (!mounted) return;
       setState(() {
-        _rate = parsed;
+        _rate = saved;
         _updatedAt = DateTime.now();
         _effectiveDate = null;
-        _editing = false;
       });
+      widget.onRateChanged?.call(_rate);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -164,7 +157,7 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
       if (BcvReferenceRateService.formatFechaValorEs(_effectiveDate) != null)
         'Fecha valor ${BcvReferenceRateService.formatFechaValorEs(_effectiveDate)}',
       if (_updatedAt != null)
-        'actualizada ${formatEsShortDateTime(_updatedAt)}',
+        'act. ${formatEsShortDateTime(_updatedAt)}',
     ];
     if (parts.isEmpty) return null;
     return parts.join(' · ');
@@ -172,180 +165,272 @@ class _AdminTasaBcvCardState extends State<AdminTasaBcvCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return Material(
-      color: AppColors.card,
+      color: theme.surfaceCard,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderSubtle),
+          border: Border.all(color: theme.borderSubtle),
         ),
         child: _loading
-            ? const SizedBox(
-                height: 52,
+            ? SizedBox(
+                height: 56,
                 child: Center(
                   child: SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.brand,
+                      color: theme.brand,
                     ),
                   ),
                 ),
               )
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final sideBySide = constraints.maxWidth >= 560;
-                  final value = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        'Tasa BCV del día',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: theme.brandContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: LucideIcon(
+                          LucideGlyph.badgeDollarSign,
+                          size: 16,
+                          color: theme.brand,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _rate != null && _rate! > 0
-                            ? '${formatTasaBcvDisplay(_rate!, fractionDigits: 4)} VES/REF'
-                            : 'Sin tasa',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.brand,
-                          height: 1.1,
-                        ),
-                      ),
-                      if (_metaLine != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          _metaLine!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1.25,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                  final actions = Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    alignment:
-                        sideBySide ? WrapAlignment.end : WrapAlignment.start,
-                    children: [
-                      if (widget.canEdit)
-                        _action(
-                          onPressed: _busy ? null : _refreshFromBcv,
-                          icon: _busy
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.sync, size: 16),
-                          label: 'Sincronizar',
-                        ),
-                      _action(
-                        onPressed: _openBcvOfficial,
-                        icon: const Icon(Icons.open_in_new, size: 16),
-                        label: 'BCV oficial',
-                      ),
-                      if (widget.canEdit)
-                        _action(
-                          onPressed: _busy
-                              ? null
-                              : () => setState(() => _editing = !_editing),
-                          icon: Icon(
-                            _editing ? Icons.close : Icons.edit_outlined,
-                            size: 16,
-                          ),
-                          label: _editing ? 'Cerrar' : 'Manual',
-                        ),
-                    ],
-                  );
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (sideBySide)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(child: value),
-                            const SizedBox(width: 12),
-                            actions,
-                          ],
-                        )
-                      else ...[
-                        value,
-                        const SizedBox(height: 8),
-                        actions,
-                      ],
-                      if (_error != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.red.shade800,
-                          ),
-                        ),
-                      ],
-                      if (_editing && widget.canEdit) ...[
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _ctrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9.,]'),
+                            Text(
+                              'Tasa BCV del día',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: theme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _rate != null && _rate! > 0
+                                  ? '${formatTasaBcvDisplay(_rate!, fractionDigits: 4)} VES/REF'
+                                  : 'Sin tasa',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: theme.brand,
+                                height: 1.1,
+                              ),
                             ),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: 'VES por 1 REF',
-                            isDense: true,
-                            border: OutlineInputBorder(),
+                        ),
+                      ),
+                      if (_busy)
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.brand,
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: theme.successFg,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton(
-                            onPressed: _busy ? null : _saveManual,
-                            child: const Text('Guardar'),
-                          ),
-                        ),
-                      ],
                     ],
-                  );
-                },
+                  ),
+                  if (_metaLine != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _metaLine!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.25,
+                        color: theme.textMuted,
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (widget.canEdit)
+                        _OutlineAction(
+                          label: 'Sincronizar',
+                          glyph: LucideGlyph.refreshCw,
+                          onPressed: _busy ? null : _refreshFromBcv,
+                        ),
+                      _OutlineAction(
+                        label: 'BCV oficial',
+                        glyph: LucideGlyph.arrowRight,
+                        onPressed: _openBcvOfficial,
+                      ),
+                      if (widget.canEdit)
+                        _OutlineAction(
+                          label: 'Manual',
+                          glyph: LucideGlyph.pencil,
+                          onPressed: _busy ? null : _openManualDialog,
+                        ),
+                    ],
+                  ),
+                ],
               ),
       ),
     );
   }
+}
 
-  Widget _action({
-    required VoidCallback? onPressed,
-    required Widget icon,
-    required String label,
-  }) {
-    return TextButton.icon(
+class _OutlineAction extends StatelessWidget {
+  const _OutlineAction({
+    required this.label,
+    required this.glyph,
+    this.onPressed,
+  });
+
+  final String label;
+  final LucideGlyph glyph;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return OutlinedButton.icon(
       onPressed: onPressed,
-      icon: icon,
-      label: Text(label),
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.brand,
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+      icon: LucideIcon(glyph, size: 14, color: theme.brand),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: theme.brand,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.brand,
+        side: BorderSide(color: theme.borderStrong),
+        minimumSize: const Size(0, 38),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
+
+class _ManualTasaBcvDialog extends StatefulWidget {
+  const _ManualTasaBcvDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_ManualTasaBcvDialog> createState() => _ManualTasaBcvDialogState();
+}
+
+class _ManualTasaBcvDialogState extends State<_ManualTasaBcvDialog> {
+  late final TextEditingController _ctrl;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final parsed = parseVesOrEnDecimal(_ctrl.text);
+    if (parsed == null || parsed <= 0) {
+      setState(() => _error = 'Indique una tasa válida mayor a 0.');
+      return;
+    }
+    Navigator.of(context).pop(parsed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return UnifiedActionDialog(
+      title: 'Tasa BCV manual',
+      subtitle: 'VES por 1 REF · se notificará a usuarios si aplica.',
+      glyph: LucideGlyph.pencil,
+      tone: UnifiedActionTone.info,
+      primaryLabel: 'Guardar tasa',
+      onPrimary: _submit,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+            ],
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            style: TextStyle(color: theme.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'VES por 1 REF',
+              filled: true,
+              fillColor: theme.inputFill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.borderSubtle),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.brand, width: 1.4),
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

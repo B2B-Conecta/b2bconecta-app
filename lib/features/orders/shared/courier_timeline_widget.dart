@@ -7,6 +7,7 @@ import 'transaction_request_status.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'b2b_orders_panel_layout.dart';
+import 'order_list_colors.dart';
 
 /// «Recibido» se cierra al tomar el pedido en operación (en preparación o posterior).
 bool _recibidoDoneMotoconecta(TransactionRequestModel r) {
@@ -176,6 +177,7 @@ class CourierTimelineWidget extends StatelessWidget {
     if (r.status == TransactionRequestStatus.rechazado) {
       return _rejectedCard(r, showHeading: showHeading);
     }
+    final theme = OrderListColors.of(context).theme;
 
     final steps = <_CourierStep>[
       _CourierStep(
@@ -285,12 +287,12 @@ class CourierTimelineWidget extends StatelessWidget {
         else
           DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: theme.surfaceCard,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderSubtle),
+              border: Border.all(color: theme.borderSubtle),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.black.withOpacity(0.04),
+                  color: theme.textPrimary.withOpacity(0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

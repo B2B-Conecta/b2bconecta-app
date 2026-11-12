@@ -13,10 +13,14 @@ class AdminDailyPresenceCard extends StatefulWidget {
     super.key,
     required this.extended,
     required this.onOpenDetails,
+    this.darkRail = false,
   });
 
   final bool extended;
   final VoidCallback onOpenDetails;
+
+  /// Alinea colores con el rail corporativo oscuro.
+  final bool darkRail;
 
   @override
   State<AdminDailyPresenceCard> createState() => _AdminDailyPresenceCardState();
@@ -26,6 +30,11 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
   int? _loggedToday;
   int? _onlineNow;
   Timer? _timer;
+
+  static const _darkCard = Color(0xFF1E293B);
+  static const _darkBorder = Color(0xFF334155);
+  static const _darkMuted = Color(0xFF94A3B8);
+  static const _darkLabel = Color(0xFFF8FAFC);
 
   @override
   void initState() {
@@ -61,6 +70,19 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
     }
   }
 
+  bool get _useDark {
+    if (!widget.darkRail) return AppColors.isDarkOf(context);
+    return Theme.of(context).brightness == Brightness.dark;
+  }
+
+  Color get _card => _useDark ? _darkCard : const Color(0xFFF1F5F9);
+  Color get _border =>
+      _useDark ? _darkBorder : const Color(0xFFE2E8F0);
+  Color get _muted =>
+      _useDark ? _darkMuted : const Color(0xFF64748B);
+  Color get _label =>
+      _useDark ? _darkLabel : const Color(0xFF0F172A);
+
   @override
   Widget build(BuildContext context) {
     final today = _loggedToday?.toString() ?? '—';
@@ -75,10 +97,10 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
         child: Tooltip(
           message: tooltip,
           child: Material(
-            color: AppColors.card,
+            color: _card,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.borderSubtle),
+              side: BorderSide(color: _border),
             ),
             child: InkWell(
               onTap: widget.onOpenDetails,
@@ -95,7 +117,7 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
                         fontSize: 11,
                         height: 1,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                        color: _label,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -105,7 +127,7 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
                         Icon(
                           Icons.storefront_outlined,
                           size: 22,
-                          color: AppColors.textSecondary,
+                          color: _muted,
                         ),
                         Positioned(
                           right: -3,
@@ -129,10 +151,10 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
         message: 'Ver presencia',
         waitDuration: const Duration(milliseconds: 500),
         child: Material(
-          color: AppColors.card,
+          color: _card,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppColors.borderSubtle),
+            side: BorderSide(color: _border),
           ),
           child: InkWell(
             onTap: widget.onOpenDetails,
@@ -151,14 +173,14 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.8,
-                            color: AppColors.textSecondary,
+                            color: _muted,
                           ),
                         ),
                       ),
                       Icon(
                         Icons.arrow_outward_rounded,
                         size: 15,
-                        color: AppColors.textSecondary,
+                        color: _muted,
                       ),
                     ],
                   ),
@@ -174,7 +196,7 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
                           height: 1.1,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
-                          color: AppColors.textPrimary,
+                          color: _label,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -182,7 +204,7 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
                         _loggedToday == 1 ? 'cuenta' : 'cuentas',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: _muted,
                         ),
                       ),
                     ],
@@ -197,7 +219,7 @@ class _AdminDailyPresenceCardState extends State<AdminDailyPresenceCard> {
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                          color: _muted,
                         ),
                       ),
                     ],

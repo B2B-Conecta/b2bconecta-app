@@ -9,7 +9,9 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_eligibility.dart';
 import 'package:motolink_pro_app/features/reputation/admin_order_rating_sheet.dart';
@@ -20,6 +22,32 @@ import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_pane
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_counterparty_profile_section.dart';
+
+/// CTA compacto para registrar valoración admin (outline, no bloque filled).
+Widget _adminRateSoftButton({
+  required BuildContext context,
+  required VoidCallback onPressed,
+}) {
+  final theme = B2BThemeExtension.of(context);
+  return Align(
+    alignment: Alignment.centerLeft,
+    child: OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.brand,
+        backgroundColor: theme.brandContainer,
+        side: BorderSide(color: theme.brand.withOpacity(0.35)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+      ),
+      icon: LucideIcon(LucideGlyph.star, size: 15, color: theme.brand),
+      label: const Text('Valorar como administración'),
+    ),
+  );
+}
 
 Future<void> _launchSignedOrderDoc(
   BuildContext context,
@@ -68,6 +96,7 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
       fiscalMapsUrl: r.aliadoFiscalMapsUrl,
       logoStoragePath: r.aliadoLogoStoragePath,
       kycStatus: r.aliadoKycStatus,
+      catalogVerifiedAt: r.aliadoCatalogVerifiedAt,
       loadApprovedDocuments: !embedded,
     );
     final importadorProfile = TransactionRequestCounterpartyProfileSection(
@@ -82,6 +111,7 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
       fiscalMapsUrl: r.ownerFiscalMapsUrl,
       logoStoragePath: r.ownerLogoStoragePath,
       kycStatus: r.ownerKycStatus,
+      catalogVerifiedAt: r.ownerCatalogVerifiedAt,
       loadApprovedDocuments: false,
     );
 
@@ -161,6 +191,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
       fiscalMapsUrl: r.aliadoFiscalMapsUrl,
       logoStoragePath: r.aliadoLogoStoragePath,
       kycStatus: r.aliadoKycStatus,
+      catalogVerifiedAt: r.aliadoCatalogVerifiedAt,
       loadApprovedDocuments: !embedded,
     );
 
@@ -231,6 +262,7 @@ class TransactionRequestImporterContactSection extends StatelessWidget {
       fiscalMapsUrl: r.ownerFiscalMapsUrl,
       logoStoragePath: r.ownerLogoStoragePath,
       kycStatus: r.ownerKycStatus,
+      catalogVerifiedAt: r.ownerCatalogVerifiedAt,
       loadApprovedDocuments: false,
     );
 
@@ -320,15 +352,14 @@ class TransactionRequestAliadoExperienceAdminSection extends StatelessWidget {
                     ),
                     if (canAdminRate) ...[
                       const SizedBox(height: 10),
-                      FilledButton.icon(
+                      _adminRateSoftButton(
+                        context: context,
                         onPressed: () => showAdminOrderRatingSheet(
                           context,
                           request: r,
                           raterRole: 'aliado',
                           onSubmitted: () => onMutated?.call(),
                         ),
-                        icon: const Icon(Icons.star_outline, size: 18),
-                        label: const Text('Valorar como administración'),
                       ),
                     ],
                   ],
@@ -526,7 +557,8 @@ class _TransactionRequestImporterRatingAdminSectionState
                         ),
                         if (canAdminRate) ...[
                           const SizedBox(height: 10),
-                          FilledButton.icon(
+                          _adminRateSoftButton(
+                            context: context,
                             onPressed: () => showAdminOrderRatingSheet(
                               context,
                               request: r,
@@ -536,8 +568,6 @@ class _TransactionRequestImporterRatingAdminSectionState
                                 widget.onMutated?.call();
                               },
                             ),
-                            icon: const Icon(Icons.star_outline, size: 18),
-                            label: const Text('Valorar como administración'),
                           ),
                         ],
                       ],

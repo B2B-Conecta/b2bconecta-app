@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -36,13 +37,15 @@ Widget pedidoProductoLineCard(
   bool compact, {
   String currencyLabel = 'REF',
 }) {
+  final theme = B2BThemeExtension.of(context);
   final density = B2bOrderCardDensityScope.of(context);
   final webCompact = density.isDesktop && compact;
   final sku = p.sku?.trim();
-  final thumb = compact ? (webCompact ? 40.0 : 44.0) : 64.0;
-  final nameSize = compact ? (webCompact ? 12.0 : 13.0) : 14.0;
-  final metaSize = compact ? (webCompact ? 10.5 : 11.5) : 12.5;
-  final amountSize = compact ? (webCompact ? 12.0 : 13.0) : 16.0;
+  // Detalle ampliado: miniatura y tipografía legibles en panel admin.
+  final thumb = compact ? (webCompact ? 40.0 : 44.0) : 72.0;
+  final nameSize = compact ? (webCompact ? 12.0 : 13.0) : 15.5;
+  final metaSize = compact ? (webCompact ? 10.5 : 11.5) : 13.0;
+  final amountSize = compact ? (webCompact ? 12.0 : 13.0) : 16.5;
   final qtyLabel =
       '${p.cantidad} ${p.cantidad == 1 ? 'unidad' : 'unidades'}';
   final amountLabel = '${formatRefAmount(p.precioRef)} $currencyLabel';
@@ -53,21 +56,22 @@ Widget pedidoProductoLineCard(
       Text(
         p.nombre,
         style: TextStyle(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           fontSize: nameSize,
-          color: AppColors.textPrimary,
+          color: theme.textPrimary,
           height: 1.3,
         ),
         maxLines: compact ? 2 : 3,
         overflow: TextOverflow.ellipsis,
       ),
       if (sku != null && sku.isNotEmpty) ...[
-        SizedBox(height: compact ? 2 : 4),
+        SizedBox(height: compact ? 2 : 5),
         Text(
           'SKU: $sku',
           style: TextStyle(
             fontSize: metaSize,
-            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            color: theme.textSecondary,
             height: 1.25,
           ),
           maxLines: 1,
@@ -79,7 +83,8 @@ Widget pedidoProductoLineCard(
         qtyLabel,
         style: TextStyle(
           fontSize: metaSize,
-          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+          color: theme.textSecondary,
           height: 1.25,
         ),
       ),
@@ -91,22 +96,23 @@ Widget pedidoProductoLineCard(
     textAlign: TextAlign.end,
     style: TextStyle(
       fontSize: amountSize,
-      fontWeight: FontWeight.w700,
-      color: AppColors.textPrimary,
+      fontWeight: FontWeight.w800,
+      color: theme.textPrimary,
       height: 1.2,
     ),
   );
 
   final row = LayoutBuilder(
     builder: (context, constraints) {
-      final stackAmount = compact ||
-          constraints.maxWidth < 420 ||
-          MediaQuery.textScalerOf(context).scale(14) > 20;
+      final stackAmount = compact
+          ? true
+          : constraints.maxWidth < 360 ||
+              MediaQuery.textScalerOf(context).scale(14) > 20;
       return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           OrderProductThumb(size: thumb, url: p.imageUrl),
-          SizedBox(width: compact ? 10 : 12),
+          SizedBox(width: compact ? 10 : 14),
           Expanded(
             child: stackAmount
                 ? Column(
@@ -120,7 +126,7 @@ Widget pedidoProductoLineCard(
                 : info,
           ),
           if (!stackAmount) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             amount,
           ],
         ],
@@ -128,18 +134,16 @@ Widget pedidoProductoLineCard(
     },
   );
 
-  if (!compact) return row;
-
   return Container(
     width: double.infinity,
     padding: EdgeInsets.symmetric(
-      horizontal: webCompact ? 8 : 10,
-      vertical: webCompact ? 8 : 10,
+      horizontal: compact ? (webCompact ? 8 : 10) : 14,
+      vertical: compact ? (webCompact ? 8 : 10) : 14,
     ),
     decoration: BoxDecoration(
-      color: AppColors.surfaceTinted,
-      borderRadius: BorderRadius.circular(webCompact ? 8 : 10),
-      border: Border.all(color: AppColors.borderSubtle),
+      color: compact ? theme.surfaceSubtle : theme.inputFill,
+      borderRadius: BorderRadius.circular(compact ? (webCompact ? 8 : 10) : 12),
+      border: Border.all(color: theme.borderSubtle),
     ),
     child: row,
   );

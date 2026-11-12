@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/features/kyc/aliado_doc_type.dart';
 import 'package:motolink_pro_app/features/kyc/profile_document_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
 import 'b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status_highlight_widgets.dart';
 
@@ -24,6 +25,7 @@ class TransactionRequestCounterpartyProfileSection extends StatefulWidget {
     this.fiscalMapsUrl,
     this.logoStoragePath,
     this.kycStatus,
+    this.catalogVerifiedAt,
     this.loadApprovedDocuments = true,
   });
 
@@ -38,6 +40,8 @@ class TransactionRequestCounterpartyProfileSection extends StatefulWidget {
   final String? fiscalMapsUrl;
   final String? logoStoragePath;
   final String? kycStatus;
+  /// Sello Verificado (admin); distinto del estado KYC.
+  final DateTime? catalogVerifiedAt;
   final bool loadApprovedDocuments;
 
   @override
@@ -196,10 +200,26 @@ class _TransactionRequestCounterpartyProfileSectionState
                           fontSize: density.contentTitleSize,
                         ),
                       ),
-                      if (!_isImportador) ...[
+                      if (widget.catalogVerifiedAt != null ||
+                          (!_isImportador &&
+                              (widget.kycStatus?.trim().isNotEmpty ??
+                                  false))) ...[
                         const SizedBox(height: 6),
-                        KycAliadoGlobalStatusHighlight(
-                          kycStatus: widget.kycStatus,
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (widget.catalogVerifiedAt != null)
+                              const ImporterCatalogSealChip(
+                                kind: ImporterCatalogSealKind.verified,
+                                compact: false,
+                              ),
+                            if (!_isImportador)
+                              KycAliadoGlobalStatusHighlight(
+                                kycStatus: widget.kycStatus,
+                              ),
+                          ],
                         ),
                       ],
                     ],

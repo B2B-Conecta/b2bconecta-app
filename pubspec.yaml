@@ -66,6 +66,7 @@ dependencies:
   video_compress: ^3.1.4
   crop_your_image: ^2.0.1
   image: ^4.3.0
+  fl_chart: 0.69.0
 
 dev_dependencies:
   flutter_test:

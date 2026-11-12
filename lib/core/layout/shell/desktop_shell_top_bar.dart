@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
@@ -33,15 +33,16 @@ class DesktopShellTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return Material(
-      color: AppColors.surfaceTinted,
+      color: theme.surfaceElevated,
       elevation: 0,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
+          border: Border(bottom: BorderSide(color: theme.border)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.black.withOpacity(0.04),
+              color: theme.textPrimary.withOpacity(0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

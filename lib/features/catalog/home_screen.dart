@@ -521,6 +521,44 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {});
   }
 
+  /// Misma UX que Inicio: lupa del header compacto abre búsqueda en sheet.
+  Future<void> _openCollapsedCatalogSearch(VoidCallback? openFilters) async {
+    final filterBadge = _currentFiltersDraft().activePanelFilterCount;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheet).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Buscar repuestos',
+                  style: Theme.of(sheet).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              CatalogCollapsingSearchField(
+                controller: _searchController,
+                autofocus: true,
+                filterBadge: filterBadge,
+                onSubmitted: () => Navigator.pop(sheet, 'search'),
+                onOpenFilters: () => Navigator.pop(sheet, 'filters'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'filters') {
+      openFilters?.call();
+      return;
+    }
+    _applyFiltersFromUi();
+  }
+
   AliadoCatalogFiltersDraft _currentFiltersDraft() {
     return AliadoCatalogFiltersDraft(
       categoryLabel: _selectedCategoryLabel,
@@ -1275,21 +1313,121 @@ class _HomeScreenState extends State<HomeScreen>
 
               if (!useBrandedHeader) return browse;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              final brandField = _activeFilters.brandField;
+              final brandChip = brandField == null
+                  ? null
+                  : InputChip(
+                      label: Text(brandField.value,
+                          overflow: TextOverflow.ellipsis),
+                      onDeleted: () {
+                        _activeFilters = CatalogFilters.empty;
+                        _applyFiltersFromUi();
+                      },
+                      deleteButtonTooltipMessage: 'Quitar filtro de marca',
+                    );
+              final featuredNotice =
+                  _catalogSortMode == CatalogSortMode.featured
+                      ? Padding(
+                          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF6E5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color:
+                                    const Color(0xFFE8A317).withOpacity(0.35),
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 18,
+                                  color: Color(0xFFE8A317),
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Orden Destacados: primero los proveedores con '
+                                    'sello dorado por alto volumen.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      height: 1.35,
+                                      color: Color(0xFF8A5A00),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : null;
+
+              return Stack(
+                fit: StackFit.expand,
                 children: [
-                  AliadoCatalogBrandedHeader(
-                    profile: widget.profile,
-                    searchController: _searchController,
-                    onSearchSubmitted: _applyFiltersFromUi,
-                    onOpenFilters: openFilters,
-                    onMessagesTap: widget.onMessagesTap,
-                    onNotificationTap: widget.onNotificationTap,
-                    unreadMessages: widget.unreadMessages,
-                    unreadNotifications: widget.unreadNotifications,
-                    filterBadge: filterBadge,
+                  FutureBuilder<List<PartModel>>(
+                    future: _partsFuture,
+                    builder: (context, snapshot) {
+                      return CustomScrollView(
+                        controller: _catalogScrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          AliadoCatalogBrandedHeader(
+                            profile: widget.profile,
+                            searchController: _searchController,
+                            onSearchSubmitted: _applyFiltersFromUi,
+                            onOpenSearch: () =>
+                                _openCollapsedCatalogSearch(openFilters),
+                            onOpenFilters: openFilters,
+                            onMessagesTap: widget.onMessagesTap,
+                            onNotificationTap: widget.onNotificationTap,
+                            unreadMessages: widget.unreadMessages,
+                            unreadNotifications: widget.unreadNotifications,
+                            filterBadge: filterBadge,
+                          ),
+                          AliadoCatalogPinnedFiltersHeader(
+                            horizontalPadding: hPad,
+                            hasBrandChip: brandChip != null,
+                            child: AliadoCatalogToolbar(
+                              selectedFilter: _selectedQuickFilter,
+                              onFilterSelected: _selectQuickFilter,
+                              resultCount:
+                                  _catalogTotal ?? _loadedParts.length,
+                              sortMode: _catalogSortMode,
+                              onSortTap: _openSortSheet,
+                              brandChip: brandChip,
+                            ),
+                          ),
+                          if (featuredNotice != null)
+                            SliverToBoxAdapter(child: featuredNotice),
+                          ..._brandedCatalogContentSlivers(
+                            snapshot: snapshot,
+                            catalogWidth: catalogWidth,
+                            hPad: hPad,
+                            crossAxisCount: crossAxisCount,
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                  Expanded(child: browse),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: CatalogCartBar(
+                      onOpen: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              CartScreen(profile: widget.profile),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
@@ -1297,5 +1435,153 @@ class _HomeScreenState extends State<HomeScreen>
         },
       ),
     );
+  }
+
+  List<Widget> _brandedCatalogContentSlivers({
+    required AsyncSnapshot<List<PartModel>> snapshot,
+    required double catalogWidth,
+    required double hPad,
+    required int crossAxisCount,
+  }) {
+    if (snapshot.connectionState == ConnectionState.waiting &&
+        _loadedParts.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: true,
+          child: CatalogGridSkeleton(
+            maxWidth: catalogWidth,
+            horizontalPadding: hPad,
+          ),
+        ),
+      ];
+    }
+    if (snapshot.hasError) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline,
+                    size: 48, color: Colors.red.shade700),
+                const SizedBox(height: 12),
+                Text(
+                  'No se pudieron cargar los repuestos.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final parts = _loadedParts;
+    if (parts.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _activeFilters.hasAnyFilter
+                    ? 'No encontramos repuestos con esa búsqueda.'
+                    : 'No hay repuestos disponibles.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _clearFilters,
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('Ver todos los repuestos'),
+              ),
+            ],
+          ),
+        ),
+      ];
+    }
+
+    if (_hasMoreProducts && !_isLoadingMore) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _onCatalogScroll();
+      });
+    }
+
+    final showDistance = _activeFilters.sortByDistanceFromReference;
+    final spacing = AliadoCatalogLayout.gridSpacing(catalogWidth);
+    return [
+      SliverPadding(
+        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
+        sliver: SliverCatalogCardRows(
+          columns: crossAxisCount,
+          spacing: spacing,
+          itemCount: parts.length,
+          itemBuilder: (context, index) {
+            final p = parts[index];
+            return AliadoProductCard(
+              part: p,
+              profile: widget.profile,
+              compact: true,
+              showDistanceChips: showDistance,
+              onTap: () {
+                CatalogRouteLock.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (ctx) => ProductDetailScreen(part: p),
+                  ),
+                );
+              },
+              onImporterTap: (p.ownerId?.trim().isNotEmpty ?? false)
+                  ? () {
+                      CatalogRouteLock.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => ImporterStoreProfileScreen(
+                            importerId: p.ownerId!.trim(),
+                            viewer: widget.profile,
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+            );
+          },
+        ),
+      ),
+      if (_isLoadingMore)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 24),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.brand,
+                ),
+              ),
+            ),
+          ),
+        ),
+      const SliverToBoxAdapter(child: SizedBox(height: 72)),
+    ];
   }
 }

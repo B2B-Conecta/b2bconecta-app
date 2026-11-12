@@ -35,7 +35,7 @@ void navigateFromNotificationPayload({
           userId.isEmpty ? null : userId,
         );
         MainShellTabController.navigateToAdminUsers(
-          section: AdminUsersHubSection.verificacion,
+          section: AdminUsersHubSection.cuentas,
           userId: userId.isEmpty ? null : userId,
         );
         return;

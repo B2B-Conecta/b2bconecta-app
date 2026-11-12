@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
-
-import 'pago_metodo.dart';
-import 'pago_revision_estado.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/unified_action_dialog.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
-import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
+import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
 
-String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
+String adminEstadoPagoLabelEs(TransactionRequestModel r) {
   final pe = r.pagoEstadoRevisionEfectivo;
   final m = r.pagoMetodo?.trim();
   final efectivo = m == PagoMetodo.efectivo;
@@ -36,8 +37,24 @@ String _adminEstadoPagoLabelEs(TransactionRequestModel r) {
   }
 }
 
+ButtonStyle _softOutlineStyle(
+  B2BThemeExtension theme, {
+  required Color fg,
+  required Color bg,
+}) {
+  return OutlinedButton.styleFrom(
+    foregroundColor: fg,
+    backgroundColor: bg,
+    side: BorderSide(color: fg.withOpacity(0.35)),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    minimumSize: const Size(0, 36),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+  );
+}
+
 /// Revisión del pago del aliado (comprobante / efectivo): ver archivo y aprobar o rechazar.
-/// Aplica cuando el importador ya adjuntó su factura al aliado; el RPC admite hasta `entregado`.
 class AdminPagoRevisionSection extends StatefulWidget {
   const AdminPagoRevisionSection({
     super.key,
@@ -49,15 +66,12 @@ class AdminPagoRevisionSection extends StatefulWidget {
 
   final TransactionRequestModel request;
   final VoidCallback onRefresh;
-
-  /// Si el pedido ya está entregado y el pago fue aprobado, muestra un cierre explícito “entregado · pagado”.
   final bool highlightEntregadoPagado;
-
-  /// En “En preparación” el título `Pago del aliado` va arriba junto al aviso si aún no hay factura.
   final bool includeSectionTitle;
 
+  /// Etiqueta legible del estado de pago (usada también fuera del panel).
   static String estadoPagoLabelEs(TransactionRequestModel r) =>
-      _adminEstadoPagoLabelEs(r);
+      adminEstadoPagoLabelEs(r);
 
   @override
   State<AdminPagoRevisionSection> createState() =>
@@ -86,13 +100,16 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
       await SupabaseService.adminAprobarPagoAliado(widget.request.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pago de la tienda minorista aprobado.')),
+        const SnackBar(
+          content: Text('Pago aprobado.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       widget.onRefresh();
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text('Error: $e'), behavior: SnackBarBehavior.floating),
       );
     } finally {
       if (mounted) setState(() => _busyAprobar = false);
@@ -100,41 +117,55 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
   }
 
   Future<void> _rechazarPago(BuildContext context) async {
+    final theme = B2BThemeExtension.of(context);
     final ctrl = TextEditingController();
     try {
-      final ok = await showDialog<bool>(
+      final ok = await UnifiedActionDialog.show<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Rechazar comprobante'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+        builder: (ctx) => UnifiedActionDialog(
+          title: 'Rechazar comprobante',
+          subtitle: 'La tienda podrá enviar uno nuevo.',
+          glyph: LucideGlyph.circleAlert,
+          tone: UnifiedActionTone.warning,
+          primaryLabel: 'Rechazar comprobante',
+          onPrimary: () => Navigator.of(ctx).pop(true),
+          body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Motivo opcional; puede enviar otro comprobante.',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                'Motivo opcional con indicaciones para la tienda minorista.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: theme.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: ctrl,
                 maxLines: 3,
-                decoration: const InputDecoration(
+                autofocus: true,
+                style: TextStyle(color: theme.textPrimary, fontSize: 13.5),
+                decoration: InputDecoration(
                   labelText: 'Motivo / indicaciones',
-                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: theme.inputFill,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.borderSubtle),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.borderSubtle),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.brand, width: 1.4),
+                  ),
                 ),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Rechazar'),
-            ),
-          ],
         ),
       );
       if (ok != true || !context.mounted) return;
@@ -148,13 +179,19 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
         );
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comprobante rechazado.')),
+          const SnackBar(
+            content: Text('Comprobante rechazado.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         widget.onRefresh();
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text('Error: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       } finally {
         if (mounted) setState(() => _busyRechazar = false);
@@ -166,6 +203,7 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final r = widget.request;
     if (!r.hasProveedorFactura) return const SizedBox.shrink();
 
@@ -179,72 +217,101 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
             'Pago de la tienda minorista',
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 12,
-              color: AppColors.textPrimary,
+              fontSize: 12.5,
+              color: theme.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
         ],
         Text(
-          'Estado: ${_adminEstadoPagoLabelEs(r)}',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.brandBlue,
+          'Estado: ${adminEstadoPagoLabelEs(r)}',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: theme.brand,
           ),
         ),
         if (widget.highlightEntregadoPagado &&
             pe == PagoRevisionEstado.aprobado &&
             r.status == TransactionRequestStatus.entregado) ...[
           const SizedBox(height: 8),
-          Material(
-            color: Colors.green.shade50,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.check_circle_outline, color: Colors.green.shade800, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Pedido entregado y pagado.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.green.shade900,
-                        height: 1.3,
-                      ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            decoration: BoxDecoration(
+              color: theme.successBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: theme.successFg.withOpacity(0.28)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LucideIcon(
+                  LucideGlyph.circleCheck,
+                  size: 18,
+                  color: theme.successFg,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pedido entregado y pagado.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: theme.successFg,
+                      height: 1.3,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
-        if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty)
+        if (r.pagoMetodo != null && r.pagoMetodo!.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
           Text(
             'Método declarado: ${PagoMetodo.labelEs(r.pagoMetodo!)}',
-            style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.textPrimary,
+            ),
           ),
+        ],
         if (r.hasComprobantePago) ...[
+          const SizedBox(height: 4),
           Text(
             'Comprobante: ${r.comprobantePagoFileName ?? 'archivo'} · '
             '${formatEsShortDateTime(r.comprobantePagoSubmittedAt)}',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () => _openUrl(
-              context,
-              () => SupabaseService.createSignedUrlForComprobantePago(
-                r.comprobantePagoStoragePath!.trim(),
-              ),
-              fileName: r.comprobantePagoFileName,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: theme.textSecondary,
             ),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('Ver comprobante'),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => _openUrl(
+                context,
+                () => SupabaseService.createSignedUrlForComprobantePago(
+                  r.comprobantePagoStoragePath!.trim(),
+                ),
+                fileName: r.comprobantePagoFileName,
+              ),
+              icon: LucideIcon(
+                LucideGlyph.fileText,
+                size: 15,
+                color: theme.brand,
+              ),
+              label: const Text('Ver comprobante'),
+              style: _softOutlineStyle(
+                theme,
+                fg: theme.brand,
+                bg: theme.brandContainer,
+              ),
+            ),
           ),
         ],
         if (r.pagoComprobanteRechazoNota != null &&
@@ -252,37 +319,74 @@ class _AdminPagoRevisionSectionState extends State<AdminPagoRevisionSection> {
           const SizedBox(height: 6),
           Text(
             'Último rechazo: ${r.pagoComprobanteRechazoNota}',
-            style: TextStyle(fontSize: 11, color: Colors.red.shade800, height: 1.25),
+            style: TextStyle(
+              fontSize: 11.5,
+              color: Theme.of(context).colorScheme.error,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
         if (pe == PagoRevisionEstado.enRevision) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              FilledButton(
+              FilledButton.icon(
                 onPressed: _busyAprobar ? null : () => _aprobarPago(context),
-                child: _busyAprobar
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.brand,
+                  foregroundColor: theme.surfaceCard,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(0, 36),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: _busyAprobar
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: theme.surfaceCard,
                         ),
                       )
-                    : const Text('Aprobar pago'),
+                    : LucideIcon(
+                        LucideGlyph.check,
+                        size: 15,
+                        color: theme.surfaceCard,
+                      ),
+                label: Text(_busyAprobar ? 'Aprobando…' : 'Aprobar pago'),
               ),
-              OutlinedButton(
+              OutlinedButton.icon(
                 onPressed: _busyRechazar ? null : () => _rechazarPago(context),
-                child: _busyRechazar
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                style: _softOutlineStyle(
+                  theme,
+                  fg: Theme.of(context).colorScheme.error,
+                  bg: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0x26DC2626)
+                      : const Color(0xFFFEF2F2),
+                ),
+                icon: _busyRechazar
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       )
-                    : const Text('Rechazar comprobante'),
+                    : LucideIcon(
+                        LucideGlyph.close,
+                        size: 15,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                label: Text(
+                  _busyRechazar ? 'Rechazando…' : 'Rechazar comprobante',
+                ),
               ),
             ],
           ),

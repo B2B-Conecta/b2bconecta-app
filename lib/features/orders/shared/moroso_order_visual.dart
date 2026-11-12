@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'order_list_colors.dart';
 import 'transaction_request_model.dart';
 import 'order_flow_copy/order_payment_flow_copy.dart';
 import 'order_flow_copy/order_vocab.dart';
@@ -53,12 +54,12 @@ class MorosoOrderStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Chip(
-      label: const Text(
+      label: Text(
         OrderVocab.chipPagoPendiente,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w800,
-          color: Colors.white,
+          color: OrderListColors.of(context).onAccent,
         ),
       ),
       backgroundColor: Colors.deepOrange.shade700,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
+import 'shell/admin_shell_top_bar.dart';
 import 'shell/desktop_navigation_shell.dart';
 import 'shell/shell_destination.dart';
+import 'shell/shell_nav_badge.dart';
 
 /// Alias histórico — mismos campos que [ShellDestination].
 typedef AdminShellDestination = ShellDestination;
@@ -21,7 +23,20 @@ class AdminDesktopShell extends StatelessWidget {
     this.onMessagesTap,
     this.unreadMessages = 0,
     required this.onOpenSettings,
+    this.onOpenProfile,
+    this.onOpenNotificationPrefs,
+    this.onSignOut,
     this.railStatusBuilder,
+    this.selectedNestedId,
+    this.onNestedDestinationSelected,
+    this.navBadges,
+    this.resolveNavBadge,
+    this.onOpenDrawer,
+    this.onSearchSubmitted,
+    this.onOpenGlobalSearch,
+    this.breadcrumbsOverride,
+    this.onBreadcrumbBack,
+    this.contentOverride,
   });
 
   final Widget Function(bool extended)? railStatusBuilder;
@@ -32,10 +47,24 @@ class AdminDesktopShell extends StatelessWidget {
   final List<Widget> pages;
   final ProfileModel profile;
   final int unreadNotifications;
-  final VoidCallback onNotificationTap;
+  final void Function(BuildContext anchorContext) onNotificationTap;
+  final List<AdminShellBreadcrumb>? breadcrumbsOverride;
+  final VoidCallback? onBreadcrumbBack;
+  final Widget? contentOverride;
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onOpenNotificationPrefs;
+  final Future<void> Function()? onSignOut;
+  final Object? selectedNestedId;
+  final void Function(int parentIndex, Object? nestedId)?
+      onNestedDestinationSelected;
+  final Listenable? navBadges;
+  final ShellNavBadge? Function(Object? key)? resolveNavBadge;
+  final VoidCallback? onOpenDrawer;
+  final ValueChanged<String>? onSearchSubmitted;
+  final VoidCallback? onOpenGlobalSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +79,23 @@ class AdminDesktopShell extends StatelessWidget {
       onMessagesTap: onMessagesTap,
       unreadMessages: unreadMessages,
       onOpenSettings: onOpenSettings,
+      onOpenProfile: onOpenProfile,
+      onOpenNotificationPrefs: onOpenNotificationPrefs,
+      onSignOut: onSignOut,
       railBadgeLabel: 'Panel administrador',
       railStatusBuilder: railStatusBuilder,
+      chrome: DesktopShellChrome.darkCorporate,
+      showBcvFooter: true,
+      selectedNestedId: selectedNestedId,
+      onNestedDestinationSelected: onNestedDestinationSelected,
+      navBadges: navBadges,
+      resolveNavBadge: resolveNavBadge,
+      onOpenDrawer: onOpenDrawer,
+      onSearchSubmitted: onSearchSubmitted,
+      onOpenGlobalSearch: onOpenGlobalSearch,
+      breadcrumbsOverride: breadcrumbsOverride,
+      onBreadcrumbBack: onBreadcrumbBack,
+      contentOverride: contentOverride,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
+import 'order_list_colors.dart';
 import 'order_message_attachment.dart';
 import 'order_message_media.dart';
 import 'order_message_pick.dart';
@@ -399,12 +400,12 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
       FilledButton(
         onPressed: _saving ? null : _submit,
         child: _saving
-            ? const SizedBox(
+            ? SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: OrderListColors.of(context).onAccent,
                 ),
               )
             : const Text('Enviar reporte'),
@@ -458,8 +459,8 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
                         : () => setState(() => _evidence.removeAt(index)),
                     icon: const Icon(Icons.close, size: 16),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.card,
-                      foregroundColor: AppColors.textPrimary,
+                      backgroundColor: OrderListColors.of(context).surface,
+                      foregroundColor: OrderListColors.of(context).ink,
                     ),
                   ),
                 ),
@@ -493,11 +494,12 @@ class _ProductRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = OrderListColors.of(context);
     final name = (line.productName ?? '').trim();
     final sku = line.productSku?.trim();
     final reported = line.postventaDevolucionAt != null;
     return Material(
-      color: AppColors.card,
+      color: colors.surface,
       borderRadius: BorderRadius.circular(12),
       child: Container(
           padding: const EdgeInsets.all(10),
@@ -634,11 +636,12 @@ class _Preview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = OrderListColors.of(context);
     final pref = OrderReturnRules.preferenceLabel(preference);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle),
       ),
@@ -732,6 +735,7 @@ class _SavedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = OrderListColors.of(context);
     final line = report.line;
     final name = (line.productName ?? 'Producto').trim();
     final sku = line.productSku?.trim();
@@ -739,7 +743,7 @@ class _SavedCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSubtle),
       ),

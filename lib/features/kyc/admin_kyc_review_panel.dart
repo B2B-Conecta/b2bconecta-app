@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'account_access_status.dart';
 import 'aliado_doc_type.dart';
 import 'document_review_status.dart';
 import 'kyc_status.dart';
 import 'profile_document_model.dart';
-import 'profile_kyc_document_tile.dart';
 import 'package:motolink_pro_app/features/admin/admin_action_rules.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_dossier_form.dart';
@@ -22,9 +20,13 @@ import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_filter_bar.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_filter_models.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_search.dart';
+import 'package:motolink_pro_app/features/kyc/kyc_doc_photo_slots.dart';
+import 'package:motolink_pro_app/features/kyc/kyc_rejection_note_dialog.dart';
 
 /// Admin: cola de verificación (aliados KYC + mayoristas / importadores).
 class AdminKycReviewPanel extends StatefulWidget {
@@ -226,23 +228,6 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     return sortOwnerAccounts(rows, sort: _sort);
   }
 
-  Future<void> _openDocument(ProfileDocumentModel doc) async {
-    try {
-      final url = await SupabaseService.createSignedUrlForProfileDocument(
-        doc.storagePath,
-      );
-      final uri = Uri.parse(url);
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        throw StateError('No se pudo abrir el archivo.');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo abrir: $e')),
-      );
-    }
-  }
-
   Future<void> _uploadDoc({
     required ProfileModel profile,
     required String docType,
@@ -319,36 +304,7 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     }
   }
 
-  Future<String?> _promptRejectionNote() async {
-    final ctrl = TextEditingController();
-    final res = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Motivo del rechazo'),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Indique qué debe corregir el usuario…',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-            child: const Text('Rechazar'),
-          ),
-        ],
-      ),
-    );
-    ctrl.dispose();
-    if (res == null || res.length < 3) return null;
-    return res;
-  }
+  Future<String?> _promptRejectionNote() => promptKycRejectionNote(context);
 
   Future<void> _setGlobalKyc(ProfileModel profile, String status) async {
     if (!_canReviewKyc || !_canSetAccess) return;
@@ -877,95 +833,40 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
           style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
-        ...AliadoDocType.forAdminReview(
+        ...AliadoDocType.docGroupsForAdmin(
           role: role,
           uploadedTypes: currentByType.keys,
-        ).map((type) {
-          final doc = currentByType[type];
-          final has = doc != null;
-          final st = doc?.reviewStatus?.trim();
-          final busy = _busyDocKey == '${p.id}:$type';
-          final canApprove =
-              _canReviewKyc && has && st != DocumentReviewStatus.aprobado;
-          final canReject =
-              _canReviewKyc && has && st != DocumentReviewStatus.rechazado;
+        ).map((group) {
+          final prefix = '${p.id}:';
+          final busyType = _busyDocKey != null && _busyDocKey!.startsWith(prefix)
+              ? _busyDocKey!.substring(prefix.length)
+              : null;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ProfileKycDocumentTile(
-                  title: AliadoDocType.labelEs(type),
-                  hasFile: has,
-                  statusLabel: has
-                      ? DocumentReviewStatus.labelEs(
-                          st ?? DocumentReviewStatus.pendiente,
-                        )
-                      : 'Sin archivo',
-                  effectiveStatus: st,
-                  busy: busy,
-                  compactActions: true,
-                  showPickActions: true,
-                  reviewNote: doc?.reviewNote,
-                  onView: has ? () => _openDocument(doc) : null,
-                  onPickCamera: () => _uploadDoc(
-                    profile: p,
-                    docType: type,
-                    channel: DocumentPickChannel.camera,
-                  ),
-                  onPickGallery: () => _uploadDoc(
-                    profile: p,
-                    docType: type,
-                    channel: DocumentPickChannel.gallery,
-                  ),
-                  onPickFile: () => _uploadDoc(
-                    profile: p,
-                    docType: type,
-                    channel: DocumentPickChannel.file,
-                  ),
-                ),
-                if (canApprove || canReject) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      if (canApprove)
-                        Expanded(
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                            onPressed: busy
-                                ? null
-                                : () => _reviewDoc(
-                                      profile: p,
-                                      docType: type,
-                                      status: DocumentReviewStatus.aprobado,
-                                    ),
-                            child: const Text('Aprobar'),
-                          ),
-                        ),
-                      if (canApprove && canReject) const SizedBox(width: 8),
-                      if (canReject)
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              foregroundColor: Colors.red.shade800,
-                            ),
-                            onPressed: busy
-                                ? null
-                                : () => _reviewDoc(
-                                      profile: p,
-                                      docType: type,
-                                      status: DocumentReviewStatus.rechazado,
-                                    ),
-                            child: const Text('Rechazar'),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ],
+            child: KycDocPhotoSlots(
+              baseType: group,
+              docsByType: {
+                for (final slot in AliadoDocType.photoSlotsFor(group))
+                  if (currentByType[slot] != null) slot: currentByType[slot]!,
+              },
+              busyType: busyType,
+              canUpload: true,
+              canReview: _canReviewKyc,
+              onUpload: (docType, channel) => _uploadDoc(
+                profile: p,
+                docType: docType,
+                channel: channel,
+              ),
+              onApprove: (docType) => _reviewDoc(
+                profile: p,
+                docType: docType,
+                status: DocumentReviewStatus.aprobado,
+              ),
+              onReject: (docType) => _reviewDoc(
+                profile: p,
+                docType: docType,
+                status: DocumentReviewStatus.rechazado,
+              ),
             ),
           );
         }),
@@ -1066,6 +967,20 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
     final listColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: AdminUsersChrome.card(),
+            child: AdminUsersChrome.sectionHeader(
+              title: 'Bandeja de verificación',
+              subtitle:
+                  'Revise RIF en expediente, registro mercantil, cédulas y '
+                  'referencias. Apruebe o rechace con feedback inmediato.',
+              glyph: LucideGlyph.clipboardCheck,
+            ),
+          ),
+        ),
         AdminUsersFilterBar(
           searchController: _searchCtrl,
           searchHint: 'Buscar por empresa, RIF, correo o teléfono…',

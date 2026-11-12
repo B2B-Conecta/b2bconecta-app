@@ -4,7 +4,7 @@ import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/features/catalog/promo_banner_layout.dart';
 
 /// Resultado del recorte obligatorio de una valla.
@@ -124,8 +124,10 @@ class _PromoBannerCropDialogState extends State<_PromoBannerCropDialog> {
     final maxH = size.height * 0.86;
     final ratioLabel = widget.mobile ? '3:1' : '7:1';
     final slot = widget.mobile ? 'móvil' : 'escritorio';
+    final theme = B2BThemeExtension.of(context);
 
     return Dialog(
+      backgroundColor: theme.dialogSurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
@@ -136,9 +138,10 @@ class _PromoBannerCropDialogState extends State<_PromoBannerCropDialog> {
             children: [
               Text(
                 'Recortar valla ($slot · $ratioLabel)',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
+                  color: theme.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -149,7 +152,7 @@ class _PromoBannerCropDialogState extends State<_PromoBannerCropDialog> {
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.35,
-                  color: AppColors.textSecondary,
+                  color: theme.textSecondary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -157,7 +160,7 @@ class _PromoBannerCropDialogState extends State<_PromoBannerCropDialog> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: ColoredBox(
-                    color: Colors.black87,
+                    color: theme.textPrimary.withOpacity(0.87),
                     child: Crop(
                       image: widget.imageBytes,
                       controller: _controller,
@@ -165,10 +168,10 @@ class _PromoBannerCropDialogState extends State<_PromoBannerCropDialog> {
                       withCircleUi: false,
                       interactive: true,
                       fixCropRect: true,
-                      baseColor: Colors.black87,
-                      maskColor: Colors.black.withOpacity(.55),
-                      progressIndicator: const Center(
-                        child: CircularProgressIndicator(color: AppColors.brand),
+                      baseColor: theme.textPrimary.withOpacity(0.87),
+                      maskColor: theme.textPrimary.withOpacity(0.55),
+                      progressIndicator: Center(
+                        child: CircularProgressIndicator(color: theme.brand),
                       ),
                       onCropped: _onCropped,
                     ),
@@ -204,13 +207,17 @@ class _PromoBannerCropDialogState extends State<_PromoBannerCropDialog> {
                             });
                             _controller.crop();
                           },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.brand,
+                      foregroundColor: theme.surfaceCard,
+                    ),
                     icon: _busy
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: theme.surfaceCard,
                             ),
                           )
                         : const Icon(Icons.crop),

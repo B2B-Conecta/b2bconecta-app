@@ -69,8 +69,10 @@ Future<PickedDocumentBytes?> _guarded(
   }
 }
 
-/// Muestra cámara / galería / archivo y devuelve bytes listos para subir.
+/// En móvil muestra cámara / galería / archivo; en web abre el selector nativo.
 Future<PickedDocumentBytes?> pickKycDocumentBytes(BuildContext context) async {
+  if (kIsWeb) return _pickFromFiles();
+
   final source = await showModalBottomSheet<DocumentPickChannel>(
     context: context,
     showDragHandle: true,
@@ -88,11 +90,7 @@ Future<PickedDocumentBytes?> pickKycDocumentBytes(BuildContext context) async {
           ListTile(
             leading: const Icon(Icons.photo_camera_outlined),
             title: const Text('Tomar foto'),
-            subtitle: const Text(
-              kIsWeb
-                  ? 'En iPhone: elija Cámara o Fototeca en el menú'
-                  : 'Usar la cámara del dispositivo',
-            ),
+            subtitle: const Text('Usar la cámara del dispositivo'),
             onTap: () => Navigator.of(ctx).pop(DocumentPickChannel.camera),
           ),
           ListTile(
@@ -125,8 +123,10 @@ Future<PickedDocumentBytes?> pickKycDocumentBytes(BuildContext context) async {
   }
 }
 
-/// Solo imágenes (logo de perfil): cámara, galería o archivo.
+/// Solo imágenes (logo de perfil). En web abre el selector nativo directo.
 Future<PickedDocumentBytes?> pickProfileImageBytes(BuildContext context) async {
+  if (kIsWeb) return _pickImageFromFiles();
+
   final source = await showModalBottomSheet<DocumentPickChannel>(
     context: context,
     showDragHandle: true,

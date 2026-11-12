@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'admin_order_rating_row_model.dart';
-import 'rating_questionnaire_model.dart';
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
+import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
-import 'rating_scale_labels.dart';
-import 'aliado_order_experience_display.dart';
-import 'order_rating_form.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/reputation/admin_order_rating_row_model.dart';
+import 'package:motolink_pro_app/features/reputation/aliado_order_experience_display.dart';
+import 'package:motolink_pro_app/features/reputation/order_rating_form.dart';
+import 'package:motolink_pro_app/features/reputation/rating_questionnaire_model.dart';
+import 'package:motolink_pro_app/features/reputation/rating_scale_labels.dart';
 
 enum _AdminRatingFilter {
   all,
@@ -18,7 +20,13 @@ enum _AdminRatingFilter {
   commentHidden,
 }
 
-/// C4: expediente admin — listado de valoraciones con nombres reales.
+/// Ámbar corporativo de estrellas (módulo valoraciones).
+const Color _kRatingAmber = Color(0xFFF59E0B);
+
+/// Alias de producto del módulo Valoraciones (`/admin/ratings`).
+typedef RatingsModule = AdminOrderRatingsPanel;
+
+/// C4: expediente admin — resumen + listado estándar de valoraciones.
 class AdminOrderRatingsPanel extends StatefulWidget {
   const AdminOrderRatingsPanel({super.key});
 
@@ -27,6 +35,8 @@ class AdminOrderRatingsPanel extends StatefulWidget {
 }
 
 class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
+  final _searchCtrl = TextEditingController();
+
   bool _loading = true;
   String? _error;
   List<AdminOrderRatingRowModel> _rows = const [];
@@ -39,32 +49,77 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
     questions: [],
   );
   int _offset = 0;
-  static const _pageSize = 50;
+  static const _fetchSize = 100;
   bool _end = false;
   _AdminRatingFilter _filter = _AdminRatingFilter.all;
+  int _pageIndex = 0;
+  int _pageSize = listPageSizeOptions.first;
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() {
+      if (!mounted) return;
+      setState(() => _pageIndex = 0);
+    });
     _load();
   }
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     super.dispose();
   }
 
   List<AdminOrderRatingRowModel> get _filteredRows {
+    Iterable<AdminOrderRatingRowModel> list = _rows;
     switch (_filter) {
       case _AdminRatingFilter.all:
-        return _rows;
+        break;
       case _AdminRatingFilter.aliadoRatesImporter:
-        return _rows.where((r) => r.raterRole == 'aliado').toList();
+        list = list.where((r) => r.raterRole == 'aliado');
       case _AdminRatingFilter.importerRatesAliado:
-        return _rows.where((r) => r.raterRole == 'importador').toList();
+        list = list.where((r) => r.raterRole == 'importador');
       case _AdminRatingFilter.commentHidden:
-        return _rows.where((r) => r.commentHidden).toList();
+        list = list.where((r) => r.commentHidden);
     }
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((r) {
+        final hay = [
+          r.aliadoName,
+          r.importadorName,
+          r.comment,
+          r.raterLabelEs,
+          r.checkoutGroupId ?? '',
+        ].join(' ').toLowerCase();
+        return hay.contains(q);
+      });
+    }
+    return list.toList();
+  }
+
+  _RatingsSummary get _summary {
+    final source = _rows;
+    if (source.isEmpty) {
+      return const _RatingsSummary(
+        average: 0,
+        total: 0,
+        buckets: [0, 0, 0, 0, 0],
+      );
+    }
+    final buckets = List<int>.filled(5, 0);
+    var sum = 0;
+    for (final r in source) {
+      final s = r.overallStars.clamp(1, 5);
+      buckets[s - 1]++;
+      sum += s;
+    }
+    return _RatingsSummary(
+      average: sum / source.length,
+      total: source.length,
+      buckets: buckets,
+    );
   }
 
   Future<void> _setCommentHidden(
@@ -76,13 +131,19 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       reason = await _promptHideReason();
       if (reason == null) return;
     } else {
+      final theme = B2BThemeExtension.of(context);
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Restaurar comentario'),
-          content: const Text(
+          backgroundColor: theme.dialogSurface,
+          title: Text(
+            'Restaurar comentario',
+            style: TextStyle(color: theme.textPrimary),
+          ),
+          content: Text(
             'El texto volverá a mostrarse en reputación pública. '
             'Las estrellas no se modifican.',
+            style: TextStyle(color: theme.textSecondary),
           ),
           actions: [
             TextButton(
@@ -122,7 +183,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No se pudo moderar: $e'),
-          backgroundColor: Colors.red.shade800,
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -130,26 +191,38 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
   }
 
   Future<String?> _promptHideReason() async {
+    final theme = B2BThemeExtension.of(context);
     final controller = TextEditingController();
     final res = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ocultar comentario'),
+        backgroundColor: theme.dialogSurface,
+        title: Text(
+          'Ocultar comentario',
+          style: TextStyle(color: theme.textPrimary),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'El texto dejará de verse en reputación. '
               'Las estrellas y el promedio no cambian.',
+              style: TextStyle(color: theme.textSecondary),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               maxLines: 3,
-              decoration: const InputDecoration(
+              style: TextStyle(color: theme.textPrimary),
+              decoration: InputDecoration(
                 labelText: 'Motivo (opcional)',
-                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: theme.inputFill,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.borderSubtle),
+                ),
               ),
             ),
           ],
@@ -176,17 +249,20 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       _error = null;
       _offset = 0;
       _end = false;
+      _pageIndex = 0;
     });
     try {
       final results = await Future.wait([
         SupabaseService.listAdminOrderRatings(
-          limit: _pageSize,
+          limit: _fetchSize,
           offset: 0,
         ),
         SupabaseService.fetchRatingQuestionnaire(
-            audience: 'aliado_rates_importer'),
+          audience: 'aliado_rates_importer',
+        ),
         SupabaseService.fetchRatingQuestionnaire(
-            audience: 'importer_rates_aliado'),
+          audience: 'importer_rates_aliado',
+        ),
       ]);
       if (!mounted) return;
       final batch = results[0] as List<AdminOrderRatingRowModel>;
@@ -197,7 +273,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         _aliadoQ = aq;
         _importadorQ = iq;
         _offset = _rows.length;
-        _end = batch.length < _pageSize;
+        _end = batch.length < _fetchSize;
         _loading = false;
         _error = null;
       });
@@ -215,14 +291,14 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
     setState(() => _loading = true);
     try {
       final batch = await SupabaseService.listAdminOrderRatings(
-        limit: _pageSize,
+        limit: _fetchSize,
         offset: _offset,
       );
       if (!mounted) return;
       setState(() {
         _rows = [..._rows, ...batch];
         _offset = _rows.length;
-        _end = batch.length < _pageSize;
+        _end = batch.length < _fetchSize;
         _loading = false;
       });
     } catch (e) {
@@ -240,11 +316,83 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
     return const RatingQuestionnaireModel(version: 'bucket_v1', questions: []);
   }
 
+  void _writeRating() {
+    MainShellTabController.navigateToAdminActivosForNotification();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Abre un pedido entregado y usa «Valorar como administración».',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _showDetail(AdminOrderRatingRowModel row) async {
+    final theme = B2BThemeExtension.of(context);
+    final q = _questionnaireFor(row);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.dialogSurface,
+        title: Text(
+          'Detalle de valoración',
+          style: TextStyle(
+            color: theme.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: _RatingDetailBody(row: row, questionnaire: q),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onRowAction(AdminOrderRatingRowModel row, String id) {
+    switch (id) {
+      case 'detail':
+        _showDetail(row);
+      case 'hide':
+        _setCommentHidden(row, hidden: true);
+      case 'restore':
+        _setCommentHidden(row, hidden: false);
+      case 'moderate':
+        if (row.commentHidden) {
+          _setCommentHidden(row, hidden: false);
+        } else if (row.comment.trim().isNotEmpty) {
+          _setCommentHidden(row, hidden: true);
+        }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final filtered = _filteredRows;
+    final page = sliceListPage(
+      items: filtered,
+      pageIndex: _pageIndex,
+      pageSize: _pageSize,
+    );
+    final summary = _summary;
+
     if (_loading && _rows.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: CircularProgressIndicator(color: theme.brand),
+      );
     }
+
     if (_error != null && _rows.isEmpty) {
       return Center(
         child: Padding(
@@ -252,7 +400,11 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.textSecondary),
+              ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: _load,
@@ -263,482 +415,702 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
         ),
       );
     }
-    if (_rows.isEmpty) {
-      return Center(
-        child: Text(
-          'No hay valoraciones registradas.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
-
-    final filtered = _filteredRows;
 
     return RefreshIndicator(
       onRefresh: _load,
+      color: theme.brand,
       child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          children: [
-            _AdminRatingsToolbar(
-              totalCount: _rows.length,
-              filteredCount: filtered.length,
-              filter: _filter,
-              loading: _loading,
-              onFilterChanged: (f) => setState(() => _filter = f),
-              onRefresh: _load,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        children: [
+          _RatingsSummaryHeader(summary: summary),
+          const SizedBox(height: 14),
+          B2bDataTableShell(
+            padding: const EdgeInsets.all(14),
+            toolbar: B2bDataTableToolbar(
+              searchController: _searchCtrl,
+              searchHint: 'Buscar taller, mayorista o comentario…',
+              onSearchChanged: (_) {},
+              filters: [
+                for (final f in _AdminRatingFilter.values)
+                  B2bDataTableFilterPill(
+                    label: switch (f) {
+                      _AdminRatingFilter.all => 'Todas',
+                      _AdminRatingFilter.aliadoRatesImporter =>
+                        'Tienda → mayorista',
+                      _AdminRatingFilter.importerRatesAliado =>
+                        'Mayorista → tienda',
+                      _AdminRatingFilter.commentHidden => 'Ocultos',
+                    },
+                    selected: _filter == f,
+                    onTap: () => setState(() {
+                      _filter = f;
+                      _pageIndex = 0;
+                    }),
+                  ),
+              ],
+              primaryAction: FilledButton.icon(
+                onPressed: _writeRating,
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.brand,
+                  foregroundColor: theme.surfaceCard,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: LucideIcon(
+                  LucideGlyph.messageSquarePlus,
+                  size: 16,
+                  color: theme.surfaceCard,
+                ),
+                label: const Text(
+                  'Escribir una valoración',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+              trailing: [
+                IconButton(
+                  onPressed: _loading ? null : _load,
+                  tooltip: 'Actualizar',
+                  icon: LucideIcon(
+                    LucideGlyph.refreshCw,
+                    size: 18,
+                    color: theme.textSecondary,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            if (filtered.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Text(
-                    'Ninguna valoración coincide con el filtro.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            header: const B2bDataTableHeader(
+              cells: [
+                B2bDataTableHeaderCell(label: 'Comprador / Taller', flex: 3),
+                B2bDataTableHeaderCell(label: 'Calificación', flex: 3),
+                B2bDataTableHeaderCell(label: 'Comentario', flex: 4),
+              ],
+            ),
+            empty: filtered.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 36),
+                    child: Center(
+                      child: Text(
+                        _rows.isEmpty
+                            ? 'No hay valoraciones registradas.'
+                            : 'Ninguna valoración coincide con el filtro.',
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
+            rows: [
+              for (var i = 0; i < page.length; i++)
+                B2bDataTableZebraRow(
+                  zebra: i.isOdd,
+                  isLast: i == page.length - 1,
+                  onTap: () => _showDetail(page[i]),
+                  child: _RatingTableRow(
+                    row: page[i],
+                    onAction: (id) => _onRowAction(page[i], id),
                   ),
                 ),
-              )
-            else
-              PagedItems(
-                items: filtered,
-                embedded: true,
-                hasMore: !_end,
-                onNeedMore: _loadMore,
-                separator: 10,
-                itemBuilder: (r) {
-                  return _AdminOrderRatingCard(
-                    row: r,
-                    questionnaire: _questionnaireFor(r),
-                    onHideComment: (!r.commentHidden &&
-                            r.comment.trim().isNotEmpty)
-                        ? () => _setCommentHidden(r, hidden: true)
-                        : null,
-                    onRestoreComment: r.commentHidden
-                        ? () => _setCommentHidden(r, hidden: false)
-                        : null,
-                  );
-                },
-              ),
-            if (_loading && _rows.isNotEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+            ],
+            footer: ListPageBar(
+              total: filtered.length,
+              pageIndex: _pageIndex,
+              pageSize: _pageSize,
+              alwaysShow: filtered.isNotEmpty,
+              entityLabel: 'valoraciones',
+              hasMore: !_end,
+              onPageIndex: (index) {
+                setState(() => _pageIndex = index);
+                final last =
+                    ((filtered.length - 1) / _pageSize).floor().clamp(0, 9999);
+                if (index >= last && !_end) {
+                  _loadMore();
+                }
+              },
+              onPageSize: (size) => setState(() {
+                _pageSize = size;
+                _pageIndex = 0;
+              }),
+            ),
+          ),
+          if (_loading && _rows.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.brand,
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _AdminRatingsToolbar extends StatelessWidget {
-  const _AdminRatingsToolbar({
-    required this.totalCount,
-    required this.filteredCount,
-    required this.filter,
-    required this.loading,
-    required this.onFilterChanged,
-    required this.onRefresh,
+class _RatingsSummary {
+  const _RatingsSummary({
+    required this.average,
+    required this.total,
+    required this.buckets,
   });
 
-  final int totalCount;
-  final int filteredCount;
-  final _AdminRatingFilter filter;
-  final bool loading;
-  final ValueChanged<_AdminRatingFilter> onFilterChanged;
-  final VoidCallback onRefresh;
+  final double average;
+  final int total;
+
+  /// Conteos indexados 0→1★ … 4→5★.
+  final List<int> buckets;
+}
+
+class _RatingsSummaryHeader extends StatelessWidget {
+  const _RatingsSummaryHeader({required this.summary});
+
+  final _RatingsSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                filter == _AdminRatingFilter.all
-                    ? '$totalCount valoraciones'
-                    : '$filteredCount de $totalCount',
+    final theme = B2BThemeExtension.of(context);
+    final avgLabel = summary.total == 0
+        ? '—'
+        : summary.average.toStringAsFixed(1);
+    final stars = summary.total == 0 ? 0 : summary.average.round().clamp(1, 5);
+    final maxBucket = summary.buckets.isEmpty
+        ? 1
+        : summary.buckets.reduce((a, b) => a > b ? a : b).clamp(1, 1 << 30);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: theme.textPrimary.withOpacity(
+              Theme.of(context).brightness == Brightness.dark ? 0.28 : 0.06,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 720;
+          final score = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Puntuación global',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textSecondary,
                 ),
               ),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    avgLabel,
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'de 5',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _AmberStarsRow(stars: stars, size: 20),
+              const SizedBox(height: 6),
+              Text(
+                summary.total == 1
+                    ? '1 reseña evaluada'
+                    : '${summary.total} reseñas evaluadas',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textSecondary,
+                ),
+              ),
+            ],
+          );
+
+          final chart = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Distribución',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (var star = 5; star >= 1; star--) ...[
+                if (star < 5) const SizedBox(height: 6),
+                _StarDistributionBar(
+                  star: star,
+                  count: summary.buckets[star - 1],
+                  total: summary.total,
+                  maxCount: maxBucket,
+                ),
+              ],
+            ],
+          );
+
+          if (wide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 2, child: score),
+                const SizedBox(width: 28),
+                Expanded(flex: 5, child: chart),
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              score,
+              const SizedBox(height: 16),
+              chart,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AmberStarsRow extends StatelessWidget {
+  const _AmberStarsRow({required this.stars, this.size = 18});
+
+  final int stars;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final filled = stars > i;
+        return Icon(
+          filled ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: size,
+          color: filled ? _kRatingAmber : theme.textMuted,
+        );
+      }),
+    );
+  }
+}
+
+class _StarDistributionBar extends StatelessWidget {
+  const _StarDistributionBar({
+    required this.star,
+    required this.count,
+    required this.total,
+    required this.maxCount,
+  });
+
+  final int star;
+  final int count;
+  final int total;
+  final int maxCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final pct = total == 0 ? 0.0 : count / total;
+    final barFrac = maxCount == 0 ? 0.0 : count / maxCount;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 18,
+          child: Text(
+            '$star',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: theme.textPrimary,
             ),
-            IconButton(
-              onPressed: loading ? null : onRefresh,
-              icon: const Icon(Icons.refresh, size: 20),
-              tooltip: 'Actualizar',
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
+          ),
         ),
-        const SizedBox(height: 6),
-        SegmentedFilterBar(
-          labels: const [
-            'Todas',
-            'Tienda → mayorista',
-            'Mayorista → tienda',
-            'Ocultos',
-          ],
-          selectedIndex: filter.index,
-          onSelected: (index) =>
-              onFilterChanged(_AdminRatingFilter.values[index]),
+        const Icon(Icons.star_rounded, size: 14, color: _kRatingAmber),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 8,
+              child: Stack(
+                children: [
+                  Container(color: theme.inputFill),
+                  FractionallySizedBox(
+                    widthFactor: barFrac.clamp(0.0, 1.0),
+                    child: Container(color: _kRatingAmber.withOpacity(0.85)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 42,
+          child: Text(
+            total == 0 ? '0%' : '${(pct * 100).round()}%',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: theme.textSecondary,
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
-class _AdminOrderRatingCard extends StatefulWidget {
-  const _AdminOrderRatingCard({
+class _RatingTableRow extends StatelessWidget {
+  const _RatingTableRow({
+    required this.row,
+    required this.onAction,
+  });
+
+  final AdminOrderRatingRowModel row;
+  final ValueChanged<String> onAction;
+
+  String get _storeName {
+    // Comprador / taller: tienda minorista (aliado).
+    return row.aliadoName.trim().isEmpty ? 'Sin nombre' : row.aliadoName.trim();
+  }
+
+  String get _subtitle {
+    final direction = row.raterRole == 'aliado'
+        ? 'Valora a ${row.importadorName}'
+        : 'Valorado por ${row.importadorName}';
+    final at = row.submittedAt;
+    if (at == null) return direction;
+    return '$direction · ${formatEsShortDateTime(at)}';
+  }
+
+  String get _productLabel {
+    final group = row.checkoutGroupId?.trim();
+    if (group != null && group.isNotEmpty) {
+      final short = group.replaceAll('-', '');
+      final id = short.length <= 8 ? short : '${short.substring(0, 8)}…';
+      return 'Pedido $id';
+    }
+    return row.importadorName.trim().isEmpty
+        ? 'Pedido B2B'
+        : row.importadorName.trim();
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      final s = parts.first;
+      return s.substring(0, s.length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final canHide = !row.commentHidden && row.comment.trim().isNotEmpty;
+    final canRestore = row.commentHidden;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 640;
+        final buyer = Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: theme.brandContainer,
+              child: Text(
+                _initials(_storeName),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: theme.brand,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _storeName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+        final rating = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _AmberStarsRow(stars: row.overallStars.clamp(0, 5), size: 16),
+            const SizedBox(height: 4),
+            Text(
+              _productLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            if (row.commentHidden)
+              B2bDataStatusBadge(
+                label: 'Oculto',
+                foreground: theme.textPrimary,
+                background: theme.surfaceSubtle,
+              )
+            else
+              B2bDataStatusBadge(
+                label: 'Verificado',
+                foreground: theme.successFg,
+                background: theme.successBg,
+              ),
+          ],
+        );
+
+        final comment = Text(
+          row.comment.trim().isEmpty
+              ? 'Sin comentario'
+              : row.comment.trim(),
+          maxLines: compact ? 3 : 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            fontWeight: FontWeight.w500,
+            fontStyle: row.comment.trim().isEmpty || row.commentHidden
+                ? FontStyle.italic
+                : FontStyle.normal,
+            color: theme.textSecondary,
+          ),
+        );
+
+        final actions = B2bDataRowActionsMenu(
+          actions: [
+            const B2bDataRowAction(
+              id: 'detail',
+              label: 'Ver detalles',
+              glyph: LucideGlyph.eye,
+            ),
+            B2bDataRowAction(
+              id: 'moderate',
+              label: canRestore
+                  ? 'Restaurar comentario'
+                  : 'Moderar comentario',
+              glyph: canRestore ? LucideGlyph.eye : LucideGlyph.eyeOff,
+              enabled: canHide || canRestore,
+            ),
+            B2bDataRowAction(
+              id: 'hide',
+              label: 'Eliminar reseña',
+              glyph: LucideGlyph.trash2,
+              destructive: true,
+              enabled: canHide,
+            ),
+          ],
+          onSelected: onAction,
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: buyer),
+                  actions,
+                ],
+              ),
+              const SizedBox(height: 10),
+              rating,
+              const SizedBox(height: 8),
+              comment,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 3, child: buyer),
+            const SizedBox(width: 8),
+            Expanded(flex: 3, child: rating),
+            const SizedBox(width: 8),
+            Expanded(flex: 4, child: comment),
+            actions,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RatingDetailBody extends StatelessWidget {
+  const _RatingDetailBody({
     required this.row,
     required this.questionnaire,
-    this.onHideComment,
-    this.onRestoreComment,
   });
 
   final AdminOrderRatingRowModel row;
   final RatingQuestionnaireModel questionnaire;
-  final VoidCallback? onHideComment;
-  final VoidCallback? onRestoreComment;
-
-  @override
-  State<_AdminOrderRatingCard> createState() => _AdminOrderRatingCardState();
-}
-
-class _AdminOrderRatingCardState extends State<_AdminOrderRatingCard> {
-  bool _detailExpanded = false;
-
-  bool get _isAliadoRater => widget.row.raterRole == 'aliado';
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.row;
-    final q = widget.questionnaire;
-    final at = r.submittedAt;
-    final hasDimensions = r.answers.isNotEmpty && q.questions.isNotEmpty;
-    final accent = _isAliadoRater
-        ? AppColors.brandAccent
-        : AppColors.successGreen;
-    final accentBg = accent.withOpacity(0.14);
-    final canModerate =
-        widget.onHideComment != null || widget.onRestoreComment != null;
+    final theme = B2BThemeExtension.of(context);
+    final hasDimensions =
+        row.answers.isNotEmpty && questionnaire.questions.isNotEmpty;
 
-    return Material(
-      color: AppColors.card,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: r.commentHidden
-              ? Colors.orange.shade300
-              : AppColors.borderSubtle,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-            color: accentBg,
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.fieldFill,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: accent.withOpacity(0.45)),
-                  ),
-                  child: Text(
-                    r.raterLabelEs,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: accent,
-                    ),
-                  ),
-                ),
-                if (r.commentHidden) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.orange.shade300),
-                    ),
-                    child: Text(
-                      'Comentario oculto',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.orange.shade900,
-                      ),
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                if (at != null)
-                  Text(
-                    formatEsShortDateTime(at),
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          row.raterLabelEs,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: theme.brand,
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.store_outlined, size: 14, color: accent),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _shortName(r.importadorName),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 7, top: 2, bottom: 2),
-                  child: Icon(
-                    Icons.arrow_downward,
-                    size: 12,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.build_outlined, size: 14, color: accent),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _shortName(r.aliadoName),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (r.checkoutGroupId != null &&
-                    r.checkoutGroupId!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Carrito ${_shortUuid(r.checkoutGroupId!)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    AliadoExperienceStarsRow(
-                      stars: r.overallStars.clamp(1, 5),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${r.overallStars} / 5',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: ratingValueColor(r.overallStars.clamp(1, 5)),
-                      ),
-                    ),
-                  ],
-                ),
-                if (r.comment.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    r.comment.trim(),
-                    maxLines: _detailExpanded ? null : 3,
-                    overflow: _detailExpanded
-                        ? TextOverflow.visible
-                        : TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: r.commentHidden
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
-                      fontStyle: r.commentHidden
-                          ? FontStyle.italic
-                          : FontStyle.normal,
-                    ),
-                  ),
-                  if (r.commentHidden &&
-                      (r.commentHiddenReason?.trim().isNotEmpty ?? false)) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Motivo: ${r.commentHiddenReason!.trim()}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.orange.shade900,
-                      ),
-                    ),
-                  ],
-                ],
-                if (canModerate) ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: r.commentHidden
-                        ? TextButton.icon(
-                            onPressed: widget.onRestoreComment,
-                            icon: const Icon(Icons.visibility_outlined,
-                                size: 18),
-                            label: const Text('Restaurar comentario'),
-                          )
-                        : TextButton.icon(
-                            onPressed: widget.onHideComment,
-                            icon: const Icon(Icons.visibility_off_outlined,
-                                size: 18),
-                            label: const Text('Ocultar comentario'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.orange.shade900,
-                            ),
-                          ),
-                  ),
-                ],
-                if (hasDimensions) ...[
-                  const SizedBox(height: 10),
-                  _AdminRatingDimensionChips(
-                    answers: r.answers,
-                    questionnaire: q,
-                  ),
-                  InkWell(
-                    onTap: () =>
-                        setState(() => _detailExpanded = !_detailExpanded),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _detailExpanded
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            size: 18,
-                            color: AppColors.brandAccent,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _detailExpanded
-                                ? 'Ocultar detalle por categoría'
-                                : 'Ver detalle por categoría',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.brandAccent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_detailExpanded) ...[
-                    const SizedBox(height: 4),
-                    OrderRatingAnswersReadOnly(
-                      answers: r.answers,
-                      questionnaire: q,
-                    ),
-                  ],
-                ],
-              ],
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${row.aliadoName} ↔ ${row.importadorName}',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: theme.textPrimary,
+          ),
+        ),
+        if (row.submittedAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            formatEsShortDateTime(row.submittedAt!),
+            style: TextStyle(fontSize: 11, color: theme.textSecondary),
           ),
         ],
-      ),
-    );
-  }
-
-  static String _shortName(String raw, {int max = 36}) {
-    final s = raw.trim();
-    if (s.length <= max) return s;
-    return '${s.substring(0, max - 1)}…';
-  }
-
-  static String _shortUuid(String id) {
-    final s = id.replaceAll('-', '');
-    if (s.length <= 8) return s;
-    return '${s.substring(0, 8)}…';
-  }
-}
-
-/// Resumen compacto de dimensiones (chips con color por nota).
-class _AdminRatingDimensionChips extends StatelessWidget {
-  const _AdminRatingDimensionChips({
-    required this.answers,
-    required this.questionnaire,
-  });
-
-  final Map<String, dynamic> answers;
-  final RatingQuestionnaireModel questionnaire;
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = <Widget>[];
-    for (final q in questionnaire.questions) {
-      final v = answers[q.id];
-      final n = v is int ? v : int.tryParse(v?.toString() ?? '');
-      if (n == null || n < questionnaire.scaleMin) continue;
-      final color = ratingValueColor(n);
-      chips.add(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withOpacity(0.45)),
-          ),
-          child: Text(
-            '${q.displayTitle} · $n',
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            AliadoExperienceStarsRow(
+              stars: row.overallStars.clamp(1, 5),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${row.overallStars} / 5',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: ratingValueColor(row.overallStars.clamp(1, 5)),
+              ),
+            ),
+          ],
+        ),
+        if (row.comment.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            row.comment.trim(),
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: color,
+              fontSize: 13,
+              height: 1.4,
+              color: theme.textPrimary,
+              fontStyle:
+                  row.commentHidden ? FontStyle.italic : FontStyle.normal,
             ),
           ),
-        ),
-      );
-    }
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: chips,
+          if (row.commentHidden &&
+              (row.commentHiddenReason?.trim().isNotEmpty ?? false)) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Motivo: ${row.commentHiddenReason!.trim()}',
+              style: TextStyle(fontSize: 11, color: theme.textSecondary),
+            ),
+          ],
+        ],
+        if (hasDimensions) ...[
+          const SizedBox(height: 14),
+          Text(
+            'Detalle por categoría',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: theme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          OrderRatingAnswersReadOnly(
+            answers: row.answers,
+            questionnaire: questionnaire,
+          ),
+        ],
+      ],
     );
   }
 }

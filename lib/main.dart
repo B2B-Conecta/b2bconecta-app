@@ -122,8 +122,13 @@ class MyApp extends StatelessWidget {
             // Sincroniza AppColors con el Theme ya resuelto (sin KeyedSubtree:
             // recrear todo el navigator dejaba overlays/sidebar a medias).
             AppColors.brightness = Theme.of(context).brightness;
-            return MarketingConsentHost(
-              child: child ?? const SizedBox.shrink(),
+            return AnimatedTheme(
+              data: Theme.of(context),
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              child: MarketingConsentHost(
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
           // La URL del navegador sigue el *nombre* de la ruta del Navigator.

@@ -3,6 +3,7 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/widgets/ios_chrome.dart';
 
 /// Barra de la tienda minorista. El centro es Catálogo, con círculo resaltado.
@@ -47,9 +48,10 @@ class AliadoBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final highContrast = MediaQuery.highContrastOf(context);
-    final surface = dark ? const Color(0xFF141C29) : Colors.white;
+    final surface = theme.surfaceElevated;
     final tint = surface.withOpacity(highContrast ? 1 : (dark ? .85 : .78));
     final labelExtra =
         (MediaQuery.textScalerOf(context).scale(11) - 11).clamp(0.0, 20.0);
@@ -65,20 +67,20 @@ class AliadoBottomNav extends StatelessWidget {
             Positioned.fill(
                 top: 8,
                 child: DecoratedBox(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     borderRadius: radius,
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0x18000000),
+                        color: theme.textPrimary.withOpacity(0.12),
                         blurRadius: 20,
-                        offset: Offset(0, 4),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: IosGlass(
                     radius: radius,
                     tint: tint,
-                    border: dark ? Colors.white24 : const Color(0xFFE1E7F1),
+                    border: theme.borderStrong.withOpacity(dark ? 0.55 : 1),
                     child: const SizedBox.expand(),
                   ),
                 )),
@@ -190,26 +192,30 @@ class _CatalogCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return Container(
       width: 44,
       height: 44,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: selected ? const Color(0xFF003BBF) : const Color(0xFF0052FF),
+        color: selected ? theme.brand : theme.brand.withOpacity(0.92),
         border: Border.all(
-          color: Theme.of(context).colorScheme.surface,
+          color: theme.surfaceCard,
           width: 2,
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x33003BBF), blurRadius: 8, offset: Offset(0, 3))
+            color: theme.brand.withOpacity(0.28),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Center(
         child: LucideIcon(
           icon,
           size: 21,
-          color: Colors.white,
+          color: theme.surfaceCard,
         ),
       ),
     );

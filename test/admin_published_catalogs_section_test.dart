@@ -64,14 +64,15 @@ void main() {
       },
     );
 
-    expect(find.text('Catálogos publicados de mayoristas'), findsOneWidget);
+    expect(find.text('Catálogos publicados'), findsOneWidget);
     await tester.tap(find.text('Mayorista Andino'));
     await tester.pumpAndSettle();
 
     expect(queried, _importerA);
     expect(find.text('Pastilla de freno'), findsOneWidget);
-    expect(find.text('SKU FR-01'), findsOneWidget);
-    expect(find.text('Frenos'), findsOneWidget);
+    expect(find.text('SKU FR-01 · Frenos'), findsOneWidget);
+    expect(find.text('Publicados'), findsOneWidget);
+    expect(find.text('Ocultos'), findsOneWidget);
     expect(find.text('Editar'), findsNothing);
     expect(find.text('Pausar'), findsNothing);
 

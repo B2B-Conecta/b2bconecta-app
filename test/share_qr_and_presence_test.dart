@@ -176,7 +176,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('la presencia se abre desde Ingresos', (tester) async {
+  testWidgets('Ingresos filtra usuarios con ingresos en el período', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -190,7 +192,13 @@ void main() {
                 profileId: '1',
                 businessName: 'Taller Norte',
                 role: 'aliado',
+                loginCountPeriod: 2,
                 loginCountToday: 1,
+              ),
+              AdminUserActivityRowModel(
+                profileId: '2',
+                businessName: 'Taller Sur',
+                role: 'aliado',
               ),
             ],
             loadCatalogCoverage: () async => AdminCatalogCoverage.empty,
@@ -210,12 +218,17 @@ void main() {
     await tester.pump();
 
     expect(find.text('Ingresaron hoy'), findsNothing);
+    expect(find.text('Taller Sur'), findsOneWidget);
     await tester.tap(find.text('Ingresos (últimos 7 días)'));
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Ingresaron hoy'), findsOneWidget);
-    expect(find.text('Taller Norte'), findsWidgets);
+    expect(find.text('Ingresaron hoy'), findsNothing);
+    expect(find.text('Taller Norte'), findsOneWidget);
+    expect(find.text('Taller Sur'), findsNothing);
+    expect(find.text('Último acceso'), findsOneWidget);
+    expect(find.text('Sin ingresos'), findsOneWidget);
+    expect(find.text('Ver métricas'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });

@@ -1,0 +1,62 @@
+---
+description: Tokens semánticos Light/Dark obligatorios vía B2BThemeExtension (sin colores hardcodeados)
+alwaysApply: true
+---
+
+# Tema dinámico B2B Conecta (Light / Dark)
+
+Antes de escribir o modificar UI en este repo, aplica esta regla. El contraste debe cumplir **WCAG 2.1 AA** en ambos modos.
+
+## Prohibido
+
+- `Colors.white`, `Colors.black`, `Colors.grey…` para fondos, tarjetas, filas, textos o bordes.
+- Hex fijos en UI (`Color(0xFFFFFFFF)`, `Color(0xFF000000)`, `Color(0xFF0F172A)`, etc.) fuera de la definición del tema.
+- Asumir “fondo claro” o “texto negro”: el tema activo puede ser oscuro (`#0F172A` / `#090D16`).
+
+Excepción: la **definición** de tokens vive solo en `lib/app/theme/b2b_theme_extension.dart` (y tokens dark relacionados). No redefinir hex en widgets.
+
+## Obligatorio
+
+Obtener tokens con:
+
+```dart
+final theme = B2BThemeExtension.of(context);
+// o Theme.of(context).extension<B2BThemeExtension>()
+```
+
+Usar semántica (no inventar aliases locales de hex):
+
+| Token | Uso |
+|---|---|
+| `theme.surfaceCard` | Tarjetas, tablas, paneles |
+| `theme.surfaceSubtle` / `tableRowOdd` | Fondos secundarios, zebra |
+| `theme.tableRowEven` | Filas pares |
+| `theme.tableHeaderBg` | Cabeceras de tabla |
+| `theme.textPrimary` | Títulos y texto principal |
+| `theme.textSecondary` / `textMuted` | Metadatos, hints |
+| `theme.borderSubtle` / `border` / `borderStrong` | Bordes y divisores |
+| `theme.inputFill` | Campos |
+| `theme.dialogSurface` | Modales / sheets |
+| `theme.brand` / `brandContainer` | Acentos y chips de marca |
+
+También válido: `AdminUsersChrome.of(context)` / getters que **delegan** a `B2BThemeExtension` (no hardcodear encima).
+
+## Alcance sin excepciones
+
+CRUD, tablas, zebra, formularios, `UnifiedActionDialog`, drawers, toasts/snackbars, popovers, rails y listados nuevos o refactorizados deben heredar el tema activo.
+
+```dart
+// ❌
+Container(color: Colors.white, child: Text('Hola', style: TextStyle(color: Color(0xFF0F172A))));
+
+// ✅
+final t = B2BThemeExtension.of(context);
+Container(
+  color: t.surfaceCard,
+  child: Text('Hola', style: TextStyle(color: t.textPrimary)),
+);
+```
+
+Sombras: no uses `Colors.black` literal; deriva opacidad de `theme.textPrimary` (o token de sombra del tema si existe).
+
+Iconos sobre botones filled: `theme.surfaceCard` (o `onPrimary` del `ColorScheme`), nunca `Colors.white` fijo.

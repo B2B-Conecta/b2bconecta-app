@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'importer_shell_tabs.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_home_dashboard.dart';
+import 'package:motolink_pro_app/features/dashboard/aliado_home_dashboard.dart';
+import 'package:motolink_pro_app/features/reputation/reputation_overview.dart';
 import 'package:motolink_pro_app/app/config/brand_copy.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -14,17 +16,27 @@ import 'package:motolink_pro_app/core/notifications/push_notification_service.da
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/auth/auth_service.dart';
 import 'theme/app_theme.dart';
+import 'theme/b2b_theme_extension.dart';
 import 'theme/theme_controller.dart';
 import 'package:motolink_pro_app/core/layout/aliado_bottom_nav.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/commissions/admin_commission_settlements_panel.dart';
 import 'package:motolink_pro_app/core/layout/admin_desktop_shell.dart';
 import 'package:motolink_pro_app/core/layout/admin_mobile_nav.dart';
+import 'package:motolink_pro_app/core/layout/admin_shell_drawer.dart';
 import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
-import 'package:motolink_pro_app/features/admin/admin_encomiendas_report_panel.dart';
+import 'package:motolink_pro_app/core/layout/responsive_scaffold.dart';
+import 'package:motolink_pro_app/core/layout/shell/admin_shell_badges.dart';
+import 'package:motolink_pro_app/core/layout/shell/admin_shell_top_bar.dart';
+import 'package:motolink_pro_app/core/layout/shell/shell_user_menu.dart';
+import 'package:motolink_pro_app/features/admin/admin_global_search_modal.dart';
+import 'package:motolink_pro_app/features/admin/admin_dashboard_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_daily_presence_card.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
+import 'package:motolink_pro_app/features/admin/admin_reports_hub_panel.dart';
+import 'package:motolink_pro_app/features/admin/admin_reports_hub_section.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_hub_panel.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
 import 'package:motolink_pro_app/features/reputation/admin_order_ratings_panel.dart';
 import 'package:motolink_pro_app/features/orders/admin/admin_orders_panel.dart';
 import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.dart';
@@ -36,14 +48,19 @@ import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
 import 'main_shell_tab.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_branded_header.dart';
 import 'package:motolink_pro_app/core/widgets/header_icon_button.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_app_bar.dart';
 import 'package:motolink_pro_app/core/layout/shell/shell_destination.dart';
-import 'package:motolink_pro_app/core/notifications/notification_center_sheet.dart';
+import 'package:motolink_pro_app/core/layout/shell/shell_nav_badge.dart';
+import 'package:motolink_pro_app/core/notifications/notification_center_popover.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_enable_banner.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_inbox_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_b2b_form.dart';
 import 'package:motolink_pro_app/features/profile/account_settings_screen.dart';
+import 'package:motolink_pro_app/features/admin/admin_settings_hub.dart';
+import 'package:motolink_pro_app/features/admin/admin_settings_tab.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_screen.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_favorites_service.dart';
@@ -69,14 +86,21 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _tabIndex = 0;
+  AdminUsersHubSection _adminUsersSection = AdminUsersHubSection.cuentas;
+  AdminReportsHubSection _adminReportsSection =
+      AdminReportsHubSection.encomiendas;
   final _visitedImporterTabs = <int>{ImporterShellTabs.inicio};
+  final _visitedAliadoTabs = <int>{AliadoShellTabs.inicio};
   late ProfileModel _profile;
   late final NotificationProvider _notifications;
+  AdminShellBadges? _adminShellBadges;
   bool _showAliadoAccessApprovedBanner = false;
   ImporterDailyStoreNotice? _dailyStoreNotice;
   Timer? _presenceTimer;
   String _aliadoAccessApprovedMessage =
       'Su acceso a B2B Conecta está habilitado. Ya puede operar en la plataforma.';
+  bool _adminSettingsOpen = false;
+  AdminSettingsTab _adminSettingsTab = AdminSettingsTab.perfil;
 
   @override
   void initState() {
@@ -95,8 +119,13 @@ class _MainShellState extends State<MainShell> {
       if (mounted) {
         setState(() {
           _tabIndex = index;
+          if (widget.homeRole == AppHomeRole.administrador) {
+            _adminSettingsOpen = false;
+          }
           if (widget.homeRole == AppHomeRole.importador) {
             _visitedImporterTabs.add(index);
+          } else if (widget.homeRole == AppHomeRole.aliado) {
+            _visitedAliadoTabs.add(index);
           }
         });
       }
@@ -106,15 +135,16 @@ class _MainShellState extends State<MainShell> {
       _notifications.reload();
     });
     if (widget.homeRole == AppHomeRole.aliado) {
-      _tabIndex = AliadoShellTabs.catalogo;
+      _tabIndex = AliadoShellTabs.inicio;
       MainShellTabController.registerB2BNavigation(
-        home: AliadoShellTabs.catalogo,
+        home: AliadoShellTabs.inicio,
         pedidos: AliadoShellTabs.pedidos,
-        reputation: AliadoShellTabs.reputacion,
+        reputation: AliadoShellTabs.perfil,
         profile: AliadoShellTabs.perfil,
+        onReputation: _openAliadoReputation,
       );
       unawaited(_loadAliadoFavorites());
-    } else if (widget.homeRole == AppHomeRole.importador) {
+    } else     if (widget.homeRole == AppHomeRole.importador) {
       MainShellTabController.registerB2BNavigation(
         home: ImporterShellTabs.inicio,
         pedidos: ImporterShellTabs.pedidos,
@@ -123,9 +153,9 @@ class _MainShellState extends State<MainShell> {
       );
     }
     if (widget.homeRole == AppHomeRole.administrador) {
-      MainShellTabController.registerAdminProfileTabIndex(
-        MainShellTabController.adminProfileTabIndexDefault,
-      );
+      MainShellTabController.registerAdminSettingsOpen(_openAdminProfile);
+      _adminShellBadges = AdminShellBadges(notifications: _notifications);
+      unawaited(_adminShellBadges!.start());
     }
     unawaited(SupabaseService.touchMyPresence());
     _presenceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -154,7 +184,9 @@ class _MainShellState extends State<MainShell> {
     _presenceTimer?.cancel();
     PushNotificationService.instance.unregisterTapHandler();
     _notifications.removeListener(_onNotificationsChanged);
+    _adminShellBadges?.dispose();
     _notifications.dispose();
+    MainShellTabController.registerAdminSettingsOpen(null);
     MainShellTabController.unregister();
     super.dispose();
   }
@@ -219,15 +251,11 @@ class _MainShellState extends State<MainShell> {
     if (mounted) setState(() => _showAliadoAccessApprovedBanner = false);
   }
 
-  Future<void> _openNotificationCenter() async {
-    await showModalBottomSheet<void>(
+  Future<void> _openNotificationCenter([BuildContext? anchor]) async {
+    await openNotificationCenter(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => NotificationCenterSheet(provider: _notifications),
+      provider: _notifications,
+      anchorContext: anchor,
     );
   }
 
@@ -242,14 +270,23 @@ class _MainShellState extends State<MainShell> {
     final p = await SupabaseService.fetchMyProfile();
     if (!mounted || p == null) return;
     setState(() => _profile = p);
-    if (widget.homeRole == AppHomeRole.administrador) {
-      MainShellTabController.registerAdminProfileTabIndex(
-        MainShellTabController.adminProfileTabIndexDefault,
-      );
-    }
   }
 
-  void _openAccountSettings() {
+  final GlobalKey<ScaffoldState> _adminMobileScaffoldKey =
+      GlobalKey<ScaffoldState>();
+  final GlobalKey<ScaffoldState> _b2bMobileScaffoldKey =
+      GlobalKey<ScaffoldState>();
+
+  void _openAccountSettings({
+    AdminSettingsTab initialTab = AdminSettingsTab.perfil,
+  }) {
+    if (widget.homeRole == AppHomeRole.administrador) {
+      setState(() {
+        _adminSettingsOpen = true;
+        _adminSettingsTab = initialTab;
+      });
+      return;
+    }
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => const AccountSettingsScreen(),
@@ -257,10 +294,41 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  void _openAdminProfile() {
+    _openAccountSettings(initialTab: AdminSettingsTab.perfil);
+  }
+
+  void _openNotificationPrefs() {
+    _openAccountSettings(initialTab: AdminSettingsTab.notificaciones);
+  }
+
+  void _handleShellUserMenuAction(ShellUserMenuAction action) {
+    switch (action) {
+      case ShellUserMenuAction.profile:
+        _openAdminProfile();
+      case ShellUserMenuAction.accountSettings:
+        _openAccountSettings();
+      case ShellUserMenuAction.notificationPrefs:
+        _openNotificationPrefs();
+      case ShellUserMenuAction.signOut:
+        unawaited(AuthService.signOut());
+    }
+  }
+
   static const _adminPanelDestinations = <AdminShellDestination>[
+    AdminShellDestination(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      lucideIcon: LucideGlyph.layoutDashboard,
+      label: 'Inicio',
+      title: 'Inicio',
+      subtitle: 'Métricas · actividad',
+    ),
     AdminShellDestination(
       icon: Icons.local_shipping_outlined,
       selectedIcon: Icons.local_shipping,
+      lucideIcon: LucideGlyph.package,
+      badgeKey: AdminShellBadgeKey.pedidos,
       label: 'Pedidos',
       title: 'Pedidos',
       subtitle: 'En curso · Cerrados · Todos',
@@ -268,13 +336,54 @@ class _MainShellState extends State<MainShell> {
     AdminShellDestination(
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics,
+      lucideIcon: LucideGlyph.barChart3,
       label: 'Reportes',
       title: 'Reportes',
       subtitle: 'Encomiendas · promos · referidos · devoluciones',
+      children: [
+        ShellDestination(
+          icon: Icons.local_shipping_outlined,
+          selectedIcon: Icons.local_shipping,
+          lucideIcon: LucideGlyph.package,
+          id: AdminReportsHubSection.encomiendas,
+          label: 'Encomiendas',
+          title: 'Encomiendas',
+          subtitle:
+              'Métricas, exportación Excel y detalle de pedidos en el periodo.',
+        ),
+        ShellDestination(
+          icon: Icons.campaign_outlined,
+          selectedIcon: Icons.campaign,
+          lucideIcon: LucideGlyph.megaphone,
+          id: AdminReportsHubSection.promos,
+          label: 'Promos',
+          title: 'Promos',
+          subtitle: 'Campañas y banners promocionales del marketplace.',
+        ),
+        ShellDestination(
+          icon: Icons.group_add_outlined,
+          selectedIcon: Icons.group_add,
+          lucideIcon: LucideGlyph.users,
+          id: AdminReportsHubSection.referidos,
+          label: 'Referidos',
+          title: 'Referidos',
+          subtitle: 'Red de referidos y comisiones de captación.',
+        ),
+        ShellDestination(
+          icon: Icons.assignment_return_outlined,
+          selectedIcon: Icons.assignment_return,
+          lucideIcon: LucideGlyph.undo2,
+          id: AdminReportsHubSection.devoluciones,
+          label: 'Devoluciones',
+          title: 'Devoluciones',
+          subtitle: 'Postventa, frecuencia y saldo por importador.',
+        ),
+      ],
     ),
     AdminShellDestination(
       icon: Icons.star_rate_outlined,
       selectedIcon: Icons.star_rate,
+      lucideIcon: LucideGlyph.star,
       label: 'Valoraciones',
       title: 'Valoraciones',
       subtitle: 'Tienda minorista ↔ importador',
@@ -282,6 +391,7 @@ class _MainShellState extends State<MainShell> {
     AdminShellDestination(
       icon: Icons.payments_outlined,
       selectedIcon: Icons.payments,
+      lucideIcon: LucideGlyph.zap,
       label: 'Comisiones',
       title: 'Comisiones',
       subtitle: 'Devengo · cortes · facturación',
@@ -289,35 +399,64 @@ class _MainShellState extends State<MainShell> {
     AdminShellDestination(
       icon: Icons.manage_accounts_outlined,
       selectedIcon: Icons.manage_accounts,
+      lucideIcon: LucideGlyph.userRound,
       label: 'Usuarios',
       title: 'Usuarios',
-      subtitle: 'KYC · cuentas · presencia',
+      subtitle: 'Cuentas · actividad · sellos',
+      children: [
+        ShellDestination(
+          icon: Icons.manage_accounts_outlined,
+          selectedIcon: Icons.manage_accounts,
+          lucideIcon: LucideGlyph.userRound,
+          id: AdminUsersHubSection.cuentas,
+          label: 'Cuentas',
+          title: 'Cuentas',
+          subtitle: 'Datos fiscales, KYC, roles, alta y baja.',
+        ),
+        ShellDestination(
+          icon: Icons.monitor_heart_outlined,
+          selectedIcon: Icons.monitor_heart,
+          lucideIcon: LucideGlyph.refreshCw,
+          id: AdminUsersHubSection.actividad,
+          label: 'Actividad',
+          title: 'Actividad',
+          subtitle: 'Presencia e ingresos recientes.',
+        ),
+        ShellDestination(
+          icon: Icons.verified_outlined,
+          selectedIcon: Icons.verified,
+          lucideIcon: LucideGlyph.shieldCheck,
+          id: AdminUsersHubSection.sellosYVitrina,
+          label: 'Sellos y Vitrina',
+          title: 'Sellos y Vitrina',
+          subtitle:
+              'Verificado y Destacado de mayoristas en el marketplace.',
+        ),
+      ],
     ),
     AdminShellDestination(
-      icon: Icons.support_agent_outlined,
-      selectedIcon: Icons.support_agent,
+      icon: Icons.headset_mic_outlined,
+      selectedIcon: Icons.headset_mic,
+      lucideIcon: LucideGlyph.headset,
+      badgeKey: AdminShellBadgeKey.mensajes,
       label: 'Soporte',
       title: 'Soporte',
       subtitle: 'Reclamos · respuesta',
     ),
   ];
 
-  static const _adminProfileDestination = AdminShellDestination(
-    icon: Icons.person_outline,
-    selectedIcon: Icons.person,
-    label: 'Perfil',
-    title: 'Perfil',
-    subtitle: 'Cuenta broker',
-  );
-
-  List<AdminShellDestination> get _adminDestinations {
-    return [
-      ..._adminPanelDestinations,
-      _adminProfileDestination,
-    ];
-  }
+  List<AdminShellDestination> get _adminDestinations => _adminPanelDestinations;
 
   static const _aliadoDestinations = <ShellDestination>[
+    ShellDestination(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      label: 'Inicio',
+      title: 'Inicio',
+      subtitle: 'Descubre · compra · repón',
+      compactHeaderOnScroll: true,
+      bottomContentPadding: 8,
+    ),
     ShellDestination(
       icon: Icons.shopping_cart_outlined,
       selectedIcon: Icons.shopping_cart,
@@ -326,13 +465,6 @@ class _MainShellState extends State<MainShell> {
       subtitle: 'En curso · entregas',
       bottomContentPadding: 8,
       compactHeaderOnScroll: true,
-    ),
-    ShellDestination(
-      icon: Icons.star_outline,
-      selectedIcon: Icons.star,
-      label: 'Reputación',
-      title: 'Reputación',
-      subtitle: 'Valoraciones · resumen',
     ),
     ShellDestination(
       icon: Icons.grid_view_outlined,
@@ -402,76 +534,148 @@ class _MainShellState extends State<MainShell> {
 
   List<Widget> _adminPanelWidgets() {
     return [
+      AdminDashboardPanel(allowAdminRole: _profile.isOwner),
       const AdminOrdersPanel(),
-      const AdminEncomiendasReportPanel(),
+      AdminReportsHubPanel(
+        section: _adminReportsSection,
+        onSectionChanged: (section) {
+          if (!mounted) return;
+          setState(() => _adminReportsSection = section);
+        },
+      ),
       const AdminOrderRatingsPanel(),
       AdminCommissionSettlementsPanel(viewerRole: _profile.role),
-      AdminUsersHubPanel(viewer: _profile),
+      AdminUsersHubPanel(
+        viewer: _profile,
+        section: _adminUsersSection,
+        onSectionChanged: (section) {
+          if (!mounted) return;
+          setState(() => _adminUsersSection = section);
+        },
+      ),
       const AdminSupportTicketsPanel(),
     ];
   }
 
-  Widget _adminProfileBody() {
-    return SingleChildScrollView(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: AppBreakpoints.formMaxWidth,
-          ),
-          child: ProfileB2BForm(
-            key: ValueKey<Object>(
-              '${_profile.id}_${_profile.businessName}_${_profile.rif}_${_profile.role}_${_profile.kycStatus}_${_profile.primerosPedidosContadoEntregados}_${_profile.creditLimit}_${_profile.creditoPreactivadoPorAdmin}_${_profile.logoStoragePath}_${_profile.fiscalMapsUrl}',
-            ),
-            initial: _profile,
-            onRelatedDataChanged: _refreshProfile,
-            onSaved: _refreshProfile,
-          ),
-        ),
-      ),
+  Widget _adminSettingsBody() {
+    return AdminSettingsHub(
+      key: ValueKey('admin-settings-$_adminSettingsTab'),
+      embedded: true,
+      initialTab: _adminSettingsTab,
+      onProfileSaved: _refreshProfile,
     );
   }
 
-  /// Pestañas admin: Pedidos … Usuarios, Soporte y Perfil.
+  List<AdminShellBreadcrumb> get _adminSettingsBreadcrumbs => [
+        AdminShellBreadcrumb(
+          label: 'Inicio',
+          onTap: () => setState(() {
+            _tabIndex = 0;
+            _adminSettingsOpen = false;
+            MainShellTabController.clearAdminBreadcrumbTrail();
+          }),
+        ),
+        const AdminShellBreadcrumb(label: 'Ajustes del sistema'),
+      ];
+
+  List<AdminShellBreadcrumb> _adminShellBreadcrumbs() {
+    if (_adminSettingsOpen) return _adminSettingsBreadcrumbs;
+    final dest = _adminDestinations;
+    final index = _tabIndex.clamp(0, dest.length - 1);
+    final crumbs = adminShellBreadcrumbsFor(
+      destinations: dest,
+      selectedIndex: index,
+      nestedId: index == MainShellTabController.adminUsersTabIndex
+          ? _adminUsersSection
+          : index == MainShellTabController.adminReportesTabIndex
+              ? _adminReportsSection
+              : null,
+      onHome: () => setState(() {
+            _tabIndex = 0;
+            _adminSettingsOpen = false;
+            MainShellTabController.clearAdminBreadcrumbTrail();
+          }),
+      onSelectParent: (i) => setState(() {
+            _tabIndex = i;
+            _adminSettingsOpen = false;
+            MainShellTabController.clearAdminBreadcrumbTrail();
+          }),
+    );
+    final trail = MainShellTabController.adminBreadcrumbTrail.value;
+    if (trail == null) return crumbs;
+    if (crumbs.isEmpty) {
+      return [AdminShellBreadcrumb(label: trail.leafLabel)];
+    }
+    final parent = crumbs.removeLast();
+    crumbs.add(
+      AdminShellBreadcrumb(
+        label: parent.label,
+        onTap: () {
+          trail.onPopToParent?.call();
+          MainShellTabController.clearAdminBreadcrumbTrail();
+        },
+      ),
+    );
+    crumbs.add(AdminShellBreadcrumb(label: trail.leafLabel));
+    return crumbs;
+  }
+
+  /// Título corto móvil (sin breadcrumbs largos que se truncan).
+  List<AdminShellBreadcrumb> _adminMobilePageTitle() {
+    if (_adminSettingsOpen) {
+      return const [AdminShellBreadcrumb(label: 'Ajustes del sistema')];
+    }
+    final trail = MainShellTabController.adminBreadcrumbTrail.value;
+    if (trail != null) {
+      return [AdminShellBreadcrumb(label: trail.leafLabel)];
+    }
+    final dest = _adminDestinations;
+    final index = _tabIndex.clamp(0, dest.length - 1);
+    final crumbs = adminShellBreadcrumbsFor(
+      destinations: dest,
+      selectedIndex: index,
+      nestedId: index == MainShellTabController.adminUsersTabIndex
+          ? _adminUsersSection
+          : index == MainShellTabController.adminReportesTabIndex
+              ? _adminReportsSection
+              : null,
+      onHome: () {},
+      onSelectParent: (_) {},
+    );
+    final label = crumbs.isEmpty ? dest[index].title : crumbs.last.label;
+    return [AdminShellBreadcrumb(label: label)];
+  }
+
+  /// Shell móvil: header con título de vista (sin hamburguesa / drawer).
   Widget _adminOrdersScaffold({
     required String title,
     required Widget child,
   }) {
+    final trail = MainShellTabController.adminBreadcrumbTrail.value;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: MotolinkAppBar(
-        currentUserProfile: _profile,
-        logoHeight: MotolinkAppBarLogoSizes.importador,
-        onNotificationTap: _openNotificationCenter,
+      appBar: AdminShellTopBar(
+        breadcrumbs: _adminMobilePageTitle(),
+        onBreadcrumbBack: trail?.onBack,
+        profile: _profile,
         unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: _openMessagesInbox,
-        unreadMessages: _notifications.unreadChatCount,
+        onNotificationTap: _openNotificationCenter,
+        onOpenGlobalSearch: _openAdminGlobalSearch,
+        onUserMenuAction: _handleShellUserMenuAction,
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          // En móvil omitimos subtítulos largos: el contenido habla por sí solo.
-          Expanded(child: child),
-        ],
-      ),
+      body: child,
     );
+  }
+
+  void _openAdminGlobalSearch() {
+    showAdminGlobalSearchModal(context);
   }
 
   Widget _buildAdminShell() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= AppBreakpoints.adminDesktop) {
+        // Rail fijo ≥768; cajón deslizable por debajo (AppShell móvil).
+        if (constraints.maxWidth >= AppBreakpoints.mobileMenu) {
           return _buildAdminDesktopShell();
         }
         return _buildAdminMobileShell();
@@ -483,35 +687,75 @@ class _MainShellState extends State<MainShell> {
     final dest = _adminDestinations;
     final index = _tabIndex.clamp(0, dest.length - 1);
     final panels = _adminPanelWidgets();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const WebPushEnableBanner(),
-        Expanded(
-          child: AdminDesktopShell(
-            selectedIndex: index,
-            onDestinationSelected: (i) => setState(() => _tabIndex = i),
-            destinations: dest,
-            profile: _profile,
-            unreadNotifications: _notifications.unreadCount,
-            onNotificationTap: _openNotificationCenter,
-            onMessagesTap: _openMessagesInbox,
-            unreadMessages: _notifications.unreadChatCount,
-            onOpenSettings: _openAccountSettings,
-            railStatusBuilder: canQueryAdminPresence(_profile.role)
-                ? (extended) => AdminDailyPresenceCard(
-                      extended: extended,
-                      onOpenDetails:
-                          MainShellTabController.navigateToAdminPresence,
-                    )
-                : null,
-            pages: [
-              ...panels,
-              _adminProfileBody(),
-            ],
-          ),
-        ),
-      ],
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        ThemeController.instance,
+        MainShellTabController.adminBreadcrumbTrail,
+      ]),
+      builder: (context, _) {
+        AppColors.brightness = ThemeController.instance.effectiveBrightness;
+        final trail = MainShellTabController.adminBreadcrumbTrail.value;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const WebPushEnableBanner(),
+            Expanded(
+              child: AdminDesktopShell(
+                selectedIndex: index,
+                onDestinationSelected: (i) => setState(() {
+                  _tabIndex = i;
+                  _adminSettingsOpen = false;
+                  MainShellTabController.clearAdminBreadcrumbTrail();
+                }),
+                selectedNestedId:
+                    index == MainShellTabController.adminUsersTabIndex
+                        ? _adminUsersSection
+                        : index == MainShellTabController.adminReportesTabIndex
+                            ? _adminReportsSection
+                            : null,
+                onNestedDestinationSelected: (parent, nestedId) {
+                  setState(() {
+                    _tabIndex = parent;
+                    _adminSettingsOpen = false;
+                    MainShellTabController.clearAdminBreadcrumbTrail();
+                    if (nestedId is AdminUsersHubSection) {
+                      _adminUsersSection = nestedId;
+                    } else if (nestedId is AdminReportsHubSection) {
+                      _adminReportsSection = nestedId;
+                    }
+                  });
+                },
+                destinations: dest,
+                profile: _profile,
+                unreadNotifications: _notifications.unreadCount,
+                onNotificationTap: _openNotificationCenter,
+                onMessagesTap: _openMessagesInbox,
+                unreadMessages: _notifications.unreadChatCount,
+                onOpenSettings: _openAccountSettings,
+                onOpenProfile: _openAdminProfile,
+                onOpenNotificationPrefs: _openNotificationPrefs,
+                onSignOut: AuthService.signOut,
+                navBadges: _adminShellBadges,
+                resolveNavBadge: _adminShellBadges?.badgeFor,
+                onOpenGlobalSearch: _openAdminGlobalSearch,
+                breadcrumbsOverride: _adminShellBreadcrumbs(),
+                onBreadcrumbBack: trail?.onBack,
+                contentOverride:
+                    _adminSettingsOpen ? _adminSettingsBody() : null,
+                railStatusBuilder: canQueryAdminPresence(_profile.role)
+                    ? (extended) => AdminDailyPresenceCard(
+                          extended: extended,
+                          darkRail: true,
+                          onOpenDetails:
+                              MainShellTabController.navigateToAdminPresence,
+                        )
+                    : null,
+                pages: panels,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -519,39 +763,51 @@ class _MainShellState extends State<MainShell> {
     final dest = _adminDestinations;
     final index = _tabIndex.clamp(0, dest.length - 1);
     final panels = _adminPanelWidgets();
-    return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const WebPushEnableBanner(),
-          Expanded(
-            child: IndexedStack(
-              index: index,
-              children: [
-                for (var i = 0; i < panels.length; i++)
-                  _adminOrdersScaffold(
-                    title: dest[i].title,
-                    child: panels[i],
-                  ),
-                _ProfileTab(
-                  profile: _profile,
-                  homeRole: AppHomeRole.administrador,
-                  onProfileSaved: _refreshProfile,
-                  onNotificationTap: _openNotificationCenter,
-                  unreadNotifications: _notifications.unreadCount,
-                  onMessagesTap: _openMessagesInbox,
-                  unreadMessages: _notifications.unreadChatCount,
-                ),
-              ],
-            ),
+    // Móvil: solo NavigationBar (Inicio · Pedidos · Reportes · Usuarios · Más).
+    // Sin drawer / hamburguesa — evita triple navegación redundante.
+    return ListenableBuilder(
+      listenable: MainShellTabController.adminBreadcrumbTrail,
+      builder: (context, _) {
+        return ResponsiveScaffold(
+          scaffoldKey: _adminMobileScaffoldKey,
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const WebPushEnableBanner(),
+              Expanded(
+                child: _adminSettingsOpen
+                    ? _adminOrdersScaffold(
+                        title: 'Ajustes del sistema',
+                        child: _adminSettingsBody(),
+                      )
+                    : IndexedStack(
+                        index: index,
+                        children: [
+                          for (var i = 0; i < panels.length; i++)
+                            _adminOrdersScaffold(
+                              title: dest[i].title,
+                              child: panels[i],
+                            ),
+                        ],
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
-      bottomNavigationBar: AdminMobileNav(
-        currentIndex: index,
-        destinations: dest,
-        onSelect: (i) => setState(() => _tabIndex = i),
-      ),
+          bottomNavigationBar: AdminMobileNav(
+            currentIndex: index,
+            destinations: dest,
+            primaryIndices: const [0, 1, 2, 5],
+            onSelect: (i) => setState(() {
+              _tabIndex = i;
+              _adminSettingsOpen = false;
+              MainShellTabController.clearAdminBreadcrumbTrail();
+            }),
+            onOpenAccountMenu: _openAccountSettings,
+            navBadges: _adminShellBadges,
+            resolveNavBadge: _adminShellBadges?.badgeFor,
+          ),
+        );
+      },
     );
   }
 
@@ -588,6 +844,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _tabIndex = i;
       if (role == AppHomeRole.importador) _visitedImporterTabs.add(i);
+      if (role == AppHomeRole.aliado) _visitedAliadoTabs.add(i);
     });
     if (role == AppHomeRole.aliado) {
       if (i == AliadoShellTabs.pedidos) {
@@ -596,7 +853,7 @@ class _MainShellState extends State<MainShell> {
       if (i == AliadoShellTabs.favoritos) {
         unawaited(_loadAliadoFavorites());
       }
-      if (i == AliadoShellTabs.reputacion || i == AliadoShellTabs.perfil) {
+      if (i == AliadoShellTabs.perfil) {
         unawaited(_refreshProfile());
       }
       return;
@@ -631,7 +888,8 @@ class _MainShellState extends State<MainShell> {
                 unreadNotifications: _notifications.unreadCount,
                 onMessagesTap: _openMessagesInbox,
                 unreadMessages: _notifications.unreadChatCount),
-        body: ImporterHomeDashboard(profile: _profile, embedInDesktopShell: desktop),
+        body: ImporterHomeDashboard(
+            profile: _profile, embedInDesktopShell: desktop),
       ),
       if (_visitedImporterTabs.contains(ImporterShellTabs.inventario))
         HomeScreen(
@@ -679,7 +937,16 @@ class _MainShellState extends State<MainShell> {
 
   List<Widget> _aliadoPages({required bool desktop}) {
     final embedded = desktop;
-    return [
+    final pages = <Widget>[
+      AliadoHomeDashboard(
+        profile: _profile,
+        isActiveTab: _tabIndex == AliadoShellTabs.inicio,
+        onNotificationTap: _openNotificationCenter,
+        unreadNotifications: _notifications.unreadCount,
+        onMessagesTap: _openMessagesInbox,
+        unreadMessages: _notifications.unreadChatCount,
+        embedInDesktopShell: embedded,
+      ),
       _OrdersTab(
         profile: _profile,
         homeRole: AppHomeRole.aliado,
@@ -689,19 +956,10 @@ class _MainShellState extends State<MainShell> {
         unreadMessages: _notifications.unreadChatCount,
         embedInDesktopShell: embedded,
       ),
-      ReputationTab(
-        profile: _profile,
-        homeRole: AppHomeRole.aliado,
-        onNotificationTap: _openNotificationCenter,
-        unreadNotifications: _notifications.unreadCount,
-        onMessagesTap: _openMessagesInbox,
-        unreadMessages: _notifications.unreadChatCount,
-        onProfileRefresh: _refreshProfile,
-        embedInDesktopShell: embedded,
-      ),
       HomeScreen(
         profile: _profile,
         homeRole: AppHomeRole.aliado,
+        isActiveTab: _tabIndex == AliadoShellTabs.catalogo,
         onNotificationTap: _openNotificationCenter,
         unreadNotifications: _notifications.unreadCount,
         onMessagesTap: _openMessagesInbox,
@@ -727,6 +985,26 @@ class _MainShellState extends State<MainShell> {
         embedInDesktopShell: embedded,
       ),
     ];
+    return [
+      for (var i = 0; i < pages.length; i++)
+        _visitedAliadoTabs.contains(i) ? pages[i] : const SizedBox.shrink()
+    ];
+  }
+
+  void _openAliadoReputation() {
+    Navigator.of(context).push<void>(MaterialPageRoute(
+        builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Mi reputación')),
+              body: StatefulBuilder(
+                  builder: (context, update) => ReputationOverview(
+                      profile: _profile,
+                      isImporter: false,
+                      showHeading: false,
+                      onProfileRefresh: () async {
+                        await _refreshProfile();
+                        if (context.mounted) update(() {});
+                      })),
+            )));
   }
 
   Widget _buildB2bDesktopShell({
@@ -783,12 +1061,27 @@ class _MainShellState extends State<MainShell> {
   Widget _buildB2bMobileShell({
     required AppHomeRole role,
     required List<BottomNavigationBarItem> navItems,
+    required List<ShellDestination> destinations,
   }) {
     return ListenableBuilder(
       listenable: ThemeController.instance,
       builder: (context, _) {
         AppColors.brightness = ThemeController.instance.effectiveBrightness;
-        return Scaffold(
+        final theme = B2BThemeExtension.of(context);
+        return ResponsiveScaffold(
+          scaffoldKey: _b2bMobileScaffoldKey,
+          extendBody:
+              role == AppHomeRole.aliado && _tabIndex == AliadoShellTabs.inicio,
+          drawer: AdminShellDrawer(
+            profile: _profile,
+            destinations: destinations,
+            selectedIndex: _tabIndex.clamp(0, destinations.length - 1),
+            onDestinationSelected: (i) => _onB2bTabSelected(i, role),
+            onAction: _handleShellUserMenuAction,
+            subtitle: role == AppHomeRole.importador
+                ? 'Portal mayorista'
+                : 'Portal tienda',
+          ),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -819,22 +1112,31 @@ class _MainShellState extends State<MainShell> {
                 )
               : DecoratedBox(
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceTinted,
+                    color: theme.surfaceCard,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: theme.textPrimary.withOpacity(0.08),
                         blurRadius: 8,
                         offset: const Offset(0, -2),
                       ),
                     ],
                   ),
-                  child: BottomNavigationBar(
-                    currentIndex: _tabIndex,
-                    type: BottomNavigationBarType.fixed,
-                    selectedFontSize: 12,
-                    unselectedFontSize: 11,
-                    onTap: (i) => _onB2bTabSelected(i, role),
-                    items: navItems,
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      height: AppBreakpoints.minTouchTarget + 12,
+                      child: BottomNavigationBar(
+                        currentIndex: _tabIndex,
+                        type: BottomNavigationBarType.fixed,
+                        backgroundColor: theme.surfaceCard,
+                        selectedItemColor: theme.brand,
+                        unselectedItemColor: theme.textSecondary,
+                        selectedFontSize: 12,
+                        unselectedFontSize: 11,
+                        onTap: (i) => _onB2bTabSelected(i, role),
+                        items: navItems,
+                      ),
+                    ),
                   ),
                 ),
         );
@@ -845,7 +1147,7 @@ class _MainShellState extends State<MainShell> {
   Widget _buildDefaultShell() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= AppBreakpoints.b2bDesktop) {
+        if (constraints.maxWidth >= AppBreakpoints.mobileMenu) {
           return _buildB2bDesktopShell(
             role: AppHomeRole.aliado,
             destinations: _aliadoDestinations,
@@ -855,27 +1157,13 @@ class _MainShellState extends State<MainShell> {
         }
         return _buildB2bMobileShell(
           role: AppHomeRole.aliado,
-          navItems: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view),
-              label: 'Catálogo',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_outlined),
-              activeIcon: Icon(Icons.shopping_cart),
-              label: 'Pedidos',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.star_outline),
-              activeIcon: Icon(Icons.star),
-              label: 'Reputación',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
-            ),
+          destinations: _aliadoDestinations,
+          navItems: [
+            for (final destination in _aliadoDestinations)
+              BottomNavigationBarItem(
+                  icon: Icon(destination.icon),
+                  activeIcon: Icon(destination.selectedIcon),
+                  label: destination.label)
           ],
         );
       },
@@ -886,16 +1174,18 @@ class _MainShellState extends State<MainShell> {
   Widget _buildImportadorShell() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= AppBreakpoints.b2bDesktop) {
+        if (constraints.maxWidth >= AppBreakpoints.mobileMenu) {
           return _buildB2bDesktopShell(
             role: AppHomeRole.importador,
             destinations: _importadorDestinations,
             railBadgeLabel: 'Panel importador',
-            railStatusBuilder: (extended) => ImporterStoreCountCard(extended: extended),
+            railStatusBuilder: (extended) =>
+                ImporterStoreCountCard(extended: extended),
           );
         }
         return _buildB2bMobileShell(
           role: AppHomeRole.importador,
+          destinations: _importadorDestinations,
           navItems: const [
             BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),
@@ -960,25 +1250,40 @@ class _OrdersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final useBranded =
+        homeRole == AppHomeRole.aliado && !embedInDesktopShell;
+    final panel = switch (homeRole) {
+      AppHomeRole.importador => const ImporterActiveOrdersPanel(),
+      AppHomeRole.administrador => const SizedBox.shrink(),
+      AppHomeRole.aliado => const AliadoPedidosPanel(),
+    };
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: embedInDesktopShell
+      appBar: useBranded || embedInDesktopShell
           ? null
           : MotolinkAppBar(
               currentUserProfile: profile,
-              logoHeight: homeRole == AppHomeRole.aliado
-                  ? MotolinkAppBarLogoSizes.aliado
-                  : MotolinkAppBarLogoSizes.importador,
+              logoHeight: MotolinkAppBarLogoSizes.importador,
               onNotificationTap: onNotificationTap,
               unreadNotifications: unreadNotifications,
               onMessagesTap: onMessagesTap,
               unreadMessages: unreadMessages,
             ),
-      body: switch (homeRole) {
-        AppHomeRole.importador => const ImporterActiveOrdersPanel(),
-        AppHomeRole.administrador => const SizedBox.shrink(),
-        AppHomeRole.aliado => const AliadoPedidosPanel(),
-      },
+      body: useBranded
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AliadoBrandedHeader(
+                  profile: profile,
+                  onMessagesTap: onMessagesTap,
+                  onNotificationTap: onNotificationTap,
+                  unreadMessages: unreadMessages,
+                  unreadNotifications: unreadNotifications,
+                ),
+                Expanded(child: panel),
+              ],
+            )
+          : panel,
     );
   }
 }
@@ -1065,10 +1370,15 @@ class _ProfileTabState extends State<_ProfileTab> {
   }
 
   Widget _buildSupportEntryCard({bool inProfileGroup = false}) {
+    final theme = B2BThemeExtension.of(context);
     if (inProfileGroup) {
       return ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.support_agent_outlined, color: AppColors.brandLink),
+        leading: LucideIcon(
+          LucideGlyph.headset,
+          size: 22,
+          color: theme.brand,
+        ),
         title: const Text('Atención al cliente',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
         subtitle: const Text('Gestiona tus reclamos (máx. 3 abiertos).',
@@ -1087,10 +1397,10 @@ class _ProfileTabState extends State<_ProfileTab> {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              const Icon(
-                Icons.support_agent_outlined,
-                color: AppColors.brandBlue,
+              LucideIcon(
+                LucideGlyph.headset,
                 size: 28,
+                color: theme.brand,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1134,83 +1444,98 @@ class _ProfileTabState extends State<_ProfileTab> {
     final showSupportEntry = widget.homeRole == AppHomeRole.aliado ||
         widget.homeRole == AppHomeRole.importador;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: widget.embedInDesktopShell
-          ? null
-          : MotolinkAppBar(
-              currentUserProfile: widget.profile,
-              logoHeight: widget.homeRole == AppHomeRole.aliado
-                  ? MotolinkAppBarLogoSizes.aliado
-                  : MotolinkAppBarLogoSizes.importador,
-              onNotificationTap: widget.onNotificationTap,
-              unreadNotifications: widget.unreadNotifications,
-              onMessagesTap: widget.onMessagesTap,
-              unreadMessages: widget.unreadMessages,
-              extraActions: widget.profile.hasActiveAccountAccess && showSupportEntry
-                  ? const []
-                  : [
-                HeaderIconButton(
-                  tooltip: 'Ajustes',
-                  icon: Icons.settings_outlined,
-                  onPressed: () {
-                    Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const AccountSettingsScreen(),
-                      ),
-                    );
+    final useBranded =
+        widget.homeRole == AppHomeRole.aliado && !widget.embedInDesktopShell;
+    final profileBody = SafeArea(
+      top: !useBranded && !widget.embedInDesktopShell,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          widget.embedInDesktopShell ? 0 : 20,
+          widget.embedInDesktopShell ? 0 : 8,
+          widget.embedInDesktopShell ? 0 : 20,
+          24,
+        ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: widget.embedInDesktopShell ? 1120 : double.infinity,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ProfileB2BForm(
+                  summaryFirst: true,
+                  accountActionsInShell: widget.embedInDesktopShell,
+                  overviewSupport: showSupportEntry
+                      ? _buildSupportEntryCard(
+                          inProfileGroup: widget.embedInDesktopShell)
+                      : null,
+                  key: ValueKey<Object>(
+                    '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
+                  ),
+                  initial: widget.profile,
+                  onRelatedDataChanged: widget.onProfileSaved,
+                  onSaved: () {
+                    widget.onProfileSaved();
                   },
+                  beforeSignOut: showSupportEntry &&
+                          widget.homeRole == AppHomeRole.aliado
+                      ? _buildSupportEntryCard()
+                      : null,
+                  afterReputation:
+                      showSupportEntry ? _buildSupportEntryCard() : null,
                 ),
               ],
-            ),
-      body: SafeArea(
-        top: !widget.embedInDesktopShell,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            widget.embedInDesktopShell ? 0 : 20,
-            widget.embedInDesktopShell ? 0 : 8,
-            widget.embedInDesktopShell ? 0 : 20,
-            24,
-          ),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: widget.embedInDesktopShell
-                    ? 1120
-                    : double.infinity,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ProfileB2BForm(
-                    summaryFirst: true,
-                    accountActionsInShell: widget.embedInDesktopShell,
-                    overviewSupport: showSupportEntry
-                        ? _buildSupportEntryCard(inProfileGroup: widget.embedInDesktopShell)
-                        : null,
-                    key: ValueKey<Object>(
-                      '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',
-                    ),
-                    initial: widget.profile,
-                    onRelatedDataChanged: widget.onProfileSaved,
-                    onSaved: () {
-                      widget.onProfileSaved();
-                    },
-                    beforeSignOut: showSupportEntry &&
-                            widget.homeRole == AppHomeRole.aliado
-                        ? _buildSupportEntryCard()
-                        : null,
-                    afterReputation: showSupportEntry
-                        ? _buildSupportEntryCard()
-                        : null,
-                  ),
-                ],
-              ),
             ),
           ),
         ),
       ),
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: useBranded || widget.embedInDesktopShell
+          ? null
+          : MotolinkAppBar(
+              currentUserProfile: widget.profile,
+              logoHeight: MotolinkAppBarLogoSizes.importador,
+              onNotificationTap: widget.onNotificationTap,
+              unreadNotifications: widget.unreadNotifications,
+              onMessagesTap: widget.onMessagesTap,
+              unreadMessages: widget.unreadMessages,
+              extraActions:
+                  widget.profile.hasActiveAccountAccess && showSupportEntry
+                      ? const []
+                      : [
+                          HeaderIconButton(
+                            tooltip: 'Ajustes',
+                            icon: Icons.settings_outlined,
+                            onPressed: () {
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const AccountSettingsScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+            ),
+      body: useBranded
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AliadoBrandedHeader(
+                  profile: widget.profile,
+                  onMessagesTap: widget.onMessagesTap,
+                  onNotificationTap: widget.onNotificationTap,
+                  unreadMessages: widget.unreadMessages,
+                  unreadNotifications: widget.unreadNotifications,
+                ),
+                Expanded(child: profileBody),
+              ],
+            )
+          : profileBody,
     );
   }
 }

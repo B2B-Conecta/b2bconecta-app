@@ -1,23 +1,31 @@
-import 'package:flutter/material.dart';
+import 'dart:async' show unawaited;
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+
+import 'activity_metrics_grid.dart';
 import 'admin_catalog_coverage.dart';
 import 'admin_user_presence_section.dart';
 import 'user_presence.dart';
 import 'admin_published_catalogs_section.dart';
 import 'admin_user_activity_row_model.dart';
+import 'admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
-import 'package:motolink_pro_app/features/admin/admin_standard_filter_bar.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 enum _ActivityPeriod { day, week }
 
 enum _ActivityRoleFilter { all, aliado, importador }
 
 enum _CatalogListFilter { todos, publicados, sinCatalogo }
+
 
 /// Admin: monitoreo de ingresos y pedidos por aliado/importador.
 class AdminUserMonitoringPanel extends StatefulWidget {
@@ -27,10 +35,14 @@ class AdminUserMonitoringPanel extends StatefulWidget {
     this.loadCatalogCoverage,
     this.loadPresence,
     this.presenceRequest = 0,
+    this.showCatalogCoverage = true,
   });
 
   /// Al cambiar (y ser > 0) abre la presencia con el período «hoy».
   final int presenceRequest;
+
+  /// Incluye métrica y modo Catálogos (Presencia / Reportes).
+  final bool showCatalogCoverage;
 
   final Future<List<AdminUserActivityRowModel>> Function({
     String? role,
@@ -54,11 +66,11 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
   final _listScroll = ScrollController();
   int _pageIndex = 0;
   int _pageSize = listPageSizeOptions.first;
+  ActivityMetricFocus _metricFocus = ActivityMetricFocus.none;
   AdminCatalogCoverage? _coverage;
   bool _coverageLoading = true;
   bool _showingCatalogs = false;
   bool _presenceOpen = false;
-  ImporterOption? _focusedCatalog;
   _CatalogListFilter _catalogFilter = _CatalogListFilter.todos;
   final _catalogSearchCtrl = TextEditingController();
   int _catalogPageIndex = 0;
@@ -76,7 +88,7 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
       _period = _ActivityPeriod.day;
     }
     _load();
-    _loadCoverage();
+    if (widget.showCatalogCoverage) _loadCoverage();
   }
 
   @override
@@ -137,10 +149,30 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     }
   }
 
+  Future<void> _refreshAll() async {
+    await _load();
+    if (widget.showCatalogCoverage) await _loadCoverage();
+  }
+
   List<AdminUserActivityRowModel> get _filtered {
+    var list = _rows;
+    switch (_metricFocus) {
+      case ActivityMetricFocus.withLogins:
+        list = list.where((r) => r.loginCountPeriod > 0).toList();
+      case ActivityMetricFocus.withOrders:
+        list = list.where((r) => r.ordersCountPeriod > 0).toList();
+      case ActivityMetricFocus.withDelivered:
+        list = list.where((r) => r.ordersDeliveredPeriod > 0).toList();
+      case ActivityMetricFocus.withVolume:
+        list = list.where((r) => r.ordersVolumeUsdPeriod > 0).toList();
+      case ActivityMetricFocus.users:
+      case ActivityMetricFocus.catalogs:
+      case ActivityMetricFocus.none:
+        break;
+    }
     final q = _searchCtrl.text.trim().toLowerCase();
-    if (q.isEmpty) return _rows;
-    return _rows.where((r) {
+    if (q.isEmpty) return list;
+    return list.where((r) {
       final name = (r.businessName ?? '').toLowerCase();
       final rif = (r.rif ?? '').toLowerCase();
       final city = (r.ciudad ?? '').toLowerCase();
@@ -150,6 +182,29 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
           city.contains(q) ||
           state.contains(q);
     }).toList();
+  }
+
+  void _onMetricFocus(ActivityMetricFocus focus) {
+    if (focus == ActivityMetricFocus.catalogs) {
+      if (_coverage == null && !_coverageLoading) {
+        unawaited(_loadCoverage());
+      }
+      setState(() {
+        _showingCatalogs = true;
+        _catalogFilter = _CatalogListFilter.todos;
+        _catalogSearchCtrl.clear();
+        _catalogPageIndex = 0;
+        _presenceOpen = false;
+        _metricFocus = ActivityMetricFocus.catalogs;
+      });
+      return;
+    }
+    setState(() {
+      _showingCatalogs = false;
+      _metricFocus = focus;
+      _pageIndex = 0;
+      if (focus != ActivityMetricFocus.none) _presenceOpen = false;
+    });
   }
 
   String get _periodLabel =>
@@ -184,201 +239,263 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     );
   }
 
+  void _setPeriod(_ActivityPeriod period) {
+    if (_period == period) return;
+    setState(() {
+      _period = period;
+      _pageIndex = 0;
+    });
+    _load();
+  }
+
+  void _setRole(_ActivityRoleFilter role) {
+    if (_roleFilter == role) return;
+    setState(() {
+      _roleFilter = role;
+      _pageIndex = 0;
+    });
+    _load();
+  }
+
+  void _openImporterCatalog(ImporterOption importer) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final theme = B2BThemeExtension.of(ctx);
+        final size = MediaQuery.sizeOf(ctx);
+        final width = size.width >= 1008 ? 960.0 : size.width - 48;
+        return Dialog(
+          backgroundColor: theme.dialogSurface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: theme.border),
+          ),
+          child: SizedBox(
+            width: width < 280 ? 280 : width,
+            height: size.height * 0.82,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AdminPublishedCatalogsSection(
+                focusImporter: importer,
+                onCloseFocus: () => Navigator.pop(ctx),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final focused = _focusedCatalog;
-    if (focused != null) {
-      return AdminPublishedCatalogsSection(
-        focusImporter: focused,
-        onCloseFocus: () => setState(() => _focusedCatalog = null),
-      );
-    }
-    if (_showingCatalogs) {
+    if (widget.showCatalogCoverage && _showingCatalogs) {
       return _catalogLists();
     }
-    if (_loading && _rows.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.brand));
-    }
 
-    if (_error != null && _rows.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _load, child: const Text('Reintentar')),
-            ],
-          ),
-        ),
-      );
-    }
-
+    final theme = B2BThemeExtension.of(context);
     final filtered = _filtered;
     final page = sliceListPage(
       items: filtered,
       pageIndex: _pageIndex,
       pageSize: _pageSize,
     );
-    final totalLogins =
-        filtered.fold<int>(0, (s, r) => s + r.loginCountPeriod);
-    final totalOrders =
-        filtered.fold<int>(0, (s, r) => s + r.ordersCountPeriod);
+    final totalUsers = _rows.length;
+    final totalLogins = _rows.fold<int>(0, (s, r) => s + r.loginCountPeriod);
+    final totalOrders = _rows.fold<int>(0, (s, r) => s + r.ordersCountPeriod);
     final totalDelivered =
-        filtered.fold<int>(0, (s, r) => s + r.ordersDeliveredPeriod);
-    final totalVolume = filtered.fold<double>(
+        _rows.fold<int>(0, (s, r) => s + r.ordersDeliveredPeriod);
+    final totalVolume = _rows.fold<double>(
       0,
       (s, r) => s + r.ordersVolumeUsdPeriod,
     );
 
     return RefreshIndicator(
-      onRefresh: _load,
-      color: AppColors.brand,
+      onRefresh: _refreshAll,
+      color: AdminUsersChrome.brand,
       child: ListView(
         controller: _listScroll,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
         children: [
-          AdminStandardFilterBar(
-            padding: EdgeInsets.zero,
-            searchController: _searchCtrl,
-            searchHint: 'Buscar por nombre, RIF o ubicación…',
-            onSearchChanged: (_) => setState(() => _pageIndex = 0),
-            clearVisible: _period != _ActivityPeriod.week ||
-                _roleFilter != _ActivityRoleFilter.all,
-            onClear: () {
-              setState(() {
-                _period = _ActivityPeriod.week;
-                _roleFilter = _ActivityRoleFilter.all;
-                _pageIndex = 0;
-              });
-              _load();
-            },
-            trailing: IconButton(
-              tooltip: 'Actualizar',
-              onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh, size: 22),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: AdminUsersChrome.card(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            B2bDataTableFilterPill(
+                              label: 'Hoy',
+                              selected: _period == _ActivityPeriod.day,
+                              glyph: LucideGlyph.activity,
+                              onTap: () => _setPeriod(_ActivityPeriod.day),
+                            ),
+                            const SizedBox(width: 6),
+                            B2bDataTableFilterPill(
+                              label: 'Semana',
+                              selected: _period == _ActivityPeriod.week,
+                              glyph: LucideGlyph.activity,
+                              onTap: () => _setPeriod(_ActivityPeriod.week),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              width: 1,
+                              height: 22,
+                              color: theme.borderSubtle,
+                            ),
+                            const SizedBox(width: 10),
+                            B2bDataTableFilterPill(
+                              label: 'Todos',
+                              selected: _roleFilter == _ActivityRoleFilter.all,
+                              glyph: LucideGlyph.users,
+                              onTap: () => _setRole(_ActivityRoleFilter.all),
+                            ),
+                            const SizedBox(width: 6),
+                            B2bDataTableFilterPill(
+                              label: 'Minorista',
+                              selected:
+                                  _roleFilter == _ActivityRoleFilter.aliado,
+                              glyph: LucideGlyph.userRound,
+                              onTap: () => _setRole(_ActivityRoleFilter.aliado),
+                            ),
+                            const SizedBox(width: 6),
+                            B2bDataTableFilterPill(
+                              label: 'Mayorista',
+                              selected: _roleFilter ==
+                                  _ActivityRoleFilter.importador,
+                              glyph: LucideGlyph.store,
+                              onTap: () =>
+                                  _setRole(_ActivityRoleFilter.importador),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      tooltip: 'Actualizar',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _loading ? null : _refreshAll,
+                      icon: LucideIcon(
+                        LucideGlyph.refreshCw,
+                        size: 16,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _summaryRow(
+                  users: totalUsers,
+                  logins: totalLogins,
+                  orders: totalOrders,
+                  delivered: totalDelivered,
+                  volumeUsd: totalVolume,
+                ),
+              ],
             ),
-            menus: [
-              AdminFilterDropdown(
-                icon: Icons.calendar_today_outlined,
-                placeholder: 'Periodo',
-                valueLabel: _period == _ActivityPeriod.day ? 'Hoy' : 'Semana',
-                active: _period != _ActivityPeriod.week,
-                options: [
-                  AdminFilterOption(
-                    label: 'Hoy',
-                    selected: _period == _ActivityPeriod.day,
-                    onSelect: () {
-                      setState(() {
-                        _period = _ActivityPeriod.day;
-                        _pageIndex = 0;
-                      });
-                      _load();
-                    },
-                  ),
-                  AdminFilterOption(
-                    label: 'Semana',
-                    selected: _period == _ActivityPeriod.week,
-                    onSelect: () {
-                      setState(() {
-                        _period = _ActivityPeriod.week;
-                        _pageIndex = 0;
-                      });
-                      _load();
-                    },
-                  ),
-                ],
-              ),
-              AdminFilterDropdown(
-                icon: Icons.badge_outlined,
-                placeholder: 'Rol',
-                valueLabel: switch (_roleFilter) {
-                  _ActivityRoleFilter.all => 'Todos',
-                  _ActivityRoleFilter.aliado => 'Minorista',
-                  _ActivityRoleFilter.importador => 'Mayorista',
-                },
-                active: _roleFilter != _ActivityRoleFilter.all,
-                options: [
-                  AdminFilterOption(
-                    label: 'Todos',
-                    selected: _roleFilter == _ActivityRoleFilter.all,
-                    onSelect: () {
-                      setState(() {
-                        _roleFilter = _ActivityRoleFilter.all;
-                        _pageIndex = 0;
-                      });
-                      _load();
-                    },
-                  ),
-                  AdminFilterOption(
-                    label: 'Minorista',
-                    selected: _roleFilter == _ActivityRoleFilter.aliado,
-                    onSelect: () {
-                      setState(() {
-                        _roleFilter = _ActivityRoleFilter.aliado;
-                        _pageIndex = 0;
-                      });
-                      _load();
-                    },
-                  ),
-                  AdminFilterOption(
-                    label: 'Mayorista',
-                    selected: _roleFilter == _ActivityRoleFilter.importador,
-                    onSelect: () {
-                      setState(() {
-                        _roleFilter = _ActivityRoleFilter.importador;
-                        _pageIndex = 0;
-                      });
-                      _load();
-                    },
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 12),
+          _activityTable(filtered, page),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityTable(
+    List<AdminUserActivityRowModel> filtered,
+    List<AdminUserActivityRowModel> page,
+  ) {
+    final theme = B2BThemeExtension.of(context);
+    final loadingEmpty = _loading && _rows.isEmpty;
+    final errorEmpty = _error != null && _rows.isEmpty;
+    final noMatches = !loadingEmpty && !errorEmpty && filtered.isEmpty;
+
+    return B2bDataTableShell(
+      toolbar: B2bDataTableToolbar(
+        searchController: _searchCtrl,
+        searchHint: 'Nombre, RIF o ubicación…',
+      ),
+      header: const B2bDataTableHeader(
+        cells: [
+          B2bDataTableHeaderCell(label: 'Cuenta', flex: 4),
+          B2bDataTableHeaderCell(label: 'Rol', flex: 2),
+          B2bDataTableHeaderCell(label: 'Actividad', flex: 4),
+          B2bDataTableHeaderCell(label: 'Último acceso', flex: 3),
+        ],
+      ),
+      rows: loadingEmpty || errorEmpty || noMatches
+          ? const <Widget>[]
+          : [
+              for (var i = 0; i < page.length; i++)
+                _UserActivityRow(
+                  row: page[i],
+                  zebra: i.isOdd,
+                  isLast: i == page.length - 1,
+                ),
             ],
-          ),
-          const SizedBox(height: 12),
-          _summaryRow(
-            users: filtered.length,
-            logins: totalLogins,
-            orders: totalOrders,
-            delivered: totalDelivered,
-            volumeUsd: totalVolume,
-          ),
-          const SizedBox(height: 12),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+      empty: loadingEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
               child: Center(
                 child: SizedBox(
                   width: 22,
                   height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.brand,
-                  ),
-                ),
-              ),
-            ),
-          if (filtered.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Text(
-                  _rows.isEmpty
-                      ? 'No hay usuarios B2B registrados.'
-                      : 'Ningún usuario coincide con la búsqueda.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  textAlign: TextAlign.center,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             )
-          else ...[
-            ListPageBar(
+          : errorEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      FilledButton(
+                        onPressed: _load,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: theme.brand,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimary,
+                        ),
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 28),
+                  child: Text(
+                    'Ningún usuario coincide con los filtros.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                ),
+      footer: loadingEmpty || errorEmpty
+          ? null
+          : ListPageBar(
               total: filtered.length,
               pageIndex: _pageIndex,
               pageSize: _pageSize,
+              alwaysShow: filtered.isNotEmpty,
+              entityLabel: 'cuentas',
               onPageIndex: (index) {
                 setState(() => _pageIndex = index);
                 if (_listScroll.hasClients) _listScroll.jumpTo(0);
@@ -391,15 +508,6 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
                 if (_listScroll.hasClients) _listScroll.jumpTo(0);
               },
             ),
-            ...page.map(
-              (r) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _UserActivityCard(row: r, periodLabel: _periodLabel),
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -410,100 +518,50 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
     required int delivered,
     required double volumeUsd,
   }) {
-    final tiles = <Widget>[
-      _MiniStat(
-        label: 'Usuarios',
-        value: '$users',
-        icon: Icons.people_outline,
-      ),
-      InkWell(
-        onTap: () => setState(() => _presenceOpen = !_presenceOpen),
-        borderRadius: BorderRadius.circular(10),
-        child: _MiniStat(
-          label: 'Ingresos ($_periodLabel)',
-          value: '$logins',
-          icon: Icons.login_outlined,
-          hint: _presenceOpen ? 'Ocultar' : 'Presencia',
-          expanded: _presenceOpen,
+    final theme = B2BThemeExtension.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ActivityMetricsGrid(
+          users: users,
+          logins: logins,
+          orders: orders,
+          delivered: delivered,
+          volumeUsd: volumeUsd,
+          periodLabel: _periodLabel,
+          focus: _metricFocus,
+          onFocusChanged: _onMetricFocus,
+          showCatalogs: widget.showCatalogCoverage,
+          catalogsLoading: _coverageLoading,
+          catalogsCount: _coverage?.published.length,
         ),
-      ),
-      _MiniStat(
-        label: 'Pedidos ($_periodLabel)',
-        value: '$orders',
-        icon: Icons.shopping_cart_outlined,
-      ),
-      _MiniStat(
-        label: 'Entregados',
-        value: '$delivered',
-        icon: Icons.check_circle_outline,
-      ),
-      _MiniStat(
-        label: 'Vol. USD entregado',
-        value: '\$${volumeUsd.toStringAsFixed(0)}',
-        icon: Icons.payments_outlined,
-      ),
-      _CatalogStat(
-        loading: _coverageLoading,
-        count: _coverage?.published.length,
-        onTap: _coverage == null
-            ? _loadCoverage
-            : () => setState(() {
-                  _showingCatalogs = true;
-                  _catalogFilter = _CatalogListFilter.todos;
-                  _catalogSearchCtrl.clear();
-                  _catalogPageIndex = 0;
-                }),
-      ),
-    ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cols = constraints.maxWidth >= 980
-            ? 6
-            : constraints.maxWidth >= 640
-                ? 3
-                : 2;
-        const gap = 8.0;
-        final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (final tile in tiles)
-                  SizedBox(width: width, height: 92, child: tile),
-              ],
+        if (_presenceOpen) ...[
+          const SizedBox(height: 8),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.surfaceCard,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: theme.brand),
             ),
-            if (_presenceOpen) ...[
-              const SizedBox(height: 8),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.brand),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                  child: AdminUserPresenceSection(
-                    loadRows: widget.loadPresence,
-                    onlyLoggedInToday: true,
-                    loadTodayLogins: () {
-                      final custom = widget.loadRows;
-                      if (custom != null) {
-                        return custom(role: null, period: 'day');
-                      }
-                      return SupabaseService.listAdminUserActivityMonitoring(
-                        period: 'day',
-                      );
-                    },
-                  ),
-                ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+              child: AdminUserPresenceSection(
+                loadRows: widget.loadPresence,
+                onlyLoggedInToday: true,
+                loadTodayLogins: () {
+                  final custom = widget.loadRows;
+                  if (custom != null) {
+                    return custom(role: null, period: 'day');
+                  }
+                  return SupabaseService.listAdminUserActivityMonitoring(
+                    period: 'day',
+                  );
+                },
               ),
-            ],
-          ],
-        );
-      },
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -545,408 +603,593 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
       pageIndex: _catalogPageIndex,
       pageSize: _catalogPageSize,
     );
-    final statusLabel = switch (_catalogFilter) {
-      _CatalogListFilter.todos => 'Todos',
-      _CatalogListFilter.publicados => 'Publicados',
-      _CatalogListFilter.sinCatalogo => 'Sin catálogo',
-    };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-          child: Row(
-            children: [
-              IconButton(
-                tooltip: 'Volver a usuarios',
-                onPressed: () => setState(() => _showingCatalogs = false),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Expanded(
-                child: Text(
-                  'Catálogos de importadores',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: DecoratedBox(
+        decoration: AdminUsersChrome.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 14, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Volver a presencia',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => setState(() {
+                      _showingCatalogs = false;
+                      _metricFocus = ActivityMetricFocus.none;
+                    }),
+                    icon: LucideIcon(
+                      LucideGlyph.arrowLeft,
+                      size: 18,
+                      color: AdminUsersChrome.titleColor,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Catálogos publicados',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AdminUsersChrome.titleColor,
                       ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              AdminStandardFilterBar(
-                padding: EdgeInsets.zero,
-                searchController: _catalogSearchCtrl,
-                searchHint: 'Buscar proveedor por nombre o ubicación…',
-                onSearchChanged: (_) => setState(() => _catalogPageIndex = 0),
-                clearVisible: _catalogFilter != _CatalogListFilter.todos,
-                onClear: () => setState(() {
-                  _catalogFilter = _CatalogListFilter.todos;
-                  _catalogSearchCtrl.clear();
-                  _catalogPageIndex = 0;
-                }),
-                menus: [
-                  AdminFilterDropdown(
-                    icon: Icons.inventory_2_outlined,
-                    placeholder: 'Estado',
-                    valueLabel: statusLabel,
-                    active: _catalogFilter != _CatalogListFilter.todos,
-                    options: [
-                      for (final f in _CatalogListFilter.values)
-                        AdminFilterOption(
-                          label: switch (f) {
-                            _CatalogListFilter.todos => 'Todos',
-                            _CatalogListFilter.publicados =>
-                              'Publicados · ${coverage.published.length}',
-                            _CatalogListFilter.sinCatalogo =>
-                              'Sin catálogo · ${coverage.withoutCatalog.length}',
-                          },
-                          selected: _catalogFilter == f,
-                          onSelect: () => setState(() {
-                            _catalogFilter = f;
-                            _catalogPageIndex = 0;
-                          }),
-                        ),
-                    ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              if (rows.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: Text(
-                      coverage.published.isEmpty &&
-                              coverage.withoutCatalog.isEmpty
-                          ? 'No hay importadores registrados.'
-                          : 'Ningún proveedor coincide con la búsqueda.',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: Text(
+                'Mayoristas con y sin catálogo publicado.',
+                style: TextStyle(fontSize: 12, color: AdminUsersChrome.muted),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                children: [
+                  TextField(
+                    controller: _catalogSearchCtrl,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: AdminUsersChrome.field(
+                      label: 'Buscar',
+                      hint: 'Proveedor o ubicación…',
+                    ).copyWith(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
                       ),
-                      textAlign: TextAlign.center,
+                      prefixIcon: Padding(
+                        padding: EdgeInsets.only(left: 10, right: 6),
+                        child: LucideIcon(
+                          LucideGlyph.search,
+                          size: 16,
+                          color: AdminUsersChrome.muted,
+                        ),
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
                     ),
                   ),
-                )
-              else ...[
-                ListPageBar(
-                  total: rows.length,
-                  pageIndex: _catalogPageIndex,
-                  pageSize: _catalogPageSize,
-                  onPageIndex: (index) =>
-                      setState(() => _catalogPageIndex = index),
-                  onPageSize: (size) => setState(() {
-                    _catalogPageSize = size;
-                    _catalogPageIndex = 0;
-                  }),
-                ),
-                ...page.map(
-                  (row) => _ImporterCatalogTile(
-                    importer: row.importer,
-                    subtitle: row.published
-                        ? 'Catálogo publicado'
-                        : 'Sin catálogo publicado',
-                    onTap: row.published
-                        ? () => setState(() => _focusedCatalog = row.importer)
-                        : null,
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        B2bDataTableFilterPill(
+                          label: 'Todos',
+                          selected:
+                              _catalogFilter == _CatalogListFilter.todos,
+                          glyph: LucideGlyph.users,
+                          onTap: () => setState(() {
+                            _catalogFilter = _CatalogListFilter.todos;
+                            _catalogPageIndex = 0;
+                          }),
+                        ),
+                        const SizedBox(width: 6),
+                        B2bDataTableFilterPill(
+                          label:
+                              'Publicados · ${coverage.published.length}',
+                          selected: _catalogFilter ==
+                              _CatalogListFilter.publicados,
+                          glyph: LucideGlyph.store,
+                          onTap: () => setState(() {
+                            _catalogFilter = _CatalogListFilter.publicados;
+                            _catalogPageIndex = 0;
+                          }),
+                        ),
+                        const SizedBox(width: 6),
+                        B2bDataTableFilterPill(
+                          label:
+                              'Sin catálogo · ${coverage.withoutCatalog.length}',
+                          selected: _catalogFilter ==
+                              _CatalogListFilter.sinCatalogo,
+                          glyph: LucideGlyph.package,
+                          onTap: () => setState(() {
+                            _catalogFilter = _CatalogListFilter.sinCatalogo;
+                            _catalogPageIndex = 0;
+                          }),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ],
-          ),
+                  const SizedBox(height: 10),
+                  if (rows.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Text(
+                        'Ningún proveedor coincide con la búsqueda.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AdminUsersChrome.muted,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AdminUsersChrome.border),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          const B2bDataTableHeader(
+                            cells: [
+                              B2bDataTableHeaderCell(
+                                label: 'Mayorista',
+                                flex: 4,
+                              ),
+                              B2bDataTableHeaderCell(
+                                label: 'Ubicación',
+                                flex: 2,
+                              ),
+                              B2bDataTableHeaderCell(
+                                label: 'Estado',
+                                flex: 2,
+                              ),
+                            ],
+                          ),
+                          for (var i = 0; i < page.length; i++)
+                            _ImporterCatalogRow(
+                              importer: page[i].importer,
+                              published: page[i].published,
+                              zebra: i.isOdd,
+                              isLast: i == page.length - 1,
+                              onOpenCatalog: page[i].published
+                                  ? () => _openImporterCatalog(page[i].importer)
+                                  : null,
+                            ),
+                        ],
+                      ),
+                    ),
+                    ListPageBar(
+                      total: rows.length,
+                      pageIndex: _catalogPageIndex,
+                      pageSize: _catalogPageSize,
+                      alwaysShow: rows.isNotEmpty,
+                      onPageIndex: (index) =>
+                          setState(() => _catalogPageIndex = index),
+                      onPageSize: (size) => setState(() {
+                        _catalogPageSize = size;
+                        _catalogPageIndex = 0;
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
-    );
-  }
-}
-
-class _CatalogStat extends StatelessWidget {
-  const _CatalogStat({
-    required this.loading,
-    required this.count,
-    required this.onTap,
-  });
-
-  final bool loading;
-  final int? count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      key: const Key('admin-published-catalogs-stat'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: _MiniStat(
-        label: 'Catálogos publicados',
-        value: loading ? '…' : '${count ?? '—'}',
-        icon: Icons.storefront_outlined,
-        hint: 'Ver lista',
       ),
     );
   }
 }
 
-class _ImporterCatalogTile extends StatelessWidget {
-  const _ImporterCatalogTile({
+class _ImporterCatalogRow extends StatefulWidget {
+  const _ImporterCatalogRow({
     required this.importer,
-    required this.subtitle,
-    this.onTap,
+    required this.published,
+    required this.zebra,
+    required this.isLast,
+    this.onOpenCatalog,
   });
 
   final ImporterOption importer;
-  final String subtitle;
-  final VoidCallback? onTap;
+  final bool published;
+  final bool zebra;
+  final bool isLast;
+  final VoidCallback? onOpenCatalog;
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderSubtle),
-      ),
-      child: ListTile(
-        title: Text(importer.businessName),
-        subtitle: Text(subtitle),
-        trailing: onTap == null ? null : const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
+  State<_ImporterCatalogRow> createState() => _ImporterCatalogRowState();
 }
 
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.hint,
-    this.expanded = false,
-  });
+class _ImporterCatalogRowState extends State<_ImporterCatalogRow> {
+  String? _logoUrl;
 
-  final String label;
-  final String value;
-  final IconData icon;
-  final String? hint;
-  final bool expanded;
+  @override
+  void initState() {
+    super.initState();
+    _resolveLogo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ImporterCatalogRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.importer.logoStoragePath !=
+        widget.importer.logoStoragePath) {
+      _resolveLogo();
+    }
+  }
+
+  Future<void> _resolveLogo() async {
+    final path = widget.importer.logoStoragePath?.trim();
+    if (path == null || path.isEmpty) {
+      if (mounted) setState(() => _logoUrl = null);
+      return;
+    }
+    try {
+      final url = await SupabaseService.createSignedUrlForProfileLogo(path);
+      if (mounted) setState(() => _logoUrl = url);
+    } catch (_) {
+      if (mounted) setState(() => _logoUrl = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: hint == null ? AppColors.borderSubtle : AppColors.brand,
+    final theme = B2BThemeExtension.of(context);
+    final name = widget.importer.businessName.trim().isEmpty
+        ? 'Sin nombre comercial'
+        : widget.importer.businessName.trim();
+    final initials = name
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .take(2)
+        .map((e) => e[0].toUpperCase())
+        .join();
+    final location = widget.importer.ubicacionLine;
+
+    final menu = B2bDataRowActionsMenu(
+      actions: [
+        B2bDataRowAction(
+          id: 'open',
+          label: widget.published ? 'Ver catálogo' : 'Sin catálogo publicado',
+          glyph: LucideGlyph.store,
+          enabled: widget.onOpenCatalog != null,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      ],
+      onSelected: (_) => widget.onOpenCatalog?.call(),
+    );
+
+    return B2bDataTableZebraRow(
+      zebra: widget.zebra,
+      isLast: widget.isLast,
+      onTap: widget.onOpenCatalog,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: AppColors.brand),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          if (hint != null)
-            Row(
+          Expanded(
+            flex: 4,
+            child: Row(
               children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: theme.brandContainer,
+                  backgroundImage:
+                      _logoUrl != null ? NetworkImage(_logoUrl!) : null,
+                  child: _logoUrl == null
+                      ? Text(
+                          initials.isEmpty ? '?' : initials,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: theme.brand,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    hint!,
+                    name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.brand,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: theme.textPrimary,
                     ),
                   ),
                 ),
-                Icon(
-                  expanded ? Icons.expand_less : Icons.chevron_right,
-                  size: 16,
-                  color: AppColors.brand,
-                ),
               ],
-            )
-          else
-            const SizedBox(height: 16),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              location,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: B2bDataStatusBadge(
+                label: widget.published ? 'Publicado' : 'Sin catálogo',
+                background:
+                    widget.published ? theme.successBg : theme.surfaceSubtle,
+                foreground:
+                    widget.published ? theme.successFg : theme.textMuted,
+              ),
+            ),
+          ),
+          SizedBox(width: 48, child: menu),
         ],
       ),
     );
   }
 }
 
-class _UserActivityCard extends StatelessWidget {
-  const _UserActivityCard({
+class _UserActivityRow extends StatelessWidget {
+  const _UserActivityRow({
     required this.row,
-    required this.periodLabel,
+    required this.zebra,
+    required this.isLast,
   });
 
   final AdminUserActivityRowModel row;
-  final String periodLabel;
+  final bool zebra;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    final roleLabel = ProfileRoleLabels.labelEs(row.role);
+    final theme = B2BThemeExtension.of(context);
     final location = [
       if ((row.ciudad ?? '').trim().isNotEmpty) row.ciudad!.trim(),
       if ((row.estado ?? '').trim().isNotEmpty) row.estado!.trim(),
     ].join(', ');
+    final title = row.businessName?.trim().isNotEmpty == true
+        ? row.businessName!.trim()
+        : 'Sin nombre comercial';
+    final initials = title
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .take(2)
+        .map((e) => e[0].toUpperCase())
+        .join();
+    final rif = (row.rif ?? '').trim();
+    final subtitle = [
+      if (rif.isNotEmpty) rif,
+      if (location.isNotEmpty) location,
+    ].join(' · ');
+    final role = _activityRoleStyle(row.role, theme);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderSubtle),
-      ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        title: Text(
-          row.businessName?.trim().isNotEmpty == true
-              ? row.businessName!.trim()
-              : 'Sin nombre comercial',
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+    final menu = B2bDataRowActionsMenu(
+      actions: [
+        B2bDataRowAction(
+          id: 'copy-name',
+          label: 'Copiar nombre',
+          glyph: LucideGlyph.user,
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 2),
-            Text(
-              '$roleLabel${row.rif != null && row.rif!.isNotEmpty ? ' · ${row.rif}' : ''}',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            if (location.isNotEmpty)
-              Text(
-                location,
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
-          ],
-        ),
-        children: [
-          _metricGrid(periodLabel),
-          const SizedBox(height: 8),
-          Text(
-            'Último ingreso: ${formatEsShortDateTime(row.lastLoginAt)}',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metricGrid(String periodLabel) {
-    final ordersLabel = row.ordersLabel;
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(),
-        1: FlexColumnWidth(),
-      },
-      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-      children: [
-        TableRow(
-          children: [
-            _metricCell(
-              'Ingresos ($periodLabel)',
-              '${row.loginCountPeriod}',
-              Icons.login,
-            ),
-            _metricCell(
-              'Ingresos hoy',
-              '${row.loginCountToday}',
-              Icons.today,
-            ),
-          ],
-        ),
-        TableRow(
-          children: [
-            _metricCell(
-              '$ordersLabel ($periodLabel)',
-              '${row.ordersCountPeriod}',
-              Icons.receipt_long_outlined,
-            ),
-            _metricCell(
-              'Entregados',
-              '${row.ordersDeliveredPeriod}',
-              Icons.local_shipping_outlined,
-            ),
-          ],
-        ),
-        TableRow(
-          children: [
-            _metricCell(
-              'En curso',
-              '${row.ordersInProgressPeriod}',
-              Icons.hourglass_top_outlined,
-            ),
-            _metricCell(
-              'Vol. USD entregado',
-              '\$${row.ordersVolumeUsdPeriod.toStringAsFixed(2)}',
-              Icons.attach_money,
-            ),
-          ],
+        B2bDataRowAction(
+          id: 'copy-rif',
+          label: 'Copiar RIF',
+          glyph: LucideGlyph.copy,
+          enabled: rif.isNotEmpty,
         ),
       ],
+      onSelected: (id) {
+        switch (id) {
+          case 'copy-name':
+            _copyValue(context, title, 'Nombre copiado');
+          case 'copy-rif':
+            _copyValue(context, rif, 'RIF copiado');
+        }
+      },
     );
-  }
 
-  Widget _metricCell(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, right: 6),
+    return B2bDataTableZebraRow(
+      zebra: zebra,
+      isLast: isLast,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: AppColors.brand),
-          const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            flex: 4,
+            child: Row(
               children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: theme.brandContainer,
+                  child: Text(
+                    initials.isEmpty ? '?' : initials,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: theme.brand,
+                    ),
+                  ),
                 ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: B2bDataStatusBadge(
+                label: role.label,
+                background: role.background,
+                foreground: role.foreground,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: _ActivityKpiLine(row: row),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              row.lastLoginAt == null
+                  ? 'Sin ingresos'
+                  : 'Último ingreso: ${formatEsShortDateTime(row.lastLoginAt)}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+                color: theme.textSecondary,
+              ),
+            ),
+          ),
+          SizedBox(width: 48, child: menu),
         ],
       ),
     );
   }
+}
+
+({String label, Color foreground, Color background}) _activityRoleStyle(
+  String? role,
+  B2BThemeExtension theme,
+) {
+  switch (role?.trim().toLowerCase()) {
+    case 'importador':
+      return (
+        label: 'Importador',
+        foreground: theme.brand,
+        background: theme.brandContainer,
+      );
+    case 'aliado':
+      return (
+        label: 'Minorista',
+        foreground: theme.successFg,
+        background: theme.successBg,
+      );
+    case 'mayorista':
+      return (
+        label: 'Mayorista',
+        foreground: theme.textPrimary,
+        background: theme.surfaceSubtle,
+      );
+    default:
+      return (
+        label: ProfileRoleLabels.labelEs(role),
+        foreground: theme.textSecondary,
+        background: theme.surfaceSubtle,
+      );
+  }
+}
+
+class _ActivityKpiLine extends StatelessWidget {
+  const _ActivityKpiLine({required this.row});
+
+  final AdminUserActivityRowModel row;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final base = TextStyle(
+      fontSize: 12,
+      height: 1.35,
+      fontWeight: FontWeight.w500,
+      color: theme.textSecondary,
+    );
+    final strong = base.copyWith(
+      fontWeight: FontWeight.w700,
+      color: theme.textPrimary,
+    );
+
+    TextSpan metric(String value, String label) {
+      return TextSpan(
+        children: [
+          TextSpan(text: value, style: strong),
+          TextSpan(text: ' $label'),
+        ],
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: [
+          metric('${row.loginCountPeriod}', 'Ingresos'),
+          const TextSpan(text: ' • '),
+          metric('${row.ordersCountPeriod}', row.ordersLabel),
+          const TextSpan(text: ' • '),
+          metric('${row.ordersDeliveredPeriod}', 'Entregados'),
+          const TextSpan(text: ' • '),
+          metric('${row.ordersInProgressPeriod}', 'En curso'),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+void _copyValue(BuildContext context, String value, String message) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return;
+  Clipboard.setData(ClipboardData(text: trimmed));
+  final theme = B2BThemeExtension.of(context);
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: theme.dialogSurface,
+      content: Text(
+        message,
+        style: TextStyle(
+          color: theme.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+  );
 }

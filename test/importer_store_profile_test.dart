@@ -70,9 +70,10 @@ ImporterStoreCatalogSource _source({
   })? fetchVisibleProduct,
 }) {
   return ImporterStoreCatalogSource(
-    fetchProfile: fetchProfile ??
-        (id) async => id == _importerA ? _profile() : null,
-    fetchCategories: fetchCategories ?? ((_) async => const ['Frenos', 'Motor']),
+    fetchProfile:
+        fetchProfile ?? (id) async => id == _importerA ? _profile() : null,
+    fetchCategories:
+        fetchCategories ?? ((_) async => const ['Frenos', 'Motor']),
     fetchParts: fetchParts ??
         ({
           required int limit,
@@ -131,7 +132,8 @@ void main() {
     expect(profile.pagoMetodoLabelsEs, isNotEmpty);
   });
 
-  test('la consulta de vitrina exige mayorista, activos y categoría propia', () {
+  test('la consulta de vitrina exige mayorista, activos y categoría propia',
+      () {
     final filters = CatalogFilters.importerStore(
       importerId: _importerA,
       category: 'Motor',
@@ -147,8 +149,16 @@ void main() {
     final kept = retainImporterStoreCatalogParts(
       importerId: _importerA,
       parts: [
-        _part(id: 'a1', ownerId: _importerA, nombre: 'Disco A', category: 'Frenos'),
-        _part(id: 'b1', ownerId: _importerB, nombre: 'Disco B', category: 'Frenos'),
+        _part(
+            id: 'a1',
+            ownerId: _importerA,
+            nombre: 'Disco A',
+            category: 'Frenos'),
+        _part(
+            id: 'b1',
+            ownerId: _importerB,
+            nombre: 'Disco B',
+            category: 'Frenos'),
         _part(
           id: 'a-off',
           ownerId: _importerA,
@@ -165,9 +175,18 @@ void main() {
       importerId: _importerA,
       category: 'Motor',
       parts: [
-        _part(id: 'a-m', ownerId: _importerA, nombre: 'Bujía', category: 'Motor'),
-        _part(id: 'a-f', ownerId: _importerA, nombre: 'Pastilla', category: 'Frenos'),
-        _part(id: 'b-m', ownerId: _importerB, nombre: 'Aceite B', category: 'Motor'),
+        _part(
+            id: 'a-m', ownerId: _importerA, nombre: 'Bujía', category: 'Motor'),
+        _part(
+            id: 'a-f',
+            ownerId: _importerA,
+            nombre: 'Pastilla',
+            category: 'Frenos'),
+        _part(
+            id: 'b-m',
+            ownerId: _importerB,
+            nombre: 'Aceite B',
+            category: 'Motor'),
       ],
     );
     expect(kept.map((p) => p.id), ['a-m']);
@@ -238,7 +257,7 @@ void main() {
     await _pumpStore(tester, source: _source());
     await tester.pumpAndSettle();
     expect(find.text('Mayorista Andino'), findsWidgets);
-    expect(find.byType(ImporterCatalogLogo), findsNothing);
+    expect(find.byType(ImporterCatalogLogo), findsOneWidget);
     expect(find.byKey(const Key('importer-store-empty')), findsOneWidget);
     expect(
       find.text('Este mayorista aún no tiene productos en vitrina.'),

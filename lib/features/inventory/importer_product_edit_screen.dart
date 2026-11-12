@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_taxonomy.dart';
 import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
@@ -39,7 +40,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   late final TextEditingController _salePriceController;
   late final TextEditingController _stockController;
   late final TextEditingController _minOrderQtyController;
-  late final TextEditingController _categoryController;
+  String? _categoryFamily;
+  String? _subcategory;
   late final TextEditingController _compatController;
   List<ProductImageEditSlot> _imageSlots = [];
   bool _isActive = true;
@@ -49,6 +51,13 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   Map<String, dynamic> _customFields = const {};
 
   bool get _isEdit => widget.initial != null && widget.initial!.id.isNotEmpty;
+
+  String? get _selectedCategory {
+    final family = _categoryFamily;
+    final child = _subcategory;
+    if (family == null) return null;
+    return child == null ? family : categoryPath(family, child);
+  }
 
   @override
   void initState() {
@@ -68,9 +77,18 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       text: p != null ? '${p.stock}' : '',
     );
     _minOrderQtyController = TextEditingController(
-      text: '${p?.minOrderQtyEffective ?? ProductMinOrderQty.platformFloor}',
+      text: p == null
+          ? ''
+          : p.hasSupplierMinOrderQty
+              ? '${p.minOrderQtyEffective}'
+              : '',
     );
-    _categoryController = TextEditingController(text: p?.category ?? '');
+    final path = canonicalCatalogCategory(p?.category) ??
+        classifyCatalogProduct(p?.category, p?.nombre ?? '');
+    if (path != null) {
+      _categoryFamily = categoryFamily(path);
+      if (path != _categoryFamily) _subcategory = categoryLeaf(path);
+    }
     _compatController = TextEditingController(text: p?.compatibilidad ?? '');
     _imageSlots = (p?.imageUrls ?? const [])
         .map((u) => ProductImageEditSlot.url(u))
@@ -146,7 +164,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     _salePriceController.dispose();
     _stockController.dispose();
     _minOrderQtyController.dispose();
-    _categoryController.dispose();
     _compatController.dispose();
     super.dispose();
   }
@@ -169,18 +186,21 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       );
       return;
     }
-    final minOrderQty = int.tryParse(_minOrderQtyController.text.trim());
-    if (minOrderQty == null ||
-        minOrderQty < ProductMinOrderQty.absoluteFloor) {
+    final minRaw = _minOrderQtyController.text.trim();
+    final minParsed =
+        minRaw.isEmpty ? null : int.tryParse(minRaw);
+    if (minRaw.isNotEmpty &&
+        (minParsed == null || minParsed < ProductMinOrderQty.absoluteFloor)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'La cantidad mínima de pedido es obligatoria y no puede ser menor a ${ProductMinOrderQty.absoluteFloor}.',
+            'La cantidad mínima de pedido no puede ser menor a ${ProductMinOrderQty.absoluteFloor}.',
           ),
         ),
       );
       return;
     }
+    final minOrderQty = ProductMinOrderQty.resolve(minParsed);
     // Solo-divisas: un solo precio USD; se limpia cualquier oferta previa.
     double? salePrice;
     if (!_pagoSoloDivisas) {
@@ -229,7 +249,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           clearDiscountRules: true,
           stock: stock,
           minOrderQty: minOrderQty,
-          category: _categoryController.text.trim(),
+          category: _selectedCategory,
           compatibility: _compatController.text.trim(),
           imageUrls: imageUrls,
           isActive: _isActive,
@@ -245,7 +265,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           salePriceUsd: salePrice,
           stock: stock,
           minOrderQty: minOrderQty,
-          category: _categoryController.text.trim(),
+          category: _selectedCategory,
           compatibility: _compatController.text.trim(),
           imageUrls: imageUrls,
           isActive: _isActive,
@@ -530,8 +550,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           salePriceUsd: _pagoSoloDivisas
               ? null
               : parsePreviewMoney(_salePriceController.text),
-          quantity: int.tryParse(_minOrderQtyController.text.trim()) ??
-              ProductMinOrderQty.platformFloor,
+          quantity: ProductMinOrderQty.resolve(
+              int.tryParse(_minOrderQtyController.text.trim())),
           pagoSoloDivisas: _pagoSoloDivisas,
         ),
         const SizedBox(height: 12),
@@ -546,18 +566,20 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           controller: _minOrderQtyController,
           decoration: _dec(
             'Pedido mínimo / MOQ',
-            hint: 'Su mínimo (vacío → 5)',
+            hint: 'Opcional (vacío = 1 unidad)',
           ).copyWith(
             helperText:
-                'Si define un mínimo, esa cantidad manda (mínimo ${ProductMinOrderQty.absoluteFloor}). '
-                'Si no lo define, la plataforma usa ${ProductMinOrderQty.platformDefault}.',
+                'Solo si quiere exigir un mínimo mayor a 1. '
+                'Vacío = el aliado puede pedir desde ${ProductMinOrderQty.platformDefault} unidad.',
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           validator: (v) {
-            final n = int.tryParse(v?.trim() ?? '');
+            final raw = v?.trim() ?? '';
+            if (raw.isEmpty) return null;
+            final n = int.tryParse(raw);
             if (n == null || n < ProductMinOrderQty.absoluteFloor) {
-              return 'Obligatorio · mínimo ${ProductMinOrderQty.absoluteFloor}';
+              return 'Mínimo ${ProductMinOrderQty.absoluteFloor}';
             }
             return null;
           },
@@ -583,10 +605,45 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _categoryController,
+            DropdownButtonFormField<String>(
+              value: _categoryFamily,
+              isExpanded: true,
               decoration: _dec('Categoría'),
+              validator: (value) =>
+                  value == null ? 'Selecciona una categoría' : null,
+              items: [
+                for (final family in catalogTaxonomy.keys)
+                  DropdownMenuItem(
+                    value: family,
+                    child: Text(catalogCategoryDisplayLabel(family)),
+                  ),
+              ],
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() {
+                        _categoryFamily = value;
+                        _subcategory = null;
+                      }),
             ),
+            if (_categoryFamily != null) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: ValueKey(_categoryFamily),
+                value: _subcategory ?? '',
+                isExpanded: true,
+                decoration: _dec('Subcategoría'),
+                items: [
+                  const DropdownMenuItem(
+                      value: '', child: Text('Sin especificar')),
+                  for (final child in catalogTaxonomy[_categoryFamily]!)
+                    DropdownMenuItem(value: child, child: Text(child)),
+                ],
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(
+                        () => _subcategory = value == '' ? null : value),
+              ),
+            ],
             const SizedBox(height: 12),
             TextFormField(
               controller: _compatController,
@@ -609,7 +666,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
                 style: TextStyle(fontSize: 12),
               ),
               value: _hasWarranty,
-              onChanged: _saving ? null : (v) => setState(() => _hasWarranty = v),
+              onChanged:
+                  _saving ? null : (v) => setState(() => _hasWarranty = v),
             ),
           ],
         ),
@@ -631,14 +689,16 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: Text(_isEdit ? 'Guardar cambios' : 'Crear producto'),
+                      child:
+                          Text(_isEdit ? 'Guardar cambios' : 'Crear producto'),
                     ),
                   ),
                   if (_isEdit) ...[
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
                       onPressed: _saving ? null : _deleteProduct,
-                      icon: Icon(Icons.delete_outline, color: Colors.red.shade700),
+                      icon: Icon(Icons.delete_outline,
+                          color: Colors.red.shade700),
                       label: Text(
                         'Eliminar',
                         style: TextStyle(color: Colors.red.shade700),
@@ -665,7 +725,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _saving ? null : _deleteProduct,
-                      icon: Icon(Icons.delete_outline, color: Colors.red.shade700),
+                      icon: Icon(Icons.delete_outline,
+                          color: Colors.red.shade700),
                       label: Text(
                         'Eliminar producto',
                         style: TextStyle(color: Colors.red.shade700),
@@ -761,8 +822,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   Widget _buildFormBody() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final desktop =
-            constraints.maxWidth >= AppBreakpoints.b2bDesktop;
+        final desktop = constraints.maxWidth >= AppBreakpoints.b2bDesktop;
         return _buildFormContent(desktop: desktop);
       },
     );

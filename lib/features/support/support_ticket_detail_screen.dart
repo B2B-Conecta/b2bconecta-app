@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'support_ticket_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'support_ticket_status.dart';
 import 'support_ticket_thread_section.dart';
 
 enum _SupportAction { refresh, details, close }
@@ -164,24 +166,171 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final uid = SupabaseService.currentUserId;
     final isOwner = uid != null && _ticket.createdBy == uid;
-    final statusColor =
-        _isClosed ? AppColors.textSecondary : AppColors.brandLink;
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: !widget.embedded,
-        title: const Text('Reclamo'),
-        actions: [
+    final statusFg = _isClosed
+        ? theme.successFg
+        : (_ticket.status == SupportTicketStatus.enRevision
+            ? theme.textPrimary
+            : theme.brand);
+    final statusBg = _isClosed
+        ? theme.successBg
+        : (_ticket.status == SupportTicketStatus.enRevision
+            ? theme.surfaceSubtle
+            : theme.brandContainer);
+    final roleLabel = _ticket.authorRole == 'importador'
+        ? 'Mayorista'
+        : 'Minorista';
+
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.isAdminView) ...[
+                  Text(
+                    _ticket.creatorDisplayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$roleLabel · ${_ticket.categoryLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Tooltip(
+                  message: _ticket.subject,
+                  child: Text(
+                    _ticket.subject,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: widget.embedded ? 14.5 : 18,
+                      fontWeight: FontWeight.w700,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _isClosed ? 'Resuelto' : _ticket.statusLabel,
+                        style: TextStyle(
+                          color: statusFg,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _ticket.categoryLabel,
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      widget.isAdminView
+                          ? _ticket.creatorDisplayName
+                          : 'Soporte B2B Conecta',
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (_ticket.relatedTransactionRequestId
+                            ?.isNotEmpty ==
+                        true)
+                      TextButton(
+                        onPressed: _showDetails,
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.brand,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Pedido vinculado',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: theme.brand,
+                          ),
+                        ),
+                      ),
+                    Text(
+                      formatEsShortDateTime(_ticket.createdAt),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: theme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (!_isClosed && (isOwner || widget.isAdminView))
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 4),
+              child: OutlinedButton(
+                onPressed: _closing ? null : _closeTicket,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.textPrimary,
+                  side: BorderSide(color: theme.borderStrong),
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text(
+                  _closing ? 'Cerrando…' : 'Resolver',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    color: theme.textPrimary,
+                  ),
+                ),
+              ),
+            ),
           PopupMenuButton<_SupportAction>(
             tooltip: 'Opciones del reclamo',
             enabled: !_closing,
             onSelected: _onAction,
+            icon: LucideIcon(
+              LucideGlyph.slidersHorizontal,
+              size: 18,
+              color: theme.textSecondary,
+            ),
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: _SupportAction.refresh,
@@ -199,87 +348,65 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                 ),
             ],
           ),
-          const SizedBox(width: 8),
         ],
+      ),
+    );
+
+    final thread = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        Divider(height: 1, color: theme.borderSubtle),
+        if (_closing || _refreshing)
+          LinearProgressIndicator(
+            minHeight: 2,
+            color: theme.brand,
+            backgroundColor: theme.brandContainer,
+          ),
+        Expanded(
+          child: SupportTicketThreadSection(
+            key: ValueKey('stm-${_ticket.id}'),
+            ticketId: _ticket.id,
+            canReplyAsOwner: isOwner && !widget.isAdminView,
+            canReplyAsAdmin: widget.isAdminView,
+            isTicketClosed: _isClosed,
+            refreshVersion: _refreshVersion,
+            onThreadChanged: () => _reloadTicket(),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.embedded) {
+      return ColoredBox(
+        color: theme.surfaceCard,
+        child: thread,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: theme.background,
+      appBar: AppBar(
+        backgroundColor: theme.surfaceCard,
+        foregroundColor: theme.textPrimary,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          'Reclamo',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: theme.textPrimary,
+          ),
+        ),
       ),
       body: SafeArea(
         top: false,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Tooltip(
-                        message: _ticket.subject,
-                        child: Text(
-                          _ticket.subject,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              _isClosed ? 'Cerrado' : _ticket.statusLabel,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          Text(_ticket.categoryLabel,
-                              style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12)),
-                          Text(
-                            widget.isAdminView
-                                ? _ticket.creatorDisplayName
-                                : 'Soporte B2B Conecta',
-                            style: TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                if (_closing || _refreshing)
-                  const LinearProgressIndicator(minHeight: 2),
-                Expanded(
-                  child: SupportTicketThreadSection(
-                    key: ValueKey('stm-${_ticket.id}'),
-                    ticketId: _ticket.id,
-                    canReplyAsOwner: isOwner && !widget.isAdminView,
-                    canReplyAsAdmin: widget.isAdminView,
-                    isTicketClosed: _isClosed,
-                    refreshVersion: _refreshVersion,
-                    onThreadChanged: () => _reloadTicket(),
-                  ),
-                ),
-              ],
+            child: ColoredBox(
+              color: theme.surfaceCard,
+              child: thread,
             ),
           ),
         ),

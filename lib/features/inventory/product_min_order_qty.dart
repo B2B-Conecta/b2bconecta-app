@@ -1,10 +1,10 @@
 /// Cantidad mínima de pedido (MOQ) por SKU.
 ///
-/// Si el proveedor no indica un mínimo, se usa [platformDefault] (5).
+/// Si el proveedor no indica un mínimo, se usa [platformDefault] (1 unidad).
 /// Si lo define, ese valor manda, con piso absoluto [absoluteFloor] (1).
 abstract final class ProductMinOrderQty {
   /// Valor por defecto cuando el proveedor no define MOQ.
-  static const platformDefault = 5;
+  static const platformDefault = 1;
 
   /// Alias histórico de [platformDefault].
   static const platformFloor = platformDefault;
@@ -26,4 +26,7 @@ abstract final class ProductMinOrderQty {
   static bool stockCovers({required int stock, required int? minOrderQty}) {
     return stock >= resolve(minOrderQty);
   }
+
+  /// Hay un MOQ explícito del proveedor (mayor al piso de plataforma).
+  static bool isSupplierDefined(int? raw) => resolve(raw) > platformDefault;
 }

@@ -7,13 +7,16 @@ import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 
 void main() {
   group('ProductMinOrderQty', () {
-    test('sin valor del proveedor queda en 5; si lo define, ese manda', () {
-      expect(ProductMinOrderQty.resolve(null), 5);
-      expect(ProductMinOrderQty.resolve(0), 5);
+    test('sin valor del proveedor queda en 1; si lo define, ese manda', () {
+      expect(ProductMinOrderQty.resolve(null), 1);
+      expect(ProductMinOrderQty.resolve(0), 1);
       expect(ProductMinOrderQty.resolve(1), 1);
       expect(ProductMinOrderQty.resolve(4), 4);
       expect(ProductMinOrderQty.resolve(5), 5);
       expect(ProductMinOrderQty.resolve(12), 12);
+      expect(ProductMinOrderQty.isSupplierDefined(null), isFalse);
+      expect(ProductMinOrderQty.isSupplierDefined(1), isFalse);
+      expect(ProductMinOrderQty.isSupplierDefined(5), isTrue);
     });
 
     test('stock cubre el mínimo', () {
@@ -37,14 +40,15 @@ void main() {
   });
 
   group('PartModel min_order_qty', () {
-    test('fromJson usa 5 si falta; respeta el mínimo del proveedor', () {
+    test('fromJson usa 1 si falta; respeta el mínimo del proveedor', () {
       final missing = PartModel.fromJson({
         'id': 'p1',
         'name': 'Caucho',
         'price_usd': 10,
         'stock': 20,
       });
-      expect(missing.minOrderQtyEffective, 5);
+      expect(missing.minOrderQtyEffective, 1);
+      expect(missing.hasSupplierMinOrderQty, isFalse);
       expect(missing.stockCoversMinOrder, isTrue);
 
       final supplierOne = PartModel.fromJson({
@@ -65,6 +69,7 @@ void main() {
         'min_order_qty': 3,
       });
       expect(belowStock.minOrderQtyEffective, 3);
+      expect(belowStock.hasSupplierMinOrderQty, isTrue);
       expect(belowStock.stockCoversMinOrder, isFalse);
     });
   });
@@ -81,24 +86,35 @@ void main() {
     expect(guessed[CatalogImportField.minOrderQty.key], 'cantidad_minima');
   });
 
-  test('carrito arranca en el mínimo y no deja bajar de ese piso', () {
+  test('carrito arranca en 1 sin MOQ de proveedor y respeta un MOQ mayor', () {
     final part = PartModel(
       id: 'p1',
       nombre: 'Caucho',
       precio: 10,
       stock: 20,
-      minOrderQty: 5,
     );
     final cart = CartService.instance;
     cart.clear();
     cart.addOrIncrement(part, precioUnitarioAliadoRef: 11, delta: 1);
     expect(cart.lines, hasLength(1));
-    expect(cart.lines.first.quantity, 5);
+    expect(cart.lines.first.quantity, 1);
 
     cart.setQuantity('p1', 3);
-    expect(cart.lines.first.quantity, 5);
+    expect(cart.lines.first.quantity, 3);
 
-    cart.setQuantity('p1', 8);
+    cart.clear();
+    final moq = PartModel(
+      id: 'p1m',
+      nombre: 'Caucho',
+      precio: 10,
+      stock: 20,
+      minOrderQty: 5,
+    );
+    cart.addOrIncrement(moq, precioUnitarioAliadoRef: 11, delta: 1);
+    expect(cart.lines.first.quantity, 5);
+    cart.setQuantity('p1m', 3);
+    expect(cart.lines.first.quantity, 5);
+    cart.setQuantity('p1m', 8);
     expect(cart.lines.first.quantity, 8);
     cart.clear();
   });

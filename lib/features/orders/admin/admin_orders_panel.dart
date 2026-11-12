@@ -10,18 +10,22 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/orders/shared/admin_order_panel_utils.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
-import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart';
+import 'package:motolink_pro_app/features/orders/importador/importer_pedidos_filters_sheet.dart'
+    show formatImporterPedidosFilterDate;
 import 'admin_checkout_group_expanded_section.dart';
 import 'admin_delete_pedido_dialog.dart';
 import 'admin_expandable_order_card.dart';
 import 'admin_motolink_anula_pedido_dialog.dart';
 import 'admin_order_pre_transit_section.dart';
+import 'admin_orders_filters_dialog.dart';
 import 'package:motolink_pro_app/features/kyc/admin_aliado_morosidad_actions.dart';
 import 'package:motolink_pro_app/features/payments/admin_pago_revision_section.dart';
 import 'package:motolink_pro_app/features/payments/efectivo_respaldo_registrar.dart';
@@ -34,11 +38,16 @@ import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_filter_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_list_entry.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_priority_controls.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
+import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
+
+/// Alias de producto del módulo Pedidos (`/admin/orders`).
+typedef OrdersModule = AdminOrdersPanel;
 
 /// Bandeja admin unificada: pedidos en curso, cerrados o todos, con filtros por estado.
 class AdminOrdersPanel extends StatefulWidget {
@@ -67,6 +76,12 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   String? _loadedKind;
   DateTime? _dateFrom;
   DateTime? _dateTo;
+
+  /// Multi-select: `aprobado` | `pendiente` | `pago_movil` | `divisas`.
+  final Set<String> _paymentFilters = {};
+
+  /// Multi-select: `revision` | `preparacion` | `transito` | `entregado`.
+  final Set<String> _fulfillmentFilters = {};
 
   String get _fetchKind => switch (_scope) {
         PedidosListScope.todos => 'todos',
@@ -202,8 +217,74 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       _replacementOnly = false;
       _dateFrom = null;
       _dateTo = null;
+      _paymentFilters.clear();
+      _fulfillmentFilters.clear();
+      _pendingOnly = false;
     });
     if (_fetchKind != _loadedKind) _load();
+  }
+
+  void _togglePaymentFilter(String key) {
+    setState(() {
+      _expandedRequestId = null;
+      if (!_paymentFilters.add(key)) _paymentFilters.remove(key);
+    });
+  }
+
+  void _toggleFulfillmentFilter(String key) {
+    setState(() {
+      _expandedRequestId = null;
+      if (!_fulfillmentFilters.add(key)) _fulfillmentFilters.remove(key);
+    });
+  }
+
+  bool _groupMatchesPayment(List<TransactionRequestModel> group) {
+    if (_paymentFilters.isEmpty) return true;
+    return _paymentFilters.any((f) {
+      switch (f) {
+        case 'aprobado':
+          return group.any((r) =>
+              r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.aprobado ||
+              r.pedidoEntregadoYPagado);
+        case 'pendiente':
+          return group.any((r) =>
+              r.esPedidoMoroso ||
+              r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.pendiente ||
+              r.pagoEstadoRevisionEfectivo == PagoRevisionEstado.enRevision);
+        case 'pago_movil':
+          return group.any((r) => r.pagoMetodo?.trim() == PagoMetodo.pagoMovil);
+        case 'divisas':
+          return group.any(
+            (r) => PagoMetodo.qualifiesForUsdDiscount(r.pagoMetodo),
+          );
+        default:
+          return false;
+      }
+    });
+  }
+
+  bool _groupMatchesFulfillment(List<TransactionRequestModel> group) {
+    if (_fulfillmentFilters.isEmpty) return true;
+    return _fulfillmentFilters.any((f) {
+      switch (f) {
+        case 'revision':
+          return group.any((r) => r.status == TransactionRequestStatus.pendiente);
+        case 'preparacion':
+          return group.any((r) =>
+              r.status == TransactionRequestStatus.enPreparacion ||
+              r.status == TransactionRequestStatus.pedidoListo ||
+              r.status == TransactionRequestStatus.aprobadoAdmin);
+        case 'transito':
+          return group.any((r) =>
+              r.status == TransactionRequestStatus.enTransito ||
+              r.status == TransactionRequestStatus.enviado);
+        case 'entregado':
+          return group
+              .any((r) => r.status == TransactionRequestStatus.entregado);
+        default:
+          return false;
+      }
+    });
   }
 
   void _applyFiltersDraft(ImporterPedidosFiltersDraft draft) {
@@ -222,13 +303,247 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   }
 
   Future<void> _openPedidosFiltersSheet() async {
-    final draft = await ImporterPedidosFiltersSheet.show(
+    final narrow =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    if (narrow) {
+      await _openMobileFiltersSheet();
+      return;
+    }
+    final draft = await AdminOrdersFiltersDialog.show(
       context,
       initial: _currentFiltersDraft(),
-      showOnlyNuevos: false,
     );
     if (draft == null || !mounted) return;
     _applyFiltersDraft(draft);
+  }
+
+  /// BottomSheet móvil: estado, pago, encomienda y periodo en un solo panel.
+  Future<void> _openMobileFiltersSheet() async {
+    final theme = B2BThemeExtension.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.dialogSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            void refreshModal() => setModal(() {});
+
+            Widget section(String title, List<Widget> children) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 6, runSpacing: 6, children: children),
+                  ],
+                ),
+              );
+            }
+
+            B2bDataTableFilterPill pill({
+              required String label,
+              required bool selected,
+              required VoidCallback onTap,
+            }) {
+              return B2bDataTableFilterPill(
+                label: label,
+                selected: selected,
+                onTap: onTap,
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  10,
+                  16,
+                  16 + MediaQuery.viewInsetsOf(ctx).bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: theme.borderSubtle,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Filtrar pedidos',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Estado, pago, encomienda y periodo',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: theme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      section('Estado del listado', [
+                        pill(
+                          label: 'Todos',
+                          selected: !_pendingOnly &&
+                              _scope == PedidosListScope.todos,
+                          onTap: () {
+                            setState(() {
+                              _expandedRequestId = null;
+                              _scope = PedidosListScope.todos;
+                              _pendingOnly = false;
+                              _statusFilter = null;
+                            });
+                            refreshModal();
+                          },
+                        ),
+                        pill(
+                          label: 'Por confirmar',
+                          selected: _pendingOnly,
+                          onTap: () {
+                            setState(() {
+                              _expandedRequestId = null;
+                              _scope = PedidosListScope.todos;
+                              _statusFilter = null;
+                              _pendingOnly = true;
+                            });
+                            refreshModal();
+                          },
+                        ),
+                        pill(
+                          label: 'En curso',
+                          selected: !_pendingOnly &&
+                              _scope == PedidosListScope.enCurso,
+                          onTap: () {
+                            _onScopeChanged(PedidosListScope.enCurso);
+                            refreshModal();
+                          },
+                        ),
+                        pill(
+                          label: 'Entregados',
+                          selected: !_pendingOnly &&
+                              _scope == PedidosListScope.entregados,
+                          onTap: () {
+                            _onScopeChanged(PedidosListScope.entregados);
+                            refreshModal();
+                          },
+                        ),
+                        pill(
+                          label: 'Cancelados',
+                          selected: !_pendingOnly &&
+                              _scope == PedidosListScope.cancelados,
+                          onTap: () {
+                            _onScopeChanged(PedidosListScope.cancelados);
+                            refreshModal();
+                          },
+                        ),
+                      ]),
+                      section('Estado de pago', [
+                        for (final e in const [
+                          ('aprobado', 'Aprobado'),
+                          ('pendiente', 'Pendiente'),
+                          ('pago_movil', 'Pago Móvil'),
+                          ('divisas', 'Divisas'),
+                        ])
+                          pill(
+                            label: e.$2,
+                            selected: _paymentFilters.contains(e.$1),
+                            onTap: () {
+                              _togglePaymentFilter(e.$1);
+                              refreshModal();
+                            },
+                          ),
+                      ]),
+                      section('Estado de encomienda', [
+                        for (final e in const [
+                          ('revision', 'Nuevo en revisión'),
+                          ('preparacion', 'En preparación'),
+                          ('transito', 'En tránsito'),
+                          ('entregado', 'Entregado'),
+                        ])
+                          pill(
+                            label: e.$2,
+                            selected: _fulfillmentFilters.contains(e.$1),
+                            onTap: () {
+                              _toggleFulfillmentFilter(e.$1);
+                              refreshModal();
+                            },
+                          ),
+                      ]),
+                      FilledButton(
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          final draft = await AdminOrdersFiltersDialog.show(
+                            context,
+                            initial: _currentFiltersDraft(),
+                          );
+                          if (draft == null || !mounted) return;
+                          _applyFiltersDraft(draft);
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: theme.brand,
+                          foregroundColor: theme.surfaceCard,
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        child: const Text('Periodo y más filtros…'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () {
+                          _clearFilters();
+                          Navigator.of(ctx).pop();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.textPrimary,
+                          side: BorderSide(color: theme.borderStrong),
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        child: const Text('Limpiar filtros'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text(
+                          'Listo',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: theme.brand,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   String _dateFilterChipLabel() {
@@ -373,8 +688,36 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           .where((g) => OrderListEntry(g).awaitingConfirmation)
           .toList();
     }
+    groups = groups
+        .where(_groupMatchesPayment)
+        .where(_groupMatchesFulfillment)
+        .toList();
     if (_pendingFirst) groups = prioritizePendingOrders(groups);
     return groups;
+  }
+
+  Future<void> _cancelGroup(
+    BuildContext context,
+    List<TransactionRequestModel> group,
+  ) async {
+    TransactionRequestModel? target;
+    for (final r in group) {
+      if (r.motolinkPuedeAnularComoAdmin) {
+        target = r;
+        break;
+      }
+    }
+    if (target == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Este pedido no se puede cancelar en su estado actual.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    await _anularPedidoPorMotolink(context, target);
   }
 
   bool _groupHasOperational(List<TransactionRequestModel> g) => g.any(
@@ -500,19 +843,45 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     String? label,
   }) {
     final busy = _deletePedidoBusyId == r.id;
-    return OutlinedButton.icon(
-      onPressed: _deletePedidoBusyId != null
-          ? null
-          : () => _eliminarPedido(context, r),
-      icon: busy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(Icons.delete_outline, size: 20, color: Colors.red.shade800),
-      label: Text(busy ? 'Eliminando…' : (label ?? 'Eliminar pedido')),
-      style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade800),
+    const danger = Color(0xFFDC2626);
+    final dangerBg = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0x26DC2626)
+        : const Color(0xFFFEF2F2);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        onPressed: _deletePedidoBusyId != null
+            ? null
+            : () => _eliminarPedido(context, r),
+        icon: busy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: danger,
+                ),
+              )
+            : const LucideIcon(
+                LucideGlyph.trash2,
+                size: 15,
+                color: danger,
+              ),
+        label: Text(busy ? 'Eliminando…' : (label ?? 'Eliminar pedido')),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: danger,
+          backgroundColor: dangerBg,
+          side: BorderSide(color: danger.withOpacity(0.35)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          minimumSize: const Size(0, 36),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle:
+              const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+        ),
+      ),
     );
   }
 
@@ -617,7 +986,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           subtitle:
               'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          initiallyExpanded: true,
+          initiallyExpanded: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -686,7 +1055,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           subtitle:
               'Hilo con tienda minorista, importador y supervisión B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
-          initiallyExpanded: true,
+          initiallyExpanded: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -763,17 +1132,26 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       return const AdminListSkeleton();
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(_error!),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(_error!),
+                    ),
+                    TextButton(onPressed: _load, child: const Text('Reintentar')),
+                  ],
+                ),
+              ),
             ),
-            TextButton(onPressed: _load, child: const Text('Reintentar')),
-          ],
-        ),
+          );
+        },
       );
     }
     // Aunque la consulta del alcance actual venga vacía (p. ej. solo hay
@@ -804,6 +1182,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
               ? 'No hay pedidos por confirmar.'
               : _emptyMessage)
           : null,
+      canCancelGroup: _groupCanAnular,
+      onCancelGroup: (g) => _cancelGroup(context, g),
       resetKey: Object.hash(
         _scope,
         _pendingOnly,
@@ -815,39 +1195,147 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         _dateFrom,
         _dateTo,
         _searchCtrl.text,
+        Object.hashAll(_paymentFilters),
+        Object.hashAll(_fulfillmentFilters),
       ),
       detailBuilder: (group) => _orderDetail(context, group),
-      controls: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          OrdersListHeading(count: groups.length),
-          OrderListFilterBar(
-            softStyle: true,
-            searchController: _searchCtrl,
-            onSearchChanged: (_) => setState(() {
-              _expandedRequestId = null;
-            }),
-            hintText: 'Buscar por producto, SKU o empresa…',
-            padding: const EdgeInsets.only(bottom: 8),
-            onFilters: _openPedidosFiltersSheet,
-            activeFilterCount: filterBadge,
-          ),
-          OrderPriorityControls(
-            scope: _scope,
-            onScope: _onScopeChanged,
-            pendingOnly: _pendingOnly,
-            pendingCount: pendingCount,
-            onPending: () => setState(() {
-              _expandedRequestId = null;
-              _scope = PedidosListScope.todos;
-              _statusFilter = null;
-              _pendingOnly = true;
-            }),
-            pendingFirst: _pendingFirst,
-            onSort: (value) => setState(() => _pendingFirst = value),
-          ),
-          if (activeFilterChips != null) activeFilterChips,
-        ],
+      controls: LayoutBuilder(
+        builder: (context, constraints) {
+          final mobile =
+              constraints.maxWidth < AppBreakpoints.mobileMenu;
+          final filterCount = filterBadge +
+              _paymentFilters.length +
+              _fulfillmentFilters.length +
+              (_pendingOnly ? 1 : 0) +
+              (_scope != PedidosListScope.enCurso && !_pendingOnly ? 1 : 0);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OrdersListHeading(count: groups.length),
+              OrderListFilterBar(
+                softStyle: true,
+                searchController: _searchCtrl,
+                onSearchChanged: (_) => setState(() {
+                  _expandedRequestId = null;
+                }),
+                hintText: 'Buscar taller, RIF o ID de pedido…',
+                padding: const EdgeInsets.only(bottom: 8),
+                onFilters: _openPedidosFiltersSheet,
+                activeFilterCount: filterCount,
+                filterButtonLabel: mobile ? 'Filtrar' : 'Filtros',
+              ),
+              if (!mobile) ...[
+                OrderPriorityControls(
+                  scope: _scope,
+                  onScope: _onScopeChanged,
+                  pendingOnly: _pendingOnly,
+                  pendingCount: pendingCount,
+                  onPending: () => setState(() {
+                    _expandedRequestId = null;
+                    _scope = PedidosListScope.todos;
+                    _statusFilter = null;
+                    _pendingOnly = true;
+                  }),
+                  pendingFirst: _pendingFirst,
+                  onSort: (value) => setState(() => _pendingFirst = value),
+                ),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final e in const [
+                        ('aprobado', 'Aprobado'),
+                        ('pendiente', 'Pendiente'),
+                        ('pago_movil', 'Pago Móvil'),
+                        ('divisas', 'Divisas'),
+                      ]) ...[
+                        B2bDataTableFilterPill(
+                          label: e.$2,
+                          selected: _paymentFilters.contains(e.$1),
+                          onTap: () => _togglePaymentFilter(e.$1),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Builder(
+                        builder: (context) {
+                          final t = B2BThemeExtension.of(context);
+                          return Container(
+                            width: 1,
+                            height: 22,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            color: t.borderSubtle,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      for (final e in const [
+                        ('revision', 'Nuevo en revisión'),
+                        ('preparacion', 'En preparación'),
+                        ('transito', 'En tránsito'),
+                        ('entregado', 'Entregado'),
+                      ]) ...[
+                        B2bDataTableFilterPill(
+                          label: e.$2,
+                          selected: _fulfillmentFilters.contains(e.$1),
+                          onTap: () => _toggleFulfillmentFilter(e.$1),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                    ],
+                  ),
+                ),
+              ] else ...[
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: PopupMenuButton<bool>(
+                    tooltip: 'Ordenar pedidos',
+                    initialValue: _pendingFirst,
+                    onSelected: (v) => setState(() => _pendingFirst = v),
+                    itemBuilder: (_) => [
+                      CheckedPopupMenuItem(
+                        value: true,
+                        checked: _pendingFirst,
+                        child: const Text('Pendientes primero'),
+                      ),
+                      CheckedPopupMenuItem(
+                        value: false,
+                        checked: !_pendingFirst,
+                        child: const Text('Orden habitual'),
+                      ),
+                    ],
+                    child: Builder(
+                      builder: (context) {
+                        final t = B2BThemeExtension.of(context);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.swap_vert,
+                                  size: 18, color: t.textSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                _pendingFirst
+                                    ? 'Pendientes primero'
+                                    : 'Orden habitual',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: t.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              if (activeFilterChips != null) activeFilterChips,
+            ],
+          );
+        },
       ),
     );
   }

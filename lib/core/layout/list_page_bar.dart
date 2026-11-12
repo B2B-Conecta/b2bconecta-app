@@ -2,7 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 /// Opciones de filas por vista. El máximo es 20.
 const listPageSizeOptions = <int>[10, 20];
@@ -52,7 +53,8 @@ List<T> sliceListPage<T>({
   return items.sublist(start, end);
 }
 
-/// Barra de página para listados de usuarios. No se muestra si caben en 10.
+/// Paginador estándar B2B Conecta (pie de listado):
+/// `Mostrando 1–10 de N` a la izquierda · `< 1 / 3 >` a la derecha.
 class ListPageBar extends StatelessWidget {
   const ListPageBar({
     super.key,
@@ -60,10 +62,12 @@ class ListPageBar extends StatelessWidget {
     required this.pageIndex,
     required this.pageSize,
     required this.onPageIndex,
-    required this.onPageSize,
+    this.onPageSize,
     this.hasMore = false,
     this.pageSizeOptions = listPageSizeOptions,
+    this.showPageSizeControls = false,
     this.alwaysShow = false,
+    this.entityLabel,
     this.topPadding = 12,
     this.bottomPadding = 10,
   });
@@ -72,127 +76,147 @@ class ListPageBar extends StatelessWidget {
   final int pageIndex;
   final int pageSize;
   final ValueChanged<int> onPageIndex;
-  final ValueChanged<int> onPageSize;
+
+  /// Opcional; solo se usa si [showPageSizeControls] es true.
+  final ValueChanged<int>? onPageSize;
 
   /// Hay filas que todavía no están en [total]. Mantiene activa la flecha siguiente.
   final bool hasMore;
 
-  /// Si solo hay un tamaño, se ocultan los chips y queda el rango.
   final List<int> pageSizeOptions;
+
+  /// Chips «Por vista» (ocultos por defecto; el estándar visual es el pie Mostrando).
+  final bool showPageSizeControls;
 
   /// Muestra la barra aunque la lista quepa en una página.
   final bool alwaysShow;
 
-  /// Separación respecto a filtros / barra de búsqueda encima.
+  /// Sufijo opcional: «Mostrando 1–8 de 8 eventos».
+  final String? entityLabel;
+
   final double topPadding;
   final double bottomPadding;
 
   @override
   Widget build(BuildContext context) {
-    // Subscribe to theme changes even when callers keep this widget constant.
-    Theme.of(context);
+    final theme = B2BThemeExtension.of(context);
     final options =
         pageSizeOptions.isEmpty ? listPageSizeOptions : pageSizeOptions;
-    final smallest = options.reduce(math.min);
-    if (total <= 0 || (!alwaysShow && total <= smallest && !hasMore)) {
+    // Pie estándar visible con datos (o alwaysShow / hasMore).
+    if (total <= 0 && !alwaysShow && !hasMore) {
       return const SizedBox.shrink();
     }
 
-    final size = options.contains(pageSize) ? pageSize : options.first;
+    final size = options.contains(pageSize)
+        ? pageSize
+        : (options.isEmpty ? pageSize : options.first);
     final index = clampListPageIndex(
       pageIndex: pageIndex,
-      total: total,
-      pageSize: size,
+      total: total <= 0 ? 1 : total,
+      pageSize: size <= 0 ? 10 : size,
     );
-    final start = index * size + 1;
-    final end = math.min(start + size - 1, total);
+    final start = total == 0 ? 0 : index * size + 1;
+    final end = total == 0 ? 0 : math.min(start + size - 1, total);
     final lastPage = total <= 0 ? 0 : ((total - 1) / size).floor();
-    final showSizes = options.length > 1;
-    final wideArrows = MediaQuery.sizeOf(context).width >= 900;
-    final pager = _pager(
-      label: '$start–$end de $total',
-      canBack: index > 0,
-      canForward: index < lastPage || hasMore,
-      onBack: () => onPageIndex(index - 1),
-      onForward: () => onPageIndex(index + 1),
-      wideArrows: wideArrows,
-    );
+    final pageCount = total <= 0 ? 1 : lastPage + 1;
+    final noun = (entityLabel ?? '').trim();
+    final showing = total == 0
+        ? (noun.isEmpty ? 'Mostrando 0' : 'Mostrando 0 $noun')
+        : (noun.isEmpty
+            ? 'Mostrando $start–$end de $total'
+            : 'Mostrando $start–$end de $total $noun');
 
     return Padding(
       padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
-      child: LayoutBuilder(builder: (context, constraints) {
-        return Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showPageSizeControls &&
+              onPageSize != null &&
+              options.length > 1) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _sizeChoices(theme, size, options),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
             children: [
-              if (showSizes)
-                _sizeChoices(size, options,
-                    showLabel: constraints.maxWidth >= 480),
-              pager,
-            ]);
-      }),
+              Expanded(
+                child: Text(
+                  showing,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: theme.textSecondary,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Anterior',
+                visualDensity: VisualDensity.compact,
+                onPressed:
+                    index > 0 ? () => onPageIndex(index - 1) : null,
+                icon: LucideIcon(
+                  LucideGlyph.chevronLeft,
+                  size: 16,
+                  color: index > 0 ? theme.textPrimary : theme.textMuted,
+                ),
+              ),
+              Text(
+                '${index + 1} / $pageCount',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: theme.textPrimary,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Siguiente',
+                visualDensity: VisualDensity.compact,
+                onPressed: (index < lastPage || hasMore)
+                    ? () => onPageIndex(index + 1)
+                    : null,
+                icon: LucideIcon(
+                  LucideGlyph.chevronRight,
+                  size: 16,
+                  color: (index < lastPage || hasMore)
+                      ? theme.textPrimary
+                      : theme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _sizeChoices(int size, List<int> options, {bool showLabel = true}) {
+  Widget _sizeChoices(
+    B2BThemeExtension theme,
+    int size,
+    List<int> options,
+  ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (showLabel)
-          Text(
-            'Por vista',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
+        Text(
+          'Por vista',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: theme.textSecondary,
           ),
-        if (showLabel) const SizedBox(width: 8),
+        ),
+        const SizedBox(width: 8),
         for (final option in options) ...[
           _SizeChip(
             label: '$option',
             selected: option == size,
-            onTap: () => onPageSize(option),
+            onTap: () => onPageSize?.call(option),
           ),
           if (option != options.last) const SizedBox(width: 6),
         ],
-      ],
-    );
-  }
-
-  Widget _pager({
-    required String label,
-    required bool canBack,
-    required bool canForward,
-    required VoidCallback onBack,
-    required VoidCallback onForward,
-    required bool wideArrows,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _StepButton(
-          icon: Icons.chevron_left,
-          tooltip: 'Anterior',
-          onPressed: canBack ? onBack : null,
-          wide: wideArrows,
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: wideArrows ? 13 : 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        _StepButton(
-          icon: Icons.chevron_right,
-          tooltip: 'Siguiente',
-          onPressed: canForward ? onForward : null,
-          wide: wideArrows,
-        ),
       ],
     );
   }
@@ -211,18 +235,15 @@ class _SizeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final accent = dark
-        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
-        : AppColors.brand;
+    final theme = B2BThemeExtension.of(context);
     return Material(
-      color: selected ? AppColors.brand : AppColors.brandBlueContainer,
+      color: selected ? theme.brand : theme.brandContainer,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Text(
@@ -230,46 +251,11 @@ class _SizeChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: selected ? AppColors.white : accent,
+              color: selected ? theme.surfaceCard : theme.brand,
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    this.wide = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final bool wide;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final accent = dark
-        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
-        : AppColors.brand;
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      visualDensity: wide ? VisualDensity.standard : VisualDensity.compact,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(
-        minWidth: 44,
-        minHeight: 44,
-      ),
-      icon: Icon(icon,
-          size: wide ? 26 : 20,
-          color: onPressed == null ? accent.withOpacity(.3) : accent),
     );
   }
 }
@@ -291,9 +277,10 @@ class PagedItems<T> extends StatefulWidget {
     this.onRefresh,
     this.pageSizeOptions = listPageSizeOptions,
     this.alwaysShow = false,
-    this.pagerAtBottom = false,
+    this.pagerAtBottom = true,
     this.pageBarBuilder,
     this.pageBarBottomPadding = 10,
+    this.entityLabel,
   });
 
   final List<T> items;
@@ -314,14 +301,15 @@ class PagedItems<T> extends StatefulWidget {
   final Future<void> Function()? onNeedMore;
   final Future<void> Function()? onRefresh;
 
-  /// Tamaños ofrecidos. Con uno solo no se muestran los chips.
   final List<int> pageSizeOptions;
 
-  /// Muestra «Por vista» aunque la lista quepa en una página.
   final bool alwaysShow;
+
+  /// Por defecto el pie estándar va abajo.
   final bool pagerAtBottom;
   final Widget Function(Widget bar)? pageBarBuilder;
   final double pageBarBottomPadding;
+  final String? entityLabel;
 
   @override
   State<PagedItems<T>> createState() => _PagedItemsState<T>();
@@ -399,6 +387,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       }),
       pageSizeOptions: widget.pageSizeOptions,
       alwaysShow: widget.alwaysShow,
+      entityLabel: widget.entityLabel,
       bottomPadding: widget.pageBarBottomPadding,
     );
     Widget buildItem(int i) {

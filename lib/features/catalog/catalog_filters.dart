@@ -21,6 +21,7 @@ class CatalogFilters {
     this.onlyEnvioIncluido = false,
     this.category,
     this.categoryAnyOf = const [],
+    this.brandField,
   });
 
   /// Texto libre: nombre del repuesto y ubicación del importador (`profiles.estado` / `ciudad`).
@@ -75,6 +76,7 @@ class CatalogFilters {
 
   /// Varias escrituras de la misma categoría (singular, plural o typo).
   final List<String> categoryAnyOf;
+  final MapEntry<String, String>? brandField;
 
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
 
@@ -117,6 +119,7 @@ class CatalogFilters {
         onlyEnvioIncluido ||
         (category != null && category!.trim().isNotEmpty) ||
         categoryAnyOf.isNotEmpty ||
+        brandField != null ||
         sortMode != CatalogSortMode.defaultMode;
   }
 
@@ -180,6 +183,7 @@ class CatalogFilters {
       category: clearCategory ? null : (category ?? this.category),
       categoryAnyOf:
           clearCategory ? const [] : (categoryAnyOf ?? this.categoryAnyOf),
+      brandField: brandField,
     );
   }
 }

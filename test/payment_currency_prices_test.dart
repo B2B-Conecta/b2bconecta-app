@@ -59,16 +59,16 @@ void main() {
               profile: buyer, liveTasaBcv: onlyDivisas ? 10 : null)));
       await tester.pumpAndSettle();
       final continueButton =
-          find.widgetWithText(FilledButton, 'Continuar con la entrega');
+          find.widgetWithText(FilledButton, 'Continuar con la entrega →');
       expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
       expect(find.text('260.00 REF'), findsWidgets);
       if (!onlyDivisas) {
         expect(find.text('Sin tasa'), findsWidgets);
         expect(find.text('Tasa BCV: 1 REF ='), findsNothing);
       }
-      await tester.ensureVisible(find.text('Divisas (USD)'));
+      await tester.ensureVisible(find.text('USD'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Divisas (USD)'));
+      await tester.tap(find.text('USD'));
       await tester.pumpAndSettle();
       expect(find.text('240.00 USD'), findsWidgets);
       expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
@@ -121,15 +121,15 @@ void main() {
       expect(cart.totalRef(), 260);
       expect(find.textContaining('52.00 REF / ud'), findsOneWidget);
       expect(find.text('260.00 REF'), findsWidgets);
-      expect(find.text('Bolívares (REF)'), findsOneWidget);
-      expect(find.text('Divisas (USD)'), findsOneWidget);
+      expect(find.text('REF / Bs'), findsOneWidget);
+      expect(find.text('USD'), findsOneWidget);
       expect(find.text('Bolívares'), findsNothing);
       expect(find.text('REF'), findsNothing);
       expect(find.text('Bs 520,00'), findsOneWidget);
-      expect(find.text('Bs 2.600,00'), findsNWidgets(2));
-      await tester.ensureVisible(find.text('Divisas (USD)'));
+      expect(find.text('Bs 2.600,00'), findsAtLeastNWidgets(2));
+      await tester.ensureVisible(find.text('USD'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Divisas (USD)'));
+      await tester.tap(find.text('USD'));
       await tester.pumpAndSettle();
       expect(find.textContaining('${(sale ?? 52).toStringAsFixed(2)} USD / ud'),
           findsOneWidget);
@@ -137,7 +137,7 @@ void main() {
           findsWidgets);
       expect(find.text('Tasa BCV: 1 REF ='), findsNothing);
       expect(find.text('Bs 2.600,00'), findsNothing);
-      await tester.tap(find.text('Bolívares (REF)'));
+      await tester.tap(find.text('REF / Bs'));
       await tester.pumpAndSettle();
       expect(find.textContaining('52.00 REF / ud'), findsOneWidget);
       expect(find.text('Bs 520,00'), findsOneWidget);

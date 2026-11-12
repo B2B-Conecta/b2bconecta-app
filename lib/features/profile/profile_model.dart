@@ -55,6 +55,7 @@ class ProfileModel {
     this.minOrderAmountRef = 0,
     this.minOrderCurrency = 'ref',
     this.catalogFeaturedUntil,
+    this.catalogVerifiedAt,
     this.referralCode,
     this.referredByProfileId,
     this.referredByExternalId,
@@ -194,12 +195,17 @@ class ProfileModel {
   /// Destacado manual en catálogo (`profiles.catalog_featured_until`).
   final DateTime? catalogFeaturedUntil;
 
+  /// Verificado admin (`profiles.catalog_verified_at`).
+  final DateTime? catalogVerifiedAt;
+
   bool get hasMinOrderAmount => minOrderAmountRef > 0;
 
   bool get isCatalogFeatured {
     final until = catalogFeaturedUntil;
     return until != null && until.isAfter(DateTime.now());
   }
+
+  bool get isCatalogVerified => catalogVerifiedAt != null;
 
   /// Legado: códigos en perfiles ya no se generan (solo vendedores externos).
   final String? referralCode;
@@ -390,6 +396,7 @@ class ProfileModel {
       minOrderAmountRef: minOrderAmountRef,
       minOrderCurrency: minOrderCurrency,
       catalogFeaturedUntil: catalogFeaturedUntil,
+      catalogVerifiedAt: catalogVerifiedAt,
       referralCode: referralCode,
       referredByProfileId: referredByProfileId,
       referredByExternalId: referredByExternalId,
@@ -513,6 +520,9 @@ class ProfileModel {
       minOrderCurrency: _text(json['min_order_currency']) ?? 'ref',
       catalogFeaturedUntil: json['catalog_featured_until'] != null
           ? DateTime.tryParse(json['catalog_featured_until'].toString())
+          : null,
+      catalogVerifiedAt: json['catalog_verified_at'] != null
+          ? DateTime.tryParse(json['catalog_verified_at'].toString())
           : null,
       referralCode: _text(json['referral_code']),
       referredByProfileId: _text(json['referred_by_profile_id']),

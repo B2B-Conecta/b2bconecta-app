@@ -11,10 +11,13 @@ import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/brand_loading_screen.dart';
 
 /// Tras login: carga `profiles` y muestra onboarding o [MainShell].
 class ProfileGate extends StatefulWidget {
-  const ProfileGate({super.key});
+  const ProfileGate({super.key, this.startupDisplayElapsed = true});
+
+  final bool startupDisplayElapsed;
 
   @override
   State<ProfileGate> createState() => _ProfileGateState();
@@ -88,21 +91,9 @@ class _ProfileGateState extends State<ProfileGate> {
     return FutureBuilder<ProfileModel?>(
       future: _profileFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _gateScaffold(
-            children: [
-              const CircularProgressIndicator(color: AppColors.brand),
-              const SizedBox(height: 16),
-              Text(
-                'Cargando perfil...',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          );
+        if (!widget.startupDisplayElapsed ||
+            snapshot.connectionState == ConnectionState.waiting) {
+          return const BrandLoadingScreen();
         }
 
         if (snapshot.hasError) {

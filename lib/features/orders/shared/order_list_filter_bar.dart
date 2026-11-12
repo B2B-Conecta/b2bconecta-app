@@ -28,6 +28,7 @@ class OrderListFilterBar extends StatefulWidget {
     this.onMorosoOnlyChanged,
     this.onFilters,
     this.activeFilterCount = 0,
+    this.filterButtonLabel = 'Filtros',
     this.padding = const EdgeInsets.fromLTRB(16, 0, 16, 8),
     this.softStyle = false,
   });
@@ -42,6 +43,8 @@ class OrderListFilterBar extends StatefulWidget {
   final ValueChanged<bool>? onMorosoOnlyChanged;
   final VoidCallback? onFilters;
   final int activeFilterCount;
+  /// Texto del botón (p. ej. «Filtrar» en móvil).
+  final String filterButtonLabel;
   final EdgeInsetsGeometry padding;
   final bool softStyle;
 
@@ -144,8 +147,8 @@ class _OrderListFilterBarState extends State<OrderListFilterBar> {
               onPressed: widget.onFilters,
               icon: const Icon(Icons.tune_rounded, size: 18),
               label: Text(widget.activeFilterCount > 0
-                  ? 'Filtros (${widget.activeFilterCount})'
-                  : 'Filtros'),
+                  ? '${widget.filterButtonLabel} (${widget.activeFilterCount})'
+                  : widget.filterButtonLabel),
               style: OutlinedButton.styleFrom(
                   foregroundColor: widget.softStyle ? colors.accent : null,
                   side: widget.softStyle

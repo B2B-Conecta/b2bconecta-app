@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 
 /// Botón de filtro tipo «píldora» que abre un menú desplegable (uso en web/escritorio).
 class FilterMenuButton extends StatelessWidget {
@@ -25,20 +25,22 @@ class FilterMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return MenuAnchor(
       alignmentOffset: const Offset(0, 6),
       style: MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(AppColors.card),
+        backgroundColor: WidgetStatePropertyAll(theme.dialogSurface),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         elevation: const WidgetStatePropertyAll(6),
-        shadowColor: WidgetStatePropertyAll(Colors.black.withOpacity(0.18)),
+        shadowColor:
+            WidgetStatePropertyAll(theme.textPrimary.withOpacity(0.18)),
         padding: const WidgetStatePropertyAll(
           EdgeInsets.symmetric(vertical: 6),
         ),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppColors.borderSubtle),
+            side: BorderSide(color: theme.border),
           ),
         ),
       ),
@@ -80,16 +82,16 @@ class FilterPillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = tone ?? AppColors.brandAccent;
+    final theme = B2BThemeExtension.of(context);
+    final accent = tone ?? theme.brand;
     final highlighted = active || open;
-    final fg = active ? accent : AppColors.textPrimary;
+    final fg = active ? accent : theme.textPrimary;
     return Material(
-      color: active ? accent.withOpacity(0.10) : AppColors.fieldFill,
+      color: active ? accent.withOpacity(0.10) : theme.inputFill,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color:
-              highlighted ? accent.withOpacity(0.55) : AppColors.borderSubtle,
+          color: highlighted ? accent.withOpacity(0.55) : theme.border,
         ),
       ),
       child: InkWell(
@@ -105,7 +107,7 @@ class FilterPillButton extends StatelessWidget {
                 Icon(
                   icon,
                   size: 16,
-                  color: active ? accent : AppColors.textSecondary,
+                  color: active ? accent : theme.textSecondary,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -121,7 +123,7 @@ class FilterPillButton extends StatelessWidget {
                   Icon(
                     open ? Icons.expand_less : Icons.expand_more,
                     size: 18,
-                    color: active ? accent : AppColors.textSecondary,
+                    color: active ? accent : theme.textSecondary,
                   ),
                 ],
               ],
@@ -150,15 +152,16 @@ class FilterMenuOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return MenuItemButton(
       onPressed: onPressed,
       leadingIcon: SizedBox(
         width: 18,
         child: selected
-            ? Icon(Icons.check, size: 18, color: AppColors.brandAccent)
+            ? Icon(Icons.check, size: 18, color: theme.brand)
             : (icon == null
                 ? null
-                : Icon(icon, size: 16, color: AppColors.textSecondary)),
+                : Icon(icon, size: 16, color: theme.textSecondary)),
       ),
       child: Padding(
         padding: const EdgeInsets.only(right: 12),
@@ -167,6 +170,7 @@ class FilterMenuOption extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: theme.textPrimary,
           ),
         ),
       ),
@@ -189,13 +193,17 @@ class FilterMenuCheck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return CheckboxMenuButton(
       value: value,
       closeOnActivate: false,
       onChanged: (v) => onChanged(v ?? false),
       child: Padding(
         padding: const EdgeInsets.only(right: 12),
-        child: Text(label, style: const TextStyle(fontSize: 13)),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 13, color: theme.textPrimary),
+        ),
       ),
     );
   }

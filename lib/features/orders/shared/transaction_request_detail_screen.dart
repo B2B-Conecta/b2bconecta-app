@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'courier_timeline_widget.dart';
+import 'order_list_colors.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_transit_eta_banner.dart';
 import 'package:motolink_pro_app/features/logistics/importer_confirm_pickup_section.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
@@ -430,11 +431,12 @@ class _TransactionRequestDetailScreenState
             ? '${r.statusLabelEs(aliadoViewer: widget.homeRole == AppHomeRole.aliado)} · ${OrderVocab.chipPagoPendiente}'
             : r.statusLabelEs(
                 aliadoViewer: widget.homeRole == AppHomeRole.aliado));
+    final colors = OrderListColors.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: colors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -749,11 +751,12 @@ class _TransactionRequestDetailScreenState
   ) {
     final hasNota = r.notasAdmin != null && r.notasAdmin!.trim().isNotEmpty;
     final isGroup = lines.length > 1;
+    final colors = OrderListColors.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: colors.border),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),

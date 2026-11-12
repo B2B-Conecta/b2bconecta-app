@@ -12,10 +12,54 @@ import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
 import 'package:motolink_pro_app/features/catalog/product_variants.dart';
 import 'package:motolink_pro_app/features/catalog/related_products.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
+import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/core/utils/haversine.dart';
 
 class CatalogService {
   CatalogService._();
+
+  static Future<List<PartModel>> fetchHomeNewArrivals() async {
+    final rows = await retryOnJwtIssuedAtFuture(() => SupabaseAccess.client
+        .from('products')
+        .select('*, ${_catalogProfileSelect(CatalogFilters.empty)}')
+        .eq('is_active', true)
+        .eq('stock_covers_min_order', true)
+        .order('created_at', ascending: false)
+        .order('id')
+        .limit(40));
+    final products = collapseProductVariants(
+        rows.map((row) => PartModel.fromJson(row)).toList());
+    return applyPromoDiscountsToParts(
+        products, await fetchActivePromoProductDiscounts());
+  }
+
+  /// Selecciones de Inicio: datos y descuentos actuales, respetando RLS.
+  /// Mantiene el orden del ranking sin descargar el catálogo completo.
+  static Future<List<PartModel>> fetchHomeProducts(
+      List<String> productIds) async {
+    final ids =
+        productIds.where((id) => id.isNotEmpty).toSet().take(24).toList();
+    if (ids.isEmpty) return const [];
+    return retryOnJwtIssuedAtFuture(() async {
+      final rows = await SupabaseAccess.client
+          .from('products')
+          .select('*, ${_catalogProfileSelect(CatalogFilters.empty)}')
+          .inFilter('id', ids)
+          .eq('is_active', true)
+          .eq('stock_covers_min_order', true);
+      final parts = {
+        for (final row in rows)
+          row['id'].toString():
+              PartModel.fromJson(Map<String, dynamic>.from(row)),
+      };
+      final ordered = [
+        for (final id in ids)
+          if (parts[id] != null) parts[id]!,
+      ];
+      return applyPromoDiscountsToParts(
+          ordered, await fetchActivePromoProductDiscounts());
+    });
+  }
 
   static Future<List<ImporterOption>> fetchImporterOptions() async {
     return retryOnJwtIssuedAtFuture(() async {
@@ -605,7 +649,7 @@ class CatalogService {
     if (f.sortByDistanceFromReference) {
       final refLat = f.sortReferenceLat!;
       final refLng = f.sortReferenceLng!;
-      final distanceCompare = comparePartsByDistanceThenCatalogBoost;
+      const distanceCompare = comparePartsByDistanceThenCatalogBoost;
       final withDist = constrainCatalogPartsToFilters(
         list.map((row) {
           final p = PartModel.fromJson(row as Map<String, dynamic>);
@@ -984,6 +1028,13 @@ class CatalogService {
     }
     if (filters.onlyActiveProducts) {
       q = q.eq('is_active', true);
+    }
+    final brand = filters.brandField;
+    if (brand != null) {
+      q = q.contains('custom_fields', {
+        brand.key: brand.value,
+        kAliadoVisibleCustomFieldKeys: [brand.key],
+      });
     }
     final anyOf = [
       for (final value in filters.categoryAnyOf)

@@ -286,7 +286,7 @@ class _OrderThumbnail extends StatelessWidget {
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: colors.border)),
               child: image == null
@@ -311,7 +311,7 @@ class _OrderThumbnail extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: colors.dark ? Colors.black : Colors.white)),
+                        color: colors.onAccent)),
               )),
       ]),
     ));

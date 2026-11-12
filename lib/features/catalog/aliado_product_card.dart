@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
-import 'aliado_catalog_categories.dart';
 import 'aliado_catalog_layout.dart';
 import 'catalog_cart_price.dart';
 import 'catalog_cart_button.dart';
 import 'favorite_heart_button.dart';
-import 'importer_catalog_logo.dart';
 import 'importer_catalog_seals.dart';
 import 'part_model.dart';
 import 'product_stock_summary.dart';
@@ -56,12 +55,8 @@ class AliadoProductCard extends StatelessWidget {
     final shippingIncluded =
         EnvioPolitica.normalize(part.ownerEnvioTipo) == EnvioPolitica.incluido;
     final radius = BorderRadius.circular(AliadoCatalogLayout.cardRadius);
-    final accent = Theme.of(context).colorScheme.primary;
-    final location = [part.ownerEstado, part.ownerCiudad]
-        .whereType<String>()
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .join(' · ');
+    const supplierBlue = Color(0xFF004BDD);
+    const navy = Color(0xFF0A1F44);
     return Material(
         color: AppColors.card,
         shape: RoundedRectangleBorder(
@@ -72,7 +67,7 @@ class AliadoProductCard extends StatelessWidget {
           borderRadius: radius,
           child: Builder(builder: (context) {
             final details = Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,38 +75,27 @@ class AliadoProductCard extends StatelessWidget {
                       Tooltip(
                           message: part.nombre,
                           excludeFromSemantics: true,
-                          child: ConstrainedBox(
-                              constraints:
-                                  BoxConstraints(minHeight: scaler.scale(36)),
-                              child: Text(part.nombre,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontSize: 15,
-                                      height: 1.2,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary)))),
-                      const SizedBox(height: 6),
-                      CatalogCartPrice(part: part),
-                      const SizedBox(height: 6),
+                          child: Text(part.nombre,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: compact ? 13.5 : 14.5,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.black))),
+                      const SizedBox(height: 8),
+                      CatalogCartPrice(
+                          part: part, compact: true, catalogGrid: true),
+                      const SizedBox(height: 8),
                       ProductStockSummary(part: part),
                       if (hasCustomFields) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         ProductCustomFieldsAliadoChips(
                             customFields: part.customFields),
                       ],
                       if (showDistanceChips) ...[
-                        const SizedBox(height: 6),
-                        Text(_distanceChipLabel(part),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontSize: 11,
-                                height: 1.2,
-                                color: AppColors.textSecondary)),
-                      ] else if (!compact && location.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(location,
+                        Text(_distanceChipLabel(part),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -121,12 +105,12 @@ class AliadoProductCard extends StatelessWidget {
                       ],
                     ]));
             final footer = Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Divider(height: 8, color: AppColors.divider),
+                      const SizedBox(height: 8),
                       Tooltip(
                           message: onImporterTap == null
                               ? supplier
@@ -134,81 +118,57 @@ class AliadoProductCard extends StatelessWidget {
                           child: InkWell(
                               onTap: onImporterTap,
                               borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
-                                  height: scaler
-                                      .scale(40)
-                                      .clamp(44, double.infinity),
+                              child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 2),
                                   child: Row(children: [
-                                    ImporterCatalogLogo(
-                                        storagePath: part.ownerLogoStoragePath,
-                                        size: 16,
-                                        fallback: Icon(
-                                            Icons.storefront_outlined,
-                                            size: 16,
-                                            color: AppColors.textSecondary)),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                        child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                          if (part.category
-                                                  ?.trim()
-                                                  .isNotEmpty ==
-                                              true)
-                                            Text(
-                                                formatCatalogCategoryLabel(
-                                                    part.category!),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                    fontSize: 11,
-                                                    height: 1.2,
-                                                    color: AppColors
-                                                        .textSecondary)),
-                                          Text(supplier,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                  fontSize: 11.5,
-                                                  height: 1.2,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: onImporterTap == null
-                                                      ? AppColors.textSecondary
-                                                      : accent)),
-                                        ])),
+                                    const LucideIcon(LucideGlyph.store,
+                                        size: 14, color: supplierBlue),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                        child: Text(supplier,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            softWrap: false,
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                height: 1.2,
+                                                fontWeight: FontWeight.w700,
+                                                color: onImporterTap == null
+                                                    ? navy
+                                                    : supplierBlue))),
                                     if (hasRating) ...[
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 6),
                                       Icon(Icons.star_rounded,
-                                          size: 14,
-                                          color: Colors.amber.shade800),
+                                          size: 15,
+                                          color: Colors.amber.shade600),
                                       const SizedBox(width: 2),
                                       Text(
                                           part.ownerRatingAvg!
                                               .toStringAsFixed(1),
-                                          style: TextStyle(
+                                          softWrap: false,
+                                          style: const TextStyle(
                                               fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.textPrimary)),
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.black)),
                                     ],
                                   ])))),
                       if (profile.isAliado) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 10),
                         CatalogCartButton(part: part, profile: profile),
                       ] else if (onTap != null) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 10),
                         FilledButton(
                             onPressed: onTap,
                             style: FilledButton.styleFrom(
-                                minimumSize: Size(0, scaler.scale(44)),
+                                minimumSize: Size(0, scaler.scale(42)),
+                                backgroundColor: supplierBlue,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 10),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                                    borderRadius: BorderRadius.circular(999)),
                                 textStyle: const TextStyle(
-                                    fontSize: 13, fontWeight: FontWeight.w600)),
+                                    fontSize: 13, fontWeight: FontWeight.w700)),
                             child: Semantics(
                                 label: 'Ver repuesto: ${part.nombre}',
                                 child: const ExcludeSemantics(
@@ -304,18 +264,16 @@ class AliadoProductCard extends StatelessWidget {
   Widget _productPhoto() {
     final url = part.coverImageUrl?.trim();
     if (url == null || url.isEmpty) return const _PhotoPlaceholder();
-    return Padding(
-        padding: const EdgeInsets.all(10),
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
-          excludeFromSemantics: true,
-          errorBuilder: (_, __, ___) =>
-              const _PhotoPlaceholder(failed: true),
-          loadingBuilder: (_, image, progress) => progress == null
-              ? image
-              : const _PhotoPlaceholder(loading: true),
-        ));
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      excludeFromSemantics: true,
+      errorBuilder: (_, __, ___) => const _PhotoPlaceholder(failed: true),
+      loadingBuilder: (_, image, progress) =>
+          progress == null ? image : const _PhotoPlaceholder(loading: true),
+    );
   }
 }
 

@@ -1,0 +1,42 @@
+---
+description: Arquitectura Flutter/Dart feature-first, Lucide y layouts responsivos
+globs: lib/**/*.dart
+alwaysApply: false
+---
+
+# Flutter / Dart — arquitectura
+
+## Feature-first
+
+Organiza por dominio bajo `lib/features/<feature>/`. Separa capas:
+
+- **UI**: widgets/pantallas (`*_screen.dart`, `*_card.dart`) — sin I/O directo.
+- **Estado / acciones**: services o controllers escuchables (`ChangeNotifier` / `Listenable`).
+- **Datos**: `*_service.dart` → Supabase/API; modelos inmutables (`*_model.dart`).
+
+Código compartido en `lib/core/` (theme, layout, widgets, utils) y `lib/app/` (shell, routing, theme).
+
+```dart
+// ❌ BAD — UI llama PostgREST
+await supabase.from('products').select();
+
+// ✅ GOOD — UI usa el servicio de feature
+final parts = await CatalogService.fetchPage(...);
+```
+
+## Iconos Lucide (obligatorio)
+
+Usa `package:lucide_icons/lucide_icons.dart`. No introduzcas Material Icons nuevos en UI de producto (salvo legado puntual).
+
+```dart
+Icon(LucideIcons.shoppingBag) // ✅
+Icon(Icons.shopping_bag)       // ❌ en UI nueva
+```
+
+## Responsive Mobile / Web
+
+- Breakpoints: `AppBreakpoints` / layouts de feature (`AliadoCatalogLayout`, shells).
+- Misma pantalla, composición distinta: móvil (AppBar + bottom nav) vs desktop (rail/shell).
+- Evita anchos fijos frágiles; usa `LayoutBuilder`, `MediaQuery.sizeOf`, `Wrap`/`Grid` con `crossAxisCount` por ancho.
+- Textos: respeta `textScaler`; no asumas altura de ficha sin `cardHeight` / contenido medible.
+- Web: tras cambios de chrome UI, preferir **hot restart** (no solo hot reload).

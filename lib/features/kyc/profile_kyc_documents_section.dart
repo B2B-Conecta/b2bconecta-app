@@ -10,6 +10,7 @@ import 'profile_document_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'aliado_profile_requirements_banner.dart';
 import 'kyc_status_highlight_widgets.dart';
 import 'profile_kyc_document_tile.dart';
@@ -74,7 +75,8 @@ class ProfileKycDocumentsSection extends StatefulWidget {
       ProfileKycDocumentsSectionState();
 }
 
-class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> {
+class ProfileKycDocumentsSectionState
+    extends State<ProfileKycDocumentsSection> {
   List<ProfileDocumentModel> _docs = [];
   bool _loading = true;
   String? _busyDocType;
@@ -166,12 +168,15 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
     setState(() => _showDocValidationErrors = true);
     if (showSnackBar && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
             'Complete los documentos obligatorios del registro inicial.',
+            style: TextStyle(
+              color: B2BThemeExtension.of(context).surfaceCard,
+            ),
           ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Color(0xFFC62828),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
@@ -324,15 +329,11 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
     final statusLine = !has
         ? 'Sin archivo'
         : DocumentReviewStatus.labelEs(
-            (rs == null || rs.isEmpty)
-                ? DocumentReviewStatus.pendiente
-                : rs,
+            (rs == null || rs.isEmpty) ? DocumentReviewStatus.pendiente : rs,
           );
     final effectiveStatus = !has
         ? null
-        : ((rs == null || rs.isEmpty)
-            ? DocumentReviewStatus.pendiente
-            : rs);
+        : ((rs == null || rs.isEmpty) ? DocumentReviewStatus.pendiente : rs);
     final reviewer = doc?.reviewerBusinessName?.trim();
     final reviewedHint = (doc != null && doc.reviewedAt != null)
         ? 'Revisión: ${_formatReviewedAt(doc.reviewedAt)}'
@@ -429,7 +430,8 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, size: 18, color: AppColors.brandAccent),
+                Icon(Icons.info_outline,
+                    size: 18, color: AppColors.brandAccent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -499,7 +501,8 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
               subtitle: reqProgress.subtitle,
               infoMessage: AliadoKycSectionHelp.requisitosPerfil,
               initiallyExpanded: !reqProgress.allComplete,
-              forceExpanded: _showDocValidationErrors && !reqProgress.allComplete,
+              forceExpanded:
+                  _showDocValidationErrors && !reqProgress.allComplete,
               child: AliadoProfileRequirementsBanner(
                 profile: widget.profile,
                 documents: _docs,
@@ -515,8 +518,8 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
                 ? null
                 : '$requiredUploaded de ${requiredTypes.length} documentos',
             infoMessage: AliadoKycSectionHelp.registroInicial,
-            initiallyExpanded:
-                requiredUploaded < requiredTypes.length || st == KycStatus.rechazado,
+            initiallyExpanded: requiredUploaded < requiredTypes.length ||
+                st == KycStatus.rechazado,
             forceExpanded: _showDocValidationErrors &&
                 requiredUploaded < requiredTypes.length,
             child: Column(
@@ -527,7 +530,8 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
             const SizedBox(height: 8),
             ProfileCollapsibleSection(
               title: 'Documentación complementaria',
-              subtitle: 'Opcional · ${_supplementaryUploaded(supplementaryTypes)} de ${supplementaryTypes.length}',
+              subtitle:
+                  'Opcional · ${_supplementaryUploaded(supplementaryTypes)} de ${supplementaryTypes.length}',
               infoMessage: AliadoKycSectionHelp.documentacionComplementaria,
               initiallyExpanded: false,
               child: Column(
@@ -570,12 +574,12 @@ class ProfileKycDocumentsSectionState extends State<ProfileKycDocumentsSection> 
                 ? null
                 : _submitReview,
             child: _submittingReview
-                ? const SizedBox(
+                ? SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: Colors.white,
+                      color: B2BThemeExtension.of(context).surfaceCard,
                     ),
                   )
                 : Text(

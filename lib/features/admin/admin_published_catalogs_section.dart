@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
-import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
 
-/// Reportes: catálogo de un mayorista. El admin puede ocultarlo de las tiendas.
+/// Catálogo de un mayorista (Presencia / Reportes). El admin puede ocultarlo.
 class AdminPublishedCatalogsSection extends StatefulWidget {
   const AdminPublishedCatalogsSection({
     super.key,
@@ -50,6 +52,7 @@ class AdminPublishedCatalogsSection extends StatefulWidget {
 class _AdminPublishedCatalogsSectionState
     extends State<AdminPublishedCatalogsSection> {
   final _searchCtrl = TextEditingController();
+  final _productSearchCtrl = TextEditingController();
   List<ImporterOption> _importers = const [];
   bool _loadingImporters = true;
   String? _importersError;
@@ -69,6 +72,9 @@ class _AdminPublishedCatalogsSectionState
     _searchCtrl.addListener(() {
       if (mounted) setState(() {});
     });
+    _productSearchCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
     final focus = widget.focusImporter;
     if (focus != null) {
       _selected = focus;
@@ -84,6 +90,7 @@ class _AdminPublishedCatalogsSectionState
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _productSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -150,13 +157,17 @@ class _AdminPublishedCatalogsSectionState
       _hasMore = true;
       _productsError = null;
       _showHidden = false;
+      _productSearchCtrl.clear();
     });
     await _loadProducts(reset: true);
   }
 
   Future<void> _selectVisibility(bool hidden) async {
     if (_showHidden == hidden) return;
-    setState(() => _showHidden = hidden);
+    setState(() {
+      _showHidden = hidden;
+      _productSearchCtrl.clear();
+    });
     await _loadProducts(reset: true);
   }
 
@@ -186,12 +197,21 @@ class _AdminPublishedCatalogsSectionState
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(hide ? 'Ocultar producto' : 'Mostrar producto'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          hide ? 'Ocultar producto' : 'Mostrar producto',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AdminUsersChrome.titleColor,
+          ),
+        ),
         content: Text(
           hide
               ? '«${part.nombre}» deja de verse en el catálogo de las tiendas. '
                   'El proveedor conserva el SKU.'
               : '«${part.nombre}» vuelve a verse en el catálogo de las tiendas.',
+          style: TextStyle(fontSize: 13, color: AdminUsersChrome.muted),
         ),
         actions: [
           TextButton(
@@ -199,6 +219,9 @@ class _AdminPublishedCatalogsSectionState
             child: const Text('Cancelar'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AdminUsersChrome.brand,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(hide ? 'Ocultar' : 'Mostrar'),
           ),
@@ -299,20 +322,113 @@ class _AdminPublishedCatalogsSectionState
     }).toList();
   }
 
+  List<PartModel> get _visibleProducts {
+    final q = _productSearchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return _products;
+    return _products.where((p) {
+      final name = p.nombre.toLowerCase();
+      final sku = (p.sku ?? '').toLowerCase();
+      final cat = (p.category ?? '').toLowerCase();
+      return name.contains(q) || sku.contains(q) || cat.contains(q);
+    }).toList();
+  }
+
+  void _goBack() {
+    if (widget.onCloseFocus != null) {
+      widget.onCloseFocus!();
+      return;
+    }
+    setState(() {
+      _selected = null;
+      _products.clear();
+      _matchingTotal = null;
+      _productsError = null;
+      _showHidden = false;
+      _productSearchCtrl.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final selected = _selected;
+    final title = selected != null
+        ? selected.businessName
+        : (widget.focusImporter != null
+            ? 'Catálogo del mayorista'
+            : 'Catálogos publicados');
+    final subtitle = selected != null
+        ? (_matchingTotal == null
+            ? (_showHidden
+                ? 'Productos ocultos del mayorista.'
+                : 'Productos publicados del mayorista.')
+            : (_showHidden
+                ? '$_matchingTotal oculto${_matchingTotal == 1 ? '' : 's'}.'
+                : '$_matchingTotal publicado${_matchingTotal == 1 ? '' : 's'}.'))
+        : 'Productos publicados u ocultos del mayorista.';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Text(
-            'Catálogos publicados de mayoristas',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
+          padding: const EdgeInsets.fromLTRB(8, 10, 14, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (selected != null)
+                IconButton(
+                  tooltip: widget.onCloseFocus != null ? 'Volver' : 'Cambiar',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _goBack,
+                  icon: LucideIcon(
+                    LucideGlyph.arrowLeft,
+                    size: 18,
+                    color: AdminUsersChrome.titleColor,
+                  ),
+                )
+              else
+                const SizedBox(width: 6),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(top: selected != null ? 8 : 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AdminUsersChrome.titleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AdminUsersChrome.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (selected != null)
+                IconButton(
+                  tooltip: 'Actualizar',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _loadingProducts
+                      ? null
+                      : () => _loadProducts(reset: true),
+                  icon: LucideIcon(
+                    LucideGlyph.refreshCw,
+                    size: 16,
+                    color: AdminUsersChrome.muted,
+                  ),
+                ),
+            ],
           ),
         ),
         Expanded(child: _body()),
@@ -322,9 +438,9 @@ class _AdminPublishedCatalogsSectionState
 
   Widget _body() {
     if (_loadingImporters) {
-      return const Center(
+      return Center(
         key: Key('admin-catalogs-importers-loading'),
-        child: CircularProgressIndicator(color: AppColors.brand),
+        child: CircularProgressIndicator(color: AdminUsersChrome.brand),
       );
     }
     if (_importersError != null && _importers.isEmpty) {
@@ -336,45 +452,94 @@ class _AdminPublishedCatalogsSectionState
     }
     final selected = _selected;
     if (selected == null) return _picker();
-    return _catalog(selected);
+    return _catalog();
   }
 
   Widget _picker() {
+    final theme = B2BThemeExtension.of(context);
     final rows = _visibleImporters;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
           child: TextField(
             controller: _searchCtrl,
-            decoration: const InputDecoration(
-              hintText: 'Buscar mayorista por nombre',
+            style: const TextStyle(fontSize: 13),
+            decoration: AdminUsersChrome.field(
+              label: 'Buscar',
+              hint: 'Mayorista por nombre…',
+            ).copyWith(
               isDense: true,
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(left: 10, right: 6),
+                child: LucideIcon(
+                  LucideGlyph.search,
+                  size: 16,
+                  color: AdminUsersChrome.muted,
+                ),
+              ),
+              prefixIconConstraints:
+                  const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
           ),
         ),
         Expanded(
           child: rows.isEmpty
-              ? const Center(child: Text('Ningún mayorista coincide.'))
+              ? Center(
+                  child: Text(
+                    'Ningún mayorista coincide.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AdminUsersChrome.muted,
+                    ),
+                  ),
+                )
               : PagedItems(
                   items: rows,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  separator: 8,
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                  separator: 0,
                   itemBuilder: (o) {
                     return Material(
-                      color: AppColors.card,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: AppColors.borderSubtle),
-                      ),
-                      child: ListTile(
-                        title: Text(o.businessName),
-                        subtitle: Text(o.id),
-                        trailing: const Icon(Icons.chevron_right),
+                      color: theme.surfaceCard,
+                      child: InkWell(
                         onTap: () => _selectImporter(o),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: AdminUsersChrome.border,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  o.businessName,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AdminUsersChrome.titleColor,
+                                  ),
+                                ),
+                              ),
+                              LucideIcon(
+                                LucideGlyph.chevronRight,
+                                size: 16,
+                                color: AdminUsersChrome.brand,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -384,45 +549,55 @@ class _AdminPublishedCatalogsSectionState
     );
   }
 
-  Widget _catalog(ImporterOption selected) {
+  Widget _catalog() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
           child: Row(
             children: [
-              Expanded(
-                child: Text(
-                  selected.businessName,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
+              _CatalogPill(
+                label: 'Publicados',
+                selected: !_showHidden,
+                glyph: LucideGlyph.store,
+                onTap: () => _selectVisibility(false),
               ),
-              TextButton(
-                onPressed: () {
-                  if (widget.onCloseFocus != null) {
-                    widget.onCloseFocus!();
-                    return;
-                  }
-                  setState(() {
-                    _selected = null;
-                    _products.clear();
-                    _matchingTotal = null;
-                    _productsError = null;
-                    _showHidden = false;
-                  });
-                },
-                child: Text(widget.onCloseFocus != null ? 'Volver' : 'Cambiar'),
+              const SizedBox(width: 6),
+              _CatalogPill(
+                label: 'Ocultos',
+                selected: _showHidden,
+                glyph: LucideGlyph.package,
+                onTap: () => _selectVisibility(true),
               ),
             ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-          child: SegmentedFilterBar(
-            labels: const ['Publicados', 'Ocultos'],
-            selectedIndex: _showHidden ? 1 : 0,
-            onSelected: (index) => _selectVisibility(index == 1),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          child: TextField(
+            controller: _productSearchCtrl,
+            style: const TextStyle(fontSize: 13),
+            decoration: AdminUsersChrome.field(
+              label: 'Buscar producto',
+              hint: 'Nombre, SKU o categoría…',
+            ).copyWith(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(left: 10, right: 6),
+                child: LucideIcon(
+                  LucideGlyph.search,
+                  size: 16,
+                  color: AdminUsersChrome.muted,
+                ),
+              ),
+              prefixIconConstraints:
+                  const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
           ),
         ),
         Expanded(child: _productBody()),
@@ -432,9 +607,9 @@ class _AdminPublishedCatalogsSectionState
 
   Widget _productBody() {
     if (_loadingProducts && _products.isEmpty) {
-      return const Center(
+      return Center(
         key: Key('admin-catalogs-products-loading'),
-        child: CircularProgressIndicator(color: AppColors.brand),
+        child: CircularProgressIndicator(color: AdminUsersChrome.brand),
       );
     }
     if (_productsError != null && _products.isEmpty) {
@@ -454,20 +629,44 @@ class _AdminPublishedCatalogsSectionState
                 ? 'Este mayorista no tiene productos ocultos.'
                 : 'Este mayorista no tiene productos publicados.',
             textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: AdminUsersChrome.muted,
+            ),
           ),
         ),
       );
     }
+
+    final visible = _visibleProducts;
+    if (visible.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Ningún producto coincide con la búsqueda.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AdminUsersChrome.muted),
+          ),
+        ),
+      );
+    }
+
     return PagedItems(
-      items: _products,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      separator: 8,
-      hasMore: _hasMore,
-      totalCount: _matchingTotal,
-      onNeedMore: _loadingMore ? null : () => _loadProducts(reset: false),
-      itemBuilder: (part) => _PublishedProductTile(
+      items: visible,
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      separator: 0,
+      hasMore: _hasMore && _productSearchCtrl.text.trim().isEmpty,
+      totalCount: _productSearchCtrl.text.trim().isEmpty
+          ? _matchingTotal
+          : visible.length,
+      onNeedMore: _loadingMore || _productSearchCtrl.text.trim().isNotEmpty
+          ? null
+          : () => _loadProducts(reset: false),
+      itemBuilder: (part) => _PublishedProductRow(
         part: part,
         importerName: _selected?.businessName ?? '',
+        zebra: part.id.hashCode.isOdd,
         busy: _busyProductId == part.id,
         enabled: _busyProductId == null,
         onToggleVisibility: () => _toggleVisibility(part),
@@ -487,10 +686,20 @@ class _AdminPublishedCatalogsSectionState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(text, textAlign: TextAlign.center),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: AdminUsersChrome.muted,
+              ),
+            ),
             const SizedBox(height: 12),
-            OutlinedButton(
+            FilledButton(
               onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: AdminUsersChrome.brand,
+              ),
               child: const Text('Reintentar'),
             ),
           ],
@@ -500,10 +709,58 @@ class _AdminPublishedCatalogsSectionState
   }
 }
 
-class _PublishedProductTile extends StatelessWidget {
-  const _PublishedProductTile({
+class _CatalogPill extends StatelessWidget {
+  const _CatalogPill({
+    required this.label,
+    required this.selected,
+    required this.glyph,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final LucideGlyph glyph;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final bg = selected ? theme.brand : theme.brandContainer;
+    final fg = selected ? theme.surfaceCard : theme.brand;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LucideIcon(glyph, size: 13, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PublishedProductRow extends StatelessWidget {
+  const _PublishedProductRow({
     required this.part,
     required this.importerName,
+    required this.zebra,
     required this.busy,
     required this.enabled,
     required this.onToggleVisibility,
@@ -511,6 +768,7 @@ class _PublishedProductTile extends StatelessWidget {
 
   final PartModel part;
   final String importerName;
+  final bool zebra;
   final bool busy;
   final bool enabled;
   final VoidCallback onToggleVisibility;
@@ -519,11 +777,11 @@ class _PublishedProductTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final sku = part.sku?.trim();
     final category = part.category?.trim();
+    final wide = MediaQuery.sizeOf(context).width >= 720;
+
     return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(12),
+      color: zebra ? AdminUsersChrome.zebra : AdminUsersChrome.rowEven,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: () {
           final named = part.ownerBusinessName?.trim().isNotEmpty == true
               ? part
@@ -534,92 +792,248 @@ class _PublishedProductTile extends StatelessWidget {
             ),
           );
         },
-        child: DecoratedBox(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderSubtle),
+            border: Border(
+              bottom: BorderSide(color: AdminUsersChrome.border),
+            ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: part.coverImageUrl != null &&
-                            part.coverImageUrl!.isNotEmpty
-                        ? Image.network(
-                            part.coverImageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => ColoredBox(
-                              color: AppColors.surfaceTinted,
-                              child: const Icon(Icons.image_outlined),
-                            ),
-                          )
-                        : ColoredBox(
-                            color: AppColors.surfaceTinted,
-                            child: const Icon(Icons.image_outlined),
-                          ),
-                  ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: part.coverImageUrl != null &&
+                          part.coverImageUrl!.isNotEmpty
+                      ? Image.network(
+                          part.coverImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const _ThumbFallback(),
+                        )
+                      : const _ThumbFallback(),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        part.nombre,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      part.nombre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AdminUsersChrome.titleColor,
                       ),
-                      if (sku != null && sku.isNotEmpty)
-                        Text(
-                          'SKU $sku',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      if (category != null && category.isNotEmpty)
-                        Text(
-                          category,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.brandBlue,
-                          ),
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (sku != null && sku.isNotEmpty) 'SKU $sku',
+                        if (category != null && category.isNotEmpty) category,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AdminUsersChrome.muted,
+                      ),
+                    ),
+                    if (!wide) ...[
                       const SizedBox(height: 4),
-                      CatalogProductPriceDisplay(
+                      _CompactPrice(
                         listPriceUsd: part.precio,
                         salePriceUsd: part.salePriceUsd,
-                        quantity: part.minOrderQtyEffective,
                         ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
-                        discountRules: part.discountRules,
-                        compact: true,
-                        showPromotionChips: false,
                       ),
                     ],
-                  ),
-                ),
-                Column(
-                  children: [
-                    const Icon(Icons.chevron_right, color: AppColors.brand),
-                    TextButton(
-                      onPressed: enabled ? onToggleVisibility : null,
-                      child: busy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(part.isActive ? 'Ocultar' : 'Mostrar'),
-                    ),
                   ],
                 ),
+              ),
+              if (wide) ...[
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 110,
+                  child: _CompactPrice(
+                    listPriceUsd: part.precio,
+                    salePriceUsd: part.salePriceUsd,
+                    ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                    alignEnd: true,
+                  ),
+                ),
               ],
+              const SizedBox(width: 8),
+              _ActionPill(
+                label: part.isActive ? 'Ocultar' : 'Mostrar',
+                busy: busy,
+                enabled: enabled,
+                onTap: onToggleVisibility,
+              ),
+              const SizedBox(width: 4),
+              LucideIcon(
+                LucideGlyph.chevronRight,
+                size: 16,
+                color: AdminUsersChrome.muted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThumbFallback extends StatelessWidget {
+  const _ThumbFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AdminUsersChrome.zebra,
+      child: Center(
+        child: LucideIcon(
+          LucideGlyph.image,
+          size: 16,
+          color: AdminUsersChrome.muted,
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactPrice extends StatefulWidget {
+  const _CompactPrice({
+    required this.listPriceUsd,
+    this.salePriceUsd,
+    this.ownerPagoSoloDivisas = false,
+    this.alignEnd = false,
+  });
+
+  final double listPriceUsd;
+  final double? salePriceUsd;
+  final bool ownerPagoSoloDivisas;
+  final bool alignEnd;
+
+  @override
+  State<_CompactPrice> createState() => _CompactPriceState();
+}
+
+class _CompactPriceState extends State<_CompactPrice> {
+  double? _rate;
+
+  @override
+  void initState() {
+    super.initState();
+    final cached = BcvBasePrice.cachedRate;
+    if (cached != null && cached > 0) {
+      _rate = cached;
+    } else {
+      BcvBasePrice.currentRate().then((rate) {
+        if (mounted) setState(() => _rate = rate);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = widget.ownerPagoSoloDivisas ? 'USD' : 'REF';
+    final sale = widget.salePriceUsd;
+    final hasSale =
+        sale != null && sale > 0 && sale < widget.listPriceUsd;
+    final main = hasSale ? sale : widget.listPriceUsd;
+    final bs = BcvBasePrice.bsForRef(main, _rate);
+
+    return Align(
+      alignment:
+          widget.alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: widget.alignEnd
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${main.toStringAsFixed(2)} $currency',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AdminUsersChrome.titleColor,
+              height: 1.15,
+            ),
+          ),
+          if (hasSale)
+            Text(
+              '${widget.listPriceUsd.toStringAsFixed(2)} $currency',
+              style: TextStyle(
+                fontSize: 11,
+                color: AdminUsersChrome.muted,
+                decoration: TextDecoration.lineThrough,
+                height: 1.2,
+              ),
+            ),
+          if (!widget.ownerPagoSoloDivisas)
+            Text(
+              bs == null ? 'Bs …' : formatBsLabel(bs),
+              style: TextStyle(
+                fontSize: 11,
+                color: AdminUsersChrome.muted,
+                height: 1.2,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({
+    required this.label,
+    required this.busy,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool busy;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (busy) {
+      return SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AdminUsersChrome.brand,
+        ),
+      );
+    }
+    final theme = B2BThemeExtension.of(context);
+    return Material(
+      color: theme.brandContainer,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: enabled
+                  ? AdminUsersChrome.brand
+                  : AdminUsersChrome.muted,
             ),
           ),
         ),

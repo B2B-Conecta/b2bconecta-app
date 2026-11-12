@@ -30,7 +30,7 @@ class B2bDesktopShell extends StatelessWidget {
   final List<Widget> pages;
   final ProfileModel profile;
   final int unreadNotifications;
-  final VoidCallback onNotificationTap;
+  final void Function(BuildContext anchorContext) onNotificationTap;
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final VoidCallback onOpenSettings;

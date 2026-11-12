@@ -23,6 +23,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.prominent = false,
     this.ownerPagoSoloDivisas = false,
     this.bcvRate,
+    this.usdColor,
   });
   final double listPriceUsd;
   final double? salePriceUsd;
@@ -35,6 +36,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool prominent;
   final bool ownerPagoSoloDivisas;
   final double? bcvRate;
+  final Color? usdColor;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +54,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     final discountLabel = ProductCatalogPricing.directSaleDiscountChipEs(
         listPriceUsd: listPriceUsd, salePriceUsd: usd);
     final mainSize = catalogGrid
-        ? (prominent ? 20.0 : (compact ? 14.0 : 16.0))
+        ? (prominent ? 20.0 : (compact ? 16.0 : 17.0))
         : (compact ? 20.0 : 22.0);
     final secondarySize = compact || catalogGrid ? 13.0 : 16.0;
 
@@ -69,6 +71,36 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: color)));
 
+    // Catálogo mock: USD verde + chip −%, REF y Bs.
+    if (catalogGrid) {
+      return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                amount(usd, 'USD', mainSize,
+                    usdColor ?? AppColors.successGreen),
+                if (discountLabel != null)
+                  _UsdDiscountChip(label: discountLabel),
+              ],
+            ),
+            if (!ownerPagoSoloDivisas) ...[
+              const SizedBox(height: 3),
+              amount(list, 'REF', secondarySize, AppColors.textPrimary),
+              _BasePriceBsLine(
+                  refUsd: list,
+                  fontSize: 12,
+                  compact: true,
+                  rate: bcvRate,
+                  color: const Color(0xFF0A1F44)),
+            ],
+          ]);
+    }
+
     return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,7 +111,8 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                 runSpacing: 2,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  amount(usd, 'USD', mainSize, AppColors.successGreen),
+                  amount(
+                      usd, 'USD', mainSize, usdColor ?? AppColors.successGreen),
                   if (discountLabel != null)
                     _UsdDiscountChip(label: discountLabel),
                 ]),
@@ -91,13 +124,13 @@ class CatalogProductPriceDisplay extends StatelessWidget {
               listCurrency,
               mainSize,
               ownerPagoSoloDivisas
-                  ? AppColors.successGreen
+                  ? usdColor ?? AppColors.successGreen
                   : AppColors.textPrimary,
             ),
           if (!ownerPagoSoloDivisas)
             _BasePriceBsLine(
                 refUsd: list,
-                fontSize: compact || catalogGrid ? 11 : 12,
+                fontSize: compact ? 11 : 12,
                 compact: true,
                 rate: bcvRate),
           if (showPromotionChips)
@@ -190,17 +223,17 @@ class _UsdDiscountChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.successGreen.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
+        color: const Color(0xFFE5F6EA),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w800,
-          color: AppColors.successGreen,
+          color: Color(0xFF1B7F3A),
           height: 1.1,
         ),
       ),
@@ -260,6 +293,7 @@ class _BasePriceBsLine extends StatefulWidget {
     required this.fontSize,
     this.compact = false,
     this.rate,
+    this.color,
   });
 
   /// Original published REF, before any cart discounts.
@@ -267,6 +301,7 @@ class _BasePriceBsLine extends StatefulWidget {
   final double fontSize;
   final bool compact;
   final double? rate;
+  final Color? color;
 
   @override
   State<_BasePriceBsLine> createState() => _BasePriceBsLineState();
@@ -301,17 +336,18 @@ class _BasePriceBsLineState extends State<_BasePriceBsLine> {
   @override
   Widget build(BuildContext context) {
     final bs = BcvBasePrice.bsForRef(widget.refUsd, _rate);
-    if (bs == null) return const SizedBox.shrink();
+    final label = bs == null ? 'Bs …' : formatBsLabel(bs);
     return Padding(
       padding: EdgeInsets.only(top: widget.compact ? 2 : 4),
       child: Text(
-        formatBsLabel(bs),
+        label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: widget.fontSize,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+          color: widget.color ?? AppColors.textSecondary,
         ),
       ),
     );

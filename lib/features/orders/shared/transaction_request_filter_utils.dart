@@ -10,10 +10,21 @@ abstract final class TransactionRequestFilterUtils {
     final q = raw.trim().toLowerCase();
     if (q.isEmpty) return true;
     bool has(String? x) => x != null && x.toLowerCase().contains(q);
+    final id = r.id.toLowerCase();
+    final group = (r.checkoutGroupId ?? '').toLowerCase();
+    final shortId = id.replaceAll('-', '');
+    final shortGroup = group.replaceAll('-', '');
+    final qCompact = q.replaceAll(RegExp(r'[#\s-]'), '');
     return has(r.productName) ||
         has(r.productSku) ||
         has(r.aliadoBusinessName) ||
-        has(r.ownerBusinessName);
+        has(r.ownerBusinessName) ||
+        has(r.aliadoRif) ||
+        has(r.ownerRif) ||
+        id.contains(q) ||
+        group.contains(q) ||
+        (qCompact.isNotEmpty &&
+            (shortId.contains(qCompact) || shortGroup.contains(qCompact)));
   }
 
   static DateTime _dateOnly(DateTime d) {

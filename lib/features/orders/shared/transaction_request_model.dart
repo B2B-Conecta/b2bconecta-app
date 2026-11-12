@@ -67,6 +67,7 @@ class TransactionRequestModel {
     this.aliadoLongitude,
     this.aliadoLogoStoragePath,
     this.aliadoKycStatus,
+    this.aliadoCatalogVerifiedAt,
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
@@ -78,6 +79,7 @@ class TransactionRequestModel {
     this.ownerLongitude,
     this.ownerLogoStoragePath,
     this.ownerKycStatus,
+    this.ownerCatalogVerifiedAt,
     this.proveedorFacturaStoragePath,
     this.proveedorFacturaFileName,
     this.proveedorFacturaSubmittedAt,
@@ -235,6 +237,9 @@ class TransactionRequestModel {
   final String? aliadoLogoStoragePath;
   final String? aliadoKycStatus;
 
+  /// Sello Verificado (admin) del aliado; independiente de KYC.
+  final DateTime? aliadoCatalogVerifiedAt;
+
   final String? ownerBusinessName;
   final String? ownerRif;
   final String? ownerPhone;
@@ -246,6 +251,12 @@ class TransactionRequestModel {
   final double? ownerLongitude;
   final String? ownerLogoStoragePath;
   final String? ownerKycStatus;
+
+  /// Sello Verificado (admin) del mayorista; independiente de KYC.
+  final DateTime? ownerCatalogVerifiedAt;
+
+  bool get aliadoCatalogVerified => aliadoCatalogVerifiedAt != null;
+  bool get ownerCatalogVerified => ownerCatalogVerifiedAt != null;
 
   /// Métodos de pago que acepta el importador de este pedido.
   final List<String>? ownerAcceptedPagoMetodos;
@@ -1184,6 +1195,7 @@ class TransactionRequestModel {
       aliadoLongitude: _asNullableDouble(aliadoMap?['longitude']),
       aliadoLogoStoragePath: _nullableText(aliadoMap?['logo_storage_path']),
       aliadoKycStatus: _nullableText(aliadoMap?['kyc_status']),
+      aliadoCatalogVerifiedAt: _parseDate(aliadoMap?['catalog_verified_at']),
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),
@@ -1195,6 +1207,7 @@ class TransactionRequestModel {
       ownerLongitude: _asNullableDouble(ownerMap?['longitude']),
       ownerLogoStoragePath: _nullableText(ownerMap?['logo_storage_path']),
       ownerKycStatus: _nullableText(ownerMap?['kyc_status']),
+      ownerCatalogVerifiedAt: _parseDate(ownerMap?['catalog_verified_at']),
       ownerAcceptedPagoMetodos:
           ProfileModel.parseStringList(ownerMap?['accepted_pago_metodos']),
       ownerPagoMetodoInstrucciones: PagoMetodoInstrucciones.parseMap(

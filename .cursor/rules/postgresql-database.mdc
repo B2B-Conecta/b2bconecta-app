@@ -1,0 +1,45 @@
+---
+description: Estándares PostgreSQL/PL/pgSQL, índices y migraciones Supabase
+globs: supabase/**/*.sql
+alwaysApply: false
+---
+
+# PostgreSQL / PL/pgSQL
+
+## Migraciones
+
+- Una migración = un cambio versionado en `supabase/migrations/`.
+- Antes de cambiar `RETURNS TABLE` / firma de función: `DROP FUNCTION IF EXISTS …` con la firma anterior (evita `42P13`).
+- RLS: políticas explícitas; no asumas acceso amplio en tablas B2B.
+- Preferir funciones `security definer` solo cuando el patrón del repo ya lo use, con `search_path` fijo.
+
+## Índices (obligatorio en FK y búsqueda crítica)
+
+Toda FK nueva y campos de lookup frecuentes llevan índice:
+
+- FKs: `owner_id`, `product_id`, `pedido_id`, `profile_id`, etc.
+- Búsqueda crítica: **RIF** / documento fiscal, **SKU** / códigos de repuesto, email de cuenta.
+- Filtros de catálogo: `category`, `is_active`, flags de publicación.
+
+```sql
+-- ✅ GOOD
+create index if not exists products_owner_id_idx on public.products (owner_id);
+create index if not exists products_sku_lower_idx on public.products (lower(sku));
+create unique index if not exists profiles_rif_uidx on public.profiles (rif)
+  where rif is not null and length(trim(rif)) > 0;
+
+-- ❌ BAD — FK sin índice de apoyo en tablas grandes
+```
+
+## Consultas
+
+- Evita `SELECT *` en RPCs de listado; proyecta columnas usadas.
+- Pagina listados (`limit`/`offset` o keyset); no cargues catálogos enteros.
+- Joins: usa FKs indexadas; filtra temprano (`where is_active`, ownership).
+- Para `ilike` / búsqueda de texto en SKU o nombre, documenta índice (`text_pattern_ops` o trigram) si el volumen lo exige.
+- Cambios de tipo/constraint: valida datos existentes; usa `not valid` + `validate` solo si el repo ya lo practica.
+
+## Seguridad de datos
+
+- Nunca loguees secretos ni tokens en `raise notice`.
+- Seeds locales: emails `*@motoconecta.seed`; no copies credenciales reales a migraciones.

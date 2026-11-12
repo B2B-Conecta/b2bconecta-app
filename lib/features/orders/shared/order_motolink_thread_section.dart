@@ -16,6 +16,7 @@ import 'transaction_request_message_model.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
@@ -470,10 +471,11 @@ class _OrderMotolinkThreadSectionState
   }
 
   Widget _attachmentMenu() {
+    final theme = B2BThemeExtension.of(context);
     return PopupMenuButton<_ChatAttachment>(
       tooltip: 'Adjuntar foto o video',
       enabled: !_sending && !_pickingAttachment,
-      icon: const Icon(Icons.attach_file_rounded),
+      icon: Icon(Icons.attach_file_rounded, color: theme.textSecondary),
       position: PopupMenuPosition.over,
       onSelected: (attachment) => _pickAttachment(
         video: attachment == _ChatAttachment.videoCamera ||

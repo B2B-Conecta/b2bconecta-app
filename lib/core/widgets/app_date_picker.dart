@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 const _monthNames = <String>[
   'enero',
@@ -231,23 +233,24 @@ class FilterDateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final text = value == null ? emptyLabel : formatAppFilterDate(value!);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderSubtle),
-          borderRadius: BorderRadius.circular(12),
-          color: AppColors.card,
+          border: Border.all(color: theme.borderSubtle),
+          borderRadius: BorderRadius.circular(10),
+          color: theme.inputFill,
         ),
         child: Row(
           children: [
             Icon(
               Icons.calendar_today_outlined,
-              size: 18,
-              color: AppColors.textSecondary,
+              size: 16,
+              color: theme.textSecondary,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -259,15 +262,15 @@ class FilterDateField extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
+                      color: theme.textSecondary,
                     ),
                   ),
                   Text(
                     text,
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: theme.textPrimary,
                     ),
                   ),
                 ],
@@ -276,7 +279,11 @@ class FilterDateField extends StatelessWidget {
             if (onClear != null)
               IconButton(
                 onPressed: onClear,
-                icon: const Icon(Icons.close, size: 18),
+                icon: LucideIcon(
+                  LucideGlyph.close,
+                  size: 16,
+                  color: theme.textMuted,
+                ),
                 visualDensity: VisualDensity.compact,
               ),
           ],

@@ -265,6 +265,36 @@ class ProfileService {
     return 'No se pudo guardar el perfil. Revise los datos e intente de nuevo.';
   }
 
+  /// Actualiza datos de cuenta/ajustes sin tocar el rol.
+  static Future<void> updateMyAccountBasics({
+    required String businessName,
+    String? phone,
+    String? rif,
+    String? estado,
+    String? ciudad,
+    String? direccion,
+  }) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final name = businessName.trim();
+    if (name.isEmpty) {
+      throw ArgumentError('El nombre comercial es obligatorio.');
+    }
+    final p = phone?.trim();
+    final r = rif?.trim();
+    final es = estado?.trim();
+    final ci = ciudad?.trim();
+    final dir = direccion?.trim();
+    await SupabaseAccess.client.from('profiles').update({
+      'business_name': name,
+      'phone': (p == null || p.isEmpty) ? null : p,
+      if (r != null) 'rif': r.isEmpty ? null : r,
+      'estado': (es == null || es.isEmpty) ? null : es,
+      'ciudad': (ci == null || ci.isEmpty) ? null : ci,
+      'direccion': (dir == null || dir.isEmpty) ? null : dir,
+    }).eq('id', uid);
+  }
+
   static Future<String> createSignedUrlForProfileLogo(
       String storagePath) async {
     final p = storagePath.trim();

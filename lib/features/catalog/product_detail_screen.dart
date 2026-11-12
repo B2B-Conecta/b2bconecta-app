@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'catalog_service.dart';
 import 'favorite_heart_button.dart';
 import 'part_model.dart';
@@ -21,6 +22,7 @@ import 'store_supplier_chat.dart';
 import 'product_photo_gallery.dart';
 import 'product_variants.dart';
 import 'product_variant_selector.dart';
+import 'recent_product_views.dart';
 
 /// Ficha de producto (aliado): imagen, specs, solicitud de pedido vía broker.
 class ProductDetailScreen extends StatefulWidget {
@@ -51,6 +53,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   List<PartModel> _related = const [];
   late PartModel _selected;
   late List<PartModel> _family;
+  final GlobalKey<ProductPhotoGalleryState> _galleryKey =
+      GlobalKey<ProductPhotoGalleryState>();
 
   PartModel get part => _selected;
 
@@ -101,7 +105,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (widget.guestPreview) return;
     try {
       final p = await SupabaseService.fetchMyProfile();
-      if (mounted) setState(() => _profile = p);
+      if (!mounted) return;
+      setState(() => _profile = p);
+      if (p?.isAliado == true) RecentProductViews.record(p!.id, widget.part.id);
     } catch (_) {}
   }
 
@@ -213,26 +219,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildMobileLayout(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
+        elevation: 0,
         leading: IconButton(
             tooltip: 'Atrás',
             onPressed: () => Navigator.of(context).maybePop(),
             icon: const Icon(Icons.arrow_back_rounded)),
-        title:
-            const Text('Detalle del repuesto', style: TextStyle(fontSize: 16)),
-        actions: [
-          if (_profile?.isAliado == true)
-            FavoriteHeartButton(productId: part.id),
-          if (_canShareProduct)
-            IconButton(
-                tooltip: 'Compartir producto',
-                onPressed: _shareProduct,
-                icon: const Icon(Icons.ios_share_rounded)),
-        ],
+        title: const Text('Detalle del repuesto',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        actions: _detailAppBarActions(),
       ),
       body: Column(
         children: [
@@ -241,7 +241,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeroImage(context)),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       ..._buildInfoSections(),
@@ -257,6 +257,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
   }
+
+  List<Widget> _detailAppBarActions() => [
+        if (_profile?.isAliado == true)
+          FavoriteHeartButton(productId: part.id),
+        if (_canShareProduct)
+          IconButton(
+            tooltip: 'Compartir producto',
+            onPressed: _shareProduct,
+            icon: const Icon(Icons.ios_share_rounded),
+          ),
+      ];
 
   Widget _buildDesktopLayout(BuildContext context) {
     return Scaffold(
@@ -277,15 +288,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ),
-        title: const Text('Detalle del producto'),
-        actions: [
-          if (_canShareProduct)
-            IconButton(
-              tooltip: 'Compartir producto',
-              onPressed: _shareProduct,
-              icon: const Icon(Icons.ios_share_rounded),
-            ),
-        ],
+        title: const Text('Detalle del repuesto'),
+        actions: _detailAppBarActions(),
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -335,9 +339,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ? (size.height * 0.5).clamp(140.0, 220.0)
             : (size.height * 0.30).clamp(220.0, 300.0);
     return SizedBox(
-        height: height,
-        child:
-            Material(color: AppColors.white, child: _buildHeroImageContent()));
+      height: height,
+      child: Material(
+        color: AppColors.white,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildHeroImageContent(),
+            if (_galleryUrls.isNotEmpty)
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: Material(
+                  color: const Color(0xFF004BDD),
+                  shape: const CircleBorder(),
+                  elevation: 2,
+                  child: IconButton(
+                    tooltip: 'Ampliar foto',
+                    onPressed: () =>
+                        _galleryKey.currentState?.openFullscreen(),
+                    style: IconButton.styleFrom(
+                      foregroundColor: AppColors.white,
+                      minimumSize: const Size(40, 40),
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const LucideIcon(LucideGlyph.maximize2,
+                        size: 18, color: AppColors.white),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildDesktopImageCard() {
@@ -376,17 +410,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildHeroImageContent() => ProductPhotoGallery(
+      key: _galleryKey,
       urls: _galleryUrls,
       productName: part.nombre,
       heroTag: ProductDetailScreen.heroImageTag(widget.part));
 
   List<Widget> _buildInfoSections({bool desktop = false}) {
-    final buyBlock = <Widget>[
+    return [
+      ProductDetailHeading(
+        part: part,
+        desktop: desktop,
+      ),
       if (_family.length > 1) ...[
+        const SizedBox(height: 14),
         ProductVariantSelector(
             options: _family, selected: part, onSelected: _selectVariant),
-        const SizedBox(height: 14),
       ],
+      const SizedBox(height: 14),
       ProductDetailPurchaseSummary(part: part),
       if (part.hasOwnerMinOrderAmount) ...[
         const SizedBox(height: 8),
@@ -409,55 +449,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _buildActionAlerts(),
         _buildActionButtons(),
       ],
-    ];
-
-    final detailsBlock = <Widget>[
+      const SizedBox(height: 16),
       ProductDetailSupplier(
           part: part,
           onOpen: _canOpenImporterStore ? _openImporterStore : null),
       if (part.isCatalogVerified || part.isCatalogFeatured) ...[
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         ImporterCatalogSealsRow(
             verified: part.isCatalogVerified,
             featured: part.isCatalogFeatured),
       ],
-      const SizedBox(height: 14),
+      const SizedBox(height: 18),
       ProductDetailInformation(
           part: part,
           showInternalReference: _profile?.isAdministrador == true ||
               _profile?.isImportador == true),
-    ];
-
-    final panelChildren = <Widget>[
-      ...buyBlock,
-      const SizedBox(height: 16),
-      Divider(height: 1, color: AppColors.divider),
-      const SizedBox(height: 4),
-      ...detailsBlock,
-    ];
-
-    return [
-      ProductDetailHeading(part: part, desktop: desktop),
-      const SizedBox(height: 14),
-      DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderSubtle),
-        ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            desktop ? 18 : 14,
-            desktop ? 16 : 14,
-            desktop ? 18 : 14,
-            desktop ? 18 : 14,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: panelChildren,
-          ),
-        ),
-      ),
     ];
   }
 
@@ -539,28 +545,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildBottomActionBar(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        16,
-        10,
-        16,
-        MediaQuery.paddingOf(context).bottom + 10,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        border: Border(top: BorderSide(color: AppColors.borderSubtle)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildActionAlerts(),
-          if (part.stockForSale < part.minOrderQtyEffective ||
-              _pedidosSuspendidosMorosidad)
-            const SizedBox(height: 8),
-          _buildActionButtons(compact: true),
-        ],
+    return Material(
+      color: AppColors.white,
+      elevation: 8,
+      shadowColor: AppColors.black.withOpacity(0.12),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          10,
+          16,
+          MediaQuery.paddingOf(context).bottom + 10,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildActionAlerts(),
+            if (part.stockForSale < part.minOrderQtyEffective ||
+                _pedidosSuspendidosMorosidad)
+              const SizedBox(height: 8),
+            _buildActionButtons(compact: true),
+          ],
+        ),
       ),
     );
   }

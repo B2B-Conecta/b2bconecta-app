@@ -1,3 +1,5 @@
+import 'catalog_taxonomy.dart';
+
 /// Primera opción del filtro. No es una categoría de producto.
 const kAliadoCatalogAllCategoriesLabel = 'Todos';
 
@@ -6,6 +8,7 @@ class AliadoCatalogCategoryGroup {
   const AliadoCatalogCategoryGroup({
     required this.label,
     required this.values,
+    this.children = const [],
   });
 
   /// Texto que ve el aliado en el filtro.
@@ -13,6 +16,52 @@ class AliadoCatalogCategoryGroup {
 
   /// Valores reales de `products.category` que entran en el grupo.
   final List<String> values;
+  final List<AliadoCatalogCategoryGroup> children;
+}
+
+/// Construye familias y subcategorías solo con valores presentes en vitrina.
+List<AliadoCatalogCategoryGroup> catalogCategoryFamilies(Iterable<String> raw) {
+  final byPath = <String, Set<String>>{};
+  for (final value in raw) {
+    final path = canonicalCatalogCategory(value);
+    if (path != null) (byPath[path] ??= {}).add(value);
+  }
+  return [
+    for (final entry in catalogTaxonomy.entries)
+      if (byPath.keys.any((path) => categoryFamily(path) == entry.key))
+        AliadoCatalogCategoryGroup(
+          label: entry.key,
+          values: [
+            for (final group in byPath.entries)
+              if (categoryFamily(group.key) == entry.key) ...group.value,
+          ],
+          children: [
+            for (final child in entry.value)
+              if (byPath[categoryPath(entry.key, child)] case final values?)
+                AliadoCatalogCategoryGroup(
+                  label: categoryPath(entry.key, child),
+                  values: values.toList(),
+                ),
+          ],
+        ),
+  ];
+}
+
+List<String> catalogValuesForSelection(
+    List<AliadoCatalogCategoryGroup> families, String? selection) {
+  if (selection == null ||
+      selection.trim().isEmpty ||
+      selection == kAliadoCatalogAllCategoriesLabel) {
+    return const [];
+  }
+  final canonical = canonicalCatalogCategory(selection) ?? selection;
+  for (final family in families) {
+    if (family.label == canonical) return family.values;
+    for (final child in family.children) {
+      if (child.label == canonical) return child.values;
+    }
+  }
+  return [selection];
 }
 
 /// Agrupa categorías parecidas y deja una etiqueta por grupo.
@@ -159,6 +208,10 @@ String _pickCategoryLabel(List<String> variants) {
 /// Etiqueta visible: primera letra en mayúscula y en plural, aunque en la base
 /// solo exista «casco» o «ACCESORIO UNIVERSAL».
 String formatCatalogCategoryLabel(String raw) {
+  final canonical = canonicalCatalogCategory(raw);
+  if (canonical != null) {
+    return categoryLeaf(catalogCategoryDisplayLabel(canonical));
+  }
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return trimmed;
   final tokens = trimmed.split(RegExp(r'\s+'));

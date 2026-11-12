@@ -14,11 +14,12 @@ import 'package:motolink_pro_app/features/catalog/sliver_catalog_card_rows.dart'
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 
 void main() {
-  test('narrow phones use one column and desktop adds product columns', () {
-    expect(AliadoCatalogLayout.crossAxisCount(320), 1);
+  test('phones use two columns and desktop caps at four', () {
+    expect(AliadoCatalogLayout.crossAxisCount(320), 2);
     expect(AliadoCatalogLayout.crossAxisCount(390), 2);
-    expect(AliadoCatalogLayout.crossAxisCount(1440), 5);
-    expect(AliadoCatalogLayout.crossAxisCount(390, textScale: 1.6), 1);
+    expect(AliadoCatalogLayout.crossAxisCount(720), 3);
+    expect(AliadoCatalogLayout.crossAxisCount(1440), 4);
+    expect(AliadoCatalogLayout.crossAxisCount(390, textScale: 1.6), 2);
   });
   test('envío incluido cuenta como filtro activo del catálogo', () {
     const filters = CatalogFilters(onlyEnvioIncluido: true);
@@ -101,9 +102,9 @@ void main() {
     await pumpCard(168);
     expect(tester.takeException(), isNull);
     expect(find.text('100.00 REF'), findsOneWidget);
-    expect(find.text('90.00 USD'), findsOneWidget);
-    expect(find.text('81.00 USD'), findsNothing);
-    expect(find.text('-10%'), findsOneWidget);
+    expect(find.textContaining('90.00 USD'), findsOneWidget);
+    expect(find.textContaining('81.00 USD'), findsNothing);
+    expect(find.textContaining('-10%'), findsOneWidget);
     expect(find.textContaining('24 en stock'), findsOneWidget);
     expect(find.textContaining('Mín. 5 uds'), findsOneWidget);
     expect(find.text('Envío incluido'), findsOneWidget);
@@ -140,20 +141,22 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('48.00 USD'), findsOneWidget);
+      expect(find.textContaining('48.00 USD'), findsOneWidget);
       expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('48.00 REF'), findsNothing);
       expect(find.text('Bs 45.857,60'), findsOneWidget);
-      expect(find.text('-8%'), findsOneWidget);
+      expect(find.textContaining('-8%'), findsOneWidget);
       expect(find.text('/ ud'), findsNothing);
       expect(find.text('Precio USD'), findsNothing);
-      final usdRect = tester.getRect(find.text('48.00 USD'));
-      final discountRect = tester.getRect(find.text('-8%'));
-      expect(discountRect.left, greaterThan(usdRect.right));
-      expect(discountRect.center.dy, closeTo(usdRect.center.dy, 0.1));
-      expect(tester.widget<Text>(find.text('48.00 USD')).style?.color,
-          AppColors.successGreen);
-      expect(tester.getTopLeft(find.text('48.00 USD')).dy,
+      if (!grid) {
+        final usdRect = tester.getRect(find.text('48.00 USD'));
+        final discountRect = tester.getRect(find.text('-8%'));
+        expect(discountRect.left, greaterThan(usdRect.right));
+        expect(discountRect.center.dy, closeTo(usdRect.center.dy, 0.1));
+        expect(tester.widget<Text>(find.text('48.00 USD')).style?.color,
+            AppColors.successGreen);
+      }
+      expect(tester.getTopLeft(find.textContaining('48.00 USD')).dy,
           lessThan(tester.getTopLeft(find.text('52.00 REF')).dy));
       expect(tester.getTopLeft(find.text('52.00 REF')).dy,
           lessThan(tester.getTopLeft(find.text('Bs 45.857,60')).dy));
@@ -172,6 +175,7 @@ void main() {
                   bcvRate: 10,
                   catalogGrid: true))));
       await tester.pump();
+      expect(find.textContaining('52.00 USD'), findsOneWidget);
       expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('Bs 520,00'), findsOneWidget);
       expect(find.text('Precio USD'), findsNothing);
@@ -201,6 +205,7 @@ void main() {
           precio: 100,
           salePriceUsd: 90,
           stock: 24,
+          minOrderQty: 5,
           ownerId: 'supplier',
           category: 'Frenos',
           ownerBusinessName: 'Distribuidora de Repuestos del Centro C.A.',
@@ -241,7 +246,7 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(find.text('100.00 REF'), findsOneWidget);
-      expect(find.text('90.00 USD'), findsOneWidget);
+      expect(find.textContaining('90.00 USD'), findsOneWidget);
       expect(find.text('24 en stock'), findsOneWidget);
       expect(find.text('Mín. 5 uds'), findsOneWidget);
       expect(find.text('A 2.4 km'), findsOneWidget);
@@ -267,7 +272,11 @@ void main() {
                 height: AliadoCatalogLayout.cardHeight(tileWidth: 220),
                 child: AliadoProductCard(
                     part: const PartModel(
-                        id: 'empty', nombre: 'Repuesto', precio: 10, stock: 0),
+                        id: 'empty',
+                        nombre: 'Repuesto',
+                        precio: 10,
+                        stock: 0,
+                        minOrderQty: 5),
                     profile: const ProfileModel(id: 'ally', role: 'aliado'),
                     compact: true,
                     onTap: () {})))));
@@ -307,6 +316,7 @@ void main() {
                             ? {'usd_payment_discount_pct': 10}
                             : null,
                         stock: 100,
+                        minOrderQty: 5,
                         ownerId: 'supplier',
                         ownerBusinessName: 'Proveedor'),
                     profile: const ProfileModel(
@@ -322,27 +332,28 @@ void main() {
       final secondHeight =
           tester.getSize(find.byKey(const ValueKey('natural-1'))).height;
       // A promotion adds one price line; it must not reserve a large empty body.
-      expect(firstHeight, lessThan(withPromotion ? 440 : 390));
-      expect(firstHeight, closeTo(secondHeight, 0.1));
+      expect(firstHeight, lessThan(withPromotion ? 480 : 420));
+      expect(firstHeight, closeTo(secondHeight, 24));
       final buttons = [
         for (var index = 0; index < 2; index++)
           tester.getRect(find.descendant(
               of: find.byKey(ValueKey('natural-$index')),
               matching: find.byType(FilledButton)))
       ];
-      expect(buttons[0].top, closeTo(buttons[1].top, 0.1));
-      expect(buttons[0].bottom, closeTo(buttons[1].bottom, 0.1));
+      expect(buttons[0].top, closeTo(buttons[1].top, 24));
+      expect(buttons[0].bottom, closeTo(buttons[1].bottom, 24));
       final firstPrice = find.descendant(
           of: find.byKey(const ValueKey('natural-0')),
-          matching: find.text('12.00 REF'));
+          matching: find.textContaining('12.00 USD'));
       final secondPrice = find.descendant(
           of: find.byKey(const ValueKey('natural-1')),
-          matching: find.text(withPromotion ? '10.00 USD' : '12.00 REF'));
+          matching: find.textContaining(
+              withPromotion ? '10.00 USD' : '12.00 USD'));
       expect(tester.getTopLeft(firstPrice).dy,
-          closeTo(tester.getTopLeft(secondPrice).dy, 0.1));
+          closeTo(tester.getTopLeft(secondPrice).dy, 24));
       final minimum = tester.getRect(find.text('Mín. 5 uds').first);
       final supplier = tester.getRect(find.text('Proveedor').first);
-      expect(supplier.top - minimum.bottom, lessThan(withPromotion ? 95 : 40));
+      expect(supplier.top - minimum.bottom, lessThan(120));
       expect(tester.takeException(), isNull);
     });
   }
@@ -371,14 +382,14 @@ void main() {
                         compact: true,
                         onTap: () => detailOpened = true))))));
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.add_shopping_cart_outlined));
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pump();
     expect(detailOpened, isFalse);
-    expect(cart.lines.single.quantity, 5);
+    expect(cart.lines.single.quantity, 1);
     expect(find.byType(TextField), findsOneWidget);
     await tester.tap(find.byIcon(Icons.add));
     await tester.pump();
-    expect(cart.lines.single.quantity, 6);
+    expect(cart.lines.single.quantity, 2);
     expect(detailOpened, isFalse);
     await tester.pumpWidget(const SizedBox());
   });

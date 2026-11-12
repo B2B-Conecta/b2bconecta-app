@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
@@ -39,7 +39,6 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
   late int _quantity = widget.part.minOrderQtyEffective;
   late int _accountRevision = _cart.accountRevision;
   late bool _hadLine = CartProductActions.lineFor(widget.part, _cart) != null;
-  bool _pointerTriggered = false;
   GlobalKey<CartQuantityFieldState> _quantityKey =
       GlobalKey<CartQuantityFieldState>();
 
@@ -100,20 +99,13 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
   }
 
   void _add() {
-    final selected = widget.compact
-        ? widget.part.minOrderQtyEffective
-        : _quantityKey.currentState?.commit() ?? _quantity;
+    final selected = _quantityKey.currentState?.commit() ?? _quantity;
     final amount = CartProductActions.addQuantity(
         part: widget.part,
         profile: widget.profile,
         cart: _cart,
         quantity: selected);
     if (amount == 0) return;
-    if (widget.compact) {
-      // The revealed control and its live region are the confirmation.
-      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
-      return;
-    }
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(
         content: Text('$amount unidades añadidas al carrito.'),
@@ -159,108 +151,64 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
     widget.onOpenCart();
   }
 
-  Widget _compactPurchase(
-      {required Widget selector,
-      required Widget action,
-      required bool inCart,
-      required int quantity,
-      required String initialLabel}) {
+  Widget _compactPurchase({
+    required Widget selector,
+    required Widget action,
+    required bool inCart,
+    required int quantity,
+  }) {
     final chat = widget.onAsk == null
         ? null
-        : IconButton.outlined(
+        : OutlinedButton(
             key: const Key('ask-about-product'),
-            tooltip: 'Preguntar sobre este producto',
             onPressed: widget.onAsk,
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20));
-    return Focus(
-        onKeyEvent: (_, event) {
-          if (event is KeyDownEvent) _pointerTriggered = false;
-          return KeyEventResult.ignored;
-        },
-        child: Listener(
-          onPointerDown: (_) => _pointerTriggered = true,
-          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            if (chat != null) ...[chat, const SizedBox(width: 10)],
-            Expanded(child: LayoutBuilder(builder: (context, constraints) {
-              final scaler = MediaQuery.textScalerOf(context);
-              final style = Theme.of(context).textTheme.labelLarge!.merge(
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600));
-              final painter = TextPainter(
-                  text: TextSpan(text: initialLabel, style: style),
-                  textScaler: scaler,
-                  textDirection: Directionality.of(context))
-                ..layout(
-                    maxWidth:
-                        (constraints.maxWidth - 50).clamp(1, double.infinity));
-              final buttonHeight = painter.height.ceilToDouble() + 24;
-              painter.dispose();
-              final height = buttonHeight
-                  .clamp((scaler.scale(18) + 24).clamp(48, double.infinity),
-                      double.infinity)
-                  .toDouble();
-              final reduceMotion = MediaQuery.disableAnimationsOf(context) ||
-                  MediaQuery.accessibleNavigationOf(context) ||
-                  !_pointerTriggered;
-              final duration = reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 220);
-              final content = inCart
-                  ? Semantics(
-                      key: const ValueKey('purchase-in-cart'),
-                      container: true,
-                      liveRegion: true,
-                      label: 'En tu carrito: $quantity unidades',
-                      child: Row(children: [
-                        Expanded(child: selector),
-                        const SizedBox(width: 10),
-                        SizedBox(
-                            width: 48,
-                            height: height,
-                            child: IconButton.filled(
-                                key: const Key('product-purchase-action'),
-                                tooltip: 'Ver carrito',
-                                onPressed: _openCart,
-                                icon: const Icon(Icons.shopping_cart_outlined,
-                                    size: 21))),
-                      ]))
-                  : SizedBox(
-                      key: const ValueKey('purchase-add'),
-                      width: double.infinity,
-                      height: height,
-                      child: action);
-              return SizedBox(
-                  key: const Key('compact-purchase-slot'),
-                  height: height,
-                  child: ClipRect(
-                      child: AnimatedSwitcher(
-                    duration: duration,
-                    reverseDuration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 160),
-                    switchInCurve: const Cubic(.23, 1, .32, 1),
-                    switchOutCurve: Curves.easeOut,
-                    layoutBuilder: (current, previous) =>
-                        Stack(fit: StackFit.expand, children: [
-                      for (final old in previous)
-                        IgnorePointer(child: ExcludeSemantics(child: old)),
-                      if (current != null) current,
-                    ]),
-                    transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                            position: Tween<Offset>(
-                                    begin: reduceMotion
-                                        ? Offset.zero
-                                        : const Offset(.16, 0),
-                                    end: Offset.zero)
-                                .animate(animation),
-                            child: child)),
-                    child: content,
-                  )));
-            })),
-          ]),
-        ));
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(48, 48),
+              padding: EdgeInsets.zero,
+              shape: const CircleBorder(),
+              side: BorderSide(color: AppColors.borderSubtle),
+              foregroundColor: AppColors.textPrimary,
+            ),
+            child: const LucideIcon(LucideGlyph.messageCircle, size: 22),
+          );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            inCart
+                ? 'En tu carrito: $quantity unidades'
+                : 'Añadirás $quantity unidades',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.3,
+              fontWeight: inCart ? FontWeight.w600 : FontWeight.w400,
+              color: inCart
+                  ? Theme.of(context).colorScheme.primary
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (chat != null) ...[chat, const SizedBox(width: 8)],
+            selector,
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                key: const Key('compact-purchase-slot'),
+                height: 48,
+                child: action,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   @override
@@ -295,9 +243,9 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
         width: 88 + MediaQuery.textScalerOf(context).scale(56),
         child: DecoratedBox(
             decoration: BoxDecoration(
-                color: AppColors.surfaceTinted,
+                color: AppColors.white,
                 border: Border.all(color: AppColors.borderSubtle),
-                borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(14)),
             child: Row(children: [
               IconButton(
                   tooltip: 'Reducir cantidad',
@@ -331,30 +279,39 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
     final hasMultiVariants = multiFamily.length > 1;
     final addAction =
         hasMultiVariants ? _openMultiVariantPicker : _add;
-    final addLabel = enabled ? 'Agregar al carrito' : unavailable;
+    final addLabel = enabled
+        ? (widget.compact ? 'Agregar' : 'Agregar al carrito')
+        : unavailable;
+    final showOpenCart = !widget.compact && line != null;
 
     final action = FilledButton.icon(
         key: const Key('product-purchase-action'),
-        onPressed: line != null
+        onPressed: showOpenCart
             ? _openCart
             : enabled
                 ? addAction
                 : null,
         style: FilledButton.styleFrom(
+            backgroundColor:
+                widget.compact ? const Color(0xFF004BDD) : null,
+            foregroundColor: widget.compact ? AppColors.white : null,
             minimumSize: const Size(0, 48),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(widget.compact ? 14 : 12),
+            ),
             textStyle: TextStyle(
-                fontSize: widget.compact ? 13 : 15,
-                fontWeight: FontWeight.w600)),
+                fontSize: widget.compact ? 14 : 15,
+                fontWeight: FontWeight.w700)),
         icon: Icon(
-            line != null
+            showOpenCart
                 ? Icons.shopping_cart_outlined
                 : hasMultiVariants
                     ? Icons.tune_rounded
                     : Icons.add_shopping_cart_rounded,
             size: 18),
         label: Text(
-            line != null ? 'Ver carrito' : addLabel,
+            showOpenCart ? 'Ver carrito' : addLabel,
             textAlign: TextAlign.center));
 
     final status = Semantics(
@@ -384,8 +341,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                 selector: selector,
                 action: action,
                 inCart: line != null,
-                quantity: quantity,
-                initialLabel: addLabel),
+                quantity: quantity),
           ] else ...[
             Row(children: [
               Expanded(child: status),
@@ -397,8 +353,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                         minimumSize: const Size(0, 44),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         textStyle: const TextStyle(fontSize: 12)),
-                    icon:
-                        const Icon(Icons.chat_bubble_outline_rounded, size: 17),
+                    icon: const LucideIcon(LucideGlyph.messageCircle, size: 18),
                     label: const Text('Consultar')),
             ]),
             const SizedBox(height: 8),

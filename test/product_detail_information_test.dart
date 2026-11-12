@@ -165,7 +165,7 @@ void main() {
     expect(find.textContaining(_part.id), findsNothing);
     expect(find.text('Regístrate para pedir'), findsOneWidget);
     expect(tester.getRect(find.text(_part.nombre)).bottom, lessThan(420));
-    expect(find.text('Mín. 5 unidades'), findsOneWidget);
+    expect(find.textContaining('Mín.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

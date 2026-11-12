@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 /// Burbuja circular: menú con iconos **claro** / **oscuro**.
 class ThemeModeBubble extends StatelessWidget {
-  const ThemeModeBubble({super.key, this.compact = false});
+  const ThemeModeBubble({super.key, this.compact = false, this.iconColor});
 
   final bool compact;
+
+  /// En cabeceras branded (azul), forzar icono claro.
+  final Color? iconColor;
 
   static const _modes = <ThemeMode>[ThemeMode.light, ThemeMode.dark];
 
@@ -27,7 +30,8 @@ class ThemeModeBubble extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final mode = controller.mode;
-        final scheme = Theme.of(context).colorScheme;
+        final theme = B2BThemeExtension.of(context);
+        final onBrand = Theme.of(context).colorScheme.onPrimary;
         return PopupMenuButton<ThemeMode>(
           tooltip: 'Claro / Oscuro',
           padding: EdgeInsets.zero,
@@ -35,15 +39,16 @@ class ThemeModeBubble extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 52, maxWidth: 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: AppColors.borderSubtle),
+            side: BorderSide(color: theme.border),
           ),
-          color: AppColors.card,
+          color: theme.dialogSurface,
           onOpened: () => FocusManager.instance.primaryFocus?.unfocus(),
           onSelected: (m) {
             FocusManager.instance.primaryFocus?.unfocus();
             controller.setMode(m);
           },
           itemBuilder: (context) {
+            final menuTheme = B2BThemeExtension.of(context);
             return [
               for (final m in _modes)
                 PopupMenuItem<ThemeMode>(
@@ -59,11 +64,11 @@ class ThemeModeBubble extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: mode == m
-                              ? AppColors.brandAccent.withOpacity(0.16)
+                              ? menuTheme.brandContainer
                               : Colors.transparent,
                           border: mode == m
                               ? Border.all(
-                                  color: AppColors.brandAccent,
+                                  color: menuTheme.brand,
                                   width: 1.5,
                                 )
                               : null,
@@ -72,8 +77,8 @@ class ThemeModeBubble extends StatelessWidget {
                           _icon(m),
                           size: 20,
                           color: mode == m
-                              ? AppColors.brandAccent
-                              : AppColors.textPrimary,
+                              ? menuTheme.brand
+                              : menuTheme.textPrimary,
                         ),
                       ),
                     ),
@@ -87,20 +92,29 @@ class ThemeModeBubble extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.fieldFill,
-              border: Border.all(color: AppColors.borderSubtle, width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: iconColor != null
+                  ? onBrand.withOpacity(0.14)
+                  : theme.inputFill,
+              border: Border.all(
+                color: iconColor != null
+                    ? onBrand.withOpacity(0.28)
+                    : theme.border,
+                width: 1.2,
+              ),
+              boxShadow: iconColor != null
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: theme.textPrimary.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
             child: Icon(
               controller.currentIcon,
               size: compact ? 18 : 20,
-              color: controller.isDark ? scheme.primary : AppColors.brandBlue,
+              color: iconColor ?? theme.brand,
             ),
           ),
         );

@@ -45,7 +45,7 @@ class OrderDeliveryStepper extends StatelessWidget {
         child: Icon(i < current || done ? Icons.check_rounded : icons[i],
             size: 18,
             color: i <= current
-                ? (colors.dark ? Colors.black : Colors.white)
+                ? colors.onAccent
                 : colors.secondary));
     return LayoutBuilder(builder: (context, constraints) {
       final compact = constraints.maxWidth < 540 ||

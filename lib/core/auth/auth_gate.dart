@@ -12,7 +12,6 @@ import 'recover_password_screen.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
 import 'auth_incoming_uri.dart';
@@ -20,7 +19,7 @@ import 'auth_link_utils.dart';
 import 'auth_recovery_storage.dart';
 import 'auth_uri_callback_clear_stub.dart'
     if (dart.library.html) 'auth_uri_callback_clear_web.dart';
-import 'phone_brand_intro.dart';
+import '../widgets/brand_loading_screen.dart';
 import 'package:motolink_pro_app/features/onboarding/profile_gate.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
@@ -73,14 +72,19 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   bool _bootstrapResolved = false;
 
-  /// La entrada de marca del teléfono solo corre una vez por sesión.
-  bool _introDismissed = false;
-
   Timer? _authCallbackTimeoutTimer;
+  Timer? _startupDisplayTimer;
+  bool _startupDisplayElapsed = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _startupDisplayTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _startupDisplayElapsed = true);
+      });
+    });
     _startInRegister = widget.startInRegister ||
         PublicAuthRoute.shouldOpenRegister(
           launchUri: widget.launchUri ?? Uri.base,
@@ -388,7 +392,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     if (data.event == AuthChangeEvent.signedOut || data.session == null) {
       _awaitingPasswordRecovery = false;
-      _introDismissed = false;
       _bootstrapResolved = true;
       _clearAuthCallbackTimeout();
       unawaited(AuthRecoveryStorage.clearPendingPasswordRecovery());
@@ -460,6 +463,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _startupDisplayTimer?.cancel();
     _clearAuthCallbackTimeout();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_authSub.cancel());
@@ -512,26 +516,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           awaitingPasswordRecovery: _awaitingPasswordRecovery,
           pendingPasswordRecovery: false,
         );
-    final phone = MediaQuery.sizeOf(context).shortestSide < 700;
-    final showIntro =
-        phone && !_introDismissed && !recovery && session != null;
-
-    if (showIntro) {
-      final ready = !waiting;
-      return PhoneBrandIntro(
-        key: const ValueKey('phone-brand-intro'),
-        reveal: ready,
-        onFinished: () {
-          if (mounted) setState(() => _introDismissed = true);
-        },
-        child: ready
-            ? const ProfileGate(key: ValueKey('profile_gate'))
-            : const SizedBox.shrink(),
-      );
-    }
-
-    if (waiting) {
-      return const _AuthLoadingScaffold();
+    if (waiting || (!_startupDisplayElapsed && (session == null || recovery))) {
+      return const BrandLoadingScreen();
     }
 
     if (recovery) {
@@ -540,7 +526,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     if (session != null) {
       ProductShareLink.suppressGuestPreview = false;
-      return const ProfileGate(key: ValueKey('profile_gate'));
+      return ProfileGate(
+        key: const ValueKey('profile_gate'),
+        startupDisplayElapsed: _startupDisplayElapsed,
+      );
     }
 
     final skipGuest = _guestLeftForAuth ||
@@ -578,20 +567,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       ),
       initialErrorMessage: _initialLinkError,
       startInRegister: _startInRegister || _registerAfterGuest,
-    );
-  }
-}
-
-class _AuthLoadingScaffold extends StatelessWidget {
-  const _AuthLoadingScaffold();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: CircularProgressIndicator(color: AppColors.brand),
-      ),
     );
   }
 }

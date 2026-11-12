@@ -1,14 +1,17 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'bandeja_sheet.dart';
 import 'bcv_rate_badge.dart';
 import 'header_icon_button.dart';
+import 'lucide_icon.dart';
 import 'messages_icon_button.dart';
 import 'motolink_pro_logo.dart';
 import 'theme_mode_bubble.dart';
@@ -20,7 +23,7 @@ abstract final class MotolinkAppBarLogoSizes {
 }
 
 /// Barra superior: marca a la izquierda.
-/// A la derecha, en este orden: acciones extra, mensajes, notificaciones y tema.
+/// A la derecha: acciones extra, bandeja (aliado) o mensajes+notificaciones, y tema.
 class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   const MotolinkAppBar({
     super.key,
@@ -33,6 +36,8 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
     this.unreadNotifications = 0,
     this.unreadMessages = 0,
     this.showBcvRate = true,
+    this.branded = false,
+    this.combineInbox,
   });
 
   /// Perfil autenticado (para marca izquierda). Si es null, solo se muestra B2B Conecta a la derecha.
@@ -53,9 +58,16 @@ class MotolinkAppBar extends StatefulWidget implements PreferredSizeWidget {
   /// Alto del logo B2B Conecta a la derecha y referencia del logo de usuario.
   final double logoHeight;
 
+  /// Cabecera azul corporativa (catálogo aliado / maquetado B2B Conecta).
+  final bool branded;
+
+  /// Unifica mensajes y notificaciones en icono «Bandeja».
+  /// Por defecto: activo para aliado.
+  final bool? combineInbox;
+
   @override
   Size get preferredSize =>
-      Size.fromHeight(math.max(kToolbarHeight, logoHeight + 18));
+      Size.fromHeight(math.max(kToolbarHeight + 8, logoHeight + 24));
 
   @override
   State<MotolinkAppBar> createState() => _MotolinkAppBarState();
@@ -106,11 +118,34 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
     final name = p?.businessName?.trim();
     final roleLabel = ProfileRoleLabels.labelEs(p?.role);
     final lh = widget.logoHeight;
+    final branded = widget.branded;
+    final titleColor = branded ? AppColors.white : AppColors.textPrimary;
+    final subtitleColor =
+        branded ? AppColors.white.withOpacity(0.78) : AppColors.textSecondary;
+    final actionIconColor = branded ? AppColors.white : null;
+    final useBandeja = widget.combineInbox ?? (p?.isAliado == true);
+    final hasInbox =
+        widget.onMessagesTap != null || widget.onNotificationTap != null;
+    final inboxUnread =
+        widget.unreadMessages + widget.unreadNotifications;
 
     return AppBar(
-      toolbarHeight: math.max(kToolbarHeight, lh + 14),
+      toolbarHeight: math.max(kToolbarHeight + 8, lh + 20),
       automaticallyImplyLeading: false,
       titleSpacing: 12,
+      backgroundColor: branded ? AppColors.brandBlue : null,
+      foregroundColor: branded ? AppColors.white : null,
+      surfaceTintColor: branded ? Colors.transparent : null,
+      elevation: branded ? 0 : null,
+      systemOverlayStyle: branded
+          ? SystemUiOverlayStyle.light.copyWith(
+              statusBarColor: Colors.transparent,
+            )
+          : null,
+      iconTheme:
+          branded ? const IconThemeData(color: AppColors.white) : null,
+      actionsIconTheme:
+          branded ? const IconThemeData(color: AppColors.white) : null,
       title: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -156,22 +191,23 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: AppColors.textPrimary,
+                            fontSize: branded ? 15 : 14,
+                            color: titleColor,
                             height: 1.15,
                           ),
                         ),
-                        Text(
-                          roleLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                            height: 1.15,
+                        if (!branded)
+                          Text(
+                            roleLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11,
+                              color: subtitleColor,
+                              height: 1.15,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -181,8 +217,8 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
             const SizedBox(width: 8),
           ] else
             const Spacer(),
-          if (MediaQuery.sizeOf(context).width >= 600)
-            Column(
+          if (!branded && MediaQuery.sizeOf(context).width >= 600)
+            const Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -209,29 +245,66 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
         ],
       ),
       actions: [
-        if (widget.showBcvRate)
+        if (widget.showBcvRate && !branded)
           const Padding(
             padding: EdgeInsets.only(right: 2),
             child: Center(child: BcvRateBadge()),
           ),
-        ...?widget.extraActions,
-        if (widget.onMessagesTap != null)
-          MessagesIconButton(
-            onPressed: widget.onMessagesTap!,
-            unreadCount: widget.unreadMessages,
-          ),
-        HeaderIconButton(
-          tooltip: 'Notificaciones',
-          onPressed: widget.onNotificationTap,
-          count: widget.unreadNotifications,
-          badgeColor: Colors.red,
-          icon: widget.unreadNotifications > 0
-              ? Icons.notifications
-              : Icons.notifications_none_outlined,
+        ...?widget.extraActions?.map(
+          (action) => actionIconColor == null
+              ? action
+              : IconTheme(
+                  data: IconThemeData(color: actionIconColor, size: 22),
+                  child: action,
+                ),
         ),
-        const Padding(
-          padding: EdgeInsets.only(left: 2, right: 8),
-          child: ThemeModeBubble(compact: true),
+        if (useBandeja && hasInbox)
+          HeaderIconButton(
+            tooltip: 'Bandeja',
+            onPressed: () => showBandejaSheet(
+              context: context,
+              onMessagesTap: widget.onMessagesTap,
+              onNotificationTap: widget.onNotificationTap,
+              unreadMessages: widget.unreadMessages,
+              unreadNotifications: widget.unreadNotifications,
+            ),
+            count: inboxUnread,
+            badgeColor: Colors.red,
+            iconColor: actionIconColor,
+            icon: Icons.inbox_outlined,
+            iconWidget: LucideIcon(
+              LucideGlyph.inbox,
+              size: 22,
+              color: actionIconColor,
+            ),
+          )
+        else ...[
+          if (widget.onMessagesTap != null)
+            MessagesIconButton(
+              onPressed: widget.onMessagesTap!,
+              unreadCount: widget.unreadMessages,
+              iconColor: actionIconColor,
+            ),
+          HeaderIconButton(
+            tooltip: 'Notificaciones',
+            onPressed: widget.onNotificationTap,
+            count: widget.unreadNotifications,
+            badgeColor: Colors.red,
+            iconColor: actionIconColor,
+            icon: Icons.notifications_none_outlined,
+            iconWidget: LucideIcon(
+              LucideGlyph.bell,
+              size: 22,
+              color: actionIconColor,
+            ),
+          ),
+        ],
+        Padding(
+          padding: const EdgeInsets.only(left: 2, right: 8),
+          child: ThemeModeBubble(
+            compact: true,
+            iconColor: actionIconColor,
+          ),
         ),
       ],
       bottom: PreferredSize(
@@ -239,7 +312,9 @@ class _MotolinkAppBarState extends State<MotolinkAppBar> {
         child: Divider(
           height: 1,
           thickness: 1,
-          color: AppColors.divider,
+          color: branded
+              ? AppColors.white.withOpacity(0.18)
+              : AppColors.divider,
         ),
       ),
     );

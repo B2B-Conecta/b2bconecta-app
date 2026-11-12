@@ -16,7 +16,7 @@ void main() {
     MainShellTabController.consumePendingAdminUsersSection();
   });
 
-  test('KYC admin abre Usuarios → Verificación con userId', () {
+  test('KYC admin abre Usuarios → Cuentas con userId', () {
     int? tab;
     MainShellTabController.register((index) => tab = index);
     const userId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -26,10 +26,10 @@ void main() {
       relatedId: userId,
     );
     expect(tab, MainShellTabController.adminUsersTabIndex);
-    expect(MainShellTabController.peekPendingKycProfileId(), userId);
+    expect(MainShellTabController.peekPendingAccountProfileId(), userId);
     expect(
       MainShellTabController.peekPendingAdminUsersSection(),
-      AdminUsersHubSection.verificacion,
+      AdminUsersHubSection.cuentas,
     );
   });
 

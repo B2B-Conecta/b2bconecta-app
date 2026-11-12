@@ -8,11 +8,13 @@ import 'package:motolink_pro_app/features/catalog/promo_banner_layout.dart';
 import 'package:motolink_pro_app/features/catalog/promo_campaign_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 String _formatPromoDate(DateTime d) {
   final local = d.toLocal();
@@ -190,6 +192,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
       );
     }
 
+    final theme = B2BThemeExtension.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -200,10 +203,10 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
               Expanded(
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.campaign_outlined,
+                    LucideIcon(
+                      LucideGlyph.megaphone,
                       size: 18,
-                      color: AppColors.brandAccent,
+                      color: theme.brand,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -214,7 +217,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: theme.textPrimary,
                         ),
                       ),
                     ),
@@ -223,8 +226,12 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
               ),
               FilledButton.icon(
                 onPressed: _saving ? null : () => _openEditor(),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Nueva'),
+                icon: LucideIcon(
+                  LucideGlyph.megaphone,
+                  size: 18,
+                  color: theme.surfaceCard,
+                ),
+                label: const Text('Nueva campaña'),
               ),
             ],
           ),
@@ -234,12 +241,60 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
               ? RefreshIndicator(
                   onRefresh: _bootstrap,
                   child: ListView(
-                    children: const [
-                      SizedBox(height: 80),
-                      Center(
-                        child: Text(
-                          'Sin campañas',
-                          textAlign: TextAlign.center,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      const SizedBox(height: 48),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: theme.surfaceSubtle,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: theme.borderSubtle),
+                              ),
+                              alignment: Alignment.center,
+                              child: LucideIcon(
+                                LucideGlyph.megaphone,
+                                size: 32,
+                                color: theme.brand,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Sin campañas activas',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Crea la primera campaña promocional para minoristas e importadores del marketplace.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.4,
+                                color: theme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed:
+                                  _saving ? null : () => _openEditor(),
+                              icon: LucideIcon(
+                                LucideGlyph.megaphone,
+                                size: 18,
+                                color: theme.surfaceCard,
+                              ),
+                              label: const Text('Nueva campaña'),
+                            ),
+                          ],
                         ),
                       ),
                     ],

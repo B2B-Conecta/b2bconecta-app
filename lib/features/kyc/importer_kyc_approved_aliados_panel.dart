@@ -4,6 +4,7 @@ import 'kyc_approved_aliado_model.dart';
 import 'kyc_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
@@ -16,12 +17,13 @@ Future<void> showImporterAliadoKycDetailSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: B2BThemeExtension.of(context).dialogSurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (ctx) {
       final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+      final sheet = B2BThemeExtension.of(ctx);
       return Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 20),
         child: SingleChildScrollView(
@@ -31,12 +33,13 @@ Future<void> showImporterAliadoKycDetailSheet(
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Expediente KYC',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
+                        color: sheet.textPrimary,
                       ),
                     ),
                   ),
@@ -46,7 +49,7 @@ Future<void> showImporterAliadoKycDetailSheet(
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close, color: sheet.textPrimary),
                   ),
                 ],
               ),
@@ -59,7 +62,7 @@ Future<void> showImporterAliadoKycDetailSheet(
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: sheet.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -162,13 +165,13 @@ class _ImporterKycApprovedAliadosPanelState
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
+    final theme = B2BThemeExtension.of(context);
 
     return ProfileCollapsibleSection(
       title: 'Tiendas minoristas verificados (KYC)',
       subtitle: _sectionSubtitle(),
       initiallyExpanded: false,
-      infoMessage:
-          'Tiendas minoristas con KYC aprobado',
+      infoMessage: 'Tiendas minoristas con KYC aprobado',
       trailingActions: [
         IconButton(
           onPressed: _loading ? null : _load,
@@ -194,7 +197,10 @@ class _ImporterKycApprovedAliadosPanelState
           else if (_error != null)
             Text(
               _error!,
-              style: TextStyle(color: Colors.red.shade800, fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+              ),
             )
           else ...[
             TextField(
@@ -204,7 +210,7 @@ class _ImporterKycApprovedAliadosPanelState
                 prefixIcon: const Icon(Icons.search, size: 20),
                 isDense: true,
                 filled: true,
-                fillColor: AppColors.fieldFill,
+                fillColor: theme.inputFill,
                 border: OutlineInputBorder(
                   borderRadius: AppDecorations.radius12,
                   borderSide: BorderSide.none,
@@ -215,12 +221,12 @@ class _ImporterKycApprovedAliadosPanelState
             if (_rows.isEmpty)
               Text(
                 'Aún no hay tiendas minoristas con KYC aprobado en la plataforma.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: theme.textSecondary),
               )
             else if (filtered.isEmpty)
               Text(
                 'Ninguna tienda minorista coincide con la búsqueda.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: theme.textSecondary),
               )
             else
               PagedItems(
@@ -228,12 +234,12 @@ class _ImporterKycApprovedAliadosPanelState
                 embedded: true,
                 separator: 8,
                 itemBuilder: (a) => _AliadoKycListTile(
+                  aliado: a,
+                  onTap: () => showImporterAliadoKycDetailSheet(
+                    context,
                     aliado: a,
-                    onTap: () => showImporterAliadoKycDetailSheet(
-                      context,
-                      aliado: a,
-                    ),
                   ),
+                ),
               ),
           ],
         ],
@@ -256,11 +262,12 @@ class _AliadoKycListTile extends StatelessWidget {
     final loc = aliado.locationLine;
     final rating = aliado.ratingAsPayerAvgRolling100;
     final ratingCount = aliado.ratingAsPayerCountRolling100 ?? 0;
+    final theme = B2BThemeExtension.of(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: AppColors.brandBlueContainer.withOpacity(0.25),
+        color: theme.brandContainer,
         borderRadius: AppDecorations.radius12,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -275,9 +282,10 @@ class _AliadoKycListTile extends StatelessWidget {
                     children: [
                       Text(
                         aliado.displayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 13.5,
+                          color: theme.textPrimary,
                         ),
                       ),
                       if (loc.isNotEmpty) ...[
@@ -286,7 +294,7 @@ class _AliadoKycListTile extends StatelessWidget {
                           loc,
                           style: TextStyle(
                             fontSize: 11.5,
-                            color: AppColors.textSecondary,
+                            color: theme.textSecondary,
                           ),
                         ),
                       ],
@@ -297,18 +305,18 @@ class _AliadoKycListTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
-                          color: Colors.green.shade800,
+                          color: theme.successFg,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.verified_user_outlined,
-                  color: AppColors.brandBlue,
+                  color: theme.brand,
                   size: 20,
                 ),
-                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                Icon(Icons.chevron_right, color: theme.textSecondary),
               ],
             ),
           ),

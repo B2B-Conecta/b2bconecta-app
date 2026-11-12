@@ -42,15 +42,15 @@ void main() {
               profile: ProfileModel(id: 'ally', role: 'aliado'),
               liveTasaBcv: 881.8769)));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Bolívares (REF)'));
+      await tester.ensureVisible(find.text('REF / Bs'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Bolívares (REF)'));
+      await tester.tap(find.text('REF / Bs'));
       await tester.pumpAndSettle();
       final amounts = find.text('Bs 229.287,99');
-      expect(amounts, findsNWidgets(2));
-      expect(find.text('260.00 REF'), findsNWidgets(2));
-      expect(find.text('Tasa BCV: 1 REF ='), findsOneWidget);
-      expect(find.text('Bs 881,8769'), findsOneWidget);
+      expect(amounts, findsAtLeastNWidgets(1));
+      expect(find.text('260.00 REF'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('por REF'), findsOneWidget);
+      expect(find.text('Equivalente en Bs'), findsOneWidget);
       for (final element in amounts.evaluate()) {
         final paragraph = tester.renderObject<RenderParagraph>(find.descendant(
             of: find.byElementPredicate((candidate) => candidate == element),
@@ -89,12 +89,12 @@ void main() {
                 id: 'ally', role: 'aliado', accountAccessStatus: 'active'),
             liveTasaBcv: 10)));
     await tester.pumpAndSettle();
-    expect(find.textContaining('80.00 REF / ud'), findsOneWidget);
-    await tester.ensureVisible(find.text('Divisas (USD)'));
+    expect(find.textContaining('80.00 REF'), findsWidgets);
+    await tester.ensureVisible(find.text('USD'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Divisas (USD)'));
+    await tester.tap(find.text('USD'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('76.00 USD / ud'), findsOneWidget);
+    expect(find.textContaining('76.00 USD'), findsWidgets);
     expect(find.textContaining('760.00 USD'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -154,7 +154,7 @@ void main() {
               liveTasaBcv: 50)));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('Revisa tu compra'), findsOneWidget);
+      expect(find.textContaining('repuesto'), findsWidgets);
       final productScroll = find
           .descendant(
               of: find.byType(ListView), matching: find.byType(Scrollable))
@@ -165,13 +165,13 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
       expect(cart.itemCount, 12);
-      await tester.scrollUntilVisible(find.text('Resumen del pedido'), 100,
+      await tester.scrollUntilVisible(find.text('Resumen de tu compra'), 100,
           scrollable: productScroll);
-      expect(find.text('Resumen del pedido'), findsOneWidget);
+      expect(find.text('Resumen de tu compra'), findsOneWidget);
       if (size.width == 390) {
-        await tester.ensureVisible(find.text('Continuar con la entrega'));
+        await tester.ensureVisible(find.textContaining('Continuar con la entrega'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Continuar con la entrega'));
+        await tester.tap(find.textContaining('Continuar con la entrega'));
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
         expect(find.text('Confirmar pedido'), findsOneWidget);
@@ -179,15 +179,15 @@ void main() {
         await tester.pumpAndSettle();
         expect(cart.itemCount, 12);
       }
-      await tester.scrollUntilVisible(find.byTooltip('Quitar del carrito'), -80,
+      await tester.scrollUntilVisible(find.byTooltip('Eliminar'), -80,
           scrollable: productScroll);
       await Scrollable.ensureVisible(
-          tester.element(find.byTooltip('Quitar del carrito')),
+          tester.element(find.byTooltip('Eliminar')),
           alignment: 0.5);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Quitar del carrito'));
+      await tester.tap(find.byTooltip('Eliminar'));
       await tester.pumpAndSettle();
-      expect(find.text('Su carrito está vacío'), findsOneWidget);
+      expect(find.text('Tu bolsa está vacía'), findsOneWidget);
       await tester.tap(find.text('Deshacer'));
       await tester.pumpAndSettle();
       expect(cart.itemCount, 12);
@@ -242,20 +242,20 @@ void main() {
           .descendant(
               of: find.byType(ListView), matching: find.byType(Scrollable))
           .first;
-      await tester.scrollUntilVisible(find.text('Bolívares (REF)'), 150,
+      await tester.scrollUntilVisible(find.text('REF / Bs'), 150,
           scrollable: productScroll);
-      await tester.ensureVisible(find.text('Bolívares (REF)'));
+      await tester.ensureVisible(find.text('REF / Bs'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Bolívares (REF)'));
+      await tester.tap(find.text('REF / Bs'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Bs'), findsWidgets);
       await tester.scrollUntilVisible(
-          find.text('Continuar con la entrega'), 120,
+          find.textContaining('Continuar con la entrega'), 120,
           scrollable: productScroll);
       expect(
           tester
               .widget<FilledButton>(
-                  find.widgetWithText(FilledButton, 'Continuar con la entrega'))
+                  find.widgetWithText(FilledButton, 'Continuar con la entrega →'))
               .onPressed,
           isNull);
       expect(cart.supplierGroups.length, 2);

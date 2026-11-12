@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'commission_collected_income_period.dart';
 import 'commission_collected_income_report.dart';
@@ -18,12 +21,14 @@ class CommissionCollectedIncomeCard extends StatefulWidget {
     this.onOpenSettlement,
     this.onFilterImportador,
     this.onFilterDocumentType,
+    this.tasaBcv,
   });
 
   final bool isAdmin;
   final ValueChanged<String>? onOpenSettlement;
   final ValueChanged<String>? onFilterImportador;
   final ValueChanged<CommissionSettlementDocumentType>? onFilterDocumentType;
+  final double? tasaBcv;
 
   @override
   State<CommissionCollectedIncomeCard> createState() =>
@@ -40,6 +45,8 @@ class _CommissionCollectedIncomeCardState
   bool _loading = true;
   String? _error;
   bool _invalidRange = false;
+  int _pageIndex = 0;
+  int _pageSize = listPageSizeOptions.first;
 
   CommissionCollectedIncomePeriod get _period =>
       CommissionCollectedIncomePeriod.fromPreset(
@@ -69,6 +76,7 @@ class _CommissionCollectedIncomeCardState
       _invalidRange = false;
       _loading = true;
       _error = null;
+      _pageIndex = 0;
     });
     try {
       final report = await SupabaseService.fetchCollectedCommissionReport(
@@ -126,282 +134,369 @@ class _CommissionCollectedIncomeCardState
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+    final theme = B2BThemeExtension.of(context);
+    final report = _report;
+    final settlements = report?.settlements ?? const [];
+    final page = sliceListPage(
+      items: settlements,
+      pageIndex: _pageIndex,
+      pageSize: _pageSize,
+    );
+
+    Widget? emptyBody;
+    if (_invalidRange) {
+      emptyBody = _message(
+        theme,
+        'La fecha inicial no puede ser posterior a la final.',
+        error: true,
+      );
+    } else if (_loading) {
+      emptyBody = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        child: Center(child: CircularProgressIndicator(color: theme.brand)),
+      );
+    } else if (_error != null) {
+      emptyBody = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.isAdmin
-                  ? 'Ingresos cobrados de la plataforma'
-                  : 'Comisión cobrada a su organización',
+              'No se pudo cargar el reporte.',
               style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Solo cortes pagados · fecha de cobro (America/Caracas)',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.3,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 10),
-            SegmentedFilterBar(
-              labels: const [
-                'Hoy',
-                '7 días',
-                'Este mes',
-                'Mes anterior',
-                'Rango',
-              ],
-              selectedIndex: CommissionCollectedIncomePreset.values.indexOf(
-                _preset,
-              ),
-              onSelected: (index) => _selectPreset(
-                CommissionCollectedIncomePreset.values[index],
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_invalidRange)
-              Text(
-                'La fecha inicial no puede ser posterior a la final.',
-                style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-              )
-            else if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_error != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'No se pudo cargar el reporte.',
-                    style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(onPressed: _load, child: const Text('Reintentar')),
-                ],
-              )
-            else
-              _body(),
+            TextButton(onPressed: _load, child: const Text('Reintentar')),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _body() {
-    final report = _report;
-    if (report == null) return const SizedBox.shrink();
-    final period = _period;
-
-    if (report.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Período: ${period.labelEs}',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'No hay comisión cobrada en este período.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-        ],
+      );
+    } else if (report == null || report.isEmpty) {
+      emptyBody = _message(
+        theme,
+        'No hay comisión cobrada en este período (${_period.labelEs}).',
       );
     }
 
-    final variation = report.canShowVariation ? report.variationPct! : null;
-    final variationLabel = variation == null
-        ? null
-        : '${variation >= 0 ? '+' : ''}${variation.toStringAsFixed(1)} % vs período anterior';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: report.settlements.isEmpty
-              ? null
-              : () {
-                  final id = report.settlements.first.settlementId;
-                  if (id.isNotEmpty) widget.onOpenSettlement?.call(id);
-                },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return B2bDataTableShell(
+      padding: const EdgeInsets.all(12),
+      toolbar: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Text(
-                'USD ${report.totalCollectedUsd.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Período: ${period.labelEs}',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              Text(
-                '${report.operationCount} operación(es) · '
-                '${report.settlementCount} corte(s) cobrado(s)',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              if (variationLabel != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  variationLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: (variation ?? 0) >= 0
-                        ? AppColors.successGreen
-                        : Colors.red.shade700,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (report.series.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            _grainTitle(report.grain),
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          ...report.series.map(
-            (b) => _line(
-              _bucketLabel(report.grain, b.bucket),
-              b.totalCollectedUsd,
-              b.operationCount,
-            ),
-          ),
-        ],
-        if (widget.isAdmin && report.byImportador.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Por importador',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          ...report.byImportador.map(
-            (r) => InkWell(
-              onTap: () => widget.onFilterImportador?.call(r.importadorId),
-              child: _line(
-                r.businessName,
-                r.totalCollectedUsd,
-                r.operationCount,
-              ),
-            ),
-          ),
-        ],
-        if (report.byDocumentType.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Por tipo de documento',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          ...report.byDocumentType.map(
-            (r) => InkWell(
-              onTap: () => widget.onFilterDocumentType?.call(
-                CommissionSettlementDocumentType.effective(r.documentType),
-              ),
-              child: _line(r.labelEs, r.totalCollectedUsd, r.operationCount),
-            ),
-          ),
-        ],
-        if (report.settlements.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Cortes cobrados',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          ...report.settlements.map((s) {
-            final ref = (s.invoiceReference?.trim().isNotEmpty == true)
-                ? s.invoiceReference!.trim()
-                : s.settlementId.substring(0, 8);
-            final paid = s.paidAt == null
-                ? ''
-                : ' · ${formatEsShortDateTime(s.paidAt)}';
-            return InkWell(
-              onTap: () => widget.onOpenSettlement?.call(s.settlementId),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        '$ref · ${s.businessName}$paid',
-                        style: const TextStyle(fontSize: 12),
+                    Text(
+                      widget.isAdmin
+                          ? 'Ingresos cobrados'
+                          : 'Comisión cobrada',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: theme.textPrimary,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      'USD ${s.totalCollectedUsd.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      'Solo cortes pagados · America/Caracas',
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        color: theme.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-            );
-          }),
+              if (report != null && !report.isEmpty) ...[
+                const SizedBox(width: 12),
+                _TotalBadge(
+                  usd: report.totalCollectedUsd,
+                  tasaBcv: widget.tasaBcv,
+                  ops: report.operationCount,
+                  variationPct:
+                      report.canShowVariation ? report.variationPct : null,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final preset in CommissionCollectedIncomePreset.values)
+                B2bDataTableFilterPill(
+                  label: switch (preset) {
+                    CommissionCollectedIncomePreset.today => 'Hoy',
+                    CommissionCollectedIncomePreset.last7Days => '7 días',
+                    CommissionCollectedIncomePreset.thisMonth => 'Este mes',
+                    CommissionCollectedIncomePreset.previousMonth =>
+                      'Mes anterior',
+                    CommissionCollectedIncomePreset.custom => 'Rango',
+                  },
+                  selected: _preset == preset,
+                  onTap: () => _selectPreset(preset),
+                ),
+            ],
+          ),
         ],
-      ],
-    );
-  }
-
-  Widget _line(String label, double usd, int ops) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '$label · $ops op.',
-              style: const TextStyle(fontSize: 12),
+      ),
+      header: const B2bDataTableHeader(
+        cells: [
+          B2bDataTableHeaderCell(label: 'Corte / Ref.', flex: 3),
+          B2bDataTableHeaderCell(label: 'Importador', flex: 3),
+          B2bDataTableHeaderCell(label: 'Cobrado', flex: 2),
+          B2bDataTableHeaderCell(label: 'Ops.', flex: 1),
+          B2bDataTableHeaderCell(label: 'Fecha', flex: 2),
+        ],
+        showTrailingSlot: false,
+      ),
+      empty: emptyBody,
+      rows: [
+        for (var i = 0; i < page.length; i++)
+          B2bDataTableZebraRow(
+            zebra: i.isOdd,
+            isLast: i == page.length - 1,
+            onTap: () =>
+                widget.onOpenSettlement?.call(page[i].settlementId),
+            child: _IncomeSettlementRow(
+              row: page[i],
+              tasaBcv: widget.tasaBcv,
+              onFilterImportador: widget.isAdmin
+                  ? widget.onFilterImportador
+                  : null,
             ),
           ),
-          Text(
-            'USD ${usd.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ],
+      ],
+      footer: ListPageBar(
+        total: settlements.length,
+        pageIndex: _pageIndex,
+        pageSize: _pageSize,
+        alwaysShow: settlements.isNotEmpty,
+        entityLabel: 'cobros',
+        onPageIndex: (i) => setState(() => _pageIndex = i),
+        onPageSize: (size) => setState(() {
+          _pageSize = size;
+          _pageIndex = 0;
+        }),
       ),
     );
   }
 
-  String _grainTitle(String grain) {
-    switch (grain) {
-      case 'week':
-        return 'Desglose semanal';
-      case 'month':
-        return 'Desglose mensual';
-      default:
-        return 'Desglose diario';
-    }
+  Widget _message(B2BThemeExtension theme, String text, {bool error = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 12),
+      child: Center(
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: error
+                ? Theme.of(context).colorScheme.error
+                : theme.textSecondary,
+          ),
+        ),
+      ),
+    );
   }
+}
 
-  String _bucketLabel(String grain, DateTime bucket) {
-    final d =
-        '${bucket.day.toString().padLeft(2, '0')}/${bucket.month.toString().padLeft(2, '0')}/${bucket.year}';
-    if (grain == 'month') {
-      return '${bucket.month.toString().padLeft(2, '0')}/${bucket.year}';
-    }
-    return d;
+class _TotalBadge extends StatelessWidget {
+  const _TotalBadge({
+    required this.usd,
+    required this.ops,
+    this.tasaBcv,
+    this.variationPct,
+  });
+
+  final double usd;
+  final int ops;
+  final double? tasaBcv;
+  final double? variationPct;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final rate = tasaBcv;
+    final bs = rate != null && rate > 0 ? usd * rate : null;
+    final variation = variationPct;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.brandContainer,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'REF ${formatRefAmount(usd)}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: theme.textPrimary,
+            ),
+          ),
+          Text(
+            bs == null ? '$ops op.' : '${formatBsLabel(bs)} · $ops op.',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: theme.textSecondary,
+            ),
+          ),
+          if (variation != null)
+            Text(
+              '${variation >= 0 ? '+' : ''}${variation.toStringAsFixed(1)} % vs ant.',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: variation >= 0 ? theme.successFg : theme.brand,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IncomeSettlementRow extends StatelessWidget {
+  const _IncomeSettlementRow({
+    required this.row,
+    this.tasaBcv,
+    this.onFilterImportador,
+  });
+
+  final CommissionCollectedIncomeSettlementRow row;
+  final double? tasaBcv;
+  final ValueChanged<String>? onFilterImportador;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final ref = (row.invoiceReference?.trim().isNotEmpty == true)
+        ? row.invoiceReference!.trim()
+        : row.settlementId.substring(0, 8);
+    final rate = tasaBcv;
+    final bs = rate != null && rate > 0 ? row.totalCollectedUsd * rate : null;
+    final doc = CommissionSettlementDocumentType.effective(row.documentType);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ref,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: theme.textPrimary,
+                  ),
+                ),
+                Text(
+                  doc.labelEs,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: InkWell(
+              onTap: onFilterImportador == null
+                  ? null
+                  : () => onFilterImportador!(row.importadorId),
+              child: Text(
+                row.businessName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textPrimary,
+                  decoration: onFilterImportador == null
+                      ? null
+                      : TextDecoration.underline,
+                  decorationColor: theme.brand.withOpacity(0.35),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'REF ${formatRefAmount(row.totalCollectedUsd)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: theme.textPrimary,
+                  ),
+                ),
+                Text(
+                  bs == null ? 'Bs —' : formatBsLabel(bs),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text(
+              '${row.operationCount}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: theme.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              row.paidAt == null ? '—' : formatEsShortDateTime(row.paidAt),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: theme.textSecondary,
+              ),
+            ),
+          ),
+          LucideIcon(
+            LucideGlyph.chevronRight,
+            size: 14,
+            color: theme.textMuted,
+          ),
+        ],
+      ),
+    );
   }
 }

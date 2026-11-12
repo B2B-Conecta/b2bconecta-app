@@ -3,7 +3,20 @@ import 'package:flutter/scheduler.dart';
 
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'importer_shell_tabs.dart';
+import 'package:motolink_pro_app/features/admin/admin_reports_hub_section.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
+import '../features/catalog/catalog_filters.dart';
+import '../features/catalog/promo_campaign_model.dart';
+
+class AliadoCatalogRequest {
+  const AliadoCatalogRequest(
+      {this.filters = CatalogFilters.empty,
+      this.campaign,
+      this.openFilters = false});
+  final CatalogFilters filters;
+  final PromoCampaignModel? campaign;
+  final bool openFilters;
+}
 
 /// Permite cambiar la pestaña del [MainShell] desde hijos o rutas apiladas
 /// (p. ej. importador → tab Pedidos tras marcar en preparación).
@@ -13,6 +26,31 @@ class MainShellTabController {
   static void Function(int index)? _goTo;
   static VoidCallback? _refreshImporterInventory;
   static VoidCallback? _refreshImporterHome;
+  static VoidCallback? _openAliadoCatalog;
+  static VoidCallback? _openReputation;
+  static AliadoCatalogRequest? _catalogRequest;
+
+  static void registerAliadoCatalog(VoidCallback? open) =>
+      _openAliadoCatalog = open;
+
+  static AliadoCatalogRequest? consumeAliadoCatalogRequest() {
+    final request = _catalogRequest;
+    _catalogRequest = null;
+    return request;
+  }
+
+  static void navigateToAliadoCatalog({
+    CatalogFilters filters = CatalogFilters.empty,
+    PromoCampaignModel? campaign,
+    bool openFilters = false,
+  }) {
+    _catalogRequest = AliadoCatalogRequest(
+        filters: filters, campaign: campaign, openFilters: openFilters);
+    _goTo?.call(AliadoShellTabs.catalogo);
+    SchedulerBinding.instance
+        .addPostFrameCallback((_) => _openAliadoCatalog?.call());
+  }
+
   static final importerInventoryRequest = ValueNotifier<String?>(null);
 
   static void registerImporterHomeReload(VoidCallback? reload) =>
@@ -51,18 +89,32 @@ class MainShellTabController {
   static VoidCallback? _adminAccountNotificationDeepLink;
   static AdminUsersHubSection? _pendingAdminUsersSection;
   static VoidCallback? _adminUsersHubDeepLink;
+  static AdminReportsHubSection? _pendingAdminReportsSection;
+  static VoidCallback? _adminReportsHubDeepLink;
   static String? _pendingSupportTicketId;
   static VoidCallback? _adminSupportNotificationDeepLink;
   static VoidCallback? _b2bSupportNotificationDeepLink;
 
-  /// Admin: pestaña Usuarios (hub Verificación · Cuentas · Actividad).
-  static const int adminUsersTabIndex = 4;
+  /// Admin: Inicio (dashboard de métricas).
+  static const int adminInicioTabIndex = 0;
 
-  /// Admin: pestaña Soporte (tras fusionar Cuentas en Usuarios).
-  static const int adminSupportTabIndex = 5;
+  /// Admin: bandeja de Pedidos.
+  static const int adminPedidosTabIndex = 1;
+
+  /// Admin: Reportes y analíticas.
+  static const int adminReportesTabIndex = 2;
+
+  /// Admin: pestaña Comisiones.
+  static const int adminComisionesTabIndex = 4;
+
+  /// Admin: pestaña Usuarios (hub Cuentas · Actividad).
+  static const int adminUsersTabIndex = 5;
+
+  /// Admin: pestaña Soporte.
+  static const int adminSupportTabIndex = 6;
 
   /// Admin: pestaña Perfil.
-  static const int adminProfileTabIndexDefault = 6;
+  static const int adminProfileTabIndexDefault = 7;
 
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
@@ -71,6 +123,9 @@ class MainShellTabController {
     _goTo = null;
     _refreshImporterInventory = null;
     _refreshImporterHome = null;
+    _openAliadoCatalog = null;
+    _openReputation = null;
+    _catalogRequest = null;
     importerInventoryRequest.value = null;
     _refreshImporterPedidos = null;
     _pendingNotificationRelatedId = null;
@@ -100,6 +155,8 @@ class MainShellTabController {
     _adminAccountNotificationDeepLink = null;
     _pendingAdminUsersSection = null;
     _adminUsersHubDeepLink = null;
+    _pendingAdminReportsSection = null;
+    _adminReportsHubDeepLink = null;
     _pendingSupportTicketId = null;
     _adminSupportNotificationDeepLink = null;
     _b2bSupportNotificationDeepLink = null;
@@ -133,11 +190,13 @@ class MainShellTabController {
     required int pedidos,
     required int reputation,
     required int profile,
+    VoidCallback? onReputation,
   }) {
     _homeTabIndex = home;
     _b2bPedidosTabIndex = pedidos;
     _b2bReputationTabIndex = reputation;
     _b2bProfileTabIndex = profile;
+    _openReputation = onReputation;
   }
 
   static void registerB2BProfileTabIndex(int index) =>
@@ -154,7 +213,11 @@ class MainShellTabController {
 
   /// Pestaña Reputación del rol que tiene el shell abierto.
   static void navigateToReputationTab() {
-    _goTo?.call(_b2bReputationTabIndex);
+    if (_openReputation != null) {
+      _openReputation!();
+    } else {
+      _goTo?.call(_b2bReputationTabIndex);
+    }
     SchedulerBinding.instance.addPostFrameCallback((_) {
       requestNotificationsReload();
     });
@@ -292,19 +355,19 @@ class MainShellTabController {
     _adminPedidosBandejaNotificationHandler = onNavigate;
   }
 
-  /// Admin: pestaña Pedidos unificada (índice 0) + manejo de notificación in-app.
+  /// Admin: pestaña Pedidos unificada + manejo de notificación in-app.
   static void navigateToAdminActivosForNotification() {
     _pendingAdminPedidosScope = AdminPedidosNotificationScope.enCurso;
-    _goTo?.call(0);
+    _goTo?.call(adminPedidosTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminPedidosBandejaNotificationHandler?.call();
     });
   }
 
-  /// Admin: misma pestaña Pedidos (índice 0), vista «Cerrados» + expand moroso.
+  /// Admin: misma pestaña Pedidos, vista «Cerrados» + expand moroso.
   static void navigateToAdminCerradosForNotification() {
     _pendingAdminPedidosScope = AdminPedidosNotificationScope.cerrados;
-    _goTo?.call(0);
+    _goTo?.call(adminPedidosTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminPedidosBandejaNotificationHandler?.call();
     });
@@ -349,50 +412,58 @@ class MainShellTabController {
   }
 
   static int _adminProfileTabIndex = adminProfileTabIndexDefault;
+  static VoidCallback? _openAdminSettings;
 
-  /// Admin: hub Usuarios → Verificación (deep link `userId` / KYC).
+  /// Admin: hub Usuarios → Cuentas (deep link `userId` / KYC en expediente).
   static void navigateToAdminKycForNotification() {
     navigateToAdminUsers(
-      section: AdminUsersHubSection.verificacion,
-      userId: peekPendingKycProfileId(),
+      section: AdminUsersHubSection.cuentas,
+      userId: peekPendingKycProfileId() ?? peekPendingAccountProfileId(),
     );
   }
 
   /// Admin: hub Usuarios (sección + ficha `userId` opcional).
   static void navigateToAdminUsers({
-    AdminUsersHubSection section = AdminUsersHubSection.verificacion,
+    AdminUsersHubSection section = AdminUsersHubSection.cuentas,
     String? userId,
   }) {
     _pendingAdminUsersSection = section;
     final id = userId?.trim();
     if (id != null && id.isNotEmpty) {
       switch (section) {
-        case AdminUsersHubSection.verificacion:
-          setPendingKycProfileId(id);
         case AdminUsersHubSection.cuentas:
           setPendingAccountProfileId(id);
+          setPendingKycProfileId(id);
         case AdminUsersHubSection.actividad:
+        case AdminUsersHubSection.sellosYVitrina:
           break;
       }
     }
     _goTo?.call(adminUsersTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminUsersHubDeepLink?.call();
-      if (section == AdminUsersHubSection.verificacion) {
-        _adminKycNotificationDeepLink?.call();
-      }
       if (section == AdminUsersHubSection.cuentas) {
         _adminAccountNotificationDeepLink?.call();
+        _adminKycNotificationDeepLink?.call();
       }
     });
   }
 
-  /// Admin: pestaña Perfil.
+  /// Admin: índice legado (ya no hay pestaña Perfil en el rail).
   static void registerAdminProfileTabIndex(int index) {
     _adminProfileTabIndex = index;
   }
 
+  /// Admin: abre Ajustes del sistema dentro del shell.
+  static void registerAdminSettingsOpen(VoidCallback? open) {
+    _openAdminSettings = open;
+  }
+
   static void navigateToAdminProfileTab() {
+    if (_openAdminSettings != null) {
+      _openAdminSettings!();
+      return;
+    }
     _goTo?.call(_adminProfileTabIndex);
   }
 
@@ -409,9 +480,30 @@ class MainShellTabController {
     });
   }
 
-  /// Admin: pestaña Comisiones (índice 3).
+  /// Admin: pestaña Reportes / analíticas (sección opcional del hub).
+  static void navigateToAdminReportes({
+    AdminReportsHubSection section = AdminReportsHubSection.encomiendas,
+  }) {
+    _pendingAdminReportsSection = section;
+    _goTo?.call(adminReportesTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminReportsHubDeepLink?.call();
+    });
+  }
+
+  static void registerAdminReportsHubDeepLink(VoidCallback? onNavigate) {
+    _adminReportsHubDeepLink = onNavigate;
+  }
+
+  static AdminReportsHubSection? consumePendingAdminReportsSection() {
+    final section = _pendingAdminReportsSection;
+    _pendingAdminReportsSection = null;
+    return section;
+  }
+
+  /// Admin: pestaña Comisiones.
   static void navigateToAdminComisionesForNotification() {
-    _goTo?.call(3);
+    _goTo?.call(adminComisionesTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminCommissionSettlementDeepLink?.call();
     });
@@ -591,6 +683,38 @@ class MainShellTabController {
 
   static VoidCallback? peekB2BSupportNotificationHandler() =>
       _b2bSupportNotificationDeepLink;
+
+  /// Segmento extra del breadcrumb (p. ej. Cuentas › Registro Incompleto).
+  static final ValueNotifier<AdminBreadcrumbTrail?> adminBreadcrumbTrail =
+      ValueNotifier<AdminBreadcrumbTrail?>(null);
+
+  static void setAdminBreadcrumbTrail(AdminBreadcrumbTrail? trail) {
+    adminBreadcrumbTrail.value = trail;
+  }
+
+  static void clearAdminBreadcrumbTrail() {
+    if (adminBreadcrumbTrail.value != null) {
+      adminBreadcrumbTrail.value = null;
+    }
+  }
+}
+
+/// Nivel profundo del breadcrumb admin (filtros / detalle).
+class AdminBreadcrumbTrail {
+  const AdminBreadcrumbTrail({
+    required this.leafLabel,
+    required this.onBack,
+    this.onPopToParent,
+  });
+
+  /// Etiqueta del nivel actual (no clicable).
+  final String leafLabel;
+
+  /// Retroceso rápido (flecha / historial inmediato).
+  final VoidCallback onBack;
+
+  /// Al pulsar el padre inmediato (p. ej. «Cuentas»).
+  final VoidCallback? onPopToParent;
 }
 
 /// Alcance de la bandeja admin al abrir desde una notificación in-app.

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/ios_chrome.dart';
 
 /// Barra de la tienda minorista. El centro es Catálogo, con círculo resaltado.
 class AliadoBottomNav extends StatelessWidget {
@@ -16,67 +19,84 @@ class AliadoBottomNav extends StatelessWidget {
 
   static const _items = <_AliadoNavItem>[
     _AliadoNavItem(
-      index: AliadoShellTabs.pedidos,
-      label: 'Pedidos',
-      icon: Icons.shopping_cart_outlined,
-      selectedIcon: Icons.shopping_cart,
+      index: AliadoShellTabs.inicio,
+      label: 'Inicio',
+      icon: LucideGlyph.house,
     ),
     _AliadoNavItem(
-      index: AliadoShellTabs.reputacion,
-      label: 'Reputación',
-      icon: Icons.star_outline,
-      selectedIcon: Icons.star,
+      index: AliadoShellTabs.pedidos,
+      label: 'Pedidos',
+      icon: LucideGlyph.package,
     ),
     _AliadoNavItem(
       index: AliadoShellTabs.catalogo,
       label: 'Catálogo',
-      icon: Icons.grid_view_outlined,
-      selectedIcon: Icons.grid_view,
+      icon: LucideGlyph.layoutGrid,
       circled: true,
     ),
     _AliadoNavItem(
       index: AliadoShellTabs.favoritos,
       label: 'Favoritos',
-      icon: Icons.favorite_border,
-      selectedIcon: Icons.favorite,
+      icon: LucideGlyph.heart,
     ),
     _AliadoNavItem(
       index: AliadoShellTabs.perfil,
       label: 'Perfil',
-      icon: Icons.person_outline,
-      selectedIcon: Icons.person,
+      icon: LucideGlyph.userRound,
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTinted,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            children: [
-              for (final item in _items)
-                Expanded(
-                  child: _AliadoNavButton(
+    final theme = B2BThemeExtension.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final highContrast = MediaQuery.highContrastOf(context);
+    final surface = theme.surfaceElevated;
+    final tint = surface.withOpacity(highContrast ? 1 : (dark ? .85 : .78));
+    final labelExtra =
+        (MediaQuery.textScalerOf(context).scale(11) - 11).clamp(0.0, 20.0);
+    final height = 74 + labelExtra * 1.2;
+    const radius = BorderRadius.all(Radius.circular(26));
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(10, 0, 10, 7),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          children: [
+            Positioned.fill(
+                top: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: radius,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.textPrimary.withOpacity(0.12),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: IosGlass(
+                    radius: radius,
+                    tint: tint,
+                    border: theme.borderStrong.withOpacity(dark ? 0.55 : 1),
+                    child: const SizedBox.expand(),
+                  ),
+                )),
+            Material(
+              color: Colors.transparent,
+              child: Row(children: [
+                for (final item in _items)
+                  Expanded(
+                      child: _AliadoNavButton(
                     item: item,
                     selected: currentIndex == item.index,
                     onTap: () => onTap(item.index),
-                  ),
-                ),
-            ],
-          ),
+                  )),
+              ]),
+            ),
+          ],
         ),
       ),
     );
@@ -88,14 +108,12 @@ class _AliadoNavItem {
     required this.index,
     required this.label,
     required this.icon,
-    required this.selectedIcon,
     this.circled = false,
   });
 
   final int index;
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
+  final LucideGlyph icon;
   final bool circled;
 }
 
@@ -112,42 +130,54 @@ class _AliadoNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.brand : AppColors.textSecondary;
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (item.circled)
-            _CatalogCircle(
-              selected: selected,
-              icon: selected ? item.selectedIcon : item.icon,
-            )
-          else
-            Icon(
-              selected ? item.selectedIcon : item.icon,
-              size: 22,
-              color: color,
-            ),
-          const SizedBox(height: 2),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                item.label,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final color = selected
+        ? (dark ? AppColors.brandAccent : const Color(0xFF0052FF))
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final icon = item.icon;
+    return Semantics(
+        button: true,
+        selected: selected,
+        child: IosPressable(
+          onTap: onTap,
+          radius: BorderRadius.circular(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (item.circled)
+                _CatalogCircle(
+                  selected: selected,
+                  icon: icon,
+                )
+              else
+                LucideIcon(
+                  icon,
+                  size: 22,
                   color: color,
                 ),
+              const SizedBox(height: 3),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.2,
+                      fontFamily: iosChromeFontFallback.first,
+                      fontFamilyFallback: iosChromeFontFallback,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: color,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 9),
+            ],
           ),
-        ],
-      ),
-    );
+        ));
   }
 }
 
@@ -158,25 +188,35 @@ class _CatalogCircle extends StatelessWidget {
   });
 
   final bool selected;
-  final IconData icon;
+  final LucideGlyph icon;
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return Container(
-      width: 36,
-      height: 36,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: selected ? AppColors.brand : AppColors.brandBlueContainer,
+        color: selected ? theme.brand : theme.brand.withOpacity(0.92),
         border: Border.all(
-          color: AppColors.brand,
-          width: selected ? 0 : 1.5,
+          color: theme.surfaceCard,
+          width: 2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.brand.withOpacity(0.28),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Icon(
-        icon,
-        size: 20,
-        color: selected ? AppColors.white : AppColors.brand,
+      child: Center(
+        child: LucideIcon(
+          icon,
+          size: 21,
+          color: theme.surfaceCard,
+        ),
       ),
     );
   }

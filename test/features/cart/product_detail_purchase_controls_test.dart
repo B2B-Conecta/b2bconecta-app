@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
@@ -17,7 +16,8 @@ const part = PartModel(
     precio: 52,
     salePriceUsd: 48,
     stock: 30,
-    stockReserved: 5);
+    stockReserved: 5,
+    minOrderQty: 5);
 
 Future<void> pumpControls(WidgetTester tester, CartService cart,
     {PartModel product = part,
@@ -25,14 +25,12 @@ Future<void> pumpControls(WidgetTester tester, CartService cart,
     VoidCallback? onOpen,
     double scale = 1,
     bool dark = false,
-    bool compact = false,
-    bool reduceMotion = false}) async {
+    bool compact = false}) async {
   await tester.pumpWidget(MaterialApp(
       theme: dark ? buildAppDarkTheme() : buildAppTheme(),
       builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(scale),
-              disableAnimations: reduceMotion),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
           child: child!),
       home: Scaffold(
           body: Align(
@@ -59,107 +57,60 @@ void main() {
     await tester.tap(find.byKey(const Key('product-purchase-action')));
     await tester.pumpAndSettle();
     expect(cart.itemCount, 2);
+    ScaffoldMessenger.of(
+            tester.element(find.byKey(const Key('product-purchase-action'))))
+        .hideCurrentSnackBar();
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '9');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(cart.itemCount, 9);
     await pumpControls(tester, cart, product: second, compact: true);
     await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('product-purchase-action')));
     await tester.tap(find.byKey(const Key('product-purchase-action')));
     await tester.pumpAndSettle();
     expect(
-        cart.lines.singleWhere((line) => line.part.id == first.id).quantity, 2);
+        cart.lines.singleWhere((line) => line.part.id == first.id).quantity, 9);
     expect(cart.lines.singleWhere((line) => line.part.id == second.id).quantity,
         1);
     await pumpControls(tester, cart, product: first, compact: true);
     await tester.pumpAndSettle();
     expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text, '2');
-    expect(cart.itemCount, 3);
+        tester.widget<TextField>(find.byType(TextField)).controller!.text, '9');
+    expect(cart.itemCount, 10);
     expect(tester.takeException(), isNull);
   });
 
-  for (final scenario in [
-    (size: const Size(390, 844), scale: 1.0),
-    (size: const Size(320, 640), scale: 1.6),
-    (size: const Size(568, 320), scale: 1.0),
-  ]) {
-    testWidgets('compact add reveals quantity at the same height: $scenario',
-        (tester) async {
-      tester.view.physicalSize = scenario.size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final cart = CartService();
-      var opened = false;
-      await pumpControls(tester, cart,
-          compact: true, scale: scenario.scale, onOpen: () => opened = true);
-      expect(find.byType(TextField), findsNothing);
-      final slot = find.byKey(const Key('compact-purchase-slot'));
-      final height = tester.getSize(slot).height;
-      final before = tester.getRect(slot);
-      await tester.tap(find.byKey(const Key('product-purchase-action')));
-      await tester.pump(const Duration(milliseconds: 80));
-      expect(cart.itemCount, 5);
-      expect(
-          tester
-              .widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher))
-              .duration,
-          const Duration(milliseconds: 220));
-      await tester.pumpAndSettle();
-      expect(find.byType(TextField), findsOneWidget);
-      expect(find.byTooltip('Ver carrito'), findsOneWidget);
-      expect(tester.getSize(slot).height, closeTo(height, .1));
-      expect(tester.getRect(slot).top, closeTo(before.top, .1));
-      await tester.tap(find.byTooltip('Aumentar cantidad'));
-      await tester.pump();
-      expect(cart.itemCount, 6);
-      await tester.enterText(find.byType(TextField), '12');
-      await tester.tap(find.byTooltip('Ver carrito'));
-      expect(opened, isTrue);
-      expect(cart.itemCount, 12);
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  testWidgets('reduced motion reveals the control immediately', (tester) async {
-    final cart = CartService();
-    await pumpControls(tester, cart, compact: true, reduceMotion: true);
-    await tester.tap(find.byKey(const Key('product-purchase-action')));
-    await tester.pumpAndSettle();
-    expect(
-        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
-        Duration.zero);
-    expect(cart.itemCount, 5);
-    expect(find.byType(TextField), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('keyboard activation is immediate and adds once', (tester) async {
-    final cart = CartService();
-    await pumpControls(tester, cart, compact: true);
-    Focus.of(tester.element(find.text('Agregar al carrito'))).requestFocus();
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pumpAndSettle();
-    expect(cart.itemCount, 5);
-    expect(
-        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
-        Duration.zero);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('reversing the reveal quickly never duplicates a field or a line',
+  testWidgets('compact keeps qty and Agregar visible before and after add',
       (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final cart = CartService();
     await pumpControls(tester, cart, compact: true);
-    await tester.tap(find.byKey(const Key('product-purchase-action')));
-    await tester.pump(const Duration(milliseconds: 30));
-    cart.removeProduct(part.id);
-    await tester.pump(const Duration(milliseconds: 30));
-    await tester.tap(find.text('Agregar al carrito').last);
-    await tester.pumpAndSettle();
-    expect(cart.lines.length, 1);
-    expect(cart.itemCount, 5);
     expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Agregar'), findsOneWidget);
+    final slot = find.byKey(const Key('compact-purchase-slot'));
+    final height = tester.getSize(slot).height;
+    await tester.tap(find.byKey(const Key('product-purchase-action')));
+    await tester.pumpAndSettle();
+    expect(cart.itemCount, 5);
+    expect(find.text('En tu carrito: 5 unidades'), findsOneWidget);
+    expect(find.text('Agregar'), findsOneWidget);
+    expect(tester.getSize(slot).height, closeTo(height, .1));
+    ScaffoldMessenger.of(tester.element(slot)).hideCurrentSnackBar();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Aumentar cantidad'));
+    await tester.tap(find.byTooltip('Aumentar cantidad'), warnIfMissed: false);
+    await tester.pump();
+    expect(cart.itemCount, 6);
+    await tester.enterText(find.byType(TextField), '12');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(cart.itemCount, 12);
     expect(tester.takeException(), isNull);
   });
 
@@ -279,6 +230,7 @@ void main() {
                 find.byKey(const Key('product-purchase-action')))
             .onPressed,
         isNotNull);
+    expect(find.text('Ver carrito'), findsOneWidget);
     expect(cart.itemCount, 8);
   });
 

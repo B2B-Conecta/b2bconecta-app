@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'in_app_notification_model.dart';
 import 'notification_provider.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 enum _ReadFilter {
   all,
@@ -315,75 +316,93 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
 
   Widget _typeAvatar(InAppNotificationModel n) {
     final t = n.type.trim();
-    IconData icon;
-    Color bg;
+    late final Widget glyph;
+    late final Color bg;
     switch (t) {
       case 'kyc':
-        icon = Icons.verified_user_outlined;
+        glyph = const Icon(Icons.verified_user_outlined,
+            color: Colors.white, size: 18);
         bg = Colors.red.shade600;
         break;
       case 'credito':
-        icon = Icons.account_balance_outlined;
+        glyph = const Icon(Icons.account_balance_outlined,
+            color: Colors.white, size: 18);
         bg = Colors.teal.shade700;
         break;
       case 'morosidad':
-        icon = Icons.warning_amber_rounded;
+        glyph = const Icon(Icons.warning_amber_rounded,
+            color: Colors.white, size: 18);
         bg = Colors.deepOrange.shade700;
         break;
       case 'tasa_bcv':
-        icon = Icons.currency_exchange;
+        glyph =
+            const Icon(Icons.currency_exchange, color: Colors.white, size: 18);
         bg = AppColors.brandBlue;
         break;
       case 'pago':
-        icon = Icons.payments_outlined;
+        glyph = const Icon(Icons.payments_outlined,
+            color: Colors.white, size: 18);
         bg = Colors.red.shade700;
         break;
       case 'supervision':
-        icon = Icons.admin_panel_settings_outlined;
+        glyph = const Icon(Icons.admin_panel_settings_outlined,
+            color: Colors.white, size: 18);
         bg = Colors.indigo.shade700;
         break;
       case 'mensaje':
       case 'mensaje_directo':
-        icon = Icons.chat_bubble_outline;
+        glyph = const LucideIcon(LucideGlyph.messageCircle,
+            color: Colors.white, size: 18);
         bg = AppColors.brandBlue;
         break;
       case 'actividad':
-        icon = Icons.notifications_active_outlined;
+        glyph = const Icon(Icons.notifications_active_outlined,
+            color: Colors.white, size: 18);
         bg = AppColors.brandBlue;
         break;
       case 'pedido':
-        icon = Icons.local_shipping_outlined;
+        glyph = const Icon(Icons.local_shipping_outlined,
+            color: Colors.white, size: 18);
         bg = AppColors.brand;
         break;
       case 'envio':
       case 'logistica':
-        icon = Icons.local_shipping_outlined;
+        glyph = const Icon(Icons.local_shipping_outlined,
+            color: Colors.white, size: 18);
         bg = Colors.green.shade600;
         break;
       case 'validacion':
-        icon = Icons.fact_check_outlined;
+        glyph = const Icon(Icons.fact_check_outlined,
+            color: Colors.white, size: 18);
         bg = AppColors.brandBlue;
         break;
       case 'promocion':
-        icon = Icons.campaign_outlined;
+        glyph =
+            const Icon(Icons.campaign_outlined, color: Colors.white, size: 18);
         bg = AppColors.brand;
         break;
       case 'inventario':
-        icon = Icons.inventory_2_outlined;
+        glyph = const Icon(Icons.inventory_2_outlined,
+            color: Colors.white, size: 18);
         bg = AppColors.brand;
         break;
       case 'soporte':
-        icon = Icons.support_agent_outlined;
+        glyph = const LucideIcon(
+          LucideGlyph.headset,
+          size: 18,
+          color: Colors.white,
+        );
         bg = Colors.blue.shade700;
         break;
       default:
-        icon = Icons.notifications_none_outlined;
+        glyph = const Icon(Icons.notifications_none_outlined,
+            color: Colors.white, size: 18);
         bg = AppColors.brandAccent;
     }
     return CircleAvatar(
       radius: 18,
       backgroundColor: bg,
-      child: Icon(icon, color: Colors.white, size: 18),
+      child: glyph,
     );
   }
 

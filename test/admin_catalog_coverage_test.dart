@@ -44,13 +44,10 @@ void main() {
     await tester.tap(find.byKey(const Key('admin-published-catalogs-stat')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Catálogos publicados · 1'), findsOneWidget);
+    expect(find.text('Catálogos publicados'), findsWidgets);
     expect(find.text('Repuestos Delta'), findsOneWidget);
-    expect(find.text('Sin catálogo publicado · 1'), findsOneWidget);
     expect(find.text('Accesorios Punto Fijo'), findsOneWidget);
-    expect(
-      find.text('Importadores registrados que aún no publican productos.'),
-      findsOneWidget,
-    );
+    expect(find.text('Catálogo publicado'), findsOneWidget);
+    expect(find.text('Sin catálogo publicado'), findsOneWidget);
   });
 }

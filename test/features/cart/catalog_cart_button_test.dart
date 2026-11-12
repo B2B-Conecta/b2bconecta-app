@@ -37,7 +37,7 @@ void main() {
                     profile: buyer,
                     cart: cart,
                     onChooseVariant: () => choosing = true)))));
-    await tester.tap(find.text('Agregar al carrito'));
+    await tester.tap(find.text('Agregar'));
     await tester.pump();
     expect(choosing, isTrue);
     expect(cart.isEmpty, isTrue);
@@ -67,7 +67,7 @@ void main() {
                 width: 360,
                 child: CatalogCartButton(
                     part: family, profile: buyer, cart: cart)))));
-    await tester.tap(find.text('Agregar al carrito'));
+    await tester.tap(find.text('Agregar'));
     await tester.pumpAndSettle();
     expect(find.text('Cancelar'), findsOneWidget);
     expect(cart.isEmpty, isTrue);
@@ -98,7 +98,7 @@ void main() {
 
     // Re-open and cancel leaves cart unchanged.
     final before = cart.itemCount;
-    await tester.tap(find.text('Agregar al carrito').first);
+    await tester.tap(find.text('Agregar').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
@@ -114,7 +114,7 @@ void main() {
         home: Scaffold(
             body:
                 CatalogCartButton(part: product, profile: buyer, cart: cart))));
-    await tester.tap(find.text('Agregar al carrito'));
+    await tester.tap(find.text('Agregar'));
     await tester.pump();
     expect(cart.itemCount, 5);
     expect(cart.totalRef(), 60);
@@ -179,7 +179,7 @@ void main() {
         lessThan(tester.getTopLeft(find.text('100.00 REF')).dy));
     expect(tester.getTopLeft(find.text('100.00 REF')).dy,
         lessThan(tester.getTopLeft(find.text('Bs 1.000,00')).dy));
-    await tester.tap(find.text('Agregar al carrito'));
+    await tester.tap(find.text('Agregar'));
     await tester.pump();
     await tester.enterText(find.byType(TextField), '10');
     await tester.testTextInput.receiveAction(TextInputAction.done);

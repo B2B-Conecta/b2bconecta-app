@@ -8,14 +8,13 @@ abstract final class AliadoCatalogLayout {
 
   static int crossAxisCount(double width, {double textScale = 1}) {
     width /= textScale < 1 ? 1 : textScale;
-    if (width >= 1320) return 5;
+    // Mock móvil: 2 cols; tablet/web: 3–4 (tope 4).
     if (width >= 1040) return 4;
     if (width >= 720) return 3;
-    if (width < 360) return 1;
     return 2;
   }
 
-  static bool useCompactCards(double width) => crossAxisCount(width) >= 3;
+  static bool useCompactCards(double width) => crossAxisCount(width) >= 2;
 
   static int pageSizeForCount(int columns) => columns * 4;
 
@@ -43,7 +42,7 @@ abstract final class AliadoCatalogLayout {
     final image = inner / cardImageAspect;
     // Space for the full price, stock, ERP fields and supplier actions.
     final scale = textScale < 1 ? 1.0 : textScale;
-    return 8 + image + 70 + 224 * scale + (showDistance ? 20 * scale : 0);
+    return 8 + image + 70 + 260 * scale + (showDistance ? 20 * scale : 0);
   }
 
   static double childAspectRatio({

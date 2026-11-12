@@ -3,7 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 
 import 'app_breakpoints.dart';
 
@@ -32,13 +32,14 @@ Future<T?> showAdaptiveAdminSheet<T>({
   bool isDismissible = true,
   double? desktopMaxWidth,
 }) {
+  final theme = B2BThemeExtension.of(context);
   if (!isAdminDesktopLayout(context)) {
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       isDismissible: isDismissible,
       showDragHandle: showDragHandle,
-      backgroundColor: AppColors.card,
+      backgroundColor: theme.dialogSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -58,7 +59,7 @@ Future<T?> showAdaptiveAdminSheet<T>({
   return showDialog<T>(
     context: context,
     barrierDismissible: isDismissible,
-    barrierColor: Colors.black.withOpacity(0.28),
+    barrierColor: theme.textPrimary.withOpacity(0.35),
     builder: (ctx) => _AdminDesktopDialog(
       draggable: draggable,
       maxWidth: desktopMaxWidth ?? kAdminDialogMaxWidth,
@@ -93,6 +94,7 @@ class _AdminDesktopDialogState extends State<_AdminDesktopDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final maxHeight = math.min(MediaQuery.sizeOf(context).height * 0.86, 760.0);
     Widget content = widget.builder(
       context,
@@ -116,12 +118,12 @@ class _AdminDesktopDialogState extends State<_AdminDesktopDialog> {
           ),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: theme.dialogSurface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.borderSubtle),
+              border: Border.all(color: theme.borderSubtle),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.black.withOpacity(0.14),
+                  color: theme.textPrimary.withOpacity(0.22),
                   blurRadius: 32,
                   offset: const Offset(0, 12),
                 ),

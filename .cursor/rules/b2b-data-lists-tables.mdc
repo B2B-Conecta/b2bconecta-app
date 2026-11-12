@@ -1,0 +1,48 @@
+---
+description: Estándar obligatorio de listados/tablas (modelo Cuentas / AccountsDataTable)
+alwaysApply: true
+---
+
+# Listados y tablas B2B Conecta
+
+Referencia: `UsersDataTable` / `AccountsDataTable`.
+Shell: `lib/core/layout/b2b_data_table_shell.dart`.
+Paginación única: `ListPageBar` (`lib/core/layout/list_page_bar.dart`).
+
+## Obligatorio
+
+1. **Contenedor:** `B2bDataTableShell` → `theme.surfaceCard`, radio `12`, `theme.borderSubtle`.
+2. **Toolbar:** buscador + píldoras + acción primaria (`B2bDataTableToolbar`).
+3. **Header:** `B2bDataTableHeader` (`theme.tableHeaderBg`, `12` / `w600` / `theme.textSecondary`).
+4. **Filas:** zebra `theme.tableRowEven` / `theme.tableRowOdd`.
+5. **Acciones por fila:** `B2bDataRowActionsMenu`.
+6. **Paginación:** solo el pie `ListPageBar` (formato abajo).
+7. **Colores:** `B2BThemeExtension`.
+
+## Paginación unificada (pie de tabla)
+
+Único diseño permitido — **abajo** del listado, no arriba:
+
+| Lado | UI |
+|---|---|
+| Izquierda | `Mostrando 1–8 de 8` (`theme.textSecondary`, 12 / w600). Opcional `entityLabel` → «… de 8 eventos». |
+| Derecha | `< 1 / 3 >` — chevrons Lucide + `página / totalPáginas` (`theme.textPrimary`). |
+
+```dart
+// … header + filas …
+ListPageBar(
+  total: filtered.length,
+  pageIndex: _pageIndex,
+  pageSize: _pageSize,
+  alwaysShow: filtered.isNotEmpty,
+  onPageIndex: (i) => setState(() => _pageIndex = i),
+),
+```
+
+Prohibido: chips «Por vista» como paginador principal, `< 1–10 de N >` entre flechas, o `_Pager` locales distintos.
+
+## Prohibido
+
+- Paginadores custom / «Por vista» como control principal del pie.
+- Filas sin zebra o colores fijos.
+- Listados sin shell / sin menú de acciones cuando el dominio lo permita.

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -95,12 +95,14 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
       (sum, row) => sum + _num(row['saldo_vigente']),
     );
 
+    final theme = B2BThemeExtension.of(context);
+
     Widget sectionTitle(String text) => Text(
           text,
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 15,
-            color: AppColors.textPrimary,
+            color: theme.textPrimary,
           ),
         );
 
@@ -113,56 +115,59 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             sliver: SliverList.list(
               children: [
-          Text(
-            'Devoluciones',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Lectura para mediación. La decisión sigue en el importador.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _Stat(
-                  label: 'Casos',
-                  value: '$totalCasos',
+                Text(
+                  'Devoluciones',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: theme.textPrimary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _Stat(
-                  label: 'En revisión',
-                  value: '$abiertas',
+                const SizedBox(height: 4),
+                Text(
+                  'Lectura para mediación y postventa. La decisión sigue en el importador.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: theme.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _Stat(
-                  label: 'Saldo vigente',
-                  value: '${formatRefAmount(saldo)} REF',
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Stat(
+                        theme: theme,
+                        label: 'Casos',
+                        value: '$totalCasos',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _Stat(
+                        theme: theme,
+                        label: 'En revisión',
+                        value: '$abiertas',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _Stat(
+                        theme: theme,
+                        label: 'Saldo vigente',
+                        value: '${formatRefAmount(saldo)} REF',
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          sectionTitle('Por importador'),
-          const SizedBox(height: 8),
-          if (_importers.isEmpty)
-            Text(
-              'Todavía no hay devoluciones.',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+                const SizedBox(height: 20),
+                sectionTitle('Por importador'),
+                const SizedBox(height: 8),
+                if (_importers.isEmpty)
+                  Text(
+                    'Todavía no hay devoluciones.',
+                    style: TextStyle(color: theme.textSecondary),
+                  ),
               ],
             ),
           ),
@@ -209,8 +214,13 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat({
+    required this.theme,
+    required this.label,
+    required this.value,
+  });
 
+  final B2BThemeExtension theme;
   final String label;
   final String value;
 
@@ -218,9 +228,9 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: theme.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(color: theme.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
@@ -229,16 +239,16 @@ class _Stat extends StatelessWidget {
           children: [
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
-                fontSize: 14,
-                color: AppColors.brand,
+                fontSize: 15,
+                color: theme.brand,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: theme.textSecondary),
             ),
           ],
         ),
@@ -261,11 +271,12 @@ class _ImporterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final saldo = number(row['saldo_vigente']);
+    final theme = B2BThemeExtension.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: theme.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(color: theme.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -277,7 +288,7 @@ class _ImporterCard extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
-                color: AppColors.textPrimary,
+                color: theme.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
@@ -290,16 +301,16 @@ class _ImporterCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.35,
-                color: AppColors.textSecondary,
+                color: theme.textSecondary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'Saldo vigente ${formatRefAmount(saldo)} REF',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: AppColors.brand,
+                color: theme.brand,
               ),
             ),
           ],
@@ -328,11 +339,12 @@ class _CaseCard extends StatelessWidget {
     final note = row['rejection_note']?.toString().trim();
     final credit = number(row['credit_amount']);
     final remaining = row['remaining'];
+    final theme = B2BThemeExtension.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: theme.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(color: theme.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -344,13 +356,13 @@ class _CaseCard extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 13.5,
-                color: AppColors.textPrimary,
+                color: theme.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               '${row['product_name'] ?? 'Producto'} · ${row['affected_qty'] ?? 1} uds',
-              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13, color: theme.textPrimary),
             ),
             const SizedBox(height: 4),
             Text(
@@ -359,7 +371,7 @@ class _CaseCard extends StatelessWidget {
                 if (pref.isNotEmpty) 'Prefiere $pref',
                 if (when != null) formatEsShortDateTime(when.toLocal()),
               ].join(' · '),
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: theme.textSecondary),
             ),
             if (credit > 0)
               Padding(
@@ -369,10 +381,10 @@ class _CaseCard extends StatelessWidget {
                       ? 'Crédito ${formatRefAmount(credit)} REF'
                       : 'Crédito ${formatRefAmount(credit)} REF · vigente ${formatRefAmount(number(remaining))} REF'
                           '${row['erp_reference'] == null ? '' : ' · ${row['erp_reference']}'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.brand,
+                    color: theme.brand,
                   ),
                 ),
               ),
@@ -381,7 +393,7 @@ class _CaseCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Cambio: $shipment',
-                  style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                  style: TextStyle(fontSize: 12.5, color: theme.textPrimary),
                 ),
               ),
             if (note != null && note.isNotEmpty)
@@ -392,7 +404,7 @@ class _CaseCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
-                    color: AppColors.textSecondary,
+                    color: theme.textSecondary,
                   ),
                 ),
               ),

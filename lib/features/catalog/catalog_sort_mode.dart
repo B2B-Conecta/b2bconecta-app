@@ -36,6 +36,21 @@ extension CatalogSortModeLabel on CatalogSortMode {
     }
   }
 
+  /// Etiqueta corta del maquetado («N repuestos · Relevancia ↓»).
+  String get compactLabelEs {
+    switch (this) {
+      case CatalogSortMode.category:
+      case CatalogSortMode.recommended:
+        return 'Relevancia';
+      case CatalogSortMode.nearest:
+        return 'Cercanos';
+      case CatalogSortMode.featured:
+        return 'Destacados';
+      case CatalogSortMode.reputation:
+        return 'Reputación';
+    }
+  }
+
   String get subtitleEs {
     switch (this) {
       case CatalogSortMode.category:

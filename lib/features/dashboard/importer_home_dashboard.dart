@@ -57,7 +57,8 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
     _storeRefresh?.cancel();
     if (!widget.embedInDesktopShell) {
       _storeRefresh = Timer.periodic(const Duration(minutes: 5), (_) {
-        setState(() => _stores = _loadStores());
+        final next = _loadStores();
+        setState(() => _stores = next);
       });
     }
   }

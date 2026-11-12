@@ -228,6 +228,10 @@ class PartModel {
         minOrderQty: minOrderQty,
       );
 
+  /// El proveedor definió un MOQ por encima del piso de 1 unidad.
+  bool get hasSupplierMinOrderQty =>
+      ProductMinOrderQty.isSupplierDefined(minOrderQty);
+
   String get minOrderQtyLabelEs => 'Mín. $minOrderQtyEffective uds';
 
   bool get hasVariantFamily =>

@@ -2,32 +2,27 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/payments/document_type_preference.dart';
-import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
-import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
-import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
-import 'admin_promo_campaigns_panel.dart';
-import 'package:motolink_pro_app/features/referrals/admin_referrals_panel.dart';
-import 'admin_returns_report_panel.dart';
 import 'encomiendas_report_excel_service.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
-import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
-import 'package:motolink_pro_app/core/layout/filter_chip_strip.dart';
-import 'package:motolink_pro_app/core/layout/filter_menu_button.dart';
-import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
-import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'admin_product_sales_ranking.dart';
-import 'admin_catalog_featured_section.dart';
-import 'package:motolink_pro_app/core/utils/app_date_format.dart';
-import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
-import 'package:motolink_pro_app/core/widgets/segmented_filter_bar.dart';
+import 'encomiendas_filters_bar.dart';
+import 'encomiendas_orders_table.dart';
+import 'executive_summary_cards.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 
 /// Reportes de encomiendas: facturación (preferencia de documento) y métricas gerenciales.
 class AdminEncomiendasReportPanel extends StatefulWidget {
-  const AdminEncomiendasReportPanel({super.key});
+  const AdminEncomiendasReportPanel({
+    super.key,
+    this.embeddedInHub = false,
+  });
+
+  /// Cuando vive dentro de [AdminReportsHubPanel] (sin tabs internas).
+  final bool embeddedInHub;
 
   @override
   State<AdminEncomiendasReportPanel> createState() =>
@@ -46,26 +41,18 @@ class _AdminEncomiendasReportPanelState
   late DateTime _hasta;
   final _searchCtrl = TextEditingController();
 
-  /// Vacío = todos los estados (servidor).
-  final Set<String> _statusSelection = {};
+  EncomiendasPeriodPreset _periodPreset = EncomiendasPeriodPreset.d90;
+  EncomiendasStatusPill _statusPill = EncomiendasStatusPill.todos;
 
   String? _ownerId;
   String _docPrefFilter = 'all';
-  bool _soloConValoracion = false;
-  bool _soloPagosAprobados = false;
-  bool _soloEntregados = false;
 
-  /// `null` = todos; 10/20/50 = solo pedidos de los productos más vendidos.
+  /// `null` = todos; 10/20 = top productos más vendidos.
   int? _topSoldLimit;
-  int _sectionIndex = 0;
-  final Set<int> _visitedSections = {0};
   bool _exporting = false;
 
-  static const _topSoldOptions = <int>[10, 20, 50];
-
   static const _docOptions = <_DocOpt>[
-    _DocOpt('all', 'Todas las preferencias'),
-    _DocOpt('pendiente', 'Preferencia pendiente'),
+    _DocOpt('all', 'Todas'),
     _DocOpt(DocumentTypePreference.notaEntrega, 'Nota de entrega'),
     _DocOpt(DocumentTypePreference.facturaFiscal, 'Factura fiscal'),
   ];
@@ -76,6 +63,7 @@ class _AdminEncomiendasReportPanelState
     final now = DateTime.now();
     _hasta = DateTime(now.year, now.month, now.day);
     _desde = _hasta.subtract(const Duration(days: 90));
+    _periodPreset = EncomiendasPeriodPreset.d90;
     _searchCtrl.addListener(_applyLocalFilters);
     _bootstrap();
   }
@@ -106,8 +94,7 @@ class _AdminEncomiendasReportPanelState
       _error = null;
     });
     try {
-      final statuses =
-          _statusSelection.isEmpty ? null : _statusSelection.toList();
+      final statuses = _statusPill.serverStatuses?.toList();
       final rows = await SupabaseService.fetchTransactionRequestsForAdminReport(
         createdFromLocal: _desde,
         createdToLocal: _hasta,
@@ -134,22 +121,7 @@ class _AdminEncomiendasReportPanelState
   }) {
     var list = List<TransactionRequestModel>.from(_raw);
 
-    if (_soloEntregados) {
-      list = list
-          .where((r) => r.status == TransactionRequestStatus.entregado)
-          .toList();
-    }
-
     switch (_docPrefFilter) {
-      case 'pendiente':
-        list = list
-            .where(
-              (r) =>
-                  r.documentTypePreference == null ||
-                  r.documentTypePreference!.trim().isEmpty,
-            )
-            .toList();
-        break;
       case DocumentTypePreference.notaEntrega:
       case DocumentTypePreference.facturaFiscal:
         list = list
@@ -158,17 +130,6 @@ class _AdminEncomiendasReportPanelState
         break;
       default:
         break;
-    }
-
-    if (_soloConValoracion) {
-      list = list.where((r) => r.aliadoExperienceSubmittedAt != null).toList();
-    }
-    if (_soloPagosAprobados) {
-      list = list
-          .where(
-            (r) => r.pagoEstadoRevision?.trim() == 'aprobado',
-          )
-          .toList();
     }
 
     list = TransactionRequestFilterUtils.apply(
@@ -192,497 +153,114 @@ class _AdminEncomiendasReportPanelState
     setState(() => _filtered = _applyLocalFiltersCore());
   }
 
-  void _setDocPrefFilter(String value) {
-    setState(() => _docPrefFilter = value);
-    _applyLocalFilters();
-  }
-
   void _clearAllFilters() {
     setState(() {
-      _statusSelection.clear();
+      _statusPill = EncomiendasStatusPill.todos;
       _ownerId = null;
       _docPrefFilter = 'all';
-      _soloConValoracion = false;
-      _soloPagosAprobados = false;
-      _soloEntregados = false;
       _topSoldLimit = null;
       _searchCtrl.clear();
+      _periodPreset = EncomiendasPeriodPreset.d90;
+      final now = DateTime.now();
+      _hasta = DateTime(now.year, now.month, now.day);
+      _desde = _hasta.subtract(const Duration(days: 90));
     });
     _load();
   }
 
-  String _formatDateShort(DateTime d) => '${d.day}/${d.month}/${d.year}';
-
-  int get _activeFilterCount {
+  int get _advancedActiveCount {
     var n = 0;
-    if (_statusSelection.isNotEmpty) n++;
     if (_ownerId != null) n++;
     if (_docPrefFilter != 'all') n++;
-    if (_soloConValoracion) n++;
-    if (_soloPagosAprobados) n++;
-    if (_soloEntregados) n++;
     if (_topSoldLimit != null) n++;
-    if (_searchCtrl.text.trim().isNotEmpty) n++;
     return n;
   }
 
-  Future<void> _showAdvancedFiltersSheet() async {
-    await showAdaptiveAdminSheet<void>(
-      context: context,
-      builder: (ctx, _) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            void refreshSheet() => setSheetState(() {});
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 8,
-                bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Filtros del reporte',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Estado e importador → servidor',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: AppColors.textSecondary,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Estado del pedido',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final s
-                            in TransactionRequestStatus.valuesForReportFilter)
-                          FilterChip(
-                            label: Text(
-                              TransactionRequestStatus.labelEs(s),
-                              style: const TextStyle(fontSize: 11.5),
-                            ),
-                            selected: _statusSelection.contains(s),
-                            visualDensity: VisualDensity.compact,
-                            onSelected: (v) {
-                              setState(() {
-                                if (v) {
-                                  _statusSelection.add(s);
-                                } else {
-                                  _statusSelection.remove(s);
-                                }
-                              });
-                              refreshSheet();
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String?>(
-                      value: _ownerId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Importador',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Todos los importadores'),
-                        ),
-                        ..._importers.map(
-                          (o) => DropdownMenuItem<String?>(
-                            value: o.id,
-                            child: Text(
-                              o.businessName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        setState(() => _ownerId = v);
-                        refreshSheet();
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Preferencia de documento',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SegmentedFilterBar(
-                      labels: [for (final opt in _docOptions) opt.label],
-                      selectedIndex: _docOptions
-                          .indexWhere((opt) => opt.value == _docPrefFilter)
-                          .clamp(0, _docOptions.length - 1),
-                      onSelected: (index) {
-                        _setDocPrefFilter(_docOptions[index].value);
-                        refreshSheet();
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text(
-                        'Con valoración de la tienda minorista',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                      value: _soloConValoracion,
-                      onChanged: (v) {
-                        setState(() => _soloConValoracion = v);
-                        _applyLocalFilters();
-                        refreshSheet();
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text(
-                        'Pago aprobado',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                      value: _soloPagosAprobados,
-                      onChanged: (v) {
-                        setState(() => _soloPagosAprobados = v);
-                        _applyLocalFilters();
-                        refreshSheet();
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text(
-                        'Solo entregados',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                      value: _soloEntregados,
-                      onChanged: (v) {
-                        setState(() => _soloEntregados = v);
-                        _applyLocalFilters();
-                        refreshSheet();
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Productos más vendidos',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Limita el detalle y el Excel a los productos con más unidades '
-                      'en el rango y filtros actuales (excepto este tope).',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SegmentedFilterBar(
-                      labels: [
-                        'Todos',
-                        for (final n in _topSoldOptions) 'Top $n',
-                      ],
-                      selectedIndex: _topSoldLimit == null
-                          ? 0
-                          : _topSoldOptions.indexOf(_topSoldLimit!) + 1,
-                      onSelected: (index) {
-                        setState(() {
-                          _topSoldLimit =
-                              index == 0 ? null : _topSoldOptions[index - 1];
-                        });
-                        _applyLocalFilters();
-                        refreshSheet();
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              _clearAllFilters();
-                              Navigator.pop(ctx);
-                            },
-                            child: const Text('Limpiar todo'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _load();
-                            },
-                            child: const Text('Aplicar al servidor'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCompactFiltersCard() {
-    final canExport = _filtered.isNotEmpty && !_exporting && !_loading;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: MediaQuery.sizeOf(context).width < 600
-                      ? 'Producto, SKU, tienda minorista…'
-                      : 'Buscar producto, SKU, tienda minorista…',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  filled: true,
-                  fillColor: AppColors.fieldFill,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  isDense: true,
-                  suffixIcon: _searchCtrl.text.trim().isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            _applyLocalFilters();
-                          },
-                        ),
-                ),
-                onChanged: (_) => _applyLocalFilters(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filledTonal(
-              onPressed: canExport ? _exportExcel : null,
-              icon: _exporting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download_outlined, size: 20),
-              tooltip: _filtered.isEmpty
-                  ? 'Sin datos para Excel'
-                  : 'Descargar Excel (${_filtered.length})',
-            ),
-            const SizedBox(width: 4),
-            IconButton.filled(
-              onPressed: _loading ? null : _load,
-              icon: _loading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.refresh, size: 20),
-              tooltip: 'Actualizar desde servidor',
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (isAdminDesktopLayout(context))
-          _desktopFilterToolbar()
-        else
-          FilterChipStrip(
-            children: [
-              for (final (i, days) in const [30, 90, 365].indexed)
-                StripChip(
-                  label: '$days días',
-                  selected: _presetDayIndex == i,
-                  onTap: _loading
-                      ? null
-                      : () {
-                          _presetDays(days);
-                          _load();
-                        },
-                ),
-              StripChip(
-                label:
-                    '${_formatDateShort(_desde)} – ${_formatDateShort(_hasta)}',
-                icon: Icons.calendar_today_outlined,
-                selected: _presetDayIndex < 0,
-                onTap: _loading ? null : _pickRange,
-              ),
-              const StripDivider(),
-              StripChip(
-                label: _activeFilterCount == 0
-                    ? 'Filtros'
-                    : 'Filtros ($_activeFilterCount)',
-                icon: Icons.tune,
-                selected: _activeFilterCount > 0,
-                onTap: _showAdvancedFiltersSheet,
-              ),
-              ..._activeFilterChips(),
-              if (_activeFilterCount > 0)
-                TextButton(
-                  onPressed: _clearAllFilters,
-                  child: const Text('Limpiar'),
-                ),
-            ],
-          ),
-      ],
-    );
-  }
-
-  Widget _desktopFilterToolbar() {
-    final preset = _presetDayIndex;
-    const presets = [30, 90, 365];
-    final rangeLabel =
-        '${_formatDateShort(_desde)} – ${_formatDateShort(_hasta)}';
-    return FilterToolbar(
-      children: [
-        FilterMenuButton(
-          icon: Icons.calendar_today_outlined,
-          label: preset >= 0
-              ? 'Período · ${presets[preset]} días'
-              : 'Período · $rangeLabel',
-          active: true,
-          enabled: !_loading,
-          menuChildren: [
-            for (final (i, days) in presets.indexed)
-              FilterMenuOption(
-                label: 'Últimos $days días',
-                selected: preset == i,
-                onPressed: () {
-                  _presetDays(days);
-                  _load();
-                },
-              ),
-            const Divider(height: 8),
-            FilterMenuOption(
-              label:
-                  preset < 0 ? 'Personalizado · $rangeLabel' : 'Personalizado…',
-              icon: Icons.date_range_outlined,
-              selected: preset < 0,
-              onPressed: _pickRange,
-            ),
-          ],
-        ),
-        FilterPillButton(
-          icon: Icons.tune,
-          label: _activeFilterCount == 0
-              ? 'Filtros'
-              : 'Filtros ($_activeFilterCount)',
-          active: _activeFilterCount > 0,
-          showChevron: false,
-          onTap: _showAdvancedFiltersSheet,
-        ),
-        ..._activeFilterChips(),
-        if (_activeFilterCount > 0)
-          TextButton(
-            onPressed: _clearAllFilters,
-            child: const Text('Limpiar'),
-          ),
-      ],
-    );
-  }
-
-  Future<void> _pickRange() async {
-    final from = _desde;
-    final to = _hasta;
-    await _pickDesde();
-    if (!mounted) return;
-    await _pickHasta();
-    if (!mounted) return;
-    if (_desde != from || _hasta != to) _load();
-  }
-
-  Future<void> _pickDesde() async {
-    final d = await showAppDatePicker(
-      context: context,
-      initialDate: _desde,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'Desde',
-    );
-    if (d != null) setState(() => _desde = d);
-  }
-
-  Future<void> _pickHasta() async {
-    final d = await showAppDatePicker(
-      context: context,
-      initialDate: _hasta,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'Hasta',
-    );
-    if (d != null) setState(() => _hasta = d);
-  }
-
-  int get _presetDayIndex {
-    final end = DateTime(_hasta.year, _hasta.month, _hasta.day);
-    final start = DateTime(_desde.year, _desde.month, _desde.day);
-    final today = DateTime.now();
-    final todayDay = DateTime(today.year, today.month, today.day);
-    if (end != todayDay) return -1;
-    return const [30, 90, 365].indexOf(end.difference(start).inDays);
-  }
-
-  void _presetDays(int days) {
+  void _applyPeriodPreset(EncomiendasPeriodPreset preset) {
     final now = DateTime.now();
     final end = DateTime(now.year, now.month, now.day);
+    final days = switch (preset) {
+      EncomiendasPeriodPreset.d7 => 7,
+      EncomiendasPeriodPreset.d30 => 30,
+      EncomiendasPeriodPreset.d90 => 90,
+      EncomiendasPeriodPreset.custom => null,
+    };
+    if (days == null) return;
     setState(() {
+      _periodPreset = preset;
       _hasta = end;
       _desde = end.subtract(Duration(days: days));
     });
+    _load();
+  }
+
+  Future<void> _pickCustomRange() async {
+    final picked = await pickEncomiendasCustomRange(
+      context: context,
+      desde: _desde,
+      hasta: _hasta,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _desde = picked.$1;
+      _hasta = picked.$2;
+      _periodPreset = EncomiendasPeriodPreset.custom;
+    });
+    await _load();
+  }
+
+  void _onStatusPill(EncomiendasStatusPill pill) {
+    setState(() => _statusPill = pill);
+    _load();
+  }
+
+  Future<void> _applyAdvanced({
+    required String? ownerId,
+    required String docPref,
+    required int? topSoldLimit,
+  }) async {
+    setState(() {
+      _ownerId = ownerId;
+      _docPrefFilter = docPref;
+      _topSoldLimit = topSoldLimit;
+    });
+    await _load();
+  }
+
+  Widget _buildFiltersBar() {
+    return EncomiendasFiltersBar(
+      desde: _desde,
+      hasta: _hasta,
+      periodPreset: _periodPreset,
+      statusPill: _statusPill,
+      importers: _importers,
+      ownerId: _ownerId,
+      docPrefFilter: _docPrefFilter,
+      topSoldLimit: _topSoldLimit,
+      searchCtrl: _searchCtrl,
+      loading: _loading,
+      exporting: _exporting,
+      canExport: _filtered.isNotEmpty && !_exporting && !_loading,
+      filteredCount: _filtered.length,
+      advancedActiveCount: _advancedActiveCount,
+      onPeriodPreset: _applyPeriodPreset,
+      onCustomRange: _pickCustomRange,
+      onStatusPill: _onStatusPill,
+      onSearchChanged: (_) => _applyLocalFilters(),
+      onClearSearch: () {
+        _searchCtrl.clear();
+        _applyLocalFilters();
+      },
+      onExport: _exportExcel,
+      onRefresh: _load,
+      onApplyAdvanced: _applyAdvanced,
+      onClearAll: _clearAllFilters,
+    );
   }
 
   EncomiendasReportExportMeta _exportMeta() {
     final lines = <String>[];
-    if (_statusSelection.isNotEmpty) {
-      final labels =
-          _statusSelection.map(TransactionRequestStatus.labelEs).join(', ');
-      lines.add('Estados: $labels');
-    } else {
-      lines.add('Estados: todos');
-    }
+    lines.add('Estados: ${_statusPill.labelEs}');
     if (_ownerId != null) {
       final imp = _importers
           .where((o) => o.id == _ownerId)
@@ -697,10 +275,6 @@ class _AdminEncomiendasReportPanelState
     if (docLabel != null && _docPrefFilter != 'all') {
       lines.add('Documento: $docLabel');
     }
-    if (_soloConValoracion)
-      lines.add('Solo con valoración de la tienda minorista');
-    if (_soloPagosAprobados) lines.add('Solo pagos aprobados');
-    if (_soloEntregados) lines.add('Solo entregados');
     if (_topSoldLimit != null) {
       lines.add('Productos más vendidos: top ${_topSoldLimit!}');
     }
@@ -743,9 +317,15 @@ class _AdminEncomiendasReportPanelState
         meta: _exportMeta(),
         topProducts: _productSalesRanking,
       );
-      final stamp = DateTime.now().toIso8601String().split('T').first;
+      String ymd(DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-'
+          '${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+      final from = ymd(_desde);
+      final to = ymd(_hasta);
+      final periodSuffix = from == to ? from : '${from}_a_$to';
       final result = await saveExcelForExport(
-        name: 'motolink_encomiendas_$stamp',
+        name: 'B2B_Conecta_Encomiendas_$periodSuffix',
         bytes: bytes,
       );
       if (!mounted) return;
@@ -779,73 +359,13 @@ class _AdminEncomiendasReportPanelState
     }
   }
 
-  List<Widget> _activeFilterChips() {
-    final chips = <Widget>[];
-    if (_statusSelection.isNotEmpty) {
-      for (final s in _statusSelection) {
-        chips.add(
-          Chip(
-            label: Text(TransactionRequestStatus.labelEs(s)),
-            visualDensity: VisualDensity.compact,
-          ),
-        );
-      }
-    }
-    if (_ownerId != null) {
-      final name = _importers
-          .where((o) => o.id == _ownerId)
-          .map((o) => o.businessName)
-          .firstOrNull;
-      chips.add(
-        Chip(
-          label: Text(name ?? 'Importador'),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-    if (_docPrefFilter != 'all') {
-      final label = _docOptions
-          .where((o) => o.value == _docPrefFilter)
-          .map((o) => o.label)
-          .firstOrNull;
-      if (label != null) {
-        chips.add(
-            Chip(label: Text(label), visualDensity: VisualDensity.compact));
-      }
-    }
-    if (_soloConValoracion) {
-      chips.add(const Chip(
-        label: Text('Con valoración'),
-        visualDensity: VisualDensity.compact,
-      ));
-    }
-    if (_soloPagosAprobados) {
-      chips.add(const Chip(
-        label: Text('Pago aprobado'),
-        visualDensity: VisualDensity.compact,
-      ));
-    }
-    if (_soloEntregados) {
-      chips.add(const Chip(
-        label: Text('Solo entregados'),
-        visualDensity: VisualDensity.compact,
-      ));
-    }
-    if (_topSoldLimit != null) {
-      chips.add(Chip(
-        label: Text('Top ${_topSoldLimit!} más vendidos'),
-        visualDensity: VisualDensity.compact,
-      ));
-    }
-    return chips;
-  }
-
   Widget _topSoldProductsSection() {
+    final theme = B2BThemeExtension.of(context);
     final ranking = _productSalesRanking;
     if (ranking.isEmpty) {
       return Text(
         'Sin ventas en el período con los filtros actuales.',
-        style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+        style: TextStyle(fontSize: 12.5, color: theme.textSecondary),
       );
     }
 
@@ -855,32 +375,31 @@ class _AdminEncomiendasReportPanelState
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
+      color: theme.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderSubtle),
+        side: BorderSide(color: theme.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           children: [
             for (var i = 0; i < shown.length; i++) ...[
-              if (i > 0) Divider(height: 1, color: AppColors.divider),
+              if (i > 0) Divider(height: 1, color: theme.border),
               ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
                 leading: CircleAvatar(
                   radius: 14,
                   backgroundColor: i < 3
-                      ? AppColors.brandAccent.withOpacity(0.18)
-                      : AppColors.surfaceTinted,
+                      ? theme.brand.withOpacity(0.18)
+                      : theme.surfaceSubtle,
                   child: Text(
                     '${i + 1}',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: i < 3
-                          ? AppColors.brandAccent
-                          : AppColors.textSecondary,
+                      color: i < 3 ? theme.brand : theme.textSecondary,
                     ),
                   ),
                 ),
@@ -889,7 +408,7 @@ class _AdminEncomiendasReportPanelState
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: AppColors.textPrimary,
+                    color: theme.textPrimary,
                   ),
                 ),
                 subtitle: Text(
@@ -899,8 +418,7 @@ class _AdminEncomiendasReportPanelState
                     if ((shown[i].importerName ?? '').isNotEmpty)
                       shown[i].importerName!,
                   ].join(' · '),
-                  style:
-                      TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 11, color: theme.textSecondary),
                 ),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -908,16 +426,17 @@ class _AdminEncomiendasReportPanelState
                   children: [
                     Text(
                       '${shown[i].unitsSold} uds.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
+                        color: theme.textPrimary,
                       ),
                     ),
                     Text(
                       '${shown[i].totalRefUsd.toStringAsFixed(2)} REF',
                       style: TextStyle(
                         fontSize: 10.5,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                       ),
                     ),
                   ],
@@ -931,145 +450,7 @@ class _AdminEncomiendasReportPanelState
   }
 
   Widget _summary() {
-    final list = _filtered;
-    if (list.isEmpty) {
-      return Text(
-        'Sin resultados con los filtros actuales.',
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-      );
-    }
-    final totalUsd = list.fold<double>(0, (s, r) => s + r.precioTotal);
-    final conFacturaImportador =
-        list.where((r) => r.hasProveedorFactura).length;
-    final pagosAprobados = list
-        .where(
-            (r) => r.pagoEstadoRevision?.trim() == PagoRevisionEstado.aprobado)
-        .length;
-    final prefNota = list
-        .where((r) =>
-            r.documentTypePreference == DocumentTypePreference.notaEntrega)
-        .length;
-    final prefFiscal = list
-        .where((r) =>
-            r.documentTypePreference == DocumentTypePreference.facturaFiscal)
-        .length;
-    final prefPend = list
-        .where(
-          (r) =>
-              r.documentTypePreference == null ||
-              r.documentTypePreference!.trim().isEmpty,
-        )
-        .length;
-    final valorados =
-        list.where((r) => r.aliadoExperienceSubmittedAt != null).toList();
-    double? avgStars;
-    if (valorados.isNotEmpty) {
-      final sum =
-          valorados.fold<int>(0, (s, r) => s + (r.aliadoExperienceStars ?? 0));
-      avgStars = sum / valorados.length;
-    }
-    final entregados = list
-        .where((r) => r.status == TransactionRequestStatus.entregado)
-        .length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _StatCard(
-              title: 'Pedidos',
-              value: '${list.length}',
-              icon: Icons.inventory_2_outlined,
-            ),
-            _StatCard(
-              title: 'Total REF',
-              value: totalUsd.toStringAsFixed(2),
-              icon: Icons.payments_outlined,
-            ),
-            _StatCard(
-              title: 'Con factura',
-              value: '$conFacturaImportador',
-              icon: Icons.receipt_long_outlined,
-            ),
-            _StatCard(
-              title: 'Pagos OK',
-              value: '$pagosAprobados',
-              icon: Icons.verified_outlined,
-            ),
-            _StatCard(
-              title: 'Entregados',
-              value: '$entregados',
-              icon: Icons.done_all_outlined,
-            ),
-            _StatCard(
-              title: 'Nota / Fiscal / Pend.',
-              value: '$prefNota / $prefFiscal / $prefPend',
-              icon: Icons.description_outlined,
-            ),
-            _StatCard(
-              title: 'Valoraciones',
-              value: valorados.isEmpty
-                  ? '—'
-                  : '${valorados.length} · ${avgStars!.toStringAsFixed(2)} ★',
-              icon: Icons.star_outline,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  static const _sectionLabels = <String>[
-    'Encomiendas',
-    'Promos',
-    'Referidos',
-    'Devoluciones',
-  ];
-
-  String get _sectionHint => switch (_sectionIndex) {
-        0 => 'Métricas, Excel y detalle de pedidos en el período.',
-        1 => 'Campañas y banners promocionales del marketplace.',
-        2 => 'Atribución y actividad de referidos.',
-        _ => 'Postventa: frecuencia y saldo por importador.',
-      };
-
-  void _selectSection(int index) {
-    setState(() {
-      _sectionIndex = index;
-      _visitedSections.add(index);
-    });
-  }
-
-  Widget _sectionSwitcher() {
-    return SegmentedFilterBar(
-      labels: _sectionLabels,
-      selectedIndex: _sectionIndex,
-      onSelected: _selectSection,
-    );
-  }
-
-  Widget _sectionHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionSwitcher(),
-          Text(
-            _sectionHint,
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-        ],
-      ),
-    );
+    return ExecutiveSummaryStaticCards(orders: _applyLocalFiltersCore());
   }
 
   Widget _buildEncomiendasBody() {
@@ -1096,145 +477,105 @@ class _AdminEncomiendasReportPanelState
           return ListView(
             padding: EdgeInsets.fromLTRB(16, mobile ? 8 : 0, 16, 24),
             children: [
-              _buildCompactFiltersCard(),
+              _buildFiltersBar(),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    Icons.insights_outlined,
-                    size: 18,
-                    color: AppColors.brandAccent,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    mobile ? 'Resumen' : 'Resumen gerencial',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: mobile ? 14 : 15,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              Builder(
+                builder: (context) {
+                  final theme = B2BThemeExtension.of(context);
+                  return Row(
+                    children: [
+                      LucideIcon(
+                        LucideGlyph.barChart3,
+                        size: 18,
+                        color: theme.brand,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        mobile ? 'Resumen' : 'Resumen gerencial',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: mobile ? 14 : 15,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 8),
               _summary(),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(
-                    Icons.trending_up,
-                    size: 18,
-                    color: AppColors.brandAccent,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      mobile ? 'Top ventas' : 'Productos más vendidos',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: mobile ? 14 : 15,
-                        color: AppColors.textPrimary,
+              Builder(
+                builder: (context) {
+                  final theme = B2BThemeExtension.of(context);
+                  return Row(
+                    children: [
+                      LucideIcon(
+                        LucideGlyph.trendingUp,
+                        size: 18,
+                        color: theme.brand,
                       ),
-                    ),
-                  ),
-                  if (_topSoldLimit != null)
-                    Text(
-                      'Top $_topSoldLimit',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          mobile ? 'Top ventas' : 'Productos más vendidos',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: mobile ? 14 : 15,
+                            color: theme.textPrimary,
+                          ),
+                        ),
                       ),
-                    ),
-                ],
+                      if (_topSoldLimit != null)
+                        Text(
+                          'Top $_topSoldLimit',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 8),
               _topSoldProductsSection(),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(
-                    Icons.list_alt_outlined,
-                    size: 18,
-                    color: AppColors.brandAccent,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Detalle',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: mobile ? 14 : 15,
-                        color: AppColors.textPrimary,
+              Builder(
+                builder: (context) {
+                  final theme = B2BThemeExtension.of(context);
+                  return Row(
+                    children: [
+                      LucideIcon(
+                        LucideGlyph.fileText,
+                        size: 18,
+                        color: theme.brand,
                       ),
-                    ),
-                  ),
-                  Text(
-                    '${_filtered.length}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Detalle de pedidos',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: mobile ? 14 : 15,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 8),
-              if (_filtered.isEmpty && _loading)
-                const SizedBox(
-                  height: 320,
-                  child: AdminListSkeleton(
-                    itemCount: 4,
-                    padding: EdgeInsets.zero,
-                  ),
-                )
-              else if (_filtered.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Text(
-                      'Sin resultados',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ),
-                )
-              else
-                PagedItems<TransactionRequestModel>(
-                  items: _filtered,
-                  itemKey: (r) => r.id,
-                  embedded: true,
-                  separator: 8,
-                  itemBuilder: _detailTile,
-                ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Icon(
-                    Icons.storefront_outlined,
-                    size: 18,
-                    color: AppColors.brandAccent,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Sellos de catálogo',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: mobile ? 14 : 15,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 10),
+              EncomiendasOrdersTable(
+                orders: _filtered,
+                loading: _loading && _filtered.isEmpty,
+                errorMessage: _error,
+                onRetry: _load,
+                onRefresh: _load,
+                pageSize: 10,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Verificado / Destacado de mayoristas (no afecta el Excel).',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const AdminCatalogFeaturedSection(),
             ],
           );
         },
@@ -1244,274 +585,7 @@ class _AdminEncomiendasReportPanelState
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _sectionHeader(),
-        Expanded(
-          child: IndexedStack(
-            index: _sectionIndex,
-            children: [
-              for (var i = 0; i < _sectionLabels.length; i++)
-                if (_visitedSections.contains(i))
-                  switch (i) {
-                    0 => _buildEncomiendasBody(),
-                    1 => const AdminPromoCampaignsPanel(),
-                    2 => const AdminReferralsPanel(),
-                    _ => const AdminReturnsReportPanel(),
-                  }
-                else
-                  const SizedBox.shrink(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  String? _pagoEstadoLabel(TransactionRequestModel r) {
-    final pe = r.pagoEstadoRevision?.trim();
-    if (pe == null || pe.isEmpty) return null;
-    switch (pe) {
-      case PagoRevisionEstado.pendiente:
-        return 'Pago pendiente';
-      case PagoRevisionEstado.enRevision:
-        return 'Pago en revisión';
-      case PagoRevisionEstado.aprobado:
-        return 'Pago aprobado';
-      case PagoRevisionEstado.rechazado:
-        return 'Pago rechazado';
-      default:
-        return pe;
-    }
-  }
-
-  String? _pagoMetodoLabel(TransactionRequestModel r) {
-    final m = r.pagoMetodo?.trim();
-    if (m == null || m.isEmpty) return null;
-    return PagoMetodo.labelEs(m);
-  }
-
-  Widget _detailTile(TransactionRequestModel r) {
-    final doc = r.documentTypePreference?.trim();
-    final docLabel = doc == null || doc.isEmpty
-        ? 'Pendiente'
-        : (DocumentTypePreference.labelEs(doc) ?? doc);
-    final stars = r.aliadoExperienceStars;
-    final hasRating = r.aliadoExperienceSubmittedAt != null;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderSubtle),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    r.productName ?? 'Producto',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _StatusBadge(label: TransactionRequestStatus.labelEs(r.status)),
-              ],
-            ),
-            if ((r.productSku ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                'SKU ${r.productSku!.trim()}',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
-            ],
-            const SizedBox(height: 6),
-            Text(
-              '${formatEsShortDateTime(r.createdAt)} · '
-              '${r.precioTotal.toStringAsFixed(2)} REF · ${r.cantidad} uds.',
-              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${r.aliadoBusinessName ?? "Tienda minorista"} → ${r.ownerBusinessName ?? "Importador"}',
-              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _MiniChip(
-                  icon: Icons.description_outlined,
-                  label: docLabel,
-                ),
-                _MiniChip(
-                  icon: Icons.receipt_long_outlined,
-                  label: r.hasProveedorFactura
-                      ? 'Factura importador'
-                      : 'Sin factura importador',
-                  highlighted: r.hasProveedorFactura,
-                ),
-                if (_pagoEstadoLabel(r) != null)
-                  _MiniChip(
-                    icon: Icons.payments_outlined,
-                    label: _pagoEstadoLabel(r)!,
-                    highlighted: r.pagoEstadoRevision?.trim() ==
-                        PagoRevisionEstado.aprobado,
-                  ),
-                if (_pagoMetodoLabel(r) != null)
-                  _MiniChip(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: _pagoMetodoLabel(r)!,
-                  ),
-                if (hasRating)
-                  _MiniChip(
-                    icon: Icons.star_rounded,
-                    label: '${stars ?? 0}/5',
-                    highlighted: true,
-                  ),
-              ],
-            ),
-            if ((r.aliadoExperienceComment ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                '“${r.aliadoExperienceComment!.trim()}”',
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.3,
-                  fontStyle: FontStyle.italic,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.brandBlue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          color: AppColors.brandBlue.withOpacity(0.95),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniChip extends StatelessWidget {
-  const _MiniChip({
-    required this.icon,
-    required this.label,
-    this.highlighted = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = highlighted ? AppColors.brandAccent : AppColors.textPrimary;
-    final bg =
-        highlighted ? AppColors.brandBlueContainer : AppColors.surfaceTinted;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: fg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 160,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 20, color: AppColors.brandBlue),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return _buildEncomiendasBody();
   }
 }
 

@@ -6,7 +6,7 @@ class CatalogBrowseLayout extends StatelessWidget {
   const CatalogBrowseLayout({
     super.key,
     this.heading,
-    required this.search,
+    this.search,
     this.quickFilters,
     this.notice,
     this.promotions,
@@ -15,7 +15,7 @@ class CatalogBrowseLayout extends StatelessWidget {
   });
 
   final Widget? heading;
-  final Widget search;
+  final Widget? search;
   final Widget? quickFilters;
   final Widget? notice;
   final Widget? promotions;
@@ -33,7 +33,7 @@ class CatalogBrowseLayout extends StatelessWidget {
                   key: const ValueKey('catalog-heading'),
                   compact: compact,
                   child: heading!),
-            search,
+            if (search != null) search!,
             if (quickFilters != null) quickFilters!,
             if (notice != null) notice!,
             if (promotions != null)
@@ -41,8 +41,21 @@ class CatalogBrowseLayout extends StatelessWidget {
                   key: const ValueKey('catalog-promotions'),
                   compact: compact,
                   child: promotions!),
-            Expanded(key: const ValueKey('catalog-content'), child: content),
-            if (footer != null) footer!,
+            Expanded(
+              key: const ValueKey('catalog-content'),
+              child: footer == null
+                  ? content
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        content,
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: footer!,
+                        ),
+                      ],
+                    ),
+            ),
           ],
         ),
       );

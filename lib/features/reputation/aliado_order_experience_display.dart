@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 
 import 'rating_questionnaire_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -8,6 +9,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'aliado_experience_utils.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'order_rating_form.dart';
+import 'rating_scale_labels.dart';
 
 /// Estrellas 1–5 (solo lectura).
 class AliadoExperienceStarsRow extends StatelessWidget {
@@ -22,6 +24,8 @@ class AliadoExperienceStarsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final filledColor = ratingValueColor(stars.clamp(1, 5));
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
@@ -29,7 +33,7 @@ class AliadoExperienceStarsRow extends StatelessWidget {
         return Icon(
           filled ? Icons.star : Icons.star_border,
           size: size,
-          color: filled ? Colors.amber.shade800 : Colors.grey.shade400,
+          color: filled ? filledColor : theme.textMuted,
         );
       }),
     );
@@ -72,15 +76,21 @@ class AliadoOrderExperienceStatusChip extends StatelessWidget {
       );
     }
 
+    final theme = B2BThemeExtension.of(context);
     final stars = ref.aliadoExperienceStars ?? 0;
+    final tone = ratingValueColor(stars.clamp(1, 5));
     return Chip(
-      avatar: Icon(Icons.star, size: 16, color: Colors.amber.shade800),
+      avatar: Icon(Icons.star, size: 16, color: tone),
       label: Text(
         'Valorado · $stars/5',
-        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: theme.textPrimary,
+        ),
       ),
-      backgroundColor: Colors.purple.shade50,
-      side: BorderSide(color: Colors.purple.shade200),
+      backgroundColor: theme.surfaceSubtle,
+      side: BorderSide(color: tone.withOpacity(0.45)),
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

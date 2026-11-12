@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/features/kyc/authorization_status_section.dart'
 import 'account_settings_screen.dart';
 import 'profile_model.dart';
 import 'importer_commercial_settings.dart';
+import '../../app/main_shell_tab.dart';
 
 /// Portada de las cuentas habilitadas. El formulario conserva la edición y el registro.
 class ProfileOverview extends StatelessWidget {
@@ -64,13 +65,13 @@ class ProfileOverview extends StatelessWidget {
             style: TextStyle(color: AppColors.textSecondary)),
         if (ready) ...[
           const SizedBox(height: 8),
-          Wrap(
+          const Wrap(
               spacing: 5,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Icon(Icons.check_circle_outline,
                     size: 16, color: AppColors.successGreen),
-                const Text('Cuenta habilitada', style: TextStyle(fontSize: 12)),
+                Text('Cuenta habilitada', style: TextStyle(fontSize: 12)),
               ]),
         ],
       ])),
@@ -133,8 +134,10 @@ class ProfileOverview extends StatelessWidget {
       }),
       _datum('Dirección fiscal', profile.direccion),
     ]));
-    final showShortcuts =
-        !accountActionsInShell || profile.isImportador || support != null;
+    final showShortcuts = !accountActionsInShell ||
+        profile.isImportador ||
+        profile.isAliado ||
+        support != null;
     final shortcuts = _surface(
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (!accountActionsInShell) ...[
@@ -158,6 +161,10 @@ class ProfileOverview extends StatelessWidget {
                 'Configuración comercial',
                 ImporterCommercialSettings(
                     profile: profile, onChanged: onChanged))),
+      if (profile.isAliado)
+        _entry(Icons.star_rounded, 'Mi reputación', _reputationSummary,
+            MainShellTabController.navigateToReputationTab,
+            iconColor: Colors.amber.shade800),
       if (accountActionsInShell && support != null) ...[
         if (profile.isImportador)
           Divider(height: 17, color: AppColors.borderSubtle),
@@ -215,6 +222,19 @@ class ProfileOverview extends StatelessWidget {
     ]);
   }
 
+  String get _reputationSummary {
+    final rolling = profile.ratingAsPayerAvgRolling100;
+    final score = rolling ?? profile.ratingAsPayerAvg;
+    final count = (rolling != null
+            ? profile.ratingAsPayerCountRolling100
+            : profile.ratingAsPayerCount) ??
+        0;
+    if (score == null || count == 0) {
+      return 'Aún sin valoraciones · Ver mi reputación';
+    }
+    return '${score.toStringAsFixed(1).replaceAll('.', ',')} / 5 · $count ${count == 1 ? 'valoración' : 'valoraciones'}';
+  }
+
   Widget _surface(Widget child) => Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -234,10 +254,11 @@ class ProfileOverview extends StatelessWidget {
       ]));
 
   Widget _entry(
-          IconData icon, String title, String subtitle, VoidCallback onTap) =>
+          IconData icon, String title, String subtitle, VoidCallback onTap,
+          {Color? iconColor}) =>
       ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(icon, color: AppColors.brand),
+          leading: Icon(icon, color: iconColor ?? AppColors.brand),
           title: Text(title,
               style:
                   const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),

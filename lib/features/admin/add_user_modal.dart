@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
@@ -73,10 +74,38 @@ class AddUserModal extends StatefulWidget {
     bool allowAdminRole = false,
   }) {
     final theme = B2BThemeExtension.of(context);
+    final barrier = theme.textPrimary.withOpacity(0.45);
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    if (mobile) {
+      return showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        barrierColor: barrier,
+        backgroundColor: theme.dialogSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AdminUsersChrome.sheetRadius),
+          ),
+        ),
+        builder: (ctx) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: SizedBox(
+              height: MediaQuery.sizeOf(ctx).height * 0.9,
+              child: AddUserModal(allowAdminRole: allowAdminRole),
+            ),
+          );
+        },
+      );
+    }
     return showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierColor: theme.textPrimary.withOpacity(0.45),
+      barrierColor: barrier,
       builder: (ctx) => AddUserModal(allowAdminRole: allowAdminRole),
     );
   }
@@ -328,44 +357,36 @@ class _AddUserModalState extends State<AddUserModal> {
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
-    final maxH = MediaQuery.sizeOf(context).height * 0.92;
+    final mq = MediaQuery.of(context);
+    final maxH = mq.size.height * 0.9;
+    final mobile = mq.size.width < AppBreakpoints.mobileMenu;
+    final isSheet = ModalRoute.of(context) is ModalBottomSheetRoute;
     final selectedType = _types.contains(_type) ? _type : _types.first;
 
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): _cancel,
-      },
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Focus(
-          autofocus: true,
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 640, maxHeight: maxH),
-              child: Material(
-                color: theme.dialogSurface,
-                elevation: 24,
-                shadowColor: theme.textPrimary.withOpacity(0.35),
-                borderRadius:
-                    BorderRadius.circular(AdminUsersChrome.sheetRadius),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Header(busy: _busy, onClose: _cancel),
-                    Divider(height: 1, color: theme.borderSubtle),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
+    final body = Column(
+      mainAxisSize: isSheet ? MainAxisSize.max : MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isSheet)
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              decoration: BoxDecoration(
+                color: theme.borderSubtle,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        _Header(busy: _busy, onClose: _cancel),
+        Divider(height: 1, color: theme.borderSubtle),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                             Text(
                               'Tipo de cuenta',
                               style: TextStyle(
@@ -533,48 +554,85 @@ class _AddUserModalState extends State<AddUserModal> {
                                 ),
                               ),
                             ],
-                            if (selectedType.isMinorista) ...[
-                              const SizedBox(height: 14),
-                              _KycToggleCard(
-                                value: _loadKycNow,
-                                enabled: !_busy,
-                                onChanged: (v) => setState(() {
-                                  _loadKycNow = v;
-                                  if (!v) _kycFiles.clear();
-                                }),
-                              ),
-                              AnimatedSize(
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                                alignment: Alignment.topCenter,
-                                child: _loadKycNow
-                                    ? _KycUploadBlock(
-                                        files: _kycFiles,
-                                        busy: _busy,
-                                        onPick: _pickKyc,
-                                        onClear: _clearKyc,
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    Divider(height: 1, color: theme.borderSubtle),
-                    _Footer(
-                      busy: _busy,
-                      activate: _active,
-                      onActivateChanged: (v) => setState(() => _active = v),
-                      onCancel: _cancel,
-                      onSubmit: _submit,
-                    ),
-                  ],
-                ),
-              ),
+                if (selectedType.isMinorista) ...[
+                  const SizedBox(height: 14),
+                  _KycToggleCard(
+                    value: _loadKycNow,
+                    enabled: !_busy,
+                    onChanged: (v) => setState(() {
+                      _loadKycNow = v;
+                      if (!v) _kycFiles.clear();
+                    }),
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: _loadKycNow
+                        ? _KycUploadBlock(
+                            files: _kycFiles,
+                            busy: _busy,
+                            onPick: _pickKyc,
+                            onClear: _clearKyc,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
+        Divider(height: 1, color: theme.borderSubtle),
+        _Footer(
+          busy: _busy,
+          activate: _active,
+          onActivateChanged: (v) => setState(() => _active = v),
+          onCancel: _cancel,
+          onSubmit: _submit,
+        ),
+      ],
+    );
+
+    final panel = Material(
+      color: theme.dialogSurface,
+      elevation: isSheet ? 0 : 24,
+      shadowColor: theme.textPrimary.withOpacity(0.35),
+      borderRadius: isSheet
+          ? BorderRadius.vertical(
+              top: Radius.circular(AdminUsersChrome.sheetRadius),
+            )
+          : BorderRadius.circular(AdminUsersChrome.sheetRadius),
+      clipBehavior: Clip.antiAlias,
+      child: body,
+    );
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): _cancel,
+      },
+      child: Focus(
+        autofocus: true,
+        child: isSheet
+            ? panel
+            : Dialog(
+                backgroundColor: const Color(0x00000000),
+                elevation: 0,
+                insetPadding: EdgeInsets.fromLTRB(
+                  mobile ? 12 : 20,
+                  20,
+                  mobile ? 12 : 20,
+                  20 + mq.viewInsets.bottom,
+                ),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 640, maxHeight: maxH),
+                    child: panel,
+                  ),
+                ),
+              ),
       ),
     );
   }

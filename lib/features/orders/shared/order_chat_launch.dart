@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/notifications/notification_related_order_match.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
@@ -44,8 +45,7 @@ String orderChatTitleForLines(
 }
 
 bool _preferFloatingChat(BuildContext context) {
-  final size = MediaQuery.sizeOf(context);
-  return size.width >= 900;
+  return MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
 }
 
 /// Abre el hilo existente desde la bandeja, con los mismos permisos que Pedidos.
@@ -119,7 +119,7 @@ Future<void> showOrderChatSheet({
     ),
     builder: (sheetContext) {
       final sheetTheme = B2BThemeExtension.of(sheetContext);
-      final height = MediaQuery.sizeOf(sheetContext).height * 0.82;
+      final height = MediaQuery.sizeOf(sheetContext).height * 0.9;
       return Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,

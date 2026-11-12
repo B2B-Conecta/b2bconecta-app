@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
@@ -376,6 +377,95 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
     }
   }
 
+  String _filterLabel(_AdminRatingFilter f) => switch (f) {
+        _AdminRatingFilter.all => 'Todas',
+        _AdminRatingFilter.aliadoRatesImporter => 'Tienda → mayorista',
+        _AdminRatingFilter.importerRatesAliado => 'Mayorista → tienda',
+        _AdminRatingFilter.commentHidden => 'Ocultos',
+      };
+
+  Future<void> _openMobileFilters(B2BThemeExtension theme) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: theme.dialogSurface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  10,
+                  16,
+                  16 + MediaQuery.viewInsetsOf(ctx).bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.borderSubtle,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Filtrar valoraciones',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final f in _AdminRatingFilter.values)
+                          B2bDataTableFilterPill(
+                            label: _filterLabel(f),
+                            selected: _filter == f,
+                            onTap: () {
+                              setState(() {
+                                _filter = f;
+                                _pageIndex = 0;
+                              });
+                              setModal(() {});
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(
+                        'Listo',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: theme.brand,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
@@ -386,6 +476,8 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       pageSize: _pageSize,
     );
     final summary = _summary;
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
 
     if (_loading && _rows.isEmpty) {
       return Center(
@@ -416,6 +508,18 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       );
     }
 
+    final filterPills = [
+      for (final f in _AdminRatingFilter.values)
+        B2bDataTableFilterPill(
+          label: _filterLabel(f),
+          selected: _filter == f,
+          onTap: () => setState(() {
+            _filter = f;
+            _pageIndex = 0;
+          }),
+        ),
+    ];
+
     return RefreshIndicator(
       onRefresh: _load,
       color: theme.brand,
@@ -430,46 +534,70 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
               searchController: _searchCtrl,
               searchHint: 'Buscar taller, mayorista o comentario…',
               onSearchChanged: (_) {},
-              filters: [
-                for (final f in _AdminRatingFilter.values)
-                  B2bDataTableFilterPill(
-                    label: switch (f) {
-                      _AdminRatingFilter.all => 'Todas',
-                      _AdminRatingFilter.aliadoRatesImporter =>
-                        'Tienda → mayorista',
-                      _AdminRatingFilter.importerRatesAliado =>
-                        'Mayorista → tienda',
-                      _AdminRatingFilter.commentHidden => 'Ocultos',
-                    },
-                    selected: _filter == f,
-                    onTap: () => setState(() {
-                      _filter = f;
-                      _pageIndex = 0;
-                    }),
-                  ),
-              ],
-              primaryAction: FilledButton.icon(
-                onPressed: _writeRating,
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.brand,
-                  foregroundColor: theme.surfaceCard,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                icon: LucideIcon(
-                  LucideGlyph.messageSquarePlus,
-                  size: 16,
-                  color: theme.surfaceCard,
-                ),
-                label: const Text(
-                  'Escribir una valoración',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                ),
-              ),
+              filters: mobile ? const [] : filterPills,
+              primaryAction: mobile
+                  ? null
+                  : FilledButton.icon(
+                      onPressed: _writeRating,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.brand,
+                        foregroundColor: theme.surfaceCard,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: LucideIcon(
+                        LucideGlyph.messageSquarePlus,
+                        size: 16,
+                        color: theme.surfaceCard,
+                      ),
+                      label: const Text(
+                        'Escribir una valoración',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
               trailing: [
+                if (mobile)
+                  OutlinedButton.icon(
+                    onPressed: () => _openMobileFilters(theme),
+                    icon: LucideIcon(
+                      LucideGlyph.slidersHorizontal,
+                      size: 16,
+                      color: theme.brand,
+                    ),
+                    label: Text(
+                      _filter == _AdminRatingFilter.all
+                          ? 'Filtrar'
+                          : 'Filtrar (1)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: theme.brand,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.brand,
+                      side: BorderSide(color: theme.borderSubtle),
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                  ),
+                if (mobile)
+                  IconButton(
+                    onPressed: _writeRating,
+                    tooltip: 'Escribir una valoración',
+                    icon: LucideIcon(
+                      LucideGlyph.messageSquarePlus,
+                      size: 18,
+                      color: theme.brand,
+                    ),
+                  ),
                 IconButton(
                   onPressed: _loading ? null : _load,
                   tooltip: 'Actualizar',
@@ -481,13 +609,18 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
                 ),
               ],
             ),
-            header: const B2bDataTableHeader(
-              cells: [
-                B2bDataTableHeaderCell(label: 'Comprador / Taller', flex: 3),
-                B2bDataTableHeaderCell(label: 'Calificación', flex: 3),
-                B2bDataTableHeaderCell(label: 'Comentario', flex: 4),
-              ],
-            ),
+            header: mobile
+                ? null
+                : const B2bDataTableHeader(
+                    cells: [
+                      B2bDataTableHeaderCell(
+                        label: 'Comprador / Taller',
+                        flex: 3,
+                      ),
+                      B2bDataTableHeaderCell(label: 'Calificación', flex: 3),
+                      B2bDataTableHeaderCell(label: 'Comentario', flex: 4),
+                    ],
+                  ),
             empty: filtered.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 36),
@@ -513,6 +646,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
                   onTap: () => _showDetail(page[i]),
                   child: _RatingTableRow(
                     row: page[i],
+                    forceCompact: mobile,
                     onAction: (id) => _onRowAction(page[i], id),
                   ),
                 ),
@@ -805,10 +939,12 @@ class _RatingTableRow extends StatelessWidget {
   const _RatingTableRow({
     required this.row,
     required this.onAction,
+    this.forceCompact = false,
   });
 
   final AdminOrderRatingRowModel row;
   final ValueChanged<String> onAction;
+  final bool forceCompact;
 
   String get _storeName {
     // Comprador / taller: tienda minorista (aliado).
@@ -858,7 +994,8 @@ class _RatingTableRow extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 640;
+        final compact = forceCompact ||
+            constraints.maxWidth < AppBreakpoints.mobileMenu;
         final buyer = Row(
           children: [
             CircleAvatar(

@@ -4,6 +4,7 @@ import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/admin_account_management_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_catalog_seals_panel.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_activity_log_panel.dart';
@@ -99,46 +100,136 @@ class _AdminUsersHubPanelState extends State<AdminUsersHubPanel> {
 
   AdminUsersHubSection get _activeSection => widget.section ?? _section;
 
+  Future<void> _openSectionSheet(AdminUsersHubSection current) async {
+    final theme = B2BThemeExtension.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: theme.dialogSurface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.borderSubtle,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Sección de Usuarios',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: theme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final s in AdminUsersHubSectionLabel.mobileSegments)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      s.labelEs,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      s.hintEs,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                    trailing: s == current
+                        ? LucideIcon(
+                            LucideGlyph.check,
+                            size: 18,
+                            color: theme.brand,
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _selectSection(s);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final section = _activeSection;
-    final wide =
-        MediaQuery.sizeOf(context).width >= AppBreakpoints.adminDesktop;
-    final showSegments = !wide;
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= AppBreakpoints.adminDesktop;
+    final mobile = width < AppBreakpoints.mobileMenu;
+    final showSegments = !wide && !mobile;
+    final theme = B2BThemeExtension.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showSegments)
+        if (mobile)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SegmentedFilterBar(
-                  labels: [
-                    for (final s in AdminUsersHubSectionLabel.mobileSegments)
-                      s.labelEs,
-                  ],
-                  selectedIndex: () {
-                    const mobile = AdminUsersHubSectionLabel.mobileSegments;
-                    final i = mobile.indexOf(section);
-                    return i < 0 ? 0 : i;
-                  }(),
-                  onSelected: (i) => _selectSection(
-                    AdminUsersHubSectionLabel.mobileSegments[i],
-                  ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _openSectionSheet(section),
+                icon: LucideIcon(
+                  LucideGlyph.layoutGrid,
+                  size: 16,
+                  color: theme.brand,
                 ),
-                Text(
-                  section.hintEs,
+                label: Text(
+                  section.labelEs,
                   style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.35,
-                    color: B2BThemeExtension.of(context).textSecondary,
+                    fontWeight: FontWeight.w700,
+                    color: theme.brand,
                   ),
                 ),
-                const SizedBox(height: 4),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.brand,
+                  side: BorderSide(color: theme.borderSubtle),
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+            ),
+          )
+        else if (showSegments)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: SegmentedFilterBar(
+              labels: [
+                for (final s in AdminUsersHubSectionLabel.mobileSegments)
+                  s.labelEs,
               ],
+              selectedIndex: () {
+                const mobileSegs = AdminUsersHubSectionLabel.mobileSegments;
+                final i = mobileSegs.indexOf(section);
+                return i < 0 ? 0 : i;
+              }(),
+              onSelected: (i) => _selectSection(
+                AdminUsersHubSectionLabel.mobileSegments[i],
+              ),
             ),
           ),
         Expanded(

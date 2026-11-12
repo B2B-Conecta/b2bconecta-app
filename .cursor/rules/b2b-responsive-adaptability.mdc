@@ -1,0 +1,59 @@
+---
+description: Adaptabilidad responsiva obligatoria (móvil <768 / escritorio ≥768) — sin layouts desktop-only
+alwaysApply: true
+---
+
+# Diseño responsivo B2B Conecta (Mobile + Web)
+
+Antes de crear, editar o refactorizar UI, aplica esta regla. **Prohibido** entregar código que solo funcione en escritorio.
+
+## Breakpoints (`AppBreakpoints`)
+
+Fuente: `lib/core/layout/app_breakpoints.dart`.
+
+| Viewport | Umbral | Comportamiento |
+|---|---|---|
+| Móvil | `width < AppBreakpoints.mobileMenu` (768) | Cards compactas, bottom sheets, filtros en sheet «Filtrar», sin cabeceras de tabla horizontales |
+| Escritorio | `width >= 768` | Tablas con header, popovers/flotantes, rail/`AppShell`, grids 2 cols |
+
+```dart
+final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+```
+
+## Prohibido
+
+- Layouts **desktop-only** (tablas de muchas columnas sin rama móvil).
+- Overflows: textos/labels sin `maxLines` + `TextOverflow.ellipsis`, o sin `Flexible` / `Expanded` / `Wrap`.
+- Modales/formularios que el teclado recorte (sin `viewInsets.bottom` ni scroll interno).
+- Colores fijos: usar solo `B2BThemeExtension` (ver regla de tokens).
+
+## Tablas y listados
+
+- **≥768:** `B2bDataTableHeader` + filas en columnas (shell / zebra / `ListPageBar` según regla de tablas).
+- **<768:** ocultar header horizontal; fila = **tarjeta ejecutiva** vertical (`surfaceCard`, radio 12, menú `⋮`).
+- Labels de header: siempre `maxLines: 1`, `overflow: TextOverflow.ellipsis`.
+
+## Modales / CRUD / overlays
+
+| Viewport | Patrón |
+|---|---|
+| ≥768 | `Dialog` centrado, `maxWidth` 560–640, radio 16 |
+| <768 | `showModalBottomSheet(isScrollControlled: true)`, `maxHeight: 0.9 * height`, padding `viewInsets.bottom` |
+
+Cuerpo scrollable (`SingleChildScrollView` / `ListView`); acciones **Cancelar / Guardar** fuera del scroll o siempre visibles.
+
+Chat / paneles laterales flotantes: solo ≥768; en móvil → bottom sheet a altura controlada.
+
+## Filtros y chrome
+
+En `<768`, no apilar `SegmentedFilterBar` + chips + título: una línea de búsqueda + botón **Filtrar** → sheet unificado.
+
+## Checklist rápido
+
+```dart
+// ❌ Row de 5 columnas fijo en 375px
+// ✅ if (mobile) cardColumn else desktopRow
+
+// ❌ showDialog único sin rama móvil
+// ✅ mobile ? showModalBottomSheet(...) : showDialog(...)
+```

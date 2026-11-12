@@ -341,6 +341,9 @@ class B2bDataTableHeader extends StatelessWidget {
   Widget _label(B2BThemeExtension theme, String label) {
     return Text(
       label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      softWrap: false,
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,

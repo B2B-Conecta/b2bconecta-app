@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -89,6 +90,34 @@ class _CommissionsDataTableState extends State<CommissionsDataTable> {
       pageIndex: _pageIndex,
       pageSize: _pageSize,
     );
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    final statusPills = [
+      B2bDataTableFilterPill(
+        label: 'Todas',
+        selected: widget.statusFilter == null,
+        onTap: () {
+          _pageIndex = 0;
+          widget.onStatusFilter(null);
+        },
+      ),
+      B2bDataTableFilterPill(
+        label: 'Liquidadas',
+        selected: widget.statusFilter == 'pagado',
+        onTap: () {
+          _pageIndex = 0;
+          widget.onStatusFilter('pagado');
+        },
+      ),
+      B2bDataTableFilterPill(
+        label: 'Pendientes',
+        selected: widget.statusFilter == 'emitido',
+        onTap: () {
+          _pageIndex = 0;
+          widget.onStatusFilter('emitido');
+        },
+      ),
+    ];
 
     return B2bDataTableShell(
       padding: const EdgeInsets.all(12),
@@ -99,34 +128,33 @@ class _CommissionsDataTableState extends State<CommissionsDataTable> {
           _pageIndex = 0;
           widget.onSearchChanged(q);
         },
-        filters: [
-          B2bDataTableFilterPill(
-            label: 'Todas',
-            selected: widget.statusFilter == null,
-            onTap: () {
-              _pageIndex = 0;
-              widget.onStatusFilter(null);
-            },
-          ),
-          B2bDataTableFilterPill(
-            label: 'Liquidadas',
-            selected: widget.statusFilter == 'pagado',
-            onTap: () {
-              _pageIndex = 0;
-              widget.onStatusFilter('pagado');
-            },
-          ),
-          B2bDataTableFilterPill(
-            label: 'Pendientes',
-            selected: widget.statusFilter == 'emitido',
-            onTap: () {
-              _pageIndex = 0;
-              widget.onStatusFilter('emitido');
-            },
-          ),
-        ],
+        filters: mobile ? const [] : statusPills,
         trailing: [
-          if (widget.onOpenAdvancedFilters != null)
+          if (mobile)
+            OutlinedButton.icon(
+              onPressed: () => _openMobileFilters(context, theme),
+              icon: LucideIcon(
+                LucideGlyph.slidersHorizontal,
+                size: 16,
+                color: theme.brand,
+              ),
+              label: Text(
+                widget.statusFilter == null && widget.activeFilterCount == 0
+                    ? 'Filtrar'
+                    : 'Filtrar (${(widget.statusFilter == null ? 0 : 1) + widget.activeFilterCount})',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: theme.brand,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.brand,
+                side: BorderSide(color: theme.borderSubtle),
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+            )
+          else if (widget.onOpenAdvancedFilters != null)
             IconButton(
               tooltip: 'Más filtros',
               onPressed: widget.onOpenAdvancedFilters,
@@ -143,15 +171,17 @@ class _CommissionsDataTableState extends State<CommissionsDataTable> {
             ),
         ],
       ),
-      header: const B2bDataTableHeader(
-        cells: [
-          B2bDataTableHeaderCell(label: 'Lote / Ref.', flex: 3),
-          B2bDataTableHeaderCell(label: 'Periodo', flex: 3),
-          B2bDataTableHeaderCell(label: 'Importador', flex: 3),
-          B2bDataTableHeaderCell(label: 'Monto', flex: 2),
-          B2bDataTableHeaderCell(label: 'Estado', flex: 2),
-        ],
-      ),
+      header: mobile
+          ? null
+          : const B2bDataTableHeader(
+              cells: [
+                B2bDataTableHeaderCell(label: 'Lote / Ref.', flex: 3),
+                B2bDataTableHeaderCell(label: 'Periodo', flex: 3),
+                B2bDataTableHeaderCell(label: 'Importador', flex: 3),
+                B2bDataTableHeaderCell(label: 'Monto', flex: 2),
+                B2bDataTableHeaderCell(label: 'Estado', flex: 2),
+              ],
+            ),
       empty: widget.rows.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
@@ -196,6 +226,7 @@ class _CommissionsDataTableState extends State<CommissionsDataTable> {
               tasaBcv: widget.tasaBcv,
               busy: widget.busy,
               expanded: widget.expandedIds.contains(page[i].id),
+              compact: mobile,
               onAction: (id) => widget.onRowAction(page[i], id),
             ),
           ),
@@ -227,6 +258,126 @@ class _CommissionsDataTableState extends State<CommissionsDataTable> {
       ),
     );
   }
+
+  Future<void> _openMobileFilters(
+    BuildContext context,
+    B2BThemeExtension theme,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: theme.dialogSurface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              10,
+              16,
+              16 + MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.borderSubtle,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Filtrar cortes',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: theme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Estado',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: theme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    B2bDataTableFilterPill(
+                      label: 'Todas',
+                      selected: widget.statusFilter == null,
+                      onTap: () {
+                        setState(() => _pageIndex = 0);
+                        widget.onStatusFilter(null);
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                    B2bDataTableFilterPill(
+                      label: 'Liquidadas',
+                      selected: widget.statusFilter == 'pagado',
+                      onTap: () {
+                        setState(() => _pageIndex = 0);
+                        widget.onStatusFilter('pagado');
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                    B2bDataTableFilterPill(
+                      label: 'Pendientes',
+                      selected: widget.statusFilter == 'emitido',
+                      onTap: () {
+                        setState(() => _pageIndex = 0);
+                        widget.onStatusFilter('emitido');
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                  ],
+                ),
+                if (widget.onOpenAdvancedFilters != null) ...[
+                  const SizedBox(height: 14),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      widget.onOpenAdvancedFilters!();
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.brand,
+                      foregroundColor: theme.surfaceCard,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: const Text('Más filtros…'),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(
+                    'Listo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: theme.brand,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _SettlementTableRow extends StatelessWidget {
@@ -236,6 +387,7 @@ class _SettlementTableRow extends StatelessWidget {
     required this.expanded,
     this.tasaBcv,
     this.busy = false,
+    this.compact = false,
   });
 
   final CommissionSettlementModel settlement;
@@ -243,6 +395,7 @@ class _SettlementTableRow extends StatelessWidget {
   final bool expanded;
   final double? tasaBcv;
   final bool busy;
+  final bool compact;
 
   List<B2bDataRowAction> get _actions {
     final s = settlement;
@@ -309,6 +462,93 @@ class _SettlementTableRow extends StatelessWidget {
     final rate = tasaBcv;
     final bs = rate != null && rate > 0 ? s.totalCobroUsd * rate : null;
 
+    final chevron = LucideIcon(
+      expanded ? LucideGlyph.chevronDown : LucideGlyph.chevronRight,
+      size: 14,
+      color: theme.textMuted,
+    );
+    final actions = B2bDataRowActionsMenu(
+      busy: busy,
+      actions: _actions,
+      onSelected: onAction,
+    );
+    final amountCol = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'REF ${formatRefAmount(s.totalCobroUsd)}',
+          style: TextStyle(
+            fontSize: compact ? 14 : 13,
+            fontWeight: FontWeight.w800,
+            color: theme.textPrimary,
+          ),
+        ),
+        Text(
+          bs == null ? 'Bs —' : formatBsLabel(bs),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: theme.textMuted,
+          ),
+        ),
+      ],
+    );
+
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                chevron,
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    ref.isNotEmpty ? ref : 'Sin referencia',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                ),
+                _StatusChip(label: status, settlement: s),
+                actions,
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              (name == null || name.isEmpty) ? 'Importador' : name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: theme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              s.periodLabelEs,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: theme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            amountCol,
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
       child: Row(
@@ -317,11 +557,7 @@ class _SettlementTableRow extends StatelessWidget {
             flex: 3,
             child: Row(
               children: [
-                LucideIcon(
-                  expanded ? LucideGlyph.chevronDown : LucideGlyph.chevronRight,
-                  size: 14,
-                  color: theme.textMuted,
-                ),
+                chevron,
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -364,30 +600,7 @@ class _SettlementTableRow extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'REF ${formatRefAmount(s.totalCobroUsd)}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: theme.textPrimary,
-                  ),
-                ),
-                Text(
-                  bs == null ? 'Bs —' : formatBsLabel(bs),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: theme.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(flex: 2, child: amountCol),
           Expanded(
             flex: 2,
             child: Align(
@@ -395,14 +608,7 @@ class _SettlementTableRow extends StatelessWidget {
               child: _StatusChip(label: status, settlement: s),
             ),
           ),
-          SizedBox(
-            width: 48,
-            child: B2bDataRowActionsMenu(
-              busy: busy,
-              actions: _actions,
-              onSelected: onAction,
-            ),
-          ),
+          SizedBox(width: 48, child: actions),
         ],
       ),
     );

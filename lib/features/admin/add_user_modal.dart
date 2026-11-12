@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
@@ -30,7 +31,7 @@ extension on AddUserType {
 
   LucideGlyph get glyph => switch (this) {
         AddUserType.minorista => LucideGlyph.store,
-        AddUserType.mayorista => LucideGlyph.landmark,
+        AddUserType.mayorista => LucideGlyph.building2,
         AddUserType.admin => LucideGlyph.shieldCheck,
       };
 
@@ -73,10 +74,38 @@ class AddUserModal extends StatefulWidget {
     bool allowAdminRole = false,
   }) {
     final theme = B2BThemeExtension.of(context);
+    final barrier = theme.textPrimary.withOpacity(0.45);
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    if (mobile) {
+      return showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        barrierColor: barrier,
+        backgroundColor: theme.dialogSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AdminUsersChrome.sheetRadius),
+          ),
+        ),
+        builder: (ctx) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: SizedBox(
+              height: MediaQuery.sizeOf(ctx).height * 0.9,
+              child: AddUserModal(allowAdminRole: allowAdminRole),
+            ),
+          );
+        },
+      );
+    }
     return showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierColor: theme.textPrimary.withOpacity(0.45),
+      barrierColor: barrier,
       builder: (ctx) => AddUserModal(allowAdminRole: allowAdminRole),
     );
   }
@@ -284,35 +313,32 @@ class _AddUserModalState extends State<AddUserModal> {
         suffixIcon: suffix,
       );
 
-  Widget _row2(Widget left, Widget right) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        if (c.maxWidth < 520) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              left,
-              const SizedBox(height: 12),
-              right,
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: left),
-            const SizedBox(width: 12),
-            Expanded(child: right),
-          ],
-        );
-      },
+  /// Desktop: 2 columnas. Móvil / sheet estrecho: stack vertical.
+  Widget _row2(Widget left, Widget right, {required bool stack}) {
+    if (stack) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          left,
+          const SizedBox(height: 12),
+          right,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 12),
+        Expanded(child: right),
+      ],
     );
   }
 
   Widget _sectionTitle(String text) {
     final theme = B2BThemeExtension.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 10),
+      padding: const EdgeInsets.only(top: 6, bottom: 10),
       child: Text(
         text,
         style: TextStyle(
@@ -328,253 +354,300 @@ class _AddUserModalState extends State<AddUserModal> {
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
-    final maxH = MediaQuery.sizeOf(context).height * 0.92;
+    final mq = MediaQuery.of(context);
+    final maxH = mq.size.height * 0.9;
+    final mobile = mq.size.width < AppBreakpoints.mobileMenu;
+    final isSheet = ModalRoute.of(context) is ModalBottomSheetRoute;
     final selectedType = _types.contains(_type) ? _type : _types.first;
+    // En sheet móvil siempre stack; en diálogo desktop (~640) usar grid 2 cols.
+    final stackFields = mobile || isSheet;
+
+    final scrollBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Tipo de cuenta',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: theme.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in _types)
+              _RoleChip(
+                type: t,
+                selected: selectedType == t,
+                enabled: !_busy,
+                onTap: () => setState(() {
+                  _type = t;
+                  if (!t.isMinorista) {
+                    _loadKycNow = false;
+                    _kycFiles.clear();
+                  }
+                }),
+              ),
+          ],
+        ),
+        _sectionTitle('Credenciales de acceso'),
+        TextField(
+          controller: _emailCtrl,
+          enabled: !_busy,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          textInputAction: TextInputAction.next,
+          onTap: () => setState(() => _touched = true),
+          decoration: _field(
+            'Correo de login',
+            errorText: _emailError,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _row2(
+          stack: stackFields,
+          TextField(
+            controller: _passwordCtrl,
+            enabled: !_busy,
+            obscureText: _hidePassword,
+            textInputAction: TextInputAction.next,
+            onTap: () => setState(() => _touched = true),
+            decoration: _field(
+              'Contraseña temporal',
+              errorText: _passwordError,
+              suffix: TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() => _hidePassword = !_hidePassword),
+                child: Text(
+                  _hidePassword ? 'Ver' : 'Ocultar',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: theme.brand,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          TextField(
+            controller: _password2Ctrl,
+            enabled: !_busy,
+            obscureText: _hidePassword,
+            textInputAction: TextInputAction.next,
+            onTap: () => setState(() => _touched = true),
+            decoration: _field(
+              'Confirmar contraseña',
+              errorText: _password2Error,
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _busy ? null : _generatePassword,
+            icon: LucideIcon(
+              LucideGlyph.refreshCw,
+              size: 14,
+              color: theme.brand,
+            ),
+            label: Text(
+              'Generar contraseña',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: theme.brand,
+              ),
+            ),
+          ),
+        ),
+        if (selectedType.needsFiscal) ...[
+          _sectionTitle('Datos comerciales y fiscales'),
+          TextField(
+            controller: _nameCtrl,
+            enabled: !_busy,
+            textInputAction: TextInputAction.next,
+            onTap: () => setState(() => _touched = true),
+            decoration: _field(
+              'Nombre comercial / Razón social',
+              errorText: _nameError,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _row2(
+            stack: stackFields,
+            TextField(
+              controller: _rifCtrl,
+              enabled: !_busy,
+              textInputAction: TextInputAction.next,
+              onTap: () => setState(() => _touched = true),
+              decoration: _field('RIF', errorText: _rifError),
+            ),
+            TextField(
+              controller: _phoneCtrl,
+              enabled: !_busy,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+              onTap: () => setState(() => _touched = true),
+              decoration: _field(
+                'Teléfono / WhatsApp',
+                errorText: _phoneError,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _row2(
+            stack: stackFields,
+            TextField(
+              controller: _estadoCtrl,
+              enabled: !_busy,
+              textInputAction: TextInputAction.next,
+              decoration: _field('Estado'),
+            ),
+            TextField(
+              controller: _ciudadCtrl,
+              enabled: !_busy,
+              textInputAction: TextInputAction.next,
+              decoration: _field('Ciudad'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _direccionCtrl,
+            enabled: !_busy,
+            maxLines: 2,
+            decoration: _field('Dirección fiscal'),
+          ),
+        ] else ...[
+          _sectionTitle('Identificación'),
+          TextField(
+            controller: _nameCtrl,
+            enabled: !_busy,
+            textInputAction: TextInputAction.next,
+            onTap: () => setState(() => _touched = true),
+            decoration: _field(
+              'Nombre completo',
+              errorText: _nameError,
+            ),
+          ),
+        ],
+        if (selectedType.isMinorista) ...[
+          const SizedBox(height: 14),
+          _KycToggleCard(
+            value: _loadKycNow,
+            enabled: !_busy,
+            onChanged: (v) => setState(() {
+              _loadKycNow = v;
+              if (!v) _kycFiles.clear();
+            }),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _loadKycNow
+                ? _KycUploadBlock(
+                    files: _kycFiles,
+                    busy: _busy,
+                    onPick: _pickKyc,
+                    onClear: _clearKyc,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+        const SizedBox(height: 8),
+      ],
+    );
+
+    final shell = Column(
+      mainAxisSize: isSheet ? MainAxisSize.max : MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isSheet)
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              decoration: BoxDecoration(
+                color: theme.borderSubtle,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        _Header(busy: _busy, onClose: _cancel),
+        Divider(height: 1, color: theme.borderSubtle),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+            child: scrollBody,
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.dialogSurface,
+            border: Border(top: BorderSide(color: theme.borderSubtle)),
+          ),
+          child: _Footer(
+            busy: _busy,
+            activate: _active,
+            onActivateChanged: (v) => setState(() => _active = v),
+            onCancel: _cancel,
+            onSubmit: _submit,
+            stackActions: stackFields,
+          ),
+        ),
+      ],
+    );
+
+    final panel = Material(
+      color: theme.dialogSurface,
+      elevation: isSheet ? 0 : 24,
+      shadowColor: theme.textPrimary.withOpacity(0.28),
+      shape: RoundedRectangleBorder(
+        borderRadius: isSheet
+            ? const BorderRadius.vertical(
+                top: Radius.circular(AdminUsersChrome.sheetRadius),
+              )
+            : BorderRadius.circular(AdminUsersChrome.sheetRadius),
+        side: BorderSide(color: theme.borderStrong),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: shell,
+    );
 
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): _cancel,
       },
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Focus(
-          autofocus: true,
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 640, maxHeight: maxH),
-              child: Material(
-                color: theme.dialogSurface,
-                elevation: 24,
-                shadowColor: theme.textPrimary.withOpacity(0.35),
-                borderRadius:
-                    BorderRadius.circular(AdminUsersChrome.sheetRadius),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Header(busy: _busy, onClose: _cancel),
-                    Divider(height: 1, color: theme.borderSubtle),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Tipo de cuenta',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: theme.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final t in _types)
-                                  _RoleChip(
-                                    type: t,
-                                    selected: selectedType == t,
-                                    enabled: !_busy,
-                                    onTap: () => setState(() {
-                                      _type = t;
-                                      if (!t.isMinorista) {
-                                        _loadKycNow = false;
-                                        _kycFiles.clear();
-                                      }
-                                    }),
-                                  ),
-                              ],
-                            ),
-                            _sectionTitle('Credenciales de acceso'),
-                            TextField(
-                              controller: _emailCtrl,
-                              enabled: !_busy,
-                              keyboardType: TextInputType.emailAddress,
-                              autocorrect: false,
-                              textInputAction: TextInputAction.next,
-                              onTap: () => setState(() => _touched = true),
-                              decoration: _field(
-                                'Correo de login',
-                                errorText: _emailError,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            _row2(
-                              TextField(
-                                controller: _passwordCtrl,
-                                enabled: !_busy,
-                                obscureText: _hidePassword,
-                                textInputAction: TextInputAction.next,
-                                onTap: () => setState(() => _touched = true),
-                                decoration: _field(
-                                  'Contraseña temporal',
-                                  errorText: _passwordError,
-                                  suffix: TextButton(
-                                    onPressed: _busy
-                                        ? null
-                                        : () => setState(
-                                              () => _hidePassword =
-                                                  !_hidePassword,
-                                            ),
-                                    child: Text(
-                                      _hidePassword ? 'Ver' : 'Ocultar',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: theme.brand,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              TextField(
-                                controller: _password2Ctrl,
-                                enabled: !_busy,
-                                obscureText: _hidePassword,
-                                textInputAction: TextInputAction.next,
-                                onTap: () => setState(() => _touched = true),
-                                decoration: _field(
-                                  'Confirmar contraseña',
-                                  errorText: _password2Error,
-                                ),
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: _busy ? null : _generatePassword,
-                                icon: LucideIcon(
-                                  LucideGlyph.refreshCw,
-                                  size: 14,
-                                  color: theme.brand,
-                                ),
-                                label: const Text('Generar contraseña'),
-                              ),
-                            ),
-                            if (selectedType.needsFiscal) ...[
-                              _sectionTitle('Datos comerciales y fiscales'),
-                              TextField(
-                                controller: _nameCtrl,
-                                enabled: !_busy,
-                                textInputAction: TextInputAction.next,
-                                onTap: () => setState(() => _touched = true),
-                                decoration: _field(
-                                  'Nombre comercial / Razón social',
-                                  errorText: _nameError,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _row2(
-                                TextField(
-                                  controller: _rifCtrl,
-                                  enabled: !_busy,
-                                  textInputAction: TextInputAction.next,
-                                  onTap: () =>
-                                      setState(() => _touched = true),
-                                  decoration: _field(
-                                    'RIF',
-                                    errorText: _rifError,
-                                  ),
-                                ),
-                                TextField(
-                                  controller: _phoneCtrl,
-                                  enabled: !_busy,
-                                  keyboardType: TextInputType.phone,
-                                  textInputAction: TextInputAction.next,
-                                  onTap: () =>
-                                      setState(() => _touched = true),
-                                  decoration: _field(
-                                    'Teléfono / WhatsApp',
-                                    errorText: _phoneError,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _row2(
-                                TextField(
-                                  controller: _estadoCtrl,
-                                  enabled: !_busy,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: _field('Estado'),
-                                ),
-                                TextField(
-                                  controller: _ciudadCtrl,
-                                  enabled: !_busy,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: _field('Ciudad'),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: _direccionCtrl,
-                                enabled: !_busy,
-                                maxLines: 2,
-                                decoration: _field('Dirección fiscal'),
-                              ),
-                            ] else ...[
-                              _sectionTitle('Identificación'),
-                              TextField(
-                                controller: _nameCtrl,
-                                enabled: !_busy,
-                                textInputAction: TextInputAction.next,
-                                onTap: () => setState(() => _touched = true),
-                                decoration: _field(
-                                  'Nombre completo',
-                                  errorText: _nameError,
-                                ),
-                              ),
-                            ],
-                            if (selectedType.isMinorista) ...[
-                              const SizedBox(height: 14),
-                              _KycToggleCard(
-                                value: _loadKycNow,
-                                enabled: !_busy,
-                                onChanged: (v) => setState(() {
-                                  _loadKycNow = v;
-                                  if (!v) _kycFiles.clear();
-                                }),
-                              ),
-                              AnimatedSize(
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                                alignment: Alignment.topCenter,
-                                child: _loadKycNow
-                                    ? _KycUploadBlock(
-                                        files: _kycFiles,
-                                        busy: _busy,
-                                        onPick: _pickKyc,
-                                        onClear: _clearKyc,
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+      child: Focus(
+        autofocus: true,
+        child: isSheet
+            ? panel
+            : Dialog(
+                backgroundColor: const Color(0x00000000),
+                elevation: 0,
+                insetPadding: EdgeInsets.fromLTRB(
+                  24,
+                  24,
+                  24,
+                  24 + mq.viewInsets.bottom,
+                ),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: 640,
+                      maxHeight: maxH,
                     ),
-                    Divider(height: 1, color: theme.borderSubtle),
-                    _Footer(
-                      busy: _busy,
-                      activate: _active,
-                      onActivateChanged: (v) => setState(() => _active = v),
-                      onCancel: _cancel,
-                      onSubmit: _submit,
-                    ),
-                  ],
+                    child: panel,
+                  ),
                 ),
               ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -684,7 +757,7 @@ class _RoleChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               LucideIcon(
-                selected ? LucideGlyph.circleCheck : type.glyph,
+                type.glyph,
                 size: 15,
                 color: fg,
               ),
@@ -731,6 +804,7 @@ class _KycToggleCard extends StatelessWidget {
         value: value,
         onChanged: enabled ? onChanged : null,
         activeColor: theme.brand,
+        activeTrackColor: theme.brand.withOpacity(0.45),
         title: Text(
           '¿Cargar expediente de documentos y fotos ahora?',
           style: TextStyle(
@@ -740,8 +814,8 @@ class _KycToggleCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          'Activa esta opción si ya tienes a mano el RIF, registro y fotos '
-          'del local. Si lo dejas apagado, podrás subirlos luego desde Cuentas.',
+          'Activa esta opción si ya tienes a mano el RIF y fotos del local. '
+          'Si lo dejas apagado, podrás subirlos luego.',
           style: TextStyle(
             fontSize: 11,
             height: 1.35,
@@ -1008,6 +1082,7 @@ class _Footer extends StatelessWidget {
     required this.onActivateChanged,
     required this.onCancel,
     required this.onSubmit,
+    this.stackActions = false,
   });
 
   final bool busy;
@@ -1015,106 +1090,106 @@ class _Footer extends StatelessWidget {
   final ValueChanged<bool> onActivateChanged;
   final VoidCallback onCancel;
   final VoidCallback onSubmit;
+  final bool stackActions;
 
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final stack = c.maxWidth < 520;
-          final toggle = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Switch.adaptive(
-                value: activate,
-                onChanged: busy ? null : onActivateChanged,
-                activeColor: theme.brand,
-              ),
-              Flexible(
-                child: Text(
-                  'Activar cuenta inmediatamente',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: theme.textPrimary,
-                  ),
+    final toggle = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Switch.adaptive(
+          value: activate,
+          onChanged: busy ? null : onActivateChanged,
+          activeColor: theme.brand,
+          activeTrackColor: theme.brand.withOpacity(0.45),
+        ),
+        Flexible(
+          child: Text(
+            'Activar cuenta inmediatamente',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: theme.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+    final cancelBtn = SizedBox(
+      height: 48,
+      child: OutlinedButton(
+        onPressed: busy ? null : onCancel,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(108, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          foregroundColor: theme.textPrimary,
+          side: BorderSide(color: theme.borderStrong),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.standard,
+          alignment: Alignment.center,
+        ),
+        child: Text(
+          'Cancelar',
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            height: 1.2,
+            color: theme.textPrimary,
+          ),
+        ),
+      ),
+    );
+    final createBtn = SizedBox(
+      height: 48,
+      child: FilledButton(
+        onPressed: busy ? null : onSubmit,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(140, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          backgroundColor: theme.brand,
+          foregroundColor: theme.surfaceCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.standard,
+          alignment: Alignment.center,
+        ),
+        child: busy
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: theme.surfaceCard,
                 ),
-              ),
-            ],
-          );
-          final cancelBtn = SizedBox(
-            height: 48,
-            child: OutlinedButton(
-              onPressed: busy ? null : onCancel,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(108, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                foregroundColor: theme.textPrimary,
-                side: BorderSide(color: theme.borderStrong),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.standard,
-                alignment: Alignment.center,
-              ),
-              child: Text(
-                'Cancelar',
+              )
+            : Text(
+                'Crear usuario',
                 maxLines: 1,
                 softWrap: false,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   fontSize: 13,
                   height: 1.2,
-                  color: theme.textPrimary,
+                  color: theme.surfaceCard,
                 ),
               ),
-            ),
-          );
-          final createBtn = SizedBox(
-            height: 48,
-            child: FilledButton(
-              onPressed: busy ? null : onSubmit,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(140, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                backgroundColor: theme.brand,
-                foregroundColor: theme.surfaceCard,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.standard,
-                alignment: Alignment.center,
-              ),
-              child: busy
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        color: theme.surfaceCard,
-                      ),
-                    )
-                  : Text(
-                      'Crear usuario',
-                      maxLines: 1,
-                      softWrap: false,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        height: 1.2,
-                        color: theme.surfaceCard,
-                      ),
-                    ),
-            ),
-          );
-          if (stack) {
-            return Column(
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: stackActions
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 toggle,
@@ -1127,19 +1202,16 @@ class _Footer extends StatelessWidget {
                   ],
                 ),
               ],
-            );
-          }
-          return Row(
-            children: [
-              Expanded(child: toggle),
-              const SizedBox(width: 12),
-              cancelBtn,
-              const SizedBox(width: 10),
-              createBtn,
-            ],
-          );
-        },
-      ),
+            )
+          : Row(
+              children: [
+                Expanded(child: toggle),
+                const SizedBox(width: 12),
+                cancelBtn,
+                const SizedBox(width: 10),
+                createBtn,
+              ],
+            ),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -76,10 +77,40 @@ class UnifiedActionDialog extends StatelessWidget {
     required WidgetBuilder builder,
   }) {
     final theme = B2BThemeExtension.of(context);
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    final barrier = theme.textPrimary.withOpacity(0.45);
+    if (mobile) {
+      return showModalBottomSheet<T>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        barrierColor: barrier,
+        backgroundColor: theme.dialogSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AdminUsersChrome.sheetRadius),
+          ),
+        ),
+        builder: (ctx) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(ctx).height * 0.9,
+              ),
+              child: builder(ctx),
+            ),
+          );
+        },
+      );
+    }
     return showDialog<T>(
       context: context,
       barrierDismissible: true,
-      barrierColor: theme.textPrimary.withOpacity(0.45),
+      barrierColor: barrier,
       builder: builder,
     );
   }
@@ -91,6 +122,177 @@ class UnifiedActionDialog extends StatelessWidget {
     final accent = _accent(theme);
     final pastel = _pastel(theme, dark);
     final ring = _ring(theme, dark);
+    final mq = MediaQuery.of(context);
+    final mobile = mq.size.width < AppBreakpoints.mobileMenu;
+    final isSheet = ModalRoute.of(context) is ModalBottomSheetRoute;
+    final maxH = mq.size.height * 0.9;
+
+    final panel = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: maxWidth,
+        maxHeight: maxH,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          isSheet ? 12 : 18,
+          16,
+          isSheet ? 12 : 18,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (isSheet) ...[
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: theme.borderSubtle,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: pastel,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: ring),
+                  ),
+                  alignment: Alignment.center,
+                  child: LucideIcon(glyph, size: 20, color: accent),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textPrimary,
+                            height: 1.25,
+                          ),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              color: theme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  visualDensity: VisualDensity.compact,
+                  onPressed:
+                      busy ? null : () => Navigator.of(context).maybePop(),
+                  icon: LucideIcon(
+                    LucideGlyph.close,
+                    size: 16,
+                    color: theme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            if (profile != null) ...[
+              const SizedBox(height: 14),
+              UnifiedUserContextCard(profile: profile!),
+            ],
+            const SizedBox(height: 14),
+            Flexible(
+              child: SingleChildScrollView(child: body),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: busy
+                        ? null
+                        : (onCancel ??
+                            () => Navigator.of(context).maybePop()),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.textPrimary,
+                      side: BorderSide(color: theme.borderStrong),
+                      minimumSize: const Size.fromHeight(40),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      cancelLabel,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton(
+                    onPressed: busy || !primaryEnabled || onPrimary == null
+                        ? null
+                        : onPrimary,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: accent,
+                      disabledBackgroundColor: accent.withOpacity(0.55),
+                      foregroundColor: theme.surfaceCard,
+                      minimumSize: const Size.fromHeight(40),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: busy
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: theme.surfaceCard,
+                            ),
+                          )
+                        : Text(
+                            primaryLabel,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
 
     return CallbackShortcuts(
       bindings: {
@@ -100,165 +302,28 @@ class UnifiedActionDialog extends StatelessWidget {
       },
       child: Focus(
         autofocus: true,
-        child: Dialog(
-          backgroundColor: theme.dialogSurface,
-          elevation: 10,
-          shadowColor: theme.textPrimary.withOpacity(0.28),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AdminUsersChrome.sheetRadius),
-            side: BorderSide(color: theme.borderStrong),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxWidth,
-              maxHeight: MediaQuery.sizeOf(context).height * 0.86,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: pastel,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: ring),
-                        ),
-                        alignment: Alignment.center,
-                        child: LucideIcon(glyph, size: 20, color: accent),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: theme.textPrimary,
-                                  height: 1.25,
-                                ),
-                              ),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  subtitle!,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    height: 1.4,
-                                    color: theme.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Cerrar',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: busy
-                            ? null
-                            : () => Navigator.of(context).maybePop(),
-                        icon: LucideIcon(
-                          LucideGlyph.close,
-                          size: 16,
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (profile != null) ...[
-                    const SizedBox(height: 14),
-                    UnifiedUserContextCard(profile: profile!),
-                  ],
-                  const SizedBox(height: 14),
-                  Flexible(
-                    child: SingleChildScrollView(child: body),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: busy
-                              ? null
-                              : (onCancel ??
-                                  () => Navigator.of(context).maybePop()),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: theme.textPrimary,
-                            side: BorderSide(color: theme.borderStrong),
-                            minimumSize: const Size.fromHeight(40),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: Text(
-                            cancelLabel,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton(
-                          onPressed:
-                              busy || !primaryEnabled || onPrimary == null
-                                  ? null
-                                  : onPrimary,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: accent,
-                            disabledBackgroundColor: accent.withOpacity(0.55),
-                            foregroundColor: theme.surfaceCard,
-                            minimumSize: const Size.fromHeight(40),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: busy
-                              ? SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.2,
-                                    color: theme.surfaceCard,
-                                  ),
-                                )
-                              : Text(
-                                  primaryLabel,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+        child: isSheet
+            ? Material(
+                color: theme.dialogSurface,
+                child: panel,
+              )
+            : Dialog(
+                backgroundColor: theme.dialogSurface,
+                elevation: 10,
+                insetPadding: EdgeInsets.fromLTRB(
+                  mobile ? 12 : 40,
+                  24,
+                  mobile ? 12 : 40,
+                  24 + mq.viewInsets.bottom,
+                ),
+                shadowColor: theme.textPrimary.withOpacity(0.28),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(AdminUsersChrome.sheetRadius),
+                  side: BorderSide(color: theme.borderStrong),
+                ),
+                child: panel,
               ),
-            ),
-          ),
-        ),
       ),
     );
   }

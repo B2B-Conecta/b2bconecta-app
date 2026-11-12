@@ -85,6 +85,7 @@ enum LucideGlyph {
   copy('copy'),
   scanLine('scan-line'),
   landmark('landmark'),
+  building2('building-2'),
   creditCard('credit-card'),
   download('download'),
   searchX('search-x'),

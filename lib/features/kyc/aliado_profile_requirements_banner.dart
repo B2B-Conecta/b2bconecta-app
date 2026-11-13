@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'aliado_doc_type.dart';
 import 'profile_document_model.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
 /// Progreso de requisitos mínimos del aliado (perfil + documentos iniciales).
 class AliadoProfileRequirementsProgress {
@@ -28,6 +28,8 @@ class AliadoProfileRequirementsProgress {
   final bool registroOk;
 
   bool get allComplete => done >= total;
+
+  double get fraction => total <= 0 ? 0 : (done / total).clamp(0.0, 1.0);
 
   String get subtitle {
     if (allComplete) return 'Todos los requisitos completos';
@@ -76,17 +78,15 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
   final ProfileModel? profile;
   final List<ProfileDocumentModel> documents;
   final bool compact;
-
-  /// Tras intentar guardar/enviar: incompletos en rojo como campos obligatorios.
   final bool highlightMissing;
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final progress = AliadoProfileRequirementsProgress.compute(
       profile: profile,
       documents: documents,
     );
-    final errorColor = Colors.red.shade700;
 
     Widget row(String label, bool ok) {
       final showErr = highlightMissing && !ok;
@@ -103,8 +103,8 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
                       : Icons.radio_button_unchecked),
               size: compact ? 15 : 16,
               color: ok
-                  ? AppColors.successGreen
-                  : (showErr ? errorColor : Colors.grey.shade500),
+                  ? theme.successFg
+                  : (showErr ? theme.brand : theme.textMuted),
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -117,10 +117,8 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
                       fontSize: compact ? 11 : 11.5,
                       height: 1.25,
                       color: showErr
-                          ? errorColor
-                          : (ok
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary),
+                          ? theme.brand
+                          : (ok ? theme.textPrimary : theme.textSecondary),
                       fontWeight:
                           ok || showErr ? FontWeight.w600 : FontWeight.w500,
                     ),
@@ -131,7 +129,7 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
                       style: TextStyle(
                         fontSize: compact ? 10 : 10.5,
                         height: 1.2,
-                        color: errorColor,
+                        color: theme.brand,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -146,6 +144,37 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
     final checklist = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${progress.subtitle} · ${(progress.fraction * 100).round()}%',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: theme.brand,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress.fraction,
+                  minHeight: 8,
+                  backgroundColor: theme.surfaceSubtle,
+                  color: theme.brand,
+                ),
+              ),
+            ],
+          ),
+        ),
         row('RIF', progress.rifOk),
         row('Dirección fiscal (estado, ciudad y domicilio)', progress.ubicOk),
         row('Enlace de Google Maps', progress.mapsOk),
@@ -159,9 +188,9 @@ class AliadoProfileRequirementsBanner extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.brandBlueContainer.withOpacity(0.35),
-        borderRadius: AppDecorations.radius12,
-        border: Border.all(color: AppColors.brandBlue.withOpacity(0.15)),
+        color: theme.brandContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),

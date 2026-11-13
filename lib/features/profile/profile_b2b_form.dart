@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/app/config/terms_config.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status.dart';
+import 'profile_edit_sheet.dart';
 import 'profile_model.dart';
 import 'profile_overview.dart';
 import 'package:motolink_pro_app/core/auth/auth_service.dart';
@@ -20,9 +23,13 @@ import 'package:motolink_pro_app/features/commissions/importer_commission_settle
 import 'package:motolink_pro_app/features/kyc/authorization_status_section.dart';
 import 'package:motolink_pro_app/core/widgets/media_pick_action_chips.dart';
 import 'profile_section_helpers.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_register_section.dart';
+import 'package:motolink_pro_app/features/onboarding/pending_signup_role_storage.dart';
 import 'package:motolink_pro_app/features/onboarding/terms_acceptance_section.dart';
 import 'package:motolink_pro_app/features/referrals/profile_referral_section.dart';
-import 'profile_role_labels.dart';
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 
 /// Formulario perfil B2B (referencia: Mi Perfil B2B). Dirección fiscal → `profiles.direccion`.
@@ -41,6 +48,7 @@ class ProfileB2BForm extends StatefulWidget {
     this.summaryFirst = false,
     this.accountActionsInShell = false,
     this.editingOnly = false,
+    this.omitKycDocuments = false,
     this.overviewSupport,
   });
 
@@ -48,6 +56,9 @@ class ProfileB2BForm extends StatefulWidget {
   final bool summaryFirst;
   final bool accountActionsInShell;
   final bool editingOnly;
+
+  /// KYC vive en pestaña propia del shell de Perfil.
+  final bool omitKycDocuments;
   final Widget? overviewSupport;
   final VoidCallback onSaved;
 
@@ -89,7 +100,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
   late final TextEditingController _minOrderAmountController;
   late MinOrderCurrency _minOrderCurrency;
   late final TextEditingController _emailDisplayController;
+  late final TextEditingController _cedulaController;
   String _role = 'importador';
+  bool _entrepreneurEnabled = false;
   bool _saving = false;
   bool _logoBusy = false;
 
@@ -121,8 +134,18 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     return widget.initial?.role?.trim().toLowerCase() == 'aliado';
   }
 
+  /// Onboarding sin rol persistido: puede elegir Emprendedor.
+  bool get _canChooseEntrepreneur =>
+      _isOnboarding && !_roleLocked && !widget.editingOnly;
+
+  bool get _isEntrepreneurPath =>
+      _canChooseEntrepreneur &&
+      _role.trim().toLowerCase() == 'aliado' &&
+      _entrepreneurEnabled;
+
   bool get _showAliadoKycSection =>
-      _role.trim().toLowerCase() == 'aliado' || _persistedAsAliado;
+      !_isEntrepreneurPath &&
+      (_role.trim().toLowerCase() == 'aliado' || _persistedAsAliado);
 
   /// Igual que mayorista: pueden guardar el perfil (Maps, domicilio) en cualquier
   /// momento. El envío a revisión es un botón aparte.
@@ -171,6 +194,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   /// Registro inicial: visible aunque ya aceptó (casilla bloqueada + textos).
   bool get _showTermsSection {
+    if (_isEntrepreneurPath) {
+      return !(widget.initial?.hasAcceptedCurrentTerms ?? false);
+    }
     if (!_requiresTerms || _showAliadoKycSection) return false;
     if (_isOnboarding || _showImportadorSubmitSection) return true;
     return !(widget.initial?.hasAcceptedCurrentTerms ?? false);
@@ -178,6 +204,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   /// Estado, ciudad, dirección fiscal y enlace Maps (misma sección que importador/aliado).
   bool get _requiereUbicacionFiscalCompleta {
+    if (_isEntrepreneurPath) return false;
     final r = _role.trim().toLowerCase();
     return r == 'importador' || r == 'aliado';
   }
@@ -213,16 +240,30 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _emailDisplayController = TextEditingController(
       text: Supabase.instance.client.auth.currentUser?.email ?? '',
     );
+    _cedulaController = TextEditingController(text: i?.cedula ?? '');
     final r = i?.role?.trim().toLowerCase();
     if (r == 'importador' || r == 'aliado' || r == 'administrador') {
       _role = r!;
+      if (i?.isEntrepreneurRetailer == true) {
+        _entrepreneurEnabled = true;
+      }
+    } else {
+      // Onboarding: por defecto Minorista (puede activar Emprendedor).
+      _role = 'aliado';
+      unawaited(_applyPendingSignupRole());
     }
     _termsAccepted = widget.initial?.hasAcceptedCurrentTerms ?? false;
-    if (_persistedAsAliado) {
+    if (_persistedAsAliado && !widget.omitKycDocuments) {
       MainShellTabController.registerKycDocumentationSectionKey(
         _kycDocumentationSectionKey,
       );
     }
+  }
+
+  Future<void> _applyPendingSignupRole() async {
+    final pending = await PendingSignupRoleStorage.peek();
+    if (!mounted || pending == null || _roleLocked) return;
+    setState(() => _role = pending);
   }
 
   @override
@@ -245,7 +286,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
 
   @override
   void dispose() {
-    if (_persistedAsAliado) {
+    if (_persistedAsAliado && !widget.omitKycDocuments) {
       MainShellTabController.registerKycDocumentationSectionKey(null);
     }
     _businessNameController.dispose();
@@ -260,6 +301,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     _legalContactPhoneController.dispose();
     _minOrderAmountController.dispose();
     _emailDisplayController.dispose();
+    _cedulaController.dispose();
     super.dispose();
   }
 
@@ -336,42 +378,41 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     String? label,
     bool readOnly = false,
   }) {
-    final radius = BorderRadius.circular(10);
-    final side = BorderSide(color: AppColors.borderSubtle);
+    final theme = B2BThemeExtension.of(context);
+    final radius = BorderRadius.circular(12);
+    final side = BorderSide(color: theme.borderSubtle);
     return InputDecoration(
       labelText: label,
       floatingLabelBehavior:
           label == null ? FloatingLabelBehavior.never : FloatingLabelBehavior.auto,
       hintText: hint.isEmpty ? null : hint,
-      hintStyle: AppColors.hintStyle.copyWith(fontSize: 14),
+      hintStyle: TextStyle(fontSize: 14, color: theme.textMuted),
       labelStyle: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: theme.textSecondary,
       ),
       floatingLabelStyle: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
-        color: AppColors.brandAccent,
+        color: theme.brand,
       ),
       filled: true,
-      fillColor: readOnly
-          ? AppColors.surfaceTinted
-          : AppColors.fieldFill,
+      fillColor: readOnly ? theme.surfaceSubtle : theme.inputFill,
       border: OutlineInputBorder(borderRadius: radius, borderSide: side),
       enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: side),
       disabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: side),
       focusedBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: const BorderSide(color: AppColors.brandAccent, width: 1.6),
+        borderSide: BorderSide(color: theme.brand, width: 1.6),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: BorderSide(color: Colors.red.shade400),
+        borderSide: BorderSide(color: theme.brand.withOpacity(0.55)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: radius,
-        borderSide: BorderSide(color: Colors.red.shade400, width: 1.6),
+        borderSide: BorderSide(color: theme.brand, width: 1.6),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
@@ -455,7 +496,75 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     await SupabaseService.acceptTerms(version: TermsConfig.currentVersion);
   }
 
+  Future<void> _submitEntrepreneur() async {
+    final phone = _phoneController.text.trim();
+    final rif = _rifController.text.trim();
+    final cedula = _cedulaController.text.trim();
+    final location = _fiscalAddressController.text.trim();
+    final theme = B2BThemeExtension.of(context);
+
+    if (phone.isEmpty || rif.isEmpty || cedula.isEmpty || location.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Completa teléfono, RIF, cédula y ubicación.',
+            style: TextStyle(color: theme.surfaceCard),
+          ),
+          backgroundColor: theme.textPrimary,
+        ),
+      );
+      return;
+    }
+    if (!_hasAcceptedTerms && !_termsPersisted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Debes aceptar los términos y la política de privacidad.',
+            style: TextStyle(color: theme.surfaceCard),
+          ),
+          backgroundColor: theme.textPrimary,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final name = _businessNameController.text.trim();
+      await SupabaseService.completeEntrepreneurRegistration(
+        phone: phone,
+        rif: rif,
+        cedula: cedula,
+        direccion: location,
+        businessName: name.isEmpty ? null : name,
+        termsVersion: TermsConfig.currentVersion,
+      );
+      await PendingSignupRoleStorage.clear();
+      if (!mounted) return;
+      widget.onSaved();
+      widget.onEnterApp?.call();
+    } catch (e, st) {
+      debugPrint('completeEntrepreneurRegistration error: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo activar la cuenta emprendedor.',
+            style: TextStyle(color: theme.surfaceCard),
+          ),
+          backgroundColor: theme.textPrimary,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _submit() async {
+    if (_isEntrepreneurPath) {
+      await _submitEntrepreneur();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     if (_requiresTerms &&
         !_hasAcceptedTerms &&
@@ -519,6 +628,7 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             _isImportadorRole ? _minOrderCurrency.dbValue : null,
         updateMinimumOrder: !widget.editingOnly,
       );
+      await PendingSignupRoleStorage.clear();
       await _persistAcceptedTermsIfNeeded();
       await _tryGeocodeAndSaveCoordinates();
       if (!mounted) return;
@@ -695,27 +805,13 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       return ProfileOverview(
         profile: widget.initial!,
         onEdit: () async {
-          await Navigator.of(context).push<void>(MaterialPageRoute(
-            builder: (context) => Scaffold(
-              appBar: AppBar(title: const Text('Editar mi negocio')),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Center(child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  child: ProfileB2BForm(
-                    editingOnly: true,
-                    initial: widget.initial,
-                    onSaved: () {
-                      widget.onSaved();
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                    onRelatedDataChanged: widget.onRelatedDataChanged,
-                  ),
-                )),
-              ),
-            ),
-          ));
-          if (mounted && _persistedAsAliado) {
+          await showProfileEditSheet(
+            context: context,
+            profile: widget.initial!,
+            onSaved: widget.onSaved,
+            onRelatedDataChanged: widget.onRelatedDataChanged,
+          );
+          if (mounted && _persistedAsAliado && !widget.omitKycDocuments) {
             MainShellTabController.registerKycDocumentationSectionKey(
                 _kycDocumentationSectionKey);
           }
@@ -723,17 +819,22 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         onSignOut: _signOut,
         accountActionsInShell: widget.accountActionsInShell,
         onChanged: widget.onRelatedDataChanged,
-        documents: _showAliadoKycSection ? ProfileKycDocumentsSection(
-          key: _kycDocumentationSectionKey,
-          role: 'aliado', profile: widget.initial,
-          kycStatus: widget.initial?.kycStatus,
-          beforeUpload: _ensureProfileForDocumentUpload,
-          beforeSubmitReview: _persistProfileFromForm,
-          registrationLocked: _aliadoRegistrationLocked,
-          onTermsAccepted: widget.onTermsAccepted,
-          onChanged: widget.onRelatedDataChanged,
-        ) : null,
-        support: widget.overviewSupport ?? widget.afterReputation ?? widget.beforeSignOut,
+        documents: (_showAliadoKycSection && !widget.omitKycDocuments)
+            ? ProfileKycDocumentsSection(
+                key: _kycDocumentationSectionKey,
+                role: 'aliado',
+                profile: widget.initial,
+                kycStatus: widget.initial?.kycStatus,
+                beforeUpload: _ensureProfileForDocumentUpload,
+                beforeSubmitReview: _persistProfileFromForm,
+                registrationLocked: _aliadoRegistrationLocked,
+                onTermsAccepted: widget.onTermsAccepted,
+                onChanged: widget.onRelatedDataChanged,
+              )
+            : null,
+        support: widget.overviewSupport ??
+            widget.afterReputation ??
+            widget.beforeSignOut,
       );
     }
     final email = _emailDisplayController.text.trim().isEmpty
@@ -741,9 +842,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
         : _emailDisplayController.text.trim();
 
     final businessName = _businessNameController.text.trim();
+    final theme = B2BThemeExtension.of(context);
     final width = MediaQuery.sizeOf(context).width;
-    final mobile = width < 600;
-    final wide = width >= 560;
+    final mobile = width < AppBreakpoints.mobileMenu;
+    final wide = width >= AppBreakpoints.mobileMenu;
 
     return Form(
       key: _formKey,
@@ -819,46 +921,94 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
               title: mobile ? 'Negocio' : 'Datos del negocio',
               subtitle: mobile
                   ? null
-                  : (businessName.isEmpty
-                      ? 'Tipo de cuenta, RIF y contacto'
-                      : businessName),
+                  : (_isEntrepreneurPath
+                      ? 'Alta rápida Minorista-Emprendedor'
+                      : (businessName.isEmpty
+                          ? 'Tipo de cuenta, RIF y contacto'
+                          : businessName)),
               initiallyExpanded: true,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!mobile) ...[
+                  if (_canChooseEntrepreneur)
+                    PublicSignupRoleSection(
+                      role: _role.trim().toLowerCase() == 'importador'
+                          ? PublicSignupRole.importador
+                          : PublicSignupRole.aliado,
+                      entrepreneurEnabled: _entrepreneurEnabled,
+                      enabled: !_saving,
+                      onRoleChanged: (r) {
+                        setState(() {
+                          _role = r == PublicSignupRole.importador
+                              ? 'importador'
+                              : 'aliado';
+                          if (r == PublicSignupRole.importador) {
+                            _entrepreneurEnabled = false;
+                          }
+                        });
+                      },
+                      onEntrepreneurChanged: (v) {
+                        setState(() => _entrepreneurEnabled = v);
+                      },
+                    )
+                  else if (_roleLocked)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Chip(
+                        backgroundColor: theme.brandContainer,
+                        side: BorderSide(color: theme.borderSubtle),
+                        label: Text(
+                          _persistedAsImportador
+                              ? 'Mayorista'
+                              : _persistedAsAliado
+                                  ? (widget.initial?.isEntrepreneurRetailer ==
+                                          true
+                                      ? 'Minorista-Emprendedor'
+                                      : 'Minorista')
+                                  : 'Administrador',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    )
+                  else ...[
                     Text(
                       'Tipo de cuenta',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
+                    _RoleChoiceGrid(
+                      compact: mobile,
+                      showAdministrador: _showAdministradorRoleOption,
+                      role: _role,
+                      locked: _roleLocked,
+                      saving: _saving,
+                      onChanged: (r) => setState(() => _role = r),
+                    ),
                   ],
-                  if (_roleLocked)
-                    Align(alignment: Alignment.centerLeft,
-                      child: Chip(label: Text(_persistedAsImportador
-                        ? 'Importador' : _persistedAsAliado ? 'Tienda minorista' : 'Administrador')))
-                  else _RoleChoiceGrid(
-                    compact: mobile,
-                    showAdministrador: _showAdministradorRoleOption,
-                    role: _role,
-                    locked: _roleLocked,
-                    saving: _saving,
-                    onChanged: (r) => setState(() => _role = r),
-                  ),
                   SizedBox(height: mobile ? 14 : 18),
                   TextFormField(
                     controller: _businessNameController,
                     textCapitalization: TextCapitalization.words,
                     decoration: _fieldDecoration(
-                      mobile ? 'Nombre comercial' : 'Ej: Repuestos La Victoria C.A.',
-                      label: mobile ? 'Negocio' : 'Nombre del negocio',
+                      mobile
+                          ? 'Nombre comercial'
+                          : 'Ej: Repuestos La Victoria C.A.',
+                      label: mobile
+                          ? 'Negocio'
+                          : (_isEntrepreneurPath
+                              ? 'Nombre del negocio (opcional)'
+                              : 'Nombre del negocio'),
                     ),
                     onChanged: (_) => setState(() {}),
                     validator: (v) {
+                      if (_isEntrepreneurPath) return null;
                       if (v == null || v.trim().isEmpty) {
                         return 'Campo obligatorio';
                       }
@@ -943,6 +1093,103 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
                       label: mobile ? 'Correo' : 'Correo electrónico',
                       readOnly: true,
                     ),
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeInOut,
+                    alignment: Alignment.topCenter,
+                    child: _isEntrepreneurPath
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (wide)
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _cedulaController,
+                                          decoration: _fieldDecoration(
+                                            'V-12345678',
+                                            label: 'Cédula de Identidad',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _fiscalAddressController,
+                                          maxLines: 2,
+                                          decoration: _fieldDecoration(
+                                            'Av. Bolívar, Local 4, Valencia',
+                                            label: 'Ubicación',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else ...[
+                                  TextFormField(
+                                    controller: _cedulaController,
+                                    decoration: _fieldDecoration(
+                                      'V-12345678',
+                                      label: 'Cédula de Identidad',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextFormField(
+                                    controller: _fiscalAddressController,
+                                    maxLines: 2,
+                                    decoration: _fieldDecoration(
+                                      'Av. Bolívar, Local 4, Valencia',
+                                      label: 'Ubicación',
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 12),
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: theme.brandContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: theme.borderSubtle,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        LucideIcon(
+                                          LucideGlyph.sparkles,
+                                          size: 18,
+                                          color: theme.brand,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            'Entrarás con acceso activo. '
+                                            'Tendrás 8 días hábiles para tu primera '
+                                            'compra y 8 semanas para completar el expediente.',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              height: 1.4,
+                                              color: theme.textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -1371,23 +1618,92 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
             const SizedBox(height: 8),
           ],
           if (_showGuardarPerfilButton) ...[
-            if (widget.editingOnly) Align(alignment: Alignment.centerRight,
-              child: TextButton(onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'))),
             SizedBox(height: mobile ? 18 : 24),
-            ElevatedButton(
-              onPressed: (_saving || _submittingImportadorReview) ? null : _submit,
-              child: _saving
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
+            if (widget.editingOnly)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.of(context).maybePop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.textPrimary,
+                        side: BorderSide(color: theme.borderStrong),
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    )
-                  : Text(mobile ? 'Guardar' : 'Guardar Perfil'),
-            ),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: (_saving || _submittingImportadorReview)
+                          ? null
+                          : _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.brand,
+                        foregroundColor: theme.surfaceCard,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _saving
+                          ? SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: theme.surfaceCard,
+                              ),
+                            )
+                          : const Text(
+                              'Guardar cambios',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              ElevatedButton(
+                onPressed:
+                    (_saving || _submittingImportadorReview) ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.brand,
+                  foregroundColor: theme.surfaceCard,
+                  elevation: 0,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _saving
+                    ? SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: theme.surfaceCard,
+                        ),
+                      )
+                    : Text(
+                        _isEntrepreneurPath
+                            ? (mobile
+                                ? 'Activar cuenta'
+                                : 'Activar y explorar catálogo')
+                            : (mobile ? 'Guardar' : 'Guardar Perfil'),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+              ),
           ] else
             const SizedBox(height: 16),
           if (!widget.editingOnly && widget.initial != null &&
@@ -1518,15 +1834,16 @@ class _ProfileIdentityCard extends StatelessWidget {
           const SizedBox(height: 6), actions,
         ])]);
     }
+    final theme = B2BThemeExtension.of(context);
     if (compact) {
       return Material(
-        color: AppColors.card,
+        color: theme.surfaceCard,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.borderSubtle),
+            border: Border.all(color: theme.borderSubtle),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
@@ -1545,7 +1862,7 @@ class _ProfileIdentityCard extends StatelessWidget {
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     height: 1.2,
-                    color: AppColors.textPrimary,
+                    color: theme.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1556,7 +1873,7 @@ class _ProfileIdentityCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: AppColors.textSecondary,
+                    color: theme.textSecondary,
                   ),
                 ),
               ],
@@ -1567,13 +1884,13 @@ class _ProfileIdentityCard extends StatelessWidget {
     }
 
     return Material(
-      color: AppColors.card,
+      color: theme.surfaceCard,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderSubtle),
+          border: Border.all(color: theme.borderSubtle),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -1599,7 +1916,7 @@ class _ProfileIdentityCard extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         height: 1.2,
-                        color: AppColors.textPrimary,
+                        color: theme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1607,7 +1924,7 @@ class _ProfileIdentityCard extends StatelessWidget {
                       email,
                       style: TextStyle(
                         fontSize: 13.5,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                       ),
                     ),
                   ],
@@ -1657,13 +1974,13 @@ class _RoleChoiceGrid extends StatelessWidget {
 
     final importador = tile(
       value: 'importador',
-      label: 'Importador',
+      label: compact ? 'Mayorista' : 'Mayorista',
       icon: Icons.local_shipping_outlined,
     );
     final aliado = tile(
       value: 'aliado',
-      label: ProfileRoleLabels.aliadoEs,
-      icon: Icons.person_outline,
+      label: compact ? 'Minorista' : 'Minorista',
+      icon: Icons.storefront_outlined,
     );
     final admin = tile(
       value: 'administrador',
@@ -1728,7 +2045,8 @@ class _RoleChoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = selected ? AppColors.brandAccent : AppColors.textSecondary;
+    final theme = B2BThemeExtension.of(context);
+    final accent = selected ? theme.brand : theme.textSecondary;
     final content = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: EdgeInsets.symmetric(
@@ -1736,11 +2054,11 @@ class _RoleChoiceTile extends StatelessWidget {
         horizontal: compact ? 6 : 10,
       ),
       decoration: BoxDecoration(
-        color: selected ? AppColors.brandBlueContainer : AppColors.fieldFill,
-        borderRadius: BorderRadius.circular(compact ? 12 : 10),
+        color: selected ? theme.brandContainer : theme.inputFill,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: selected ? AppColors.brandAccent : AppColors.borderSubtle,
-          width: selected ? 1.8 : 1,
+          color: selected ? theme.brand : theme.borderSubtle,
+          width: selected ? 1.6 : 1,
         ),
       ),
       child: compact
@@ -1757,9 +2075,8 @@ class _RoleChoiceTile extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 11.5,
-                    color: selected
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
+                    color:
+                        selected ? theme.textPrimary : theme.textSecondary,
                   ),
                 ),
               ],
@@ -1779,9 +2096,8 @@ class _RoleChoiceTile extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       fontSize: 13.5,
                       height: 1.2,
-                      color: selected
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
+                      color:
+                          selected ? theme.textPrimary : theme.textSecondary,
                     ),
                   ),
                 ),
@@ -1792,10 +2108,10 @@ class _RoleChoiceTile extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1 : 0.55,
       child: Material(
-        color: Colors.transparent,
+        color: theme.surfaceCard.withOpacity(0),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(compact ? 12 : 10),
+          borderRadius: BorderRadius.circular(12),
           child: content,
         ),
       ),

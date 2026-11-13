@@ -1,6 +1,7 @@
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/app/config/terms_config.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_retailer.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo_instrucciones.dart';
 import 'package:motolink_pro_app/features/reputation/rating_dimension_stat_model.dart';
@@ -67,11 +68,20 @@ class ProfileModel {
     this.email,
     this.isOwner = false,
     this.deactivatedAt,
+    this.cedula,
+    this.retailerTier = RetailerTier.standard,
+    this.entrepreneurStatus,
+    this.entrepreneurRegisteredAt,
+    this.firstPurchaseDeadline,
+    this.kycCompletionDeadline,
+    this.firstPurchaseBusinessDay,
+    this.hasSeenEntrepreneurWelcome = false,
   });
 
   final String id;
   final String? businessName;
   final String? rif;
+  final String? cedula;
 
   /// `importador`, `aliado` o `administrador` (broker B2B Conecta).
   final String? role;
@@ -233,6 +243,49 @@ class ProfileModel {
   /// Baja lógica (`profiles.deactivated_at`). No borra `auth.users`.
   final DateTime? deactivatedAt;
 
+  /// `standard` | `entrepreneur` (`profiles.retailer_tier`).
+  final String retailerTier;
+
+  final String? entrepreneurStatus;
+  final DateTime? entrepreneurRegisteredAt;
+  final DateTime? firstPurchaseDeadline;
+  final DateTime? kycCompletionDeadline;
+
+  /// Día hábil actual de la ventana de primera compra (1–8), vía admin RPC.
+  final int? firstPurchaseBusinessDay;
+  final bool hasSeenEntrepreneurWelcome;
+
+  bool get isEntrepreneurRetailer =>
+      isAliado &&
+      retailerTier.trim().toLowerCase() == RetailerTier.entrepreneur;
+
+  /// Marketplace pausado (caducidad 8 semanas o reactivación pendiente).
+  bool get isEntrepreneurMarketplaceLocked =>
+      EntrepreneurMarketplaceLock.locksMarketplace(
+        isEntrepreneurRetailer: isEntrepreneurRetailer,
+        entrepreneurStatus: entrepreneurStatus,
+      );
+
+  bool get isEntrepreneurFirstPurchaseLock =>
+      EntrepreneurFirstPurchaseProgress.isFirstPurchaseLock(
+        entrepreneurStatus: entrepreneurStatus,
+        kycCompletionDeadline: kycCompletionDeadline,
+      );
+
+  bool get isEntrepreneurFirstPurchaseWarning =>
+      isEntrepreneurRetailer &&
+      EntrepreneurStatus.isFirstPurchaseWarning(entrepreneurStatus);
+
+  int get entrepreneurFirstPurchaseDayOfEight =>
+      EntrepreneurFirstPurchaseProgress.dayOfEight(
+        rpcDay: firstPurchaseBusinessDay,
+        registeredAt: entrepreneurRegisteredAt,
+        createdAt: createdAt,
+      );
+
+  bool get needsEntrepreneurWelcome =>
+      isEntrepreneurRetailer && !hasSeenEntrepreneurWelcome;
+
   bool get hasReferralAttribution =>
       (referredByExternalId != null && referredByExternalId!.isNotEmpty) ||
       (referredByProfileId != null && referredByProfileId!.isNotEmpty);
@@ -355,6 +408,7 @@ class ProfileModel {
       id: id,
       businessName: businessName,
       rif: rif,
+      cedula: cedula,
       role: role,
       phone: phone,
       createdAt: createdAt,
@@ -399,6 +453,13 @@ class ProfileModel {
       catalogVerifiedAt: catalogVerifiedAt,
       referralCode: referralCode,
       referredByProfileId: referredByProfileId,
+      retailerTier: retailerTier,
+      entrepreneurStatus: entrepreneurStatus,
+      entrepreneurRegisteredAt: entrepreneurRegisteredAt,
+      firstPurchaseDeadline: firstPurchaseDeadline,
+      kycCompletionDeadline: kycCompletionDeadline,
+      firstPurchaseBusinessDay: firstPurchaseBusinessDay,
+      hasSeenEntrepreneurWelcome: hasSeenEntrepreneurWelcome,
       referredByExternalId: referredByExternalId,
       referredByExternalName: referredByExternalName,
       referredByExternalCode: referredByExternalCode,
@@ -455,8 +516,26 @@ class ProfileModel {
       id: json['id']?.toString() ?? '',
       businessName: _text(json['business_name']),
       rif: _text(json['rif']),
+      cedula: _text(json['cedula']),
       role: _text(json['role']),
       phone: _text(json['phone']),
+      retailerTier: _text(json['retailer_tier']) ?? RetailerTier.standard,
+      entrepreneurStatus: _text(json['entrepreneur_status']),
+      entrepreneurRegisteredAt: json['entrepreneur_registered_at'] != null
+          ? DateTime.tryParse(json['entrepreneur_registered_at'].toString())
+          : null,
+      firstPurchaseDeadline: json['first_purchase_deadline'] != null
+          ? DateTime.tryParse(json['first_purchase_deadline'].toString())
+          : null,
+      kycCompletionDeadline: json['kyc_completion_deadline'] != null
+          ? DateTime.tryParse(json['kyc_completion_deadline'].toString())
+          : null,
+      firstPurchaseBusinessDay: () {
+        final raw = json['first_purchase_business_day'];
+        if (raw is int) return raw;
+        return int.tryParse(raw?.toString() ?? '');
+      }(),
+      hasSeenEntrepreneurWelcome: _parseBool(json['has_seen_entrepreneur_welcome']),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,

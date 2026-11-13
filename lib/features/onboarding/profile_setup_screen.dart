@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'b2b_onboarding_shell.dart';
 import 'package:motolink_pro_app/features/profile/profile_b2b_form.dart';
 
@@ -87,26 +87,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     if (widget.isEditing) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: theme.background,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
+          backgroundColor: theme.surfaceCard,
+          foregroundColor: theme.textPrimary,
+          surfaceTintColor: theme.surfaceCard.withOpacity(0),
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
-          title: const Text(
+          title: Text(
             'Mi Perfil B2B',
-            style: TextStyle(fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: theme.textPrimary,
+            ),
           ),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
             child: Divider(
               height: 1,
               thickness: 1,
-              color: Colors.grey.shade200,
+              color: theme.borderSubtle,
             ),
           ),
         ),
@@ -134,7 +139,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.background,
       body: B2bOnboardingShell(
         child: ProfileB2BForm(
           key: _formSessionKey,

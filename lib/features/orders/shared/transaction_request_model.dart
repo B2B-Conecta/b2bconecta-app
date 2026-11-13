@@ -68,6 +68,7 @@ class TransactionRequestModel {
     this.aliadoLogoStoragePath,
     this.aliadoKycStatus,
     this.aliadoCatalogVerifiedAt,
+    this.aliadoEntrepreneurBadge = false,
     this.ownerBusinessName,
     this.ownerRif,
     this.ownerPhone,
@@ -239,6 +240,9 @@ class TransactionRequestModel {
 
   /// Sello Verificado (admin) del aliado; independiente de KYC.
   final DateTime? aliadoCatalogVerifiedAt;
+
+  /// Sello Emprendedor visible solo en pedidos vinculados (importador/admin).
+  final bool aliadoEntrepreneurBadge;
 
   final String? ownerBusinessName;
   final String? ownerRif;
@@ -1196,6 +1200,7 @@ class TransactionRequestModel {
       aliadoLogoStoragePath: _nullableText(aliadoMap?['logo_storage_path']),
       aliadoKycStatus: _nullableText(aliadoMap?['kyc_status']),
       aliadoCatalogVerifiedAt: _parseDate(aliadoMap?['catalog_verified_at']),
+      aliadoEntrepreneurBadge: json['aliado_entrepreneur_badge'] == true,
       ownerBusinessName: _nullableText(ownerMap?['business_name']),
       ownerRif: _nullableText(ownerMap?['rif']),
       ownerPhone: _nullableText(ownerMap?['phone']),

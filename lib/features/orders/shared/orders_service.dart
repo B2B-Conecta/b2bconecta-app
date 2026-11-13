@@ -186,6 +186,7 @@ class OrdersService {
     flete_pago_aprobado_at,
     created_at,
     updated_at,
+    aliado_entrepreneur_badge,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at ),
     importer_carrier:importer_carriers!transaction_requests_importer_carrier_id_fkey ( company_name, contact_phone, flete_pago_modo, accepted_pago_metodos, pago_metodo_instrucciones ),
     importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at, accepted_pago_metodos, pago_metodo_instrucciones, pago_solo_divisas )

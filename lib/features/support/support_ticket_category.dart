@@ -6,7 +6,9 @@ abstract final class SupportTicketCategory {
   static const kyc = 'kyc';
   static const plataforma = 'plataforma';
   static const otro = 'otro';
+  static const reactivacionEmprendedor = 'reactivacion_emprendedor';
 
+  /// Categorías seleccionables al crear un ticket manual.
   static const all = [
     cuenta,
     pedido,
@@ -30,6 +32,8 @@ abstract final class SupportTicketCategory {
         return 'Plataforma';
       case otro:
         return 'Otro';
+      case reactivacionEmprendedor:
+        return 'Reactivación de Cuenta Emprendedor';
       default:
         return category;
     }

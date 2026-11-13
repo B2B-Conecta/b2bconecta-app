@@ -64,6 +64,9 @@ class ShellUserMenu extends StatefulWidget {
 
     /// Si es true, el tap abre Ajustes/Perfil sin menú intermedio (admin).
     this.openSettingsOnTap = false,
+
+    /// Resalta la tarjeta cuando Perfil/Ajustes está activo.
+    this.selected = false,
   });
 
   final ProfileModel profile;
@@ -72,6 +75,7 @@ class ShellUserMenu extends StatefulWidget {
   final bool extended;
   final bool signingOut;
   final bool openSettingsOnTap;
+  final bool selected;
 
   @override
   State<ShellUserMenu> createState() => _ShellUserMenuState();
@@ -136,8 +140,10 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
     final name = ShellUserIdentity.displayName(widget.profile);
     final badge = ShellUserIdentity.roleBadge(widget.profile);
     final initials = ShellUserIdentity.initials(widget.profile);
-    final cardBg = theme.sidebarFooterBg;
-    final border = theme.sidebarFooterBorder;
+    final cardBg = widget.selected ? theme.brandContainer : theme.sidebarFooterBg;
+    final border = widget.selected
+        ? theme.brand.withOpacity(0.45)
+        : theme.sidebarFooterBorder;
     final labelColor = theme.textPrimary;
     final muted = theme.textSecondary;
     final badgeBg = theme.brandContainer;
@@ -161,11 +167,15 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
             color: cardBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: border),
+              side: BorderSide(
+                color: border,
+                width: widget.selected ? 1.5 : 1,
+              ),
             ),
             child: InkWell(
               onTap: _openMenu,
               borderRadius: BorderRadius.circular(12),
+              hoverColor: theme.brand.withOpacity(0.08),
               child: SizedBox(
                 width: 48,
                 height: 48,
@@ -194,11 +204,15 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
             child: InkWell(
               onTap: _openMenu,
               borderRadius: BorderRadius.circular(12),
+              hoverColor: theme.brand.withOpacity(0.08),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: border),
+                  border: Border.all(
+                    color: border,
+                    width: widget.selected ? 1.5 : 1,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -252,7 +266,7 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
                           ? LucideGlyph.settings
                           : LucideGlyph.chevronsUpDown,
                       size: 16,
-                      color: muted,
+                      color: widget.selected ? theme.brand : muted,
                     ),
                   ],
                 ),

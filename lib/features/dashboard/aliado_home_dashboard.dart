@@ -29,6 +29,8 @@ import '../catalog/promo_campaign_model.dart';
 import '../catalog/recent_product_views.dart';
 import '../catalog/store_supplier_chat.dart';
 import '../inventory/product_custom_fields.dart';
+import '../onboarding/entrepreneur_first_purchase_warning_banner.dart';
+import '../onboarding/entrepreneur_rail_status_card.dart';
 import '../profile/profile_model.dart';
 import 'aliado_home_service.dart';
 import 'aliado_home_header.dart';
@@ -247,8 +249,24 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                                           decoration: InputDecoration(
                                               hintText:
                                                   'Repuesto, marca o código…',
-                                              prefixIcon: const LucideIcon(
-                                                  LucideGlyph.search),
+                                              prefixIcon: Padding(
+                                                padding:
+                                                    const EdgeInsets.only(
+                                                        left: 14, right: 6),
+                                                child: LucideIcon(
+                                                  LucideGlyph.search,
+                                                  size: 18,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              ),
+                                              prefixIconConstraints:
+                                                  const BoxConstraints(
+                                                minWidth: 40,
+                                                minHeight: 40,
+                                                maxWidth: 44,
+                                                maxHeight: 44,
+                                              ),
                                               filled: true,
                                               fillColor: AppColors.fieldFill,
                                               suffixIcon: IconButton(

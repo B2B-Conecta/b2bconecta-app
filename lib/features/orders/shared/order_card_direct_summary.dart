@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_badge_chip.dart';
 import 'package:motolink_pro_app/features/orders/shared/b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/orders/shared/qty_adjustment_status.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -21,6 +23,7 @@ class OrderCardRelatedParty {
     required this.displayName,
     this.logoStoragePath,
     this.locationLine,
+    this.showEntrepreneurBadge = false,
   });
 
   final OrderCardPartyKind kind;
@@ -28,6 +31,7 @@ class OrderCardRelatedParty {
   final String displayName;
   final String? logoStoragePath;
   final String? locationLine;
+  final bool showEntrepreneurBadge;
 
   IconData get icon => kind == OrderCardPartyKind.retailer
       ? Icons.storefront_outlined
@@ -104,6 +108,9 @@ List<OrderCardRelatedParty> orderCardRelatedParties({
               : ProfileRoleLabels.aliadoEs,
           logoStoragePath: r.aliadoLogoStoragePath,
           locationLine: _locationLine(r.aliadoCiudad, r.aliadoEstado),
+          showEntrepreneurBadge: r.aliadoEntrepreneurBadge &&
+              (viewerRole == AppHomeRole.importador ||
+                  viewerRole == AppHomeRole.administrador),
         ),
       );
     }
@@ -273,16 +280,26 @@ class _OrderCardPartyRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              party.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: density.metaTextSize,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                height: 1.2,
-              ),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    party.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: density.metaTextSize,
+                      fontWeight: FontWeight.w600,
+                      color: B2BThemeExtension.of(context).textPrimary,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                if (party.showEntrepreneurBadge) ...[
+                  const SizedBox(width: 6),
+                  const EntrepreneurBadgeChip(compact: true),
+                ],
+              ],
             ),
           ),
         ],

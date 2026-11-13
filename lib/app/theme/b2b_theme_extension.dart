@@ -31,6 +31,8 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
     required this.brandContainer,
     required this.successBg,
     required this.successFg,
+    required this.warningBg,
+    required this.warningFg,
   });
 
   final Color background;
@@ -59,6 +61,9 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
   /// Fondos de estado positivo (p. ej. Entregado y pagado).
   final Color successBg;
   final Color successFg;
+  /// Ámbar discreto (p. ej. sello Emprendedor en admin).
+  final Color warningBg;
+  final Color warningFg;
 
   /// Alias: filas / cajas sutiles.
   Color get surfaceSubtle => tableRowOdd;
@@ -92,6 +97,8 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
     brandContainer: Color(0xFFEFF6FF),
     successBg: Color(0xFFDCFCE7),
     successFg: Color(0xFF16A34A),
+    warningBg: Color(0xFFFEF3C7),
+    warningFg: Color(0xFFD97706),
   );
 
   static const dark = B2BThemeExtension(
@@ -120,6 +127,8 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
     brandContainer: AppDarkTokens.brandContainer,
     successBg: AppDarkTokens.successPill,
     successFg: AppDarkTokens.successFg,
+    warningBg: AppDarkTokens.warningPill,
+    warningFg: AppDarkTokens.warningFg,
   );
 
   static B2BThemeExtension of(BuildContext context) {
@@ -154,6 +163,8 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
     Color? brandContainer,
     Color? successBg,
     Color? successFg,
+    Color? warningBg,
+    Color? warningFg,
   }) {
     return B2BThemeExtension(
       background: background ?? this.background,
@@ -181,6 +192,8 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
       brandContainer: brandContainer ?? this.brandContainer,
       successBg: successBg ?? this.successBg,
       successFg: successFg ?? this.successFg,
+      warningBg: warningBg ?? this.warningBg,
+      warningFg: warningFg ?? this.warningFg,
     );
   }
 
@@ -214,6 +227,8 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
       brandContainer: l(brandContainer, other.brandContainer),
       successBg: l(successBg, other.successBg),
       successFg: l(successFg, other.successFg),
+      warningBg: l(warningBg, other.warningBg),
+      warningFg: l(warningFg, other.warningFg),
     );
   }
 }

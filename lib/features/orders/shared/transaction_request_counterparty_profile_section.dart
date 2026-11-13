@@ -7,6 +7,7 @@ import 'package:motolink_pro_app/features/kyc/profile_document_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_badge_chip.dart';
 import 'b2b_orders_panel_layout.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status_highlight_widgets.dart';
 
@@ -26,6 +27,7 @@ class TransactionRequestCounterpartyProfileSection extends StatefulWidget {
     this.logoStoragePath,
     this.kycStatus,
     this.catalogVerifiedAt,
+    this.showEntrepreneurBadge = false,
     this.loadApprovedDocuments = true,
   });
 
@@ -42,6 +44,7 @@ class TransactionRequestCounterpartyProfileSection extends StatefulWidget {
   final String? kycStatus;
   /// Sello Verificado (admin); distinto del estado KYC.
   final DateTime? catalogVerifiedAt;
+  final bool showEntrepreneurBadge;
   final bool loadApprovedDocuments;
 
   @override
@@ -200,7 +203,8 @@ class _TransactionRequestCounterpartyProfileSectionState
                           fontSize: density.contentTitleSize,
                         ),
                       ),
-                      if (widget.catalogVerifiedAt != null ||
+                      if (widget.showEntrepreneurBadge ||
+                          widget.catalogVerifiedAt != null ||
                           (!_isImportador &&
                               (widget.kycStatus?.trim().isNotEmpty ??
                                   false))) ...[
@@ -210,6 +214,8 @@ class _TransactionRequestCounterpartyProfileSectionState
                           runSpacing: 6,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
+                            if (widget.showEntrepreneurBadge)
+                              const EntrepreneurBadgeChip(compact: false),
                             if (widget.catalogVerifiedAt != null)
                               const ImporterCatalogSealChip(
                                 kind: ImporterCatalogSealKind.verified,

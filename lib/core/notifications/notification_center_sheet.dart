@@ -324,6 +324,11 @@ class _NotificationCenterSheetState extends State<NotificationCenterSheet> {
             color: Colors.white, size: 18);
         bg = Colors.red.shade600;
         break;
+      case 'entrepreneur':
+        glyph = const LucideIcon(LucideGlyph.rocket,
+            color: Colors.white, size: 18);
+        bg = AppColors.brand;
+        break;
       case 'credito':
         glyph = const Icon(Icons.account_balance_outlined,
             color: Colors.white, size: 18);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
+import 'shell/admin_shell_top_bar.dart';
 import 'shell/desktop_navigation_shell.dart';
 import 'shell/shell_destination.dart';
 
@@ -18,10 +19,19 @@ class B2bDesktopShell extends StatelessWidget {
     this.onMessagesTap,
     this.unreadMessages = 0,
     required this.onOpenSettings,
+    this.onOpenProfile,
+    this.onOpenNotificationPrefs,
     required this.onSignOut,
     required this.railBadgeLabel,
     this.trailingActions = const [],
     this.railStatusBuilder,
+    this.chrome = DesktopShellChrome.light,
+    this.showGlobalSearch = false,
+    this.showBcvFooter = false,
+    this.pageIndex,
+    this.railSelectionActive = true,
+    this.accountFooterSelected = false,
+    this.breadcrumbsOverride,
   });
 
   final int selectedIndex;
@@ -34,12 +44,33 @@ class B2bDesktopShell extends StatelessWidget {
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onOpenNotificationPrefs;
   final Future<void> Function() onSignOut;
   final String railBadgeLabel;
   final List<Widget> trailingActions;
 
   /// Bloque opcional sobre la tarjeta de cuenta; recibe si el rail está expandido.
   final Widget Function(bool extended)? railStatusBuilder;
+
+  /// [DesktopShellChrome.darkCorporate] alinea el panel con el chrome admin.
+  final DesktopShellChrome chrome;
+
+  /// Búsqueda global tipo admin (⌘K). Por defecto off en B2B.
+  final bool showGlobalSearch;
+
+  final bool showBcvFooter;
+
+  /// Índice del contenido ([IndexedStack]); útil si Perfil no está en el rail.
+  final int? pageIndex;
+
+  /// Si false, ningún ítem del rail queda seleccionado.
+  final bool railSelectionActive;
+
+  /// Resalta la tarjeta inferior de cuenta.
+  final bool accountFooterSelected;
+
+  final List<AdminShellBreadcrumb>? breadcrumbsOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +85,19 @@ class B2bDesktopShell extends StatelessWidget {
       onMessagesTap: onMessagesTap,
       unreadMessages: unreadMessages,
       onOpenSettings: onOpenSettings,
+      onOpenProfile: onOpenProfile,
+      onOpenNotificationPrefs: onOpenNotificationPrefs,
       onSignOut: onSignOut,
       railBadgeLabel: railBadgeLabel,
       trailingActions: trailingActions,
       railStatusBuilder: railStatusBuilder,
+      chrome: chrome,
+      showGlobalSearch: showGlobalSearch,
+      showBcvFooter: showBcvFooter,
+      pageIndex: pageIndex,
+      railSelectionActive: railSelectionActive,
+      accountFooterSelected: accountFooterSelected,
+      breadcrumbsOverride: breadcrumbsOverride,
     );
   }
 }

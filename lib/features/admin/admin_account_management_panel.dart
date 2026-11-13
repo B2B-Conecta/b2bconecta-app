@@ -27,6 +27,7 @@ import 'package:motolink_pro_app/features/admin/admin_standard_filter_bar.dart';
 import 'package:motolink_pro_app/features/admin/add_user_modal.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_kyc_dossier_section.dart';
+import 'package:motolink_pro_app/features/admin/owner_entrepreneur_control_panel.dart';
 import 'package:motolink_pro_app/features/admin/users_data_table.dart';
 
 enum _AccountListMode { cuentas, incompletos }
@@ -71,6 +72,8 @@ class _AdminAccountManagementPanelState
   final _listScroll = ScrollController();
   int _pageIndex = 0;
   int _pageSize = listPageSizeOptions.first;
+  bool _entrepreneursOnly = false;
+  String? _entrepreneurStatusFilter;
 
   @override
   void initState() {
@@ -79,7 +82,17 @@ class _AdminAccountManagementPanelState
       _consumeAccountDeepLink,
     );
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
+    _consumeEntrepreneurAlertFilter();
     _load();
+  }
+
+  void _consumeEntrepreneurAlertFilter() {
+    final filter =
+        MainShellTabController.consumePendingEntrepreneurAlertFilter();
+    if (filter == null || filter.trim().isEmpty) return;
+    _entrepreneursOnly = true;
+    _entrepreneurStatusFilter = filter.trim();
+    _mode = _AccountListMode.cuentas;
   }
 
   @override
@@ -117,14 +130,23 @@ class _AdminAccountManagementPanelState
   }
 
   void _consumeAccountDeepLink() {
+    _consumeEntrepreneurAlertFilter();
     final pending = MainShellTabController.consumePendingAccountProfileId() ??
         MainShellTabController.consumePendingKycProfileId();
-    if (pending == null || !mounted) return;
+    if (pending == null &&
+        _entrepreneurStatusFilter == null &&
+        !_entrepreneursOnly) {
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _mode = _AccountListMode.cuentas;
-      _previewProfileId = pending;
-      _searchCtrl.clear();
+      if (pending != null) {
+        _previewProfileId = pending;
+        _searchCtrl.clear();
+      }
     });
+    if (pending == null) return;
     if (!isAdminDesktopLayout(context)) {
       final p = _findProfile(pending);
       if (p != null) {
@@ -271,9 +293,21 @@ class _AdminAccountManagementPanelState
               profile: p,
               isSelf: p.id == widget.viewer.id,
             ),
+            OwnerEntrepreneurControlPanel(
+              profile: p,
+              onChanged: () {
+                unawaited(_load());
+              },
+              onDeactivate: _canOperate(p) ? () => _deactivate(p) : null,
+              onHardDelete:
+                  widget.viewer.isOwner ? () => _hardDelete(p) : null,
+            ),
             OwnerAccountKycDossierSection(
               profile: p,
               viewerRole: widget.viewer.role,
+              onChanged: () {
+                if (mounted) setState(() {});
+              },
             ),
             _previewRoleToggle(p),
           ],
@@ -530,6 +564,14 @@ class _AdminAccountManagementPanelState
               errorMessage: _error,
               onRetry: _load,
               onRefresh: _load,
+              entrepreneursOnly: _entrepreneursOnly,
+              entrepreneurStatusFilter: _entrepreneurStatusFilter,
+              onEntrepreneursOnlyChanged: (v) {
+                setState(() {
+                  _entrepreneursOnly = v;
+                  if (!v) _entrepreneurStatusFilter = null;
+                });
+              },
               onCreate: () async {
                 final created = await AddUserModal.open(
                   context,
@@ -661,6 +703,18 @@ class _AdminAccountManagementPanelState
                     OwnerAccountDossier(
                       profile: preview,
                       isSelf: preview.id == widget.viewer.id,
+                    ),
+                    OwnerEntrepreneurControlPanel(
+                      profile: preview,
+                      onChanged: () {
+                        unawaited(_load());
+                      },
+                      onDeactivate: _canOperate(preview)
+                          ? () => _deactivate(preview)
+                          : null,
+                      onHardDelete: widget.viewer.isOwner
+                          ? () => _hardDelete(preview)
+                          : null,
                     ),
                     OwnerAccountKycDossierSection(
                       profile: preview,

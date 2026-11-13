@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/notifications/notification_provider.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
@@ -55,22 +57,79 @@ Future<void> showOrderChatInboxSheet({
   Future<List<TransactionRequestModel>> Function()? fetchOrders,
   bool Function()? hasSession,
 }) {
+  final theme = B2BThemeExtension.of(context);
+  final mobile =
+      MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+
+  if (mobile) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: theme.dialogSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(ctx).height * 0.92,
+          child: OrderChatInboxSheet(
+            homeRole: homeRole,
+            fetchOrders: fetchOrders,
+            hasSession: hasSession,
+            asPage: true,
+          ),
+        ),
+      ),
+    ).whenComplete(() {
+      NotificationProvider.active?.reload();
+    });
+  }
+
   return Navigator.of(context)
       .push<void>(
     MaterialPageRoute<void>(
       builder: (_) => Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: theme.background,
         appBar: AppBar(
-          title: const Text('Chats'),
-          backgroundColor: AppColors.card,
-          foregroundColor: AppColors.textPrimary,
+          title: Text(
+            'Centro de Mensajes B2B',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: theme.textPrimary,
+            ),
+          ),
+          backgroundColor: theme.surfaceCard,
+          foregroundColor: theme.textPrimary,
           elevation: 0,
+          surfaceTintColor: theme.surfaceCard.withOpacity(0),
         ),
-        body: OrderChatInboxSheet(
-          homeRole: homeRole,
-          fetchOrders: fetchOrders,
-          hasSession: hasSession,
-          asPage: true,
+        body: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.surfaceCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: theme.borderSubtle),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.textPrimary.withOpacity(0.05),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: OrderChatInboxSheet(
+                homeRole: homeRole,
+                fetchOrders: fetchOrders,
+                hasSession: hasSession,
+                asPage: true,
+              ),
+            ),
+          ),
         ),
       ),
     ),
@@ -460,17 +519,24 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     final content = ListenableBuilder(
       listenable: _provider ?? const AlwaysStoppedAnimation(0),
       builder: (context, _) => LayoutBuilder(builder: (context, constraints) {
-        final wide = widget.asPage && constraints.maxWidth >= 960;
+        final theme = B2BThemeExtension.of(context);
+        final wide =
+            widget.asPage && constraints.maxWidth >= AppBreakpoints.mobileMenu;
         final inbox = _inbox(wide);
         if (!wide) return inbox;
         return Row(
           children: [
-            SizedBox(width: 410, child: inbox),
-            const VerticalDivider(width: 1),
+            SizedBox(
+              width: (constraints.maxWidth * 0.35).clamp(320.0, 420.0),
+              child: inbox,
+            ),
+            VerticalDivider(width: 1, color: theme.borderSubtle),
             Expanded(
               child: _selectedId == null
-                  ? _notice('Selecciona una conversación',
-                      'Elige un chat para leer o responder.')
+                  ? _notice(
+                      'Centro de Mensajes B2B',
+                      'Elige un chat de pedidos o consultas para leer o responder.',
+                    )
                   : _conversation(_selectedId!, _kind, embedded: true),
             ),
           ],

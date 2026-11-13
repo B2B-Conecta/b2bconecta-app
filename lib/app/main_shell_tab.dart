@@ -79,6 +79,7 @@ class MainShellTabController {
   static bool _pendingOpenOrderChat = false;
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
+  static void Function(int index)? _aliadoProfileSubTab;
   static String? _pendingCommissionSettlementId;
   static VoidCallback? _adminCommissionSettlementDeepLink;
   static VoidCallback? _importerCommissionSettlementDeepLink;
@@ -87,6 +88,8 @@ class MainShellTabController {
   static VoidCallback? _adminKycNotificationDeepLink;
   static String? _pendingAccountProfileId;
   static VoidCallback? _adminAccountNotificationDeepLink;
+  /// Filtro de alerta emprendedor (`pending_first_purchase_alert`, etc.).
+  static String? _pendingEntrepreneurAlertFilter;
   static AdminUsersHubSection? _pendingAdminUsersSection;
   static VoidCallback? _adminUsersHubDeepLink;
   static AdminReportsHubSection? _pendingAdminReportsSection;
@@ -145,6 +148,7 @@ class MainShellTabController {
     _pendingOpenOrderChat = false;
     _notificationsReload = null;
     _kycDocumentationSectionKey = null;
+    _aliadoProfileSubTab = null;
     _pendingCommissionSettlementId = null;
     _adminCommissionSettlementDeepLink = null;
     _importerCommissionSettlementDeepLink = null;
@@ -153,6 +157,7 @@ class MainShellTabController {
     _adminKycNotificationDeepLink = null;
     _pendingAccountProfileId = null;
     _adminAccountNotificationDeepLink = null;
+    _pendingEntrepreneurAlertFilter = null;
     _pendingAdminUsersSection = null;
     _adminUsersHubDeepLink = null;
     _pendingAdminReportsSection = null;
@@ -393,9 +398,29 @@ class MainShellTabController {
     _kycDocumentationSectionKey = key;
   }
 
-  /// Pestaña Perfil: scroll a documentación KYC del aliado/importador.
-  static void navigateToProfileKycDocumentation() {
+  /// Índices de sub-pestañas Perfil (aliado).
+  static const aliadoProfileDatosTab = 0;
+  static const aliadoProfileKycTab = 1;
+  static const aliadoProfileAlertasTab = 2;
+  static const aliadoProfileSeguridadTab = 3;
+
+  /// [_ProfileTab] registra el [TabController].
+  static void registerAliadoProfileSubTab(void Function(int index)? go) {
+    _aliadoProfileSubTab = go;
+  }
+
+  /// Abre Perfil en la sub-pestaña indicada.
+  static void navigateToAliadoProfileSubTab(int index) {
     _goTo?.call(_resolvedB2BProfileTabIndex);
+    _aliadoProfileSubTab?.call(index);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _aliadoProfileSubTab?.call(index);
+    });
+  }
+
+  /// Pestaña Perfil → Verificación KYC + scroll a documentación.
+  static void navigateToProfileKycDocumentation() {
+    navigateToAliadoProfileSubTab(aliadoProfileKycTab);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         final ctx = _kycDocumentationSectionKey?.currentContext;
@@ -623,6 +648,17 @@ class MainShellTabController {
   static String? consumePendingAccountProfileId() {
     final v = _pendingAccountProfileId;
     _pendingAccountProfileId = null;
+    return v;
+  }
+
+  static void setPendingEntrepreneurAlertFilter(String? status) {
+    final s = status?.trim();
+    _pendingEntrepreneurAlertFilter = (s == null || s.isEmpty) ? null : s;
+  }
+
+  static String? consumePendingEntrepreneurAlertFilter() {
+    final v = _pendingEntrepreneurAlertFilter;
+    _pendingEntrepreneurAlertFilter = null;
     return v;
   }
 

@@ -35,6 +35,21 @@ class NotificationProvider extends ChangeNotifier {
         return !n.isRead && const {'mensaje', 'mensaje_directo'}.contains(n.type.trim());
       }).length;
 
+  /// No leídos de reclamos de soporte (`type = soporte`).
+  int get unreadSupportCount => _items.where((n) {
+        return !n.isRead && n.type.trim() == 'soporte';
+      }).length;
+
+  /// No leídos de KYC / cuentas en revisión.
+  int get unreadKycCount => _items.where((n) {
+        if (n.isRead) return false;
+        final t = n.type.trim();
+        return t == 'kyc' ||
+            t == 'kyc_pendiente' ||
+            t == 'cuenta_revision' ||
+            t.contains('kyc');
+      }).length;
+
   int unreadMensajeCountFor(Iterable<String> relatedIds) {
     return unreadMensajeCount(items: _items, relatedIds: relatedIds);
   }

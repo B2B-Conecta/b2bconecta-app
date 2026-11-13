@@ -96,7 +96,8 @@ enum LucideGlyph {
   rotateCcw('rotate-ccw'),
   circleAlert('circle-alert'),
   megaphone('megaphone'),
-  undo2('undo-2');
+  undo2('undo-2'),
+  calendar('calendar');
 
   const LucideGlyph(this.assetName);
 

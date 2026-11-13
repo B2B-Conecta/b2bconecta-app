@@ -496,17 +496,11 @@ class _AdminUserMonitoringPanelState extends State<AdminUserMonitoringPanel> {
               pageSize: _pageSize,
               alwaysShow: filtered.isNotEmpty,
               entityLabel: 'cuentas',
-              onPageIndex: (index) {
-                setState(() => _pageIndex = index);
-                if (_listScroll.hasClients) _listScroll.jumpTo(0);
-              },
-              onPageSize: (size) {
-                setState(() {
-                  _pageSize = size;
-                  _pageIndex = 0;
-                });
-                if (_listScroll.hasClients) _listScroll.jumpTo(0);
-              },
+              onPageIndex: (index) => setState(() => _pageIndex = index),
+              onPageSize: (size) => setState(() {
+                _pageSize = size;
+                _pageIndex = 0;
+              }),
             ),
     );
   }

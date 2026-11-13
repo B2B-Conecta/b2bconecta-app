@@ -1009,17 +1009,11 @@ class _AdminKycReviewPanelState extends State<AdminKycReviewPanel> {
             total: filtered.length,
             pageIndex: _pageIndex,
             pageSize: _pageSize,
-            onPageIndex: (index) {
-              setState(() => _pageIndex = index);
-              if (_listScroll.hasClients) _listScroll.jumpTo(0);
-            },
-            onPageSize: (size) {
-              setState(() {
-                _pageSize = size;
-                _pageIndex = 0;
-              });
-              if (_listScroll.hasClients) _listScroll.jumpTo(0);
-            },
+            onPageIndex: (index) => setState(() => _pageIndex = index),
+            onPageSize: (size) => setState(() {
+              _pageSize = size;
+              _pageIndex = 0;
+            }),
           ),
         ),
         Expanded(

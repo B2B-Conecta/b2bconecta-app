@@ -10,6 +10,9 @@ import 'package:motolink_pro_app/features/commissions/commissions_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 
 /// Estado reactivo de badges del sidebar admin (ChangeNotifier del proyecto).
+///
+/// El badge de Pedidos cuenta **pedidos/carritos** activos (1 por
+/// `checkout_group_id`), no líneas de `transaction_requests`.
 class AdminShellBadges extends ChangeNotifier {
   AdminShellBadges({NotificationProvider? notifications})
       : _notifications = notifications {

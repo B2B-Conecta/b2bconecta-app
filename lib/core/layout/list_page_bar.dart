@@ -53,6 +53,43 @@ List<T> sliceListPage<T>({
   return items.sublist(start, end);
 }
 
+/// Ejecuta [action] sin resetear el scroll del ancestro más cercano.
+///
+/// Evita el salto a `scrollTop = 0` al paginar tablas embebidas en
+/// [ListView] / [CustomScrollView] (p. ej. tras `setState`).
+void invokeKeepingScrollOffset(
+  BuildContext context,
+  VoidCallback action,
+) {
+  final scrollable = Scrollable.maybeOf(context);
+  final position = scrollable?.position;
+  final saved = (position != null && position.hasPixels) ? position.pixels : null;
+  final primary = PrimaryScrollController.maybeOf(context);
+  final primarySaved =
+      (primary != null && primary.hasClients) ? primary.offset : null;
+
+  action();
+
+  if (saved == null && primarySaved == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted) return;
+    final nextScrollable = Scrollable.maybeOf(context);
+    final nextPos = nextScrollable?.position;
+    if (nextPos != null && nextPos.hasPixels && saved != null) {
+      nextPos.jumpTo(saved.clamp(0.0, nextPos.maxScrollExtent));
+      return;
+    }
+    final nextPrimary = PrimaryScrollController.maybeOf(context);
+    if (nextPrimary != null &&
+        nextPrimary.hasClients &&
+        primarySaved != null) {
+      nextPrimary.jumpTo(
+        primarySaved.clamp(0.0, nextPrimary.position.maxScrollExtent),
+      );
+    }
+  });
+}
+
 /// Paginador estándar B2B Conecta (pie de listado):
 /// `Mostrando 1–10 de N` a la izquierda · `< 1 / 3 >` a la derecha.
 class ListPageBar extends StatelessWidget {
@@ -70,6 +107,8 @@ class ListPageBar extends StatelessWidget {
     this.entityLabel,
     this.topPadding = 12,
     this.bottomPadding = 10,
+    this.busy = false,
+    this.keepScrollOffset = true,
   });
 
   final int total;
@@ -96,6 +135,30 @@ class ListPageBar extends StatelessWidget {
 
   final double topPadding;
   final double bottomPadding;
+
+  /// Indicador inline sutil mientras se carga otra página (fetch remoto).
+  final bool busy;
+
+  /// Si es true (default), el cambio de página no resetea el scroll del viewport.
+  final bool keepScrollOffset;
+
+  void _goToPage(BuildContext context, int next) {
+    if (!keepScrollOffset) {
+      onPageIndex(next);
+      return;
+    }
+    invokeKeepingScrollOffset(context, () => onPageIndex(next));
+  }
+
+  void _changePageSize(BuildContext context, int size) {
+    final cb = onPageSize;
+    if (cb == null) return;
+    if (!keepScrollOffset) {
+      cb(size);
+      return;
+    }
+    invokeKeepingScrollOffset(context, () => cb(size));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,12 +194,24 @@ class ListPageBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (busy)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  minHeight: 2,
+                  backgroundColor: theme.surfaceSubtle,
+                  color: theme.brand,
+                ),
+              ),
+            ),
           if (showPageSizeControls &&
               onPageSize != null &&
               options.length > 1) ...[
             Align(
               alignment: Alignment.centerLeft,
-              child: _sizeChoices(theme, size, options),
+              child: _sizeChoices(context, theme, size, options),
             ),
             const SizedBox(height: 8),
           ],
@@ -155,12 +230,15 @@ class ListPageBar extends StatelessWidget {
               IconButton(
                 tooltip: 'Anterior',
                 visualDensity: VisualDensity.compact,
-                onPressed:
-                    index > 0 ? () => onPageIndex(index - 1) : null,
+                onPressed: index > 0 && !busy
+                    ? () => _goToPage(context, index - 1)
+                    : null,
                 icon: LucideIcon(
                   LucideGlyph.chevronLeft,
                   size: 16,
-                  color: index > 0 ? theme.textPrimary : theme.textMuted,
+                  color: index > 0 && !busy
+                      ? theme.textPrimary
+                      : theme.textMuted,
                 ),
               ),
               Text(
@@ -174,13 +252,13 @@ class ListPageBar extends StatelessWidget {
               IconButton(
                 tooltip: 'Siguiente',
                 visualDensity: VisualDensity.compact,
-                onPressed: (index < lastPage || hasMore)
-                    ? () => onPageIndex(index + 1)
+                onPressed: !busy && (index < lastPage || hasMore)
+                    ? () => _goToPage(context, index + 1)
                     : null,
                 icon: LucideIcon(
                   LucideGlyph.chevronRight,
                   size: 16,
-                  color: (index < lastPage || hasMore)
+                  color: !busy && (index < lastPage || hasMore)
                       ? theme.textPrimary
                       : theme.textMuted,
                 ),
@@ -193,6 +271,7 @@ class ListPageBar extends StatelessWidget {
   }
 
   Widget _sizeChoices(
+    BuildContext context,
     B2BThemeExtension theme,
     int size,
     List<int> options,
@@ -213,7 +292,7 @@ class ListPageBar extends StatelessWidget {
           _SizeChip(
             label: '$option',
             selected: option == size,
-            onTap: () => onPageSize?.call(option),
+            onTap: busy ? null : () => _changePageSize(context, option),
           ),
           if (option != options.last) const SizedBox(width: 6),
         ],
@@ -231,7 +310,7 @@ class _SizeChip extends StatelessWidget {
 
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -318,6 +397,7 @@ class PagedItems<T> extends StatefulWidget {
 class _PagedItemsState<T> extends State<PagedItems<T>> {
   int _pageIndex = 0;
   late int _pageSize;
+  bool _pagingBusy = false;
 
   @override
   void initState() {
@@ -344,13 +424,21 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       pageSize: _pageSize,
     );
     final needed = (next + 1) * _pageSize;
-    while (widget.onNeedMore != null &&
+    final needsFetch = widget.onNeedMore != null &&
         widget.hasMore &&
-        widget.items.length < needed) {
-      final before = widget.items.length;
-      await widget.onNeedMore!();
-      if (!mounted) return;
-      if (widget.items.length <= before) break;
+        widget.items.length < needed;
+    if (needsFetch && mounted) setState(() => _pagingBusy = true);
+    try {
+      while (widget.onNeedMore != null &&
+          widget.hasMore &&
+          widget.items.length < needed) {
+        final before = widget.items.length;
+        await widget.onNeedMore!();
+        if (!mounted) return;
+        if (widget.items.length <= before) break;
+      }
+    } finally {
+      if (mounted && _pagingBusy) setState(() => _pagingBusy = false);
     }
     if (!mounted) return;
     setState(() {
@@ -389,6 +477,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       alwaysShow: widget.alwaysShow,
       entityLabel: widget.entityLabel,
       bottomPadding: widget.pageBarBottomPadding,
+      busy: _pagingBusy,
     );
     Widget buildItem(int i) {
       final item = page[i];

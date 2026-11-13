@@ -786,17 +786,11 @@ class _AdminAccountManagementPanelState
             pageSize: _pageSize,
             alwaysShow: true,
             entityLabel: 'registros',
-            onPageIndex: (index) {
-              setState(() => _pageIndex = index);
-              if (_listScroll.hasClients) _listScroll.jumpTo(0);
-            },
-            onPageSize: (size) {
-              setState(() {
-                _pageSize = size;
-                _pageIndex = 0;
-              });
-              if (_listScroll.hasClients) _listScroll.jumpTo(0);
-            },
+            onPageIndex: (index) => setState(() => _pageIndex = index),
+            onPageSize: (size) => setState(() {
+              _pageSize = size;
+              _pageIndex = 0;
+            }),
           ),
         ],
       );
